@@ -1,30 +1,24 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
 import {
-  Cpu,
-  MemoryStick,
-  HardDrive,
-  Thermometer,
+  Activity,
   ArrowDown,
   ArrowUp,
-  Activity,
   Clock,
-} from "lucide-react"
+  Cpu,
+  HardDrive,
+  MemoryStick,
+  Thermometer,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 
-function AnimatedProgress({
-  value,
-  color,
-}: {
-  value: number
-  color: string
-}) {
-  const [width, setWidth] = useState(0)
+function AnimatedProgress({ value, color }: { value: number; color: string }) {
+  const [width, setWidth] = useState(0);
 
   useEffect(() => {
-    const timer = setTimeout(() => setWidth(value), 100)
-    return () => clearTimeout(timer)
-  }, [value])
+    const timer = setTimeout(() => setWidth(value), 100);
+    return () => clearTimeout(timer);
+  }, [value]);
 
   return (
     <div className="w-full h-1.5 rounded-full bg-secondary/60 overflow-hidden">
@@ -33,30 +27,30 @@ function AnimatedProgress({
         style={{ width: `${width}%` }}
       />
     </div>
-  )
+  );
 }
 
 export function SystemWidgets() {
-  const [uptime, setUptime] = useState({ days: 14, hours: 7, minutes: 23 })
+  const [uptime, setUptime] = useState({ days: 14, hours: 7, minutes: 23 });
 
   useEffect(() => {
     const timer = setInterval(() => {
       setUptime((prev) => {
-        let { days, hours, minutes } = prev
-        minutes += 1
+        let { days, hours, minutes } = prev;
+        minutes += 1;
         if (minutes >= 60) {
-          minutes = 0
-          hours += 1
+          minutes = 0;
+          hours += 1;
         }
         if (hours >= 24) {
-          hours = 0
-          days += 1
+          hours = 0;
+          days += 1;
         }
-        return { days, hours, minutes }
-      })
-    }, 60000)
-    return () => clearInterval(timer)
-  }, [])
+        return { days, hours, minutes };
+      });
+    }, 60000);
+    return () => clearInterval(timer);
+  }, []);
 
   return (
     <aside className="hidden xl:flex flex-col gap-3 w-72 pr-6 pt-4 pb-6 flex-shrink-0">
@@ -172,12 +166,12 @@ export function SystemWidgets() {
         <div className="grid grid-cols-2 gap-3">
           <StatBox label="Containers" value="17" sub="running" />
           <StatBox label="Services" value="20" sub="total" />
-          <StatBox label="DNS Blocked" value="34%" sub="today" />
-          <StatBox label="Updates" value="2" sub="available" />
+          {/* <StatBox label="DNS Blocked" value="34%" sub="today" />
+          <StatBox label="Updates" value="2" sub="available" /> */}
         </div>
       </div>
     </aside>
-  )
+  );
 }
 
 function ResourceItem({
@@ -187,11 +181,11 @@ function ResourceItem({
   progress,
   color,
 }: {
-  icon: React.ComponentType<{ className?: string }>
-  label: string
-  value: string
-  progress: number
-  color: string
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+  progress: number;
+  color: string;
 }) {
   return (
     <div className="flex flex-col gap-1.5">
@@ -206,7 +200,7 @@ function ResourceItem({
       </div>
       <AnimatedProgress value={progress} color={color} />
     </div>
-  )
+  );
 }
 
 function StatBox({
@@ -214,19 +208,19 @@ function StatBox({
   value,
   sub,
 }: {
-  label: string
-  value: string
-  sub: string
+  label: string;
+  value: string;
+  sub: string;
 }) {
   return (
     <div className="flex flex-col items-center gap-0.5 py-2 rounded-xl bg-glass-highlight">
       <span className="text-lg font-bold text-foreground font-mono">
         {value}
       </span>
-      <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+      <span className="text-xs text-muted-foreground uppercase tracking-wider">
         {label}
       </span>
-      <span className="text-[9px] text-muted-foreground/70">{sub}</span>
+      <span className="text-xs text-muted-foreground/70">{sub}</span>
     </div>
-  )
+  );
 }

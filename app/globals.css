@@ -1,14 +1,57 @@
-@import 'tailwindcss';
-@import 'tw-animate-css';
+@import "tailwindcss";
+@import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
 :root {
+  --background: oklch(0.96 0.006 250);
+  --foreground: oklch(0.2 0.02 250);
+  --card: oklch(0.99 0.004 250 / 0.8);
+  --card-foreground: oklch(0.2 0.02 250);
+  --popover: oklch(0.99 0.004 250 / 0.96);
+  --popover-foreground: oklch(0.2 0.02 250);
+  --primary: oklch(0.72 0.14 190);
+  --primary-foreground: oklch(0.14 0.015 250);
+  --secondary: oklch(0.9 0.01 250 / 0.7);
+  --secondary-foreground: oklch(0.28 0.02 250);
+  --muted: oklch(0.9 0.008 250 / 0.75);
+  --muted-foreground: oklch(0.45 0.02 250);
+  --accent: oklch(0.72 0.14 190);
+  --accent-foreground: oklch(0.14 0.015 250);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.98 0.01 27.325);
+  --border: oklch(0.76 0.01 250 / 0.55);
+  --input: oklch(0.9 0.01 250 / 0.75);
+  --ring: oklch(0.72 0.14 190);
+  --chart-1: oklch(0.72 0.14 190);
+  --chart-2: oklch(0.65 0.15 160);
+  --chart-3: oklch(0.55 0.12 230);
+  --chart-4: oklch(0.78 0.12 85);
+  --chart-5: oklch(0.6 0.2 340);
+  --radius: 0.875rem;
+  --sidebar: oklch(0.98 0.004 250 / 0.8);
+  --sidebar-foreground: oklch(0.2 0.02 250);
+  --sidebar-primary: oklch(0.72 0.14 190);
+  --sidebar-primary-foreground: oklch(0.14 0.015 250);
+  --sidebar-accent: oklch(0.9 0.01 250 / 0.7);
+  --sidebar-accent-foreground: oklch(0.28 0.02 250);
+  --sidebar-border: oklch(0.76 0.01 250 / 0.55);
+  --sidebar-ring: oklch(0.72 0.14 190);
+  --glass: oklch(0.98 0.004 250 / 0.9);
+  --glass-border: oklch(0.72 0.012 250 / 0.45);
+  --glass-highlight: oklch(0.2 0.01 250 / 0.05);
+  --dock: oklch(0.96 0.006 250 / 0.78);
+  --status-green: oklch(0.72 0.18 155);
+  --status-amber: oklch(0.78 0.15 80);
+  --status-red: oklch(0.65 0.22 25);
+}
+
+.dark {
   --background: oklch(0.13 0.015 250);
   --foreground: oklch(0.97 0.005 250);
-  --card: oklch(0.18 0.012 250 / 0.55);
+  --card: oklch(0.18 0.012 250 / 0.8);
   --card-foreground: oklch(0.97 0.005 250);
-  --popover: oklch(0.18 0.015 250 / 0.8);
+  --popover: oklch(0.18 0.015 250 / 0.9);
   --popover-foreground: oklch(0.97 0.005 250);
   --primary: oklch(0.72 0.14 190);
   --primary-foreground: oklch(0.13 0.015 250);
@@ -28,7 +71,6 @@
   --chart-3: oklch(0.55 0.12 230);
   --chart-4: oklch(0.78 0.12 85);
   --chart-5: oklch(0.6 0.2 340);
-  --radius: 0.875rem;
   --sidebar: oklch(0.16 0.015 250 / 0.8);
   --sidebar-foreground: oklch(0.97 0.005 250);
   --sidebar-primary: oklch(0.72 0.14 190);
@@ -37,7 +79,7 @@
   --sidebar-accent-foreground: oklch(0.97 0.005 250);
   --sidebar-border: oklch(0.35 0.02 250 / 0.3);
   --sidebar-ring: oklch(0.72 0.14 190);
-  --glass: oklch(0.16 0.012 250 / 0.45);
+  --glass: oklch(16.034% 0.01173 242.501 / 0.9);
   --glass-border: oklch(0.4 0.02 250 / 0.2);
   --glass-highlight: oklch(0.97 0.005 250 / 0.06);
   --dock: oklch(0.14 0.015 250 / 0.65);
@@ -45,10 +87,9 @@
   --status-amber: oklch(0.78 0.15 80);
   --status-red: oklch(0.65 0.22 25);
 }
-
 @theme inline {
-  --font-sans: 'Inter', 'Geist', 'Geist Fallback';
-  --font-mono: 'Geist Mono', 'Geist Mono Fallback';
+  --font-sans: "Inter", "Geist", "Geist Fallback";
+  --font-mono: "Geist Mono", "Geist Mono Fallback";
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -101,4 +142,20 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+*::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+* {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+
+:root[data-desktop-animations="off"] * {
+  transition: none !important;
+  animation: none !important;
 }

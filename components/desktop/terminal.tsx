@@ -415,17 +415,17 @@ Type 'help' for available commands.
   }
 
   return (
-    <div className="flex flex-col h-full bg-[#0c0e14] select-text">
+    <div className="flex h-full flex-col bg-card/90 select-text">
       {/* Tab bar */}
-      <div className="flex items-center gap-0 bg-[#0f1119] border-b border-[#1e2233] shrink-0">
+      <div className="flex shrink-0 items-center gap-0 border-b border-glass-border bg-popover/70">
         {Array.from({ length: tabCount }).map((_, i) => (
           <button
             key={i}
             onClick={() => setActiveTab(i)}
-            className={`flex items-center gap-2 px-4 py-2 text-xs border-r border-[#1e2233] transition-colors cursor-pointer ${
+            className={`flex cursor-pointer items-center gap-2 border-r border-glass-border px-4 py-2 text-xs transition-colors ${
               activeTab === i
-                ? "bg-[#0c0e14] text-foreground"
-                : "text-muted-foreground hover:text-foreground hover:bg-[#13151f]"
+                ? "bg-card/75 text-foreground"
+                : "text-muted-foreground hover:bg-secondary/40 hover:text-foreground"
             }`}
           >
             <ChevronRight className="size-3" />
@@ -444,7 +444,7 @@ Type 'help' for available commands.
       {/* Terminal output area */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto p-4 font-mono text-[13px] leading-5 cursor-text"
+        className="flex-1 overflow-y-auto p-4 font-mono text-sm leading-5 cursor-text"
         onClick={focusInput}
       >
         {lines.map((line, i) => (
@@ -480,7 +480,7 @@ Type 'help' for available commands.
             value={currentInput}
             onChange={(e) => setCurrentInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            className="flex-1 bg-transparent text-foreground outline-none font-mono text-[13px] caret-primary"
+            className="flex-1 bg-transparent text-foreground outline-none font-mono text-sm caret-primary"
             autoFocus
             spellCheck={false}
             autoComplete="off"
@@ -490,7 +490,7 @@ Type 'help' for available commands.
       </div>
 
       {/* Bottom info bar */}
-      <div className="flex items-center justify-between px-4 py-1.5 bg-[#0f1119] border-t border-[#1e2233] text-[10px] font-mono text-muted-foreground shrink-0">
+      <div className="flex shrink-0 items-center justify-between border-t border-glass-border bg-popover/70 px-4 py-1.5 font-mono text-xs text-muted-foreground">
         <span>bash 5.2.15</span>
         <span>{cwd.replace("~", "/home/admin")}</span>
         <span>{commandHistory.length} commands</span>
