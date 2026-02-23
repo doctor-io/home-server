@@ -59,6 +59,18 @@ describe("GET /api/v1/weather", () => {
   });
 
   it("returns weather for navigator coordinates", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          address: {
+            city: "Tunis",
+            country: "Tunisia",
+          },
+        }),
+      }),
+    );
     vi.mocked(fetchWeatherApi).mockResolvedValueOnce([
       createOpenMeteoResponse({
         temperatureC: 21.4,
@@ -84,7 +96,7 @@ describe("GET /api/v1/weather", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("Cache-Control")).toBe("no-store");
     expect(json.data.source).toBe("navigator");
-    expect(json.data.location.label).toBe("Current location");
+    expect(json.data.location.label).toBe("Tunis");
     expect(json.data.current.condition).toBe("Partly cloudy");
     expect(json.data.dailyForecast).toHaveLength(5);
     expect(json.data.dailyForecast[0]?.condition).toBe("Mainly clear");

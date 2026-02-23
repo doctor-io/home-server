@@ -9,6 +9,11 @@ type TermLine = {
   prompt?: string
 }
 
+type TerminalCommandRequest = {
+  id: number
+  command: string
+} | null
+
 const HOSTNAME = "serverlab"
 const USER = "admin"
 
@@ -220,6 +225,34 @@ jellyfin/jellyfin        latest    578MB`,
           newCwd,
         }
       }
+      if (args[0] === "logs") {
+        const container =
+          args.find((arg, index) => index > 0 && !arg.startsWith("-")) || "container"
+        return {
+          output: [{
+            type: "output",
+            content: `==> ${container} <==
+[INFO] Service boot sequence started
+[INFO] Connected to database
+[INFO] Scheduled tasks initialized
+[WARN] No optional plugin configured
+[INFO] HTTP server listening`,
+          }],
+          newCwd,
+        }
+      }
+      if (args[0] === "exec") {
+        const container =
+          args.find((arg, index) => index > 0 && !arg.startsWith("-") && !arg.includes("/")) ||
+          "container"
+        return {
+          output: [{
+            type: "info",
+            content: `Connected to ${container} shell (simulated).`,
+          }],
+          newCwd,
+        }
+      }
       return {
         output: [{ type: "error", content: `docker: '${args[0] || ""}' is not a docker command.` }],
         newCwd,
@@ -325,7 +358,11 @@ jellyfin/jellyfin        latest    578MB`,
   }
 }
 
-export function Terminal() {
+export function Terminal({
+  commandRequest = null,
+}: {
+  commandRequest?: TerminalCommandRequest
+}) {
   const [lines, setLines] = useState<TermLine[]>([
     {
       type: "welcome",
@@ -345,6 +382,7 @@ Type 'help' for available commands.
   const scrollRef = useRef<HTMLDivElement>(null)
   const [tabCount, setTabCount] = useState(1)
   const [activeTab, setActiveTab] = useState(0)
+  const lastCommandRequestIdRef = useRef<number | null>(null)
 
   // Auto-scroll and focus
   useEffect(() => {
@@ -355,11 +393,10 @@ Type 'help' for available commands.
     inputRef.current?.focus()
   }, [])
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    const input = currentInput.trim()
+  const executeCommand = useCallback((inputValue: string) => {
+    const input = inputValue.trim()
+    if (!input) return
 
-    // Add input line
     const inputLine: TermLine = {
       type: "input",
       content: input,
@@ -368,7 +405,6 @@ Type 'help' for available commands.
 
     if (input === "clear") {
       setLines([])
-      setCurrentInput("")
       setCommandHistory((prev) => [...prev, input])
       setHistoryIndex(-1)
       return
@@ -377,11 +413,14 @@ Type 'help' for available commands.
     const { output, newCwd } = simulateCommand(input, cwd)
     setCwd(newCwd)
     setLines((prev) => [...prev, inputLine, ...output])
-    setCurrentInput("")
-    if (input) {
-      setCommandHistory((prev) => [...prev, input])
-    }
+    setCommandHistory((prev) => [...prev, input])
     setHistoryIndex(-1)
+  }, [cwd])
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    executeCommand(currentInput)
+    setCurrentInput("")
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -413,6 +452,15 @@ Type 'help' for available commands.
       setLines([])
     }
   }
+
+  useEffect(() => {
+    if (!commandRequest) return
+    if (lastCommandRequestIdRef.current === commandRequest.id) return
+
+    lastCommandRequestIdRef.current = commandRequest.id
+    executeCommand(commandRequest.command)
+    setCurrentInput("")
+  }, [commandRequest, executeCommand])
 
   return (
     <div className="flex h-full flex-col bg-card/90 select-text">

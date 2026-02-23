@@ -51,7 +51,7 @@ function toDesignToMaxCapacityPercent(
   if (designedCapacityWh === null || maxCapacityWh === null) return null;
   if (maxCapacityWh <= 0) return null;
 
-  return Number(((designedCapacityWh / maxCapacityWh) * 100).toFixed(1));
+  return Number(((maxCapacityWh / designedCapacityWh) * 100).toFixed(1));
 }
 
 async function withFallback<T>(

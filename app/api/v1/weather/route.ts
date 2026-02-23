@@ -37,6 +37,19 @@ type IpApiComResponse = {
   lon?: number;
 };
 
+type ReverseGeocodeResponse = {
+  name?: string;
+  address?: {
+    city?: string;
+    town?: string;
+    village?: string;
+    municipality?: string;
+    county?: string;
+    state?: string;
+    country?: string;
+  };
+};
+
 export const runtime = "nodejs";
 const IP_LOCATION_CACHE_TTL_MS = 10 * 60 * 1000;
 const ipLocationCache = new Map<
@@ -167,12 +180,15 @@ function createFallbackSnapshot(
 }
 
 async function fetchJson<T>(url: string) {
-  const response = await fetch(url, {
-    cache: "no-store",
-    headers: {
-      Accept: "application/json",
+  const response = await fetch(
+    url,
+    {
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+      },
     },
-  });
+  );
 
   if (!response.ok) {
     throw new Error(`Request failed (${response.status}) for ${url}`);
@@ -181,11 +197,47 @@ async function fetchJson<T>(url: string) {
   return (await response.json()) as T;
 }
 
-function resolveLocationByNavigatorCoords(latitude: number, longitude: number) {
+async function resolveNavigatorLabel(latitude: number, longitude: number) {
+  try {
+    const lat = encodeURIComponent(latitude.toString());
+    const lon = encodeURIComponent(longitude.toString());
+    const reverse = await fetchJson<ReverseGeocodeResponse>(
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=10&addressdetails=1`,
+    );
+    const cityLike =
+      reverse.address?.city ??
+      reverse.address?.town ??
+      reverse.address?.village ??
+      reverse.address?.municipality ??
+      reverse.address?.county ??
+      reverse.address?.state ??
+      null;
+
+    if (cityLike) {
+      return cityLike;
+    }
+
+    return reverse.name ?? null;
+  } catch (error) {
+    logServerAction({
+      level: "warn",
+      layer: "api",
+      action: "weather.location.navigator.reverseGeocode",
+      status: "error",
+      error,
+      message:
+        "Reverse geocoding failed for navigator coordinates; using fallback label",
+    });
+    return null;
+  }
+}
+
+async function resolveLocationByNavigatorCoords(latitude: number, longitude: number) {
+  const label = (await resolveNavigatorLabel(latitude, longitude)) ?? "Current location";
   return {
     latitude,
     longitude,
-    label: "Current location",
+    label,
   };
 }
 

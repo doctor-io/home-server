@@ -6,6 +6,17 @@ describe("query keys", () => {
     expect(queryKeys.systemMetrics).toEqual(["system", "metrics"]);
     expect(queryKeys.installedApps).toEqual(["apps", "installed"]);
     expect(queryKeys.currentUser).toEqual(["auth", "current-user"]);
+    expect(queryKeys.storeCatalog).toEqual(["store", "catalog"]);
+    expect(queryKeys.storeApp("adguard-home")).toEqual([
+      "store",
+      "app",
+      "adguard-home",
+    ]);
+    expect(queryKeys.storeOperation("op-1")).toEqual([
+      "store",
+      "operation",
+      "op-1",
+    ]);
     expect(queryKeys.currentWeather(1, 2)).toEqual(["weather", "current", 1, 2]);
   });
 });

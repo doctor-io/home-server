@@ -57,6 +57,11 @@ export function DesktopShell() {
   const [isSettingsSearchOpen, setIsSettingsSearchOpen] = useState(false);
   const [settingsSearchQuery, setSettingsSearchQuery] = useState("");
   const [settingsSectionRequest, setSettingsSectionRequest] = useState<string | null>(null);
+  const [terminalCommandRequest, setTerminalCommandRequest] = useState<{
+    id: number;
+    command: string;
+  } | null>(null);
+  const terminalCommandIdRef = useRef(0);
   const [displayWallpaper, setDisplayWallpaper] = useState(
     "/images/1.jpg",
   );
@@ -253,6 +258,18 @@ export function DesktopShell() {
     return focusedWindow === id ? 110 : 100;
   }
 
+  const requestTerminalCommand = useCallback(
+    (command: string) => {
+      terminalCommandIdRef.current += 1;
+      setTerminalCommandRequest({
+        id: terminalCommandIdRef.current,
+        command,
+      });
+      openWindow("terminal");
+    },
+    [openWindow],
+  );
+
   function openSettingsSection(sectionId: string) {
     setSettingsSectionRequest(sectionId);
     setIsSettingsSearchOpen(false);
@@ -432,6 +449,13 @@ export function DesktopShell() {
           <AppGrid
             iconSize={appIconSize}
             animationsEnabled={appearance.animationsEnabled}
+            onViewLogs={({ containerName }) =>
+              requestTerminalCommand(`docker logs -f ${containerName}`)
+            }
+            onOpenTerminal={({ containerName }) =>
+              requestTerminalCommand(`docker exec -it ${containerName} /bin/sh`)
+            }
+            onOpenSettings={() => openSettingsSection("docker")}
           />
 
           {/* System Widgets (right sidebar) */}
@@ -521,7 +545,7 @@ export function DesktopShell() {
             isClosing={closingWindows.includes("terminal")}
             animationsEnabled={appearance.animationsEnabled}
           >
-            <Terminal />
+            <Terminal commandRequest={terminalCommandRequest} />
           </Window>
         )}
 

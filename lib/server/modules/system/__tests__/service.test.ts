@@ -94,7 +94,7 @@ describe("system service", () => {
     expect(snapshot.battery.percent).toBe(78);
     expect(snapshot.battery.manufacturer).toBe("SONY");
     expect(snapshot.battery.cycleCount).toBe(248);
-    expect(snapshot.battery.designToMaxCapacityPercent).toBe(111.1);
+    expect(snapshot.battery.designToMaxCapacityPercent).toBe(90);
     expect(snapshot.wifi.connected).toBe(true);
     expect(snapshot.wifi.ssid).toBe("HomeNet");
     expect(snapshot.wifi.downloadMbps).toBe(24.8);

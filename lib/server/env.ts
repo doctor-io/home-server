@@ -39,6 +39,15 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((value) => value !== "false"),
+  STORE_TEMPLATE_URL: z
+    .string()
+    .url()
+    .default(
+      "https://raw.githubusercontent.com/bigbeartechworld/big-bear-portainer/main/templates.json",
+    ),
+  STORE_CATALOG_TTL_MS: z.coerce.number().int().min(5_000).default(5 * 60_000),
+  STORE_STACKS_ROOT: z.string().default("/DATA/Apps"),
+  DOCKER_SOCKET_PATH: z.string().default("/var/run/docker.sock"),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

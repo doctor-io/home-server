@@ -1,5 +1,13 @@
 import { describe, expectTypeOf, it } from "vitest";
-import type { InstalledApp } from "@/lib/shared/contracts/apps";
+import type {
+  DockerPullProgressDetail,
+  InstalledApp,
+  InstalledStackConfig,
+  StoreAppDetail,
+  StoreAppSummary,
+  StoreOperation,
+  StoreOperationEvent,
+} from "@/lib/shared/contracts/apps";
 import type { SystemMetricsSnapshot } from "@/lib/shared/contracts/system";
 import type { WeatherSnapshot } from "@/lib/shared/contracts/weather";
 
@@ -10,6 +18,53 @@ describe("shared contracts", () => {
       name: string;
       status: "running" | "stopped" | "unknown";
       updatedAt: string;
+    }>();
+
+    expectTypeOf<StoreAppSummary>().toMatchTypeOf<{
+      id: string;
+      platform: string;
+      status:
+        | "installed"
+        | "not_installed"
+        | "installing"
+        | "error"
+        | "updating"
+        | "uninstalling";
+      webUiPort: number | null;
+      updateAvailable: boolean;
+      localDigest: string | null;
+      remoteDigest: string | null;
+    }>();
+
+    expectTypeOf<StoreAppDetail>().toMatchTypeOf<{
+      env: Array<{
+        name: string;
+      }>;
+      installedConfig: InstalledStackConfig | null;
+    }>();
+
+    expectTypeOf<DockerPullProgressDetail>().toMatchTypeOf<{
+      current: number;
+      total: number;
+      percent: number | null;
+    }>();
+
+    expectTypeOf<StoreOperation>().toMatchTypeOf<{
+      id: string;
+      action: "install" | "redeploy" | "uninstall";
+      status: "queued" | "running" | "success" | "error";
+      progressPercent: number;
+    }>();
+
+    expectTypeOf<StoreOperationEvent>().toMatchTypeOf<{
+      type:
+        | "operation.started"
+        | "operation.step"
+        | "operation.pull.progress"
+        | "operation.completed"
+        | "operation.failed";
+      operationId: string;
+      step: string;
     }>();
 
     expectTypeOf<SystemMetricsSnapshot>().toMatchTypeOf<{
