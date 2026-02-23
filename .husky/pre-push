@@ -1,2 +1,9 @@
 #!/usr/bin/env sh
-node scripts/pre-push.mjs
+# Bump package version without creating a git tag or commit (force to allow dirty tree during commit)
+npm version patch --no-git-tag-version --force
+
+# Ensure bumped files are staged for the current commit
+git add package.json package-lock.json
+
+# Run lint fixes and build validation
+npx lint-staged && npm run build

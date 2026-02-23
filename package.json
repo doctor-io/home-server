@@ -9,10 +9,13 @@
     "lint": "eslint .",
     "db:init": "node ./scripts/db-bootstrap.mjs",
     "test": "vitest run",
-    "test:unit": "vitest run",
     "test:watch": "vitest",
-    "version:patch:no-tag": "npm version patch --no-git-tag-version",
     "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{js, jsx,ts,tsx}": [
+      "eslint --fix"
+    ]
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
