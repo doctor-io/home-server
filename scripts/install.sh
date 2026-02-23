@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
 APP_NAME="home-server"
 APP_USER="${HOMEIO_USER:-homeio}"
 APP_GROUP="${HOMEIO_GROUP:-${APP_USER}}"
@@ -24,15 +29,21 @@ DOCKER_INSTALL_SCRIPT_COMMIT="${DOCKER_INSTALL_SCRIPT_COMMIT:-master}"
 HOMEIO_INSTALL_YQ="${HOMEIO_INSTALL_YQ:-false}"
 HOMEIO_HOSTNAME="${HOMEIO_HOSTNAME:-}"
 HOMEIO_ALLOW_OTHER_NODE="${HOMEIO_ALLOW_OTHER_NODE:-false}"
+HOMEIO_SEED_PRINCIPAL="${HOMEIO_SEED_PRINCIPAL:-true}"
+HOMEIO_VERBOSE="${HOMEIO_VERBOSE:-false}"
 
-log() {
-	printf "[%s] %s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
-}
+GENERATED_ADMIN_PASSWORD="false"
+EFFECTIVE_ADMIN_USERNAME=""
+EFFECTIVE_ADMIN_PASSWORD=""
+EFFECTIVE_DB_USER=""
 
-die() {
-	echo "ERROR: $*" >&2
-	exit 1
-}
+print_status() { echo -e "${GREEN}[+]${NC} $1"; }
+print_error() { echo -e "${RED}[!]${NC} $1" >&2; }
+print_info() { echo -e "${BLUE}[i]${NC} $1"; }
+print_dry() { echo -e "${BLUE}[DRY]${NC} Would: $1"; }
+
+log() { print_info "$*"; }
+die() { print_error "$*"; exit 1; }
 
 command_exists() {
 	command -v "$1" >/dev/null 2>&1
@@ -54,6 +65,8 @@ validate_identifiers() {
 
 	[[ "${db_user}" =~ ^[a-z_][a-z0-9_]{0,62}$ ]] || die "Invalid HOMEIO_DB_USER: ${db_user}"
 	[[ "${db_name}" =~ ^[a-z_][a-z0-9_]{0,62}$ ]] || die "Invalid HOMEIO_DB_NAME: ${db_name}"
+	[[ "${HOMEIO_SEED_PRINCIPAL}" == "true" || "${HOMEIO_SEED_PRINCIPAL}" == "false" ]] || die "Invalid HOMEIO_SEED_PRINCIPAL: ${HOMEIO_SEED_PRINCIPAL} (expected true|false)"
+	[[ "${HOMEIO_VERBOSE}" == "true" || "${HOMEIO_VERBOSE}" == "false" ]] || die "Invalid HOMEIO_VERBOSE: ${HOMEIO_VERBOSE} (expected true|false)"
 	if [[ "${admin_username}" != "auto" ]]; then
 		[[ "${admin_username}" =~ ^[a-zA-Z0-9._-]{3,64}$ ]] || die "Invalid HOMEIO_ADMIN_USERNAME: ${admin_username}"
 	fi
@@ -133,67 +146,129 @@ configure_hostname() {
 
 install_packages() {
 	log "Installing system dependencies..."
-	apt-get update -y
-	apt-get install -y \
-		ca-certificates \
-		curl \
-		gnupg \
-		git \
-		jq \
-		rsync \
-		python3 \
-		build-essential \
-		libudev-dev \
-		tar \
-		xz-utils \
-		unzip \
-		procps \
-		postgresql \
-		postgresql-contrib \
-		openssl
+	if [[ "${HOMEIO_VERBOSE}" == "true" ]]; then
+		apt-get update -y
+		apt-get install -y \
+			ca-certificates \
+			curl \
+			gnupg \
+			git \
+			jq \
+			rsync \
+			python3 \
+			build-essential \
+			libudev-dev \
+			tar \
+			xz-utils \
+			unzip \
+			procps \
+			postgresql \
+			postgresql-contrib \
+			openssl
+	else
+		apt-get update -qq >/dev/null
+		apt-get install -y -qq \
+			ca-certificates \
+			curl \
+			gnupg \
+			git \
+			jq \
+			rsync \
+			python3 \
+			build-essential \
+			libudev-dev \
+			tar \
+			xz-utils \
+			unzip \
+			procps \
+			postgresql \
+			postgresql-contrib \
+			openssl >/dev/null
+	fi
 }
 
 install_extras() {
 
 	log "Installing full extras..."
-	apt-get install -y \
-		network-manager \
-		nginx \
-		systemd-timesyncd \
-		openssh-server \
-		avahi-daemon \
-		avahi-discover \
-		avahi-utils \
-		libnss-mdns \
-		bluez \
-		sudo \
-		nano \
-		vim \
-		less \
-		man \
-		iproute2 \
-		iputils-ping \
-		wget \
-		usbutils \
-		whois \
-		fswatch \
-		gettext-base \
-		dmidecode \
-		unar \
-		imagemagick \
-		ffmpeg \
-		samba \
-		wsdd2 \
-		cifs-utils \
-		smbclient \
-		gdisk \
-		parted \
-		e2fsprogs \
-		exfatprogs
+	if [[ "${HOMEIO_VERBOSE}" == "true" ]]; then
+		apt-get install -y \
+			network-manager \
+			nginx \
+			systemd-timesyncd \
+			openssh-server \
+			avahi-daemon \
+			avahi-discover \
+			avahi-utils \
+			libnss-mdns \
+			bluez \
+			sudo \
+			nano \
+			vim \
+			less \
+			man \
+			iproute2 \
+			iputils-ping \
+			wget \
+			usbutils \
+			whois \
+			fswatch \
+			gettext-base \
+			dmidecode \
+			unar \
+			imagemagick \
+			ffmpeg \
+			samba \
+			wsdd2 \
+			cifs-utils \
+			smbclient \
+			gdisk \
+			parted \
+			e2fsprogs \
+			exfatprogs
+	else
+		apt-get install -y -qq \
+			network-manager \
+			nginx \
+			systemd-timesyncd \
+			openssh-server \
+			avahi-daemon \
+			avahi-discover \
+			avahi-utils \
+			libnss-mdns \
+			bluez \
+			sudo \
+			nano \
+			vim \
+			less \
+			man \
+			iproute2 \
+			iputils-ping \
+			wget \
+			usbutils \
+			whois \
+			fswatch \
+			gettext-base \
+			dmidecode \
+			unar \
+			imagemagick \
+			ffmpeg \
+			samba \
+			wsdd2 \
+			cifs-utils \
+			smbclient \
+			gdisk \
+			parted \
+			e2fsprogs \
+			exfatprogs >/dev/null
+	fi
 
 	# ntfs-3g only on amd64
 	if [[ "$(detect_arch)" == "x64" ]]; then
-		apt-get install -y ntfs-3g
+		if [[ "${HOMEIO_VERBOSE}" == "true" ]]; then
+			apt-get install -y ntfs-3g
+		else
+			apt-get install -y -qq ntfs-3g >/dev/null
+		fi
 	fi
 
 	# Let HomeIO manage these when needed
@@ -210,10 +285,14 @@ install_docker() {
 
 	log "Installing Docker ${DOCKER_VERSION}..."
 	curl -fsSL "https://raw.githubusercontent.com/docker/docker-install/${DOCKER_INSTALL_SCRIPT_COMMIT}/install.sh" -o /tmp/install-docker.sh
-	sh /tmp/install-docker.sh --version "v${DOCKER_VERSION}"
+	if [[ "${HOMEIO_VERBOSE}" == "true" ]]; then
+		sh /tmp/install-docker.sh --version "v${DOCKER_VERSION}"
+	else
+		sh /tmp/install-docker.sh --version "v${DOCKER_VERSION}" >/dev/null 2>&1
+	fi
 	rm -f /tmp/install-docker.sh
 
-	systemctl enable --now docker
+	systemctl enable --now docker >/dev/null 2>&1
 }
 
 install_node() {
@@ -245,7 +324,11 @@ install_node() {
 	[[ -n "${sha_expected}" ]] || die "Could not find checksum for ${node_tar}"
 
 	curl -fsSL "${node_url}" -o "/tmp/${node_tar}"
-	echo "${sha_expected}  /tmp/${node_tar}" | sha256sum -c -
+	if [[ "${HOMEIO_VERBOSE}" == "true" ]]; then
+		echo "${sha_expected}  /tmp/${node_tar}" | sha256sum -c -
+	else
+		echo "${sha_expected}  /tmp/${node_tar}" | sha256sum -c - >/dev/null
+	fi
 	tar -xzf "/tmp/${node_tar}" -C /usr/local --strip-components=1
 	rm -f "/tmp/${node_tar}" /tmp/SHASUMS256.txt
 }
@@ -275,7 +358,11 @@ install_yq() {
 	[[ -n "${yq_sha}" ]] || die "Could not find checksum for yq_linux_${yq_arch}"
 
 	curl -fsSL "https://github.com/mikefarah/yq/releases/download/v${YQ_VERSION}/yq_linux_${yq_arch}" -o /usr/local/bin/yq
-	echo "${yq_sha}  /usr/local/bin/yq" | sha256sum -c -
+	if [[ "${HOMEIO_VERBOSE}" == "true" ]]; then
+		echo "${yq_sha}  /usr/local/bin/yq" | sha256sum -c -
+	else
+		echo "${yq_sha}  /usr/local/bin/yq" | sha256sum -c - >/dev/null
+	fi
 	chmod +x /usr/local/bin/yq
 	rm -f /tmp/yq-checksums.txt
 }
@@ -307,8 +394,8 @@ clone_or_update_repo() {
 	log "Syncing repository (${REPO_BRANCH})..."
 
 	if [[ -d "${INSTALL_DIR}/.git" ]]; then
-		run_as_app "git -C '${INSTALL_DIR}' fetch --depth=1 origin '${REPO_BRANCH}'"
-		run_as_app "git -C '${INSTALL_DIR}' checkout --force FETCH_HEAD"
+		run_as_app "git -C '${INSTALL_DIR}' fetch --depth=1 origin '${REPO_BRANCH}' --quiet"
+		run_as_app "git -C '${INSTALL_DIR}' checkout --force FETCH_HEAD --quiet"
 		return
 	fi
 
@@ -316,7 +403,22 @@ clone_or_update_repo() {
 		die "Install directory is not empty and is not a git repo: ${INSTALL_DIR}"
 	fi
 
-	run_as_app "git clone --depth=1 --branch '${REPO_BRANCH}' '${REPO_URL}' '${INSTALL_DIR}'"
+	run_as_app "git clone --depth=1 --branch '${REPO_BRANCH}' '${REPO_URL}' '${INSTALL_DIR}' --quiet"
+}
+
+unset_env_key() {
+	local key="${1}"
+	local file="${2}"
+	local tmp_file
+	tmp_file="$(mktemp)"
+
+	awk -v key="${key}" '
+		$0 ~ ("^" key "=") { next }
+		{ print }
+	' "${file}" >"${tmp_file}"
+
+	cat "${tmp_file}" >"${file}"
+	rm -f "${tmp_file}"
 }
 
 get_env_value() {
@@ -411,15 +513,6 @@ EOF
 		generated_db_password="true"
 	fi
 
-	if [[ -z "${admin_password}" ]]; then
-		admin_password="$(get_env_value AUTH_PRIMARY_PASSWORD "${ENV_FILE}" || true)"
-	fi
-	if [[ -z "${admin_password}" ]]; then
-		admin_password="$(openssl rand -hex 12)"
-		generated_admin_password="true"
-	fi
-	[[ "${#admin_password}" -ge 8 ]] || die "Admin password must be at least 8 characters."
-
 	if [[ -z "${admin_username}" || "${admin_username}" == "auto" ]]; then
 		admin_username="$(get_env_value AUTH_PRIMARY_USERNAME "${ENV_FILE}" || true)"
 	fi
@@ -427,6 +520,19 @@ EOF
 		admin_username="homeio-$(openssl rand -hex 2)"
 	fi
 	[[ "${admin_username}" =~ ^[a-zA-Z0-9._-]{3,64}$ ]] || die "Invalid generated HOMEIO_ADMIN_USERNAME: ${admin_username}"
+
+	if [[ "${HOMEIO_SEED_PRINCIPAL}" == "true" ]]; then
+		if [[ -z "${admin_password}" ]]; then
+			admin_password="$(get_env_value AUTH_PRIMARY_PASSWORD "${ENV_FILE}" || true)"
+		fi
+		if [[ -z "${admin_password}" ]]; then
+			admin_password="$(openssl rand -hex 12)"
+			generated_admin_password="true"
+		fi
+		[[ "${#admin_password}" -ge 8 ]] || die "Admin password must be at least 8 characters."
+	else
+		admin_password=""
+	fi
 
 	local database_url="postgresql://${db_user}:${db_password}@127.0.0.1:5432/${db_name}"
 	set_env_key NODE_ENV "production" "${ENV_FILE}"
@@ -436,7 +542,6 @@ EOF
 	set_env_key DATABASE_URL "${database_url}" "${ENV_FILE}"
 	set_env_key AUTH_SESSION_SECRET "${auth_session_secret}" "${ENV_FILE}"
 	set_env_key AUTH_PRIMARY_USERNAME "${admin_username}" "${ENV_FILE}"
-	set_env_key AUTH_PRIMARY_PASSWORD "${admin_password}" "${ENV_FILE}"
 	set_env_key AUTH_ALLOW_REGISTRATION "false" "${ENV_FILE}"
 	set_env_key PG_MAX_CONNECTIONS "10" "${ENV_FILE}"
 	set_env_key METRICS_CACHE_TTL_MS "2000" "${ENV_FILE}"
@@ -446,15 +551,27 @@ EOF
 	set_env_key LOG_LEVEL "info" "${ENV_FILE}"
 	set_env_key LOG_FILE_PATH "${DATA_DIR}/logs/home-server.log" "${ENV_FILE}"
 	set_env_key LOG_TO_FILE "true" "${ENV_FILE}"
-	set_env_key NEXT_PUBLIC_PRIMARY_USERNAME "${admin_username}" "${ENV_FILE}"
 	set_env_key NEXT_PUBLIC_LOG_LEVEL "info" "${ENV_FILE}"
 	set_env_key NEXT_PUBLIC_CLIENT_LOG_INGEST "true" "${ENV_FILE}"
 	set_env_key DBUS_HELPER_SOCKET_PATH "/run/home-server/dbus-helper.sock" "${ENV_FILE}"
 	set_env_key HOMEIO_APP_PORT "${APP_PORT}" "${ENV_FILE}"
 	set_env_key HOMEIO_PUBLIC_PORT "${PUBLIC_PORT}" "${ENV_FILE}"
 
+	if [[ "${HOMEIO_SEED_PRINCIPAL}" == "true" ]]; then
+		set_env_key AUTH_PRIMARY_PASSWORD "${admin_password}" "${ENV_FILE}"
+		set_env_key NEXT_PUBLIC_PRIMARY_USERNAME "${admin_username}" "${ENV_FILE}"
+	else
+		unset_env_key AUTH_PRIMARY_PASSWORD "${ENV_FILE}"
+		set_env_key NEXT_PUBLIC_PRIMARY_USERNAME "" "${ENV_FILE}"
+	fi
+
+	EFFECTIVE_DB_USER="${db_user}"
+	EFFECTIVE_ADMIN_USERNAME="${admin_username}"
+	EFFECTIVE_ADMIN_PASSWORD="${admin_password}"
+	GENERATED_ADMIN_PASSWORD="${generated_admin_password}"
+
 	if [[ "${generated_admin_password}" == "true" ]]; then
-		log "Generated app credentials: ${admin_username} / ${admin_password}"
+		log "Generated app credentials for first login."
 	fi
 	if [[ "${generated_db_password}" == "true" ]]; then
 		log "Generated PostgreSQL password for ${db_user}."
@@ -475,7 +592,8 @@ configure_local_postgres() {
 	[[ -n "${db_pass}" ]] || die "HOMEIO_DB_PASSWORD is missing in ${ENV_FILE}"
 	[[ -n "${db_name}" ]] || die "HOMEIO_DB_NAME is missing in ${ENV_FILE}"
 
-	runuser -u postgres -- psql -v ON_ERROR_STOP=1 --set=db_user="${db_user}" --set=db_pass="${db_pass}" <<'SQL'
+	if [[ "${HOMEIO_VERBOSE}" == "true" ]]; then
+		runuser -u postgres -- psql -v ON_ERROR_STOP=1 --set=db_user="${db_user}" --set=db_pass="${db_pass}" <<'SQL'
 SELECT format('CREATE ROLE %I LOGIN PASSWORD %L', :'db_user', :'db_pass')
 WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'db_user')
 \gexec
@@ -484,6 +602,17 @@ SELECT format('ALTER ROLE %I WITH LOGIN PASSWORD %L', :'db_user', :'db_pass')
 WHERE EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'db_user')
 \gexec
 SQL
+	else
+		runuser -u postgres -- psql -v ON_ERROR_STOP=1 --set=db_user="${db_user}" --set=db_pass="${db_pass}" >/dev/null <<'SQL'
+SELECT format('CREATE ROLE %I LOGIN PASSWORD %L', :'db_user', :'db_pass')
+WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'db_user')
+\gexec
+
+SELECT format('ALTER ROLE %I WITH LOGIN PASSWORD %L', :'db_user', :'db_pass')
+WHERE EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'db_user')
+\gexec
+SQL
+	fi
 
 	if ! runuser -u postgres -- psql -tAc "SELECT 1 FROM pg_database WHERE datname='${db_name}'" | grep -q 1; then
 		runuser -u postgres -- createdb --owner="${db_user}" "${db_name}"
@@ -492,9 +621,15 @@ SQL
 
 install_homeio() {
 	log "Installing ${APP_NAME} dependencies and building..."
-	run_as_app "cd '${INSTALL_DIR}' && npm ci"
-	run_as_app "cd '${INSTALL_DIR}' && set -a && source '${ENV_FILE}' && set +a && npm run db:init"
-	run_as_app "cd '${INSTALL_DIR}' && npm run build"
+	if [[ "${HOMEIO_VERBOSE}" == "true" ]]; then
+		run_as_app "cd '${INSTALL_DIR}' && npm ci"
+		run_as_app "cd '${INSTALL_DIR}' && set -a && source '${ENV_FILE}' && set +a && npm run db:init"
+		run_as_app "cd '${INSTALL_DIR}' && npm run build"
+	else
+		run_as_app "cd '${INSTALL_DIR}' && npm ci --silent --no-audit --no-fund" >/dev/null
+		run_as_app "cd '${INSTALL_DIR}' && set -a && source '${ENV_FILE}' && set +a && npm run db:init --silent" >/dev/null
+		run_as_app "cd '${INSTALL_DIR}' && npm run build --silent" >/dev/null
+	fi
 }
 
 install_systemd_service() {
@@ -608,19 +743,28 @@ print_summary() {
 	local host
 	host="$(hostnamectl --static 2>/dev/null || hostname)"
 
-	log "${APP_NAME} installation complete."
+	print_status "${APP_NAME} installation complete."
 
-		if [[ "${PUBLIC_PORT}" == "80" ]]; then
-			log "Open: http://${host}.local"
-		else
-			log "Open: http://${host}.local:${PUBLIC_PORT}"
+	if [[ "${PUBLIC_PORT}" == "80" ]]; then
+		print_info "Open: http://${host}.local"
+	else
+		print_info "Open: http://${host}.local:${PUBLIC_PORT}"
+	fi
+
+	print_info "App runtime: 127.0.0.1:${APP_PORT}"
+	print_info "Service: systemctl status ${SERVICE_NAME}.service"
+	print_info "DBus helper: systemctl status ${DBUS_SERVICE_NAME}.service"
+	print_info "Environment: ${ENV_FILE}"
+
+	if [[ "${HOMEIO_SEED_PRINCIPAL}" == "true" ]]; then
+		print_info "Auth entry: /login (principal user seeded)"
+		print_info "Principal username: ${EFFECTIVE_ADMIN_USERNAME}"
+		if [[ "${GENERATED_ADMIN_PASSWORD}" == "true" ]]; then
+			print_info "Principal password: ${EFFECTIVE_ADMIN_PASSWORD}"
 		fi
-
-	log "App runtime: 127.0.0.1:${APP_PORT}"
-	log "Service: systemctl status ${SERVICE_NAME}.service"
-	log "DBus helper: systemctl status ${DBUS_SERVICE_NAME}.service"
-
-	log "Environment: ${ENV_FILE}"
+	else
+		print_info "Auth entry: /register (no user seeded)"
+	fi
 }
 
 main() {

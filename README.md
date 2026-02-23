@@ -21,6 +21,20 @@ It is designed as an alternative to other home server managers, focused on a mod
 curl -fsSL https://raw.githubusercontent.com/doctor-io/home-server/main/scripts/install.sh | sudo bash
 ```
 
+Installer defaults:
+- `HOMEIO_SEED_PRINCIPAL=true`: creates a principal user and routes first access to `/login`.
+- `HOMEIO_VERBOSE=false`: keeps installer output concise.
+
+Common install variants:
+
+```bash
+# First-run registration flow (no seeded user)
+curl -fsSL https://raw.githubusercontent.com/doctor-io/home-server/main/scripts/install.sh | sudo HOMEIO_SEED_PRINCIPAL=false bash
+
+# Verbose installer logs
+curl -fsSL https://raw.githubusercontent.com/doctor-io/home-server/main/scripts/install.sh | sudo HOMEIO_VERBOSE=true bash
+```
+
 ## Update
 
 ```bash
@@ -93,8 +107,8 @@ npm run dev
 http://localhost:3000
 ```
 
-On first run with no users, the app routes to `/register`.
-After at least one user exists, it routes to `/login`.
+With no users in database, the app routes to `/register`.
+With at least one user, it routes to `/login`.
 
 ## Useful Commands
 
