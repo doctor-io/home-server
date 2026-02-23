@@ -1,11 +1,11 @@
 {
   "name": "my-project",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 80",
     "lint": "eslint .",
     "db:init": "node ./scripts/db-bootstrap.mjs",
     "test": "vitest run",
@@ -53,6 +53,7 @@
     "clsx": "^2.1.1",
     "cmdk": "1.1.1",
     "date-fns": "4.1.0",
+    "dbus-next": "^0.10.2",
     "embla-carousel-react": "8.6.0",
     "input-otp": "1.4.2",
     "lucide-react": "^0.564.0",

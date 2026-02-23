@@ -10,6 +10,7 @@ import { useStatusBarData } from "@/components/desktop/status-bar/use-status-bar
 import { WeatherPopover } from "@/components/desktop/status-bar/weather-popover";
 import { WifiPopover } from "@/components/desktop/status-bar/wifi-popover";
 import { useCurrentWeather } from "@/hooks/useCurrentWeather";
+import { useNetworkEventsSse } from "@/hooks/useNetworkEventsSse";
 import type { StatusBarProps, StatusPopover } from "@/components/desktop/status-bar/types";
 import { formatDate, formatTemperature, formatTime } from "@/components/desktop/status-bar/utils";
 
@@ -20,6 +21,7 @@ export function StatusBar({
 }: StatusBarProps) {
   const {
     metrics,
+    networkStatus,
     serverName,
     batteryText,
     isWifiConnected,
@@ -31,6 +33,7 @@ export function StatusBar({
     clearNotifications,
   } = useStatusBarData();
   const { data: weather } = useCurrentWeather();
+  useNetworkEventsSse(true);
   const weatherText = formatTemperature(weather?.current.temperatureC);
 
   const [now, setNow] = useState<Date | null>(null);
@@ -95,7 +98,11 @@ export function StatusBar({
               )}
             </button>
             {activePopover === "wifi" && (
-              <WifiPopover metrics={metrics} onClose={closePopovers} />
+              <WifiPopover
+                metrics={metrics}
+                networkStatus={networkStatus}
+                onClose={closePopovers}
+              />
             )}
           </div>
 

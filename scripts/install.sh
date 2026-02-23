@@ -9,6 +9,7 @@ DATA_DIR="${HOMEIO_DATA_DIR:-/var/lib/home-server}"
 ENV_DIR="${HOMEIO_ENV_DIR:-/etc/home-server}"
 ENV_FILE="${HOMEIO_ENV_FILE:-${ENV_DIR}/home-server.env}"
 SERVICE_NAME="${HOMEIO_SERVICE_NAME:-home-server}"
+DBUS_SERVICE_NAME="${HOMEIO_DBUS_SERVICE_NAME:-home-server-dbus}"
 PORT="${HOMEIO_PORT:-3000}"
 REPO_URL="${HOMEIO_REPO_URL:-https://github.com/doctor-io/home-server.git}"
 REPO_BRANCH="${HOMEIO_REPO_BRANCH:-main}"
@@ -18,8 +19,6 @@ YQ_VERSION="${YQ_VERSION:-4.45.4}"
 DOCKER_VERSION="${DOCKER_VERSION:-28.0.1}"
 DOCKER_INSTALL_SCRIPT_COMMIT="${DOCKER_INSTALL_SCRIPT_COMMIT:-master}"
 
-HOMEIO_INSTALL_DOCKER="${HOMEIO_INSTALL_DOCKER:-false}"
-HOMEIO_INSTALL_EXTRAS="${HOMEIO_INSTALL_EXTRAS:-false}"
 HOMEIO_INSTALL_YQ="${HOMEIO_INSTALL_YQ:-false}"
 HOMEIO_HOSTNAME="${HOMEIO_HOSTNAME:-}"
 HOMEIO_ALLOW_OTHER_NODE="${HOMEIO_ALLOW_OTHER_NODE:-false}"
@@ -153,10 +152,6 @@ install_packages() {
 }
 
 install_extras() {
-	if [[ "${HOMEIO_INSTALL_EXTRAS}" != "true" ]]; then
-		log "Skipping full extras install (HOMEIO_INSTALL_EXTRAS=${HOMEIO_INSTALL_EXTRAS})."
-		return
-	fi
 
 	log "Installing full extras..."
 	apt-get install -y \
@@ -204,10 +199,6 @@ install_extras() {
 }
 
 install_docker() {
-	if [[ "${HOMEIO_INSTALL_DOCKER}" != "true" ]]; then
-		log "Skipping Docker install (HOMEIO_INSTALL_DOCKER=${HOMEIO_INSTALL_DOCKER})."
-		return
-	fi
 
 	if command_exists docker; then
 		log "Docker already installed."
@@ -455,6 +446,7 @@ EOF
 	set_env_key NEXT_PUBLIC_PRIMARY_USERNAME "${admin_username}" "${ENV_FILE}"
 	set_env_key NEXT_PUBLIC_LOG_LEVEL "info" "${ENV_FILE}"
 	set_env_key NEXT_PUBLIC_CLIENT_LOG_INGEST "true" "${ENV_FILE}"
+	set_env_key DBUS_HELPER_SOCKET_PATH "/run/home-server/dbus-helper.sock" "${ENV_FILE}"
 
 	if [[ "${generated_admin_password}" == "true" ]]; then
 		log "Generated app credentials: ${admin_username} / ${admin_password}"
@@ -532,6 +524,41 @@ EOF
 	systemctl enable --now "${SERVICE_NAME}.service"
 }
 
+install_dbus_helper_service() {
+	command_exists systemctl || die "systemd is required but systemctl is not available."
+
+	local unit_file="/etc/systemd/system/${DBUS_SERVICE_NAME}.service"
+	log "Installing systemd unit ${DBUS_SERVICE_NAME}.service..."
+
+	cat >"${unit_file}" <<EOF
+[Unit]
+Description=${APP_NAME} DBus Network Helper
+After=network.target dbus.service NetworkManager.service
+Wants=NetworkManager.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=${INSTALL_DIR}
+Environment=HOMEIO_GROUP=${APP_GROUP}
+Environment=DBUS_HELPER_SOCKET_PATH=/run/home-server/dbus-helper.sock
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/usr/bin/env node ${INSTALL_DIR}/services/dbus-helper/index.mjs
+Restart=on-failure
+RestartSec=2
+RuntimeDirectory=home-server
+RuntimeDirectoryMode=0770
+UMask=0007
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+	systemctl daemon-reload
+	systemctl enable --now "${DBUS_SERVICE_NAME}.service"
+}
+
 print_summary() {
 	local host
 	host="$(hostnamectl --static 2>/dev/null || hostname)"
@@ -543,6 +570,7 @@ print_summary() {
 		log "Open: http://${host}.local:${PORT}"
 	fi
 	log "Service: systemctl status ${SERVICE_NAME}.service"
+	log "DBus helper: systemctl status ${DBUS_SERVICE_NAME}.service"
 
 	log "Environment: ${ENV_FILE}"
 }
@@ -564,6 +592,7 @@ main() {
 	configure_local_postgres
 	install_homeio
 	install_systemd_service
+	install_dbus_helper_service
 	print_summary
 }
 

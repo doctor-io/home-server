@@ -9,6 +9,7 @@ DATA_DIR="${HOMEIO_DATA_DIR:-/var/lib/home-server}"
 ENV_DIR="${HOMEIO_ENV_DIR:-/etc/home-server}"
 ENV_FILE="${HOMEIO_ENV_FILE:-${ENV_DIR}/home-server.env}"
 SERVICE_NAME="${HOMEIO_SERVICE_NAME:-home-server}"
+DBUS_SERVICE_NAME="${HOMEIO_DBUS_SERVICE_NAME:-home-server-dbus}"
 
 PURGE="false"
 ASSUME_YES="false"
@@ -17,6 +18,11 @@ REMOVE_SYSTEM_USER="false"
 SERVICE_UNIT="${SERVICE_NAME}"
 if [[ "${SERVICE_UNIT}" != *.service ]]; then
 	SERVICE_UNIT="${SERVICE_UNIT}.service"
+fi
+
+DBUS_SERVICE_UNIT="${DBUS_SERVICE_NAME}"
+if [[ "${DBUS_SERVICE_UNIT}" != *.service ]]; then
+	DBUS_SERVICE_UNIT="${DBUS_SERVICE_UNIT}.service"
 fi
 
 log() {
@@ -99,17 +105,27 @@ stop_and_remove_service() {
 		log "Stopping and disabling ${SERVICE_UNIT}..."
 		systemctl stop "${SERVICE_UNIT}" >/dev/null 2>&1 || true
 		systemctl disable "${SERVICE_UNIT}" >/dev/null 2>&1 || true
+		log "Stopping and disabling ${DBUS_SERVICE_UNIT}..."
+		systemctl stop "${DBUS_SERVICE_UNIT}" >/dev/null 2>&1 || true
+		systemctl disable "${DBUS_SERVICE_UNIT}" >/dev/null 2>&1 || true
 	fi
 
 	local unit_file="/etc/systemd/system/${SERVICE_UNIT}"
 	if [[ -f "${unit_file}" ]]; then
 		rm -f "${unit_file}"
 	fi
+	local dbus_unit_file="/etc/systemd/system/${DBUS_SERVICE_UNIT}"
+	if [[ -f "${dbus_unit_file}" ]]; then
+		rm -f "${dbus_unit_file}"
+	fi
 
 	if command_exists systemctl; then
 		systemctl daemon-reload
 		systemctl reset-failed >/dev/null 2>&1 || true
 	fi
+
+	rm -f /run/home-server/dbus-helper.sock >/dev/null 2>&1 || true
+	rmdir /run/home-server >/dev/null 2>&1 || true
 }
 
 remove_app_files() {

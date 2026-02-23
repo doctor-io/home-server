@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mockUseSystemMetrics = vi.fn();
 const mockUseInstalledApps = vi.fn();
 const mockUseCurrentUser = vi.fn();
+const mockUseNetworkStatus = vi.fn();
 
 vi.mock("@/hooks/useSystemMetrics", () => ({
   useSystemMetrics: () => mockUseSystemMetrics(),
@@ -17,6 +18,10 @@ vi.mock("@/hooks/useInstalledApps", () => ({
 
 vi.mock("@/hooks/useCurrentUser", () => ({
   useCurrentUser: () => mockUseCurrentUser(),
+}));
+
+vi.mock("@/hooks/useNetworkStatus", () => ({
+  useNetworkStatus: () => mockUseNetworkStatus(),
 }));
 
 import { useStatusBarData } from "@/components/desktop/status-bar/use-status-bar-data";
@@ -98,6 +103,16 @@ describe("useStatusBarData", () => {
       data: [{ id: "1", name: "Immich", status: "stopped", updatedAt: "2026-02-22T23:00:00.000Z" }],
     });
     mockUseCurrentUser.mockReturnValue({ data: { id: "u1", username: "admin" } });
+    mockUseNetworkStatus.mockReturnValue({
+      data: {
+        connected: true,
+        iface: "wlan0",
+        ssid: "HomeNet",
+        ipv4: "192.168.1.22",
+        signalPercent: 67,
+      },
+      isError: false,
+    });
   });
 
   it("builds ui state and supports read/clear notification actions", async () => {
@@ -198,6 +213,16 @@ describe("useStatusBarData", () => {
     });
     mockUseInstalledApps.mockReturnValue({ data: [] });
     mockUseCurrentUser.mockReturnValue({ data: null });
+    mockUseNetworkStatus.mockReturnValue({
+      data: {
+        connected: false,
+        iface: "wlan0",
+        ssid: null,
+        ipv4: null,
+        signalPercent: null,
+      },
+      isError: false,
+    });
 
     const { result } = renderHook(() => useStatusBarData());
 

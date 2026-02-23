@@ -4,6 +4,8 @@ import { queryKeys } from "@/lib/shared/query-keys";
 describe("query keys", () => {
   it("exports stable cache keys", () => {
     expect(queryKeys.systemMetrics).toEqual(["system", "metrics"]);
+    expect(queryKeys.networkStatus).toEqual(["network", "status"]);
+    expect(queryKeys.networkNetworks).toEqual(["network", "networks"]);
     expect(queryKeys.installedApps).toEqual(["apps", "installed"]);
     expect(queryKeys.currentUser).toEqual(["auth", "current-user"]);
     expect(queryKeys.storeCatalog).toEqual(["store", "catalog"]);

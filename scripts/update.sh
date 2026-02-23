@@ -8,6 +8,7 @@ INSTALL_DIR="${HOMEIO_INSTALL_DIR:-/opt/home-server}"
 ENV_DIR="${HOMEIO_ENV_DIR:-/etc/home-server}"
 ENV_FILE="${HOMEIO_ENV_FILE:-${ENV_DIR}/home-server.env}"
 SERVICE_NAME="${HOMEIO_SERVICE_NAME:-home-server}"
+DBUS_SERVICE_NAME="${HOMEIO_DBUS_SERVICE_NAME:-home-server-dbus}"
 PORT="${HOMEIO_PORT:-3000}"
 REPO_URL="${HOMEIO_REPO_URL:-https://github.com/doctor-io/home-server.git}"
 REPO_BRANCH="${HOMEIO_REPO_BRANCH:-main}"
@@ -22,6 +23,11 @@ HOMEIO_HEALTHCHECK_DELAY_SEC="${HOMEIO_HEALTHCHECK_DELAY_SEC:-2}"
 SERVICE_UNIT="${SERVICE_NAME}"
 if [[ "${SERVICE_UNIT}" != *.service ]]; then
 	SERVICE_UNIT="${SERVICE_UNIT}.service"
+fi
+
+DBUS_SERVICE_UNIT="${DBUS_SERVICE_NAME}"
+if [[ "${DBUS_SERVICE_UNIT}" != *.service ]]; then
+	DBUS_SERVICE_UNIT="${DBUS_SERVICE_UNIT}.service"
 fi
 
 BACKUP_DIR=""
@@ -159,6 +165,17 @@ start_service() {
 	systemctl start "${SERVICE_UNIT}"
 }
 
+restart_dbus_helper_service() {
+	if ! systemctl cat "${DBUS_SERVICE_UNIT}" >/dev/null 2>&1; then
+		log "DBus helper unit ${DBUS_SERVICE_UNIT} not found; skipping helper restart."
+		return
+	fi
+
+	systemctl daemon-reload
+	systemctl enable --now "${DBUS_SERVICE_UNIT}"
+	systemctl restart "${DBUS_SERVICE_UNIT}"
+}
+
 stop_service() {
 	systemctl stop "${SERVICE_UNIT}" >/dev/null 2>&1 || true
 }
@@ -235,6 +252,7 @@ main() {
 	install_dependencies_if_needed
 	run_db_and_build
 	start_service
+	restart_dbus_helper_service
 
 	if ! healthcheck; then
 		die "Health check failed at ${HOMEIO_HEALTHCHECK_URL}"

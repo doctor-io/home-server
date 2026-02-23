@@ -10,6 +10,12 @@ import type {
 } from "@/lib/shared/contracts/apps";
 import type { SystemMetricsSnapshot } from "@/lib/shared/contracts/system";
 import type { WeatherSnapshot } from "@/lib/shared/contracts/weather";
+import type {
+  ConnectNetworkRequest,
+  NetworkEvent,
+  NetworkStatus,
+  WifiAccessPoint,
+} from "@/lib/shared/contracts/network";
 
 describe("shared contracts", () => {
   it("exposes typed runtime contracts", () => {
@@ -91,6 +97,31 @@ describe("shared contracts", () => {
       current: {
         condition: string;
       };
+    }>();
+
+    expectTypeOf<NetworkStatus>().toMatchTypeOf<{
+      connected: boolean;
+      iface: string | null;
+      ssid: string | null;
+      ipv4: string | null;
+      signalPercent: number | null;
+    }>();
+
+    expectTypeOf<WifiAccessPoint>().toMatchTypeOf<{
+      ssid: string;
+      bssid: string | null;
+      security: string | null;
+    }>();
+
+    expectTypeOf<ConnectNetworkRequest>().toMatchTypeOf<{
+      ssid: string;
+      password?: string;
+    }>();
+
+    expectTypeOf<NetworkEvent>().toMatchTypeOf<{
+      type: "network.connection.changed" | "network.device.state.changed";
+      connected: boolean;
+      timestamp: string;
     }>();
   });
 });

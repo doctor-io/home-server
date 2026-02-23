@@ -48,6 +48,7 @@ const envSchema = z.object({
   STORE_CATALOG_TTL_MS: z.coerce.number().int().min(5_000).default(5 * 60_000),
   STORE_STACKS_ROOT: z.string().default("/DATA/Apps"),
   DOCKER_SOCKET_PATH: z.string().default("/var/run/docker.sock"),
+  DBUS_HELPER_SOCKET_PATH: z.string().default("/run/home-server/dbus-helper.sock"),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

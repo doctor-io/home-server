@@ -7,6 +7,9 @@ const mockUseSystemMetrics = vi.fn();
 const mockUseInstalledApps = vi.fn();
 const mockUseCurrentUser = vi.fn();
 const mockUseCurrentWeather = vi.fn();
+const mockUseNetworkStatus = vi.fn();
+const mockUseWifiNetworks = vi.fn();
+const mockUseNetworkActions = vi.fn();
 
 vi.mock("@/hooks/useSystemMetrics", () => ({
   useSystemMetrics: () => mockUseSystemMetrics(),
@@ -22,6 +25,22 @@ vi.mock("@/hooks/useCurrentUser", () => ({
 
 vi.mock("@/hooks/useCurrentWeather", () => ({
   useCurrentWeather: () => mockUseCurrentWeather(),
+}));
+
+vi.mock("@/hooks/useNetworkStatus", () => ({
+  useNetworkStatus: () => mockUseNetworkStatus(),
+}));
+
+vi.mock("@/hooks/useNetworkEventsSse", () => ({
+  useNetworkEventsSse: () => ({ status: "connected" }),
+}));
+
+vi.mock("@/hooks/useWifiNetworks", () => ({
+  useWifiNetworks: () => mockUseWifiNetworks(),
+}));
+
+vi.mock("@/hooks/useNetworkActions", () => ({
+  useNetworkActions: () => mockUseNetworkActions(),
 }));
 
 import { StatusBar } from "@/components/desktop/status-bar";
@@ -147,6 +166,43 @@ describe("StatusBar", () => {
           },
         ],
       },
+    });
+    mockUseNetworkStatus.mockReturnValue({
+      data: {
+        connected: true,
+        iface: "wlan0",
+        ssid: "HomeNet",
+        ipv4: "192.168.1.22",
+        signalPercent: 67,
+      },
+      isError: false,
+    });
+    mockUseWifiNetworks.mockReturnValue({
+      data: [
+        {
+          ssid: "HomeNet",
+          bssid: "11:22:33",
+          signalPercent: 67,
+          channel: 1,
+          frequencyMhz: 2412,
+          security: "WPA2",
+        },
+        {
+          ssid: "OfficeNet",
+          bssid: "22:33:44",
+          signalPercent: 42,
+          channel: 11,
+          frequencyMhz: 2462,
+          security: "WPA2",
+        },
+      ],
+    });
+    mockUseNetworkActions.mockReturnValue({
+      connectNetwork: vi.fn(),
+      disconnectNetwork: vi.fn(),
+      isConnecting: false,
+      isDisconnecting: false,
+      actionError: null,
     });
   });
 

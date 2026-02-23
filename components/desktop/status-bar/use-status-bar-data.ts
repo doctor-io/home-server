@@ -3,12 +3,14 @@
 import { useMemo } from "react";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useInstalledApps } from "@/hooks/useInstalledApps";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { useSystemMetrics } from "@/hooks/useSystemMetrics";
 import { safePercent } from "@/components/desktop/status-bar/utils";
 import { useStatusNotifications } from "@/components/desktop/status-bar/use-status-notifications";
 
 export function useStatusBarData() {
   const { data: metrics, isError: isMetricsError } = useSystemMetrics();
+  const { data: networkStatus, isError: isNetworkError } = useNetworkStatus();
   const { data: apps } = useInstalledApps();
   const { data: currentUser } = useCurrentUser();
 
@@ -23,8 +25,10 @@ export function useStatusBarData() {
       : null;
   const batteryText = metrics?.battery.hasBattery ? `${batteryPercent ?? "--"}%` : "AC";
 
-  const isWifiConnected = Boolean(metrics?.wifi.connected);
-  const showWifiError = isMetricsError || !isWifiConnected;
+  const isWifiConnected = Boolean(
+    networkStatus?.connected ?? metrics?.wifi.connected,
+  );
+  const showWifiError = (isMetricsError && isNetworkError) || !isWifiConnected;
   const wifiIconClassName = showWifiError
     ? "size-4 text-status-red"
     : "size-4 text-status-green";
@@ -42,6 +46,7 @@ export function useStatusBarData() {
   return useMemo(
     () => ({
       metrics,
+      networkStatus,
       serverName,
       batteryText,
       isWifiConnected,
@@ -55,6 +60,7 @@ export function useStatusBarData() {
     [
       batteryText,
       isMetricsError,
+      networkStatus,
       isWifiConnected,
       markAllRead,
       clearAll,
