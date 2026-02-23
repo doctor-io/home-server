@@ -5,13 +5,13 @@
 - Modules: `system`, `apps`, shared `db` and `cache` infrastructure.
 - Realtime:
   - SSE at `/api/v1/system/stream` for one-way live metrics.
-  - WebSocket at `/api/ws` for bidirectional interactive flows.
+  - SSE at `/api/v1/network/events/stream` for live network state updates.
 
 ## Why this works on Pi 4
 - Single deployable process reduces memory and orchestration overhead.
 - Postgres handles durable state and future growth without immediate migration.
 - In-memory LRU cache absorbs hot reads and smooths CPU usage.
-- SSE is lightweight for dashboards; WS reserved for interactive channels.
+- SSE is lightweight for dashboards and state updates.
 
 ## API Endpoints
 - `GET /api/health`
@@ -23,8 +23,9 @@
 - `GET /api/auth/status`
 - `GET /api/v1/system/metrics`
 - `GET /api/v1/system/stream` (SSE)
+- `GET /api/v1/network/events/stream` (SSE)
 - `GET /api/v1/apps`
-- `GET /api/ws` (initializes WS server, then connect over WebSocket to same path)
+- `POST /api/v1/terminal/execute`
 - `POST /api/v1/logs` (ingests client/hook logs into server log file)
 
 ## Auth Flow
@@ -51,7 +52,7 @@
 - TanStack Query is configured in `AppProviders`.
 - `useSystemMetrics` fetches baseline metrics.
 - `useSystemSse` pushes live metric updates into query cache.
-- `useSystemWebSocket` is optional for bidirectional use-cases.
+- Terminal commands are executed via the terminal API route and rendered by the desktop terminal window.
 
 ## Setup
 1. Copy `.env.example` values into your runtime env.

@@ -16,6 +16,10 @@ import type {
   NetworkStatus,
   WifiAccessPoint,
 } from "@/lib/shared/contracts/network";
+import type {
+  TerminalExecuteRequest,
+  TerminalExecuteResult,
+} from "@/lib/shared/contracts/terminal";
 
 describe("shared contracts", () => {
   it("exposes typed runtime contracts", () => {
@@ -122,6 +126,21 @@ describe("shared contracts", () => {
       type: "network.connection.changed" | "network.device.state.changed";
       connected: boolean;
       timestamp: string;
+    }>();
+
+    expectTypeOf<TerminalExecuteRequest>().toMatchTypeOf<{
+      command: string;
+      cwd?: string;
+      history?: string[];
+    }>();
+
+    expectTypeOf<TerminalExecuteResult>().toMatchTypeOf<{
+      cwd: string;
+      lines: Array<{
+        type: "output" | "error" | "info";
+        content: string;
+      }>;
+      exitCode: number | null;
     }>();
   });
 });

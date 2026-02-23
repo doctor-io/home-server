@@ -9,14 +9,16 @@ ENV_DIR="${HOMEIO_ENV_DIR:-/etc/home-server}"
 ENV_FILE="${HOMEIO_ENV_FILE:-${ENV_DIR}/home-server.env}"
 SERVICE_NAME="${HOMEIO_SERVICE_NAME:-home-server}"
 DBUS_SERVICE_NAME="${HOMEIO_DBUS_SERVICE_NAME:-home-server-dbus}"
-PORT="${HOMEIO_PORT:-3000}"
+APP_PORT="${HOMEIO_APP_PORT:-${HOMEIO_PORT:-12026}}"
+PUBLIC_PORT="${HOMEIO_PUBLIC_PORT:-80}"
+NGINX_SITE_NAME="${HOMEIO_NGINX_SITE_NAME:-home-server}"
 REPO_URL="${HOMEIO_REPO_URL:-https://github.com/doctor-io/home-server.git}"
 REPO_BRANCH="${HOMEIO_REPO_BRANCH:-main}"
 
 HOMEIO_RELEASE_TARBALL_URL="${HOMEIO_RELEASE_TARBALL_URL:-}"
 HOMEIO_CREATE_BACKUP="${HOMEIO_CREATE_BACKUP:-true}"
 HOMEIO_BACKUP_ROOT="${HOMEIO_BACKUP_ROOT:-/var/backups/home-server/releases}"
-HOMEIO_HEALTHCHECK_URL="${HOMEIO_HEALTHCHECK_URL:-http://127.0.0.1:${PORT}/api/health}"
+HOMEIO_HEALTHCHECK_URL="${HOMEIO_HEALTHCHECK_URL:-http://127.0.0.1:${APP_PORT}/api/health}"
 HOMEIO_HEALTHCHECK_RETRIES="${HOMEIO_HEALTHCHECK_RETRIES:-30}"
 HOMEIO_HEALTHCHECK_DELAY_SEC="${HOMEIO_HEALTHCHECK_DELAY_SEC:-2}"
 
@@ -176,6 +178,48 @@ restart_dbus_helper_service() {
 	systemctl restart "${DBUS_SERVICE_UNIT}"
 }
 
+configure_reverse_proxy() {
+	if ! command_exists nginx; then
+		log "nginx is not installed; skipping reverse proxy update."
+		return
+	fi
+
+	local nginx_conf="/etc/nginx/sites-available/${NGINX_SITE_NAME}.conf"
+	local nginx_enabled="/etc/nginx/sites-enabled/${NGINX_SITE_NAME}.conf"
+
+	log "Updating nginx reverse proxy on :${PUBLIC_PORT} -> 127.0.0.1:${APP_PORT}..."
+
+	cat >"${nginx_conf}" <<EOF
+server {
+    listen ${PUBLIC_PORT};
+    listen [::]:${PUBLIC_PORT};
+    server_name _;
+
+    client_max_body_size 32m;
+    proxy_read_timeout 3600s;
+    proxy_send_timeout 3600s;
+
+    location / {
+        proxy_pass http://127.0.0.1:${APP_PORT};
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Connection "";
+        proxy_buffering off;
+    }
+}
+EOF
+
+	ln -sf "${nginx_conf}" "${nginx_enabled}"
+	rm -f /etc/nginx/sites-enabled/default >/dev/null 2>&1 || true
+
+	nginx -t
+	systemctl enable --now nginx
+	systemctl reload nginx
+}
+
 stop_service() {
 	systemctl stop "${SERVICE_UNIT}" >/dev/null 2>&1 || true
 }
@@ -252,6 +296,7 @@ main() {
 	install_dependencies_if_needed
 	run_db_and_build
 	start_service
+	configure_reverse_proxy
 	restart_dbus_helper_service
 
 	if ! healthcheck; then

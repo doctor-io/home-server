@@ -6,12 +6,14 @@ It is designed as an alternative to other home server managers, focused on a mod
 ## Features
 
 - Desktop-like shell UI with dock, windows, widgets, and lock screen.
-- Realtime system metrics via SSE and WebSocket APIs.
+- Realtime system metrics via SSE APIs.
+- Backend terminal command execution via `POST /api/v1/terminal/execute`.
 - App Store flow with install, uninstall, and redeploy operations.
 - Auth bootstrap flow: first-run register, then login/session-based access.
 - PostgreSQL-backed persistence for users, sessions, and installed apps.
 - Structured server/client logging with optional file sink.
 - One-command install/update/uninstall scripts for server deployments.
+- Production networking: app listens on `127.0.0.1:12026`, exposed publicly on `:80` via Nginx.
 
 ## Install
 

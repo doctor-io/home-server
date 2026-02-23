@@ -10,6 +10,7 @@ ENV_DIR="${HOMEIO_ENV_DIR:-/etc/home-server}"
 ENV_FILE="${HOMEIO_ENV_FILE:-${ENV_DIR}/home-server.env}"
 SERVICE_NAME="${HOMEIO_SERVICE_NAME:-home-server}"
 DBUS_SERVICE_NAME="${HOMEIO_DBUS_SERVICE_NAME:-home-server-dbus}"
+NGINX_SITE_NAME="${HOMEIO_NGINX_SITE_NAME:-home-server}"
 
 PURGE="false"
 ASSUME_YES="false"
@@ -128,6 +129,29 @@ stop_and_remove_service() {
 	rmdir /run/home-server >/dev/null 2>&1 || true
 }
 
+remove_reverse_proxy() {
+	if ! command_exists nginx; then
+		return
+	fi
+
+	local nginx_conf="/etc/nginx/sites-available/${NGINX_SITE_NAME}.conf"
+	local nginx_enabled="/etc/nginx/sites-enabled/${NGINX_SITE_NAME}.conf"
+	local default_available="/etc/nginx/sites-available/default"
+	local default_enabled="/etc/nginx/sites-enabled/default"
+
+	if [[ -f "${nginx_conf}" || -L "${nginx_enabled}" ]]; then
+		log "Removing nginx site ${NGINX_SITE_NAME}..."
+		rm -f "${nginx_enabled}" >/dev/null 2>&1 || true
+		rm -f "${nginx_conf}" >/dev/null 2>&1 || true
+	fi
+
+	if [[ -f "${default_available}" && ! -e "${default_enabled}" ]]; then
+		ln -sf "${default_available}" "${default_enabled}"
+	fi
+
+	nginx -t >/dev/null 2>&1 && systemctl reload nginx >/dev/null 2>&1 || true
+}
+
 remove_app_files() {
 	if [[ -d "${INSTALL_DIR}" ]]; then
 		log "Removing app files from ${INSTALL_DIR}..."
@@ -206,6 +230,7 @@ main() {
 	fi
 
 	stop_and_remove_service
+	remove_reverse_proxy
 	remove_app_files
 
 	if [[ "${PURGE}" == "true" ]]; then

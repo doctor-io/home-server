@@ -10,7 +10,9 @@ ENV_DIR="${HOMEIO_ENV_DIR:-/etc/home-server}"
 ENV_FILE="${HOMEIO_ENV_FILE:-${ENV_DIR}/home-server.env}"
 SERVICE_NAME="${HOMEIO_SERVICE_NAME:-home-server}"
 DBUS_SERVICE_NAME="${HOMEIO_DBUS_SERVICE_NAME:-home-server-dbus}"
-PORT="${HOMEIO_PORT:-3000}"
+APP_PORT="${HOMEIO_APP_PORT:-${HOMEIO_PORT:-12026}}"
+PUBLIC_PORT="${HOMEIO_PUBLIC_PORT:-80}"
+NGINX_SITE_NAME="${HOMEIO_NGINX_SITE_NAME:-home-server}"
 REPO_URL="${HOMEIO_REPO_URL:-https://github.com/doctor-io/home-server.git}"
 REPO_BRANCH="${HOMEIO_REPO_BRANCH:-main}"
 
@@ -156,6 +158,7 @@ install_extras() {
 	log "Installing full extras..."
 	apt-get install -y \
 		network-manager \
+		nginx \
 		systemd-timesyncd \
 		openssh-server \
 		avahi-daemon \
@@ -447,6 +450,8 @@ EOF
 	set_env_key NEXT_PUBLIC_LOG_LEVEL "info" "${ENV_FILE}"
 	set_env_key NEXT_PUBLIC_CLIENT_LOG_INGEST "true" "${ENV_FILE}"
 	set_env_key DBUS_HELPER_SOCKET_PATH "/run/home-server/dbus-helper.sock" "${ENV_FILE}"
+	set_env_key HOMEIO_APP_PORT "${APP_PORT}" "${ENV_FILE}"
+	set_env_key HOMEIO_PUBLIC_PORT "${PUBLIC_PORT}" "${ENV_FILE}"
 
 	if [[ "${generated_admin_password}" == "true" ]]; then
 		log "Generated app credentials: ${admin_username} / ${admin_password}"
@@ -511,7 +516,7 @@ Group=${APP_GROUP}
 WorkingDirectory=${INSTALL_DIR}
 EnvironmentFile=${ENV_FILE}
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-ExecStart=/usr/bin/env npm run start -- -H 0.0.0.0 -p ${PORT}
+ExecStart=/usr/bin/env npm run start -- -H 127.0.0.1 -p ${APP_PORT}
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=30
@@ -522,6 +527,46 @@ EOF
 
 	systemctl daemon-reload
 	systemctl enable --now "${SERVICE_NAME}.service"
+}
+
+install_reverse_proxy() {
+	command_exists systemctl || die "systemd is required but systemctl is not available."
+	command_exists nginx || die "nginx is required but was not found."
+
+	local nginx_conf="/etc/nginx/sites-available/${NGINX_SITE_NAME}.conf"
+	local nginx_enabled="/etc/nginx/sites-enabled/${NGINX_SITE_NAME}.conf"
+
+	log "Configuring nginx reverse proxy on :${PUBLIC_PORT} -> 127.0.0.1:${APP_PORT}..."
+
+	cat >"${nginx_conf}" <<EOF
+server {
+    listen ${PUBLIC_PORT};
+    listen [::]:${PUBLIC_PORT};
+    server_name _;
+
+    client_max_body_size 32m;
+    proxy_read_timeout 3600s;
+    proxy_send_timeout 3600s;
+
+    location / {
+        proxy_pass http://127.0.0.1:${APP_PORT};
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Connection "";
+        proxy_buffering off;
+    }
+}
+EOF
+
+	ln -sf "${nginx_conf}" "${nginx_enabled}"
+	rm -f /etc/nginx/sites-enabled/default >/dev/null 2>&1 || true
+
+	nginx -t
+	systemctl enable --now nginx
+	systemctl restart nginx
 }
 
 install_dbus_helper_service() {
@@ -564,11 +609,14 @@ print_summary() {
 	host="$(hostnamectl --static 2>/dev/null || hostname)"
 
 	log "${APP_NAME} installation complete."
-	if [[ "${host}" == *.* ]]; then
-		log "Open: http://${host}:${PORT}"
-	else
-		log "Open: http://${host}.local:${PORT}"
-	fi
+
+		if [[ "${PUBLIC_PORT}" == "80" ]]; then
+			log "Open: http://${host}.local"
+		else
+			log "Open: http://${host}.local:${PUBLIC_PORT}"
+		fi
+
+	log "App runtime: 127.0.0.1:${APP_PORT}"
 	log "Service: systemctl status ${SERVICE_NAME}.service"
 	log "DBus helper: systemctl status ${DBUS_SERVICE_NAME}.service"
 
@@ -592,6 +640,7 @@ main() {
 	configure_local_postgres
 	install_homeio
 	install_systemd_service
+	install_reverse_proxy
 	install_dbus_helper_service
 	print_summary
 }

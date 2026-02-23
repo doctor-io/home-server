@@ -450,10 +450,12 @@ export function DesktopShell() {
             iconSize={appIconSize}
             animationsEnabled={appearance.animationsEnabled}
             onViewLogs={({ containerName }) =>
-              requestTerminalCommand(`docker logs -f ${containerName}`)
+              requestTerminalCommand(`docker logs --tail 200 ${containerName}`)
             }
             onOpenTerminal={({ containerName }) =>
-              requestTerminalCommand(`docker exec -it ${containerName} /bin/sh`)
+              requestTerminalCommand(
+                `docker exec ${containerName} /bin/sh -c "pwd && ls"`,
+              )
             }
             onOpenSettings={() => openSettingsSection("docker")}
           />
