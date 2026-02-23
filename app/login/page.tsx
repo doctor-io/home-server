@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { LoginForm } from "@/components/auth/login-form";
 
 export default function LoginPage() {
@@ -14,7 +15,9 @@ export default function LoginPage() {
         </p>
       </div>
       <div className="relative z-10 w-full max-w-sm">
-        <LoginForm />
+        <Suspense fallback={null}>
+          <LoginForm />
+        </Suspense>
       </div>
     </main>
   );
