@@ -115,28 +115,39 @@ jobs:
 
           INCLUDE_PATHS=(
             ".next/"
-            "src/"
+            "app/"
+            "components/"
+            "hooks/"
+            "lib/"
+            "pages/"
+            "styles/"
+            "db/"
             "node_modules/"
             "public/"
-            "installed-apps/"
-            "store/"
-            "server.ts"
             "proxy.ts"
             "package.json"
-            "next.config.ts"
-            "tsconfig.json"
+            "package-lock.json"
+            "next.config.mjs"
+            "postcss.config.mjs"
+            "tailwind.config.ts"
             "components.json"
-            "scripts/install.sh"
-            "scripts/uninstall.sh"
-            "scripts/update.sh"
+            "eslint.config.mjs"
+            "tsconfig.json"
+            "vitest.config.ts"
+            "scripts/"
           )
 
           EXISTING_PATHS=()
-          for path in "${INCLUDE_PATHS[@]}"; do
-            if [ -e "$path" ]; then
-              EXISTING_PATHS+=("$path")
+          for include_path in "${INCLUDE_PATHS[@]}"; do
+            if [ -e "$include_path" ]; then
+              EXISTING_PATHS+=("$include_path")
             fi
           done
+
+          if [ "${#EXISTING_PATHS[@]}" -eq 0 ]; then
+            echo "No files found for tar packaging."
+            exit 1
+          fi
 
           tar czf "${TARBALL}" \
             --exclude='.next/cache' \

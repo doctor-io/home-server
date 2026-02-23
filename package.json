@@ -9,7 +9,10 @@
     "lint": "eslint .",
     "db:init": "node ./scripts/db-bootstrap.mjs",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:unit": "vitest run",
+    "test:watch": "vitest",
+    "version:patch:no-tag": "npm version patch --no-git-tag-version",
+    "prepare": "husky"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
@@ -81,6 +84,7 @@
     "@types/ws": "^8.5.13",
     "eslint": "^9.39.3",
     "eslint-config-next": "^16.1.6",
+    "husky": "^9.1.7",
     "jsdom": "^28.1.0",
     "postcss": "^8.5",
     "tailwindcss": "^4.2.0",
