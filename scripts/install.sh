@@ -555,6 +555,7 @@ EOF
 	set_env_key AUTH_SESSION_SECRET "${auth_session_secret}" "${ENV_FILE}"
 	set_env_key AUTH_PRIMARY_USERNAME "${admin_username}" "${ENV_FILE}"
 	set_env_key AUTH_ALLOW_REGISTRATION "false" "${ENV_FILE}"
+	set_env_key AUTH_COOKIE_SECURE "false" "${ENV_FILE}"
 	set_env_key PG_MAX_CONNECTIONS "10" "${ENV_FILE}"
 	set_env_key METRICS_CACHE_TTL_MS "2000" "${ENV_FILE}"
 	set_env_key METRICS_PUBLISH_INTERVAL_MS "2000" "${ENV_FILE}"
@@ -760,31 +761,70 @@ EOF
 }
 
 print_summary() {
-	local host
+	local host primary_ip local_url network_url auth_entry
 	host="$(hostnamectl --static 2>/dev/null || hostname)"
-
-	print_status "${APP_NAME} installation complete."
+	primary_ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
 
 	if [[ "${PUBLIC_PORT}" == "80" ]]; then
-		print_status "Open: http://${host}.local"
+		local_url="http://${host}.local"
 	else
-		print_status "Open: http://${host}.local:${PUBLIC_PORT}"
+		local_url="http://${host}.local:${PUBLIC_PORT}"
 	fi
 
-	print_status "App runtime: 127.0.0.1:${APP_PORT}"
-	print_status "Service: systemctl status ${SERVICE_NAME}.service"
-	print_status "DBus helper: systemctl status ${DBUS_SERVICE_NAME}.service"
-	print_status "Environment: ${ENV_FILE}"
+	if [[ -n "${primary_ip}" ]]; then
+		if [[ "${PUBLIC_PORT}" == "80" ]]; then
+			network_url="http://${primary_ip}"
+		else
+			network_url="http://${primary_ip}:${PUBLIC_PORT}"
+		fi
+	fi
 
 	if [[ "${HOMEIO_SEED_PRINCIPAL}" == "true" ]]; then
-		print_status "Auth entry: /login (principal user seeded)"
-		print_status "Principal username: ${EFFECTIVE_ADMIN_USERNAME}"
-		if [[ "${GENERATED_ADMIN_PASSWORD}" == "true" ]]; then
-			print_status "Principal password: ${EFFECTIVE_ADMIN_PASSWORD}"
-		fi
+		auth_entry="/login (principal user seeded)"
 	else
-		print_status "Auth entry: /register (no user seeded)"
+		auth_entry="/register (no user seeded)"
 	fi
+
+	if [[ "${HOMEIO_DRY_RUN}" == "true" ]]; then
+		print_status "Dry run complete. Above actions would be performed during actual installation."
+		return
+	fi
+
+	echo ""
+	echo -e "${GREEN}╭────────────────────────────────────────────────────╮${NC}"
+	echo -e "${GREEN}│         Installation Complete!                    │${NC}"
+	echo -e "${GREEN}├────────────────────────────────────────────────────┤${NC}"
+	echo -e "${GREEN}│${NC}  ${APP_NAME} is now running and accessible via:    ${GREEN}│${NC}"
+	echo -e "${GREEN}│${NC}                                                  ${GREEN}│${NC}"
+	printf "%b\n" "${GREEN}│${NC}  ${BLUE}*${NC} Local:      ${BLUE}${local_url}${NC}"
+	if [[ -n "${network_url}" ]]; then
+		printf "%b\n" "${GREEN}│${NC}  ${BLUE}*${NC} Network:    ${BLUE}${network_url}${NC}"
+	fi
+	echo -e "${GREEN}│${NC}                                                  ${GREEN}│${NC}"
+	echo -e "${GREEN}╰────────────────────────────────────────────────────╯${NC}"
+	echo ""
+
+	echo -e "${BLUE}Manage service:${NC}"
+	echo -e "  sudo systemctl [start|stop|restart|status] ${SERVICE_NAME}.service"
+	echo ""
+	echo -e "${BLUE}Manage DBus helper:${NC}"
+	echo -e "  sudo systemctl [start|stop|restart|status] ${DBUS_SERVICE_NAME}.service"
+	echo ""
+	echo -e "${BLUE}View logs:${NC}"
+	echo -e "  sudo journalctl -u ${SERVICE_NAME}.service -f"
+	echo -e "  sudo journalctl -u ${DBUS_SERVICE_NAME}.service -f"
+	echo ""
+	echo -e "${BLUE}Configuration:${NC}"
+	echo -e "  Environment: ${ENV_FILE}"
+	echo -e "  App runtime: 127.0.0.1:${APP_PORT}"
+	echo -e "  Auth entry:  ${auth_entry}"
+	if [[ "${HOMEIO_SEED_PRINCIPAL}" == "true" ]]; then
+		echo -e "  Username:    ${EFFECTIVE_ADMIN_USERNAME}"
+		if [[ "${GENERATED_ADMIN_PASSWORD}" == "true" ]]; then
+			echo -e "  Password:    ${EFFECTIVE_ADMIN_PASSWORD}"
+		fi
+	fi
+	echo ""
 }
 
 main() {
@@ -805,7 +845,7 @@ main() {
 	run_step "Installing app systemd service..." install_systemd_service
 	run_step "Configuring reverse proxy..." install_reverse_proxy
 	run_step "Installing DBus helper service..." install_dbus_helper_service
-	run_step "Printing installation summary..." print_summary
+	print_summary
 }
 
 main "$@"

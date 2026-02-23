@@ -22,6 +22,15 @@ describe("server env", () => {
     expect(serverEnv.DATABASE_URL).toContain("postgresql://");
     expect(serverEnv.PG_MAX_CONNECTIONS).toBe(10);
     expect(serverEnv.WEBSOCKET_ENABLED).toBe(true);
+    expect(serverEnv.AUTH_COOKIE_SECURE).toBe(false);
+  });
+
+  it("parses AUTH_COOKIE_SECURE=true", async () => {
+    process.env.AUTH_COOKIE_SECURE = "true";
+
+    const { serverEnv } = await import("@/lib/server/env");
+
+    expect(serverEnv.AUTH_COOKIE_SECURE).toBe(true);
   });
 
   it("throws for invalid database url", async () => {

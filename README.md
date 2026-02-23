@@ -24,6 +24,11 @@ curl -fsSL https://raw.githubusercontent.com/doctor-io/home-server/main/scripts/
 Installer defaults:
 - `HOMEIO_SEED_PRINCIPAL=false`: does not create a principal user; first access goes to `/register`.
 - `HOMEIO_VERBOSE=false`: keeps installer output concise.
+- `AUTH_COOKIE_SECURE=false`: keeps auth cookie compatible with `http://` installs.
+
+Cookie security:
+- HTTP deployment: `AUTH_COOKIE_SECURE=false`
+- HTTPS deployment: set `AUTH_COOKIE_SECURE=true`
 
 Common install variants:
 

@@ -33,6 +33,10 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((value) => value === "true"),
+  AUTH_COOKIE_SECURE: z
+    .string()
+    .optional()
+    .transform((value) => value === "true"),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
   LOG_FILE_PATH: z.string().default("logs/home-server.log"),
   LOG_TO_FILE: z
