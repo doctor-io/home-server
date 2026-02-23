@@ -29,8 +29,9 @@ DOCKER_INSTALL_SCRIPT_COMMIT="${DOCKER_INSTALL_SCRIPT_COMMIT:-master}"
 HOMEIO_INSTALL_YQ="${HOMEIO_INSTALL_YQ:-false}"
 HOMEIO_HOSTNAME="${HOMEIO_HOSTNAME:-}"
 HOMEIO_ALLOW_OTHER_NODE="${HOMEIO_ALLOW_OTHER_NODE:-false}"
-HOMEIO_SEED_PRINCIPAL="${HOMEIO_SEED_PRINCIPAL:-true}"
+HOMEIO_SEED_PRINCIPAL="${HOMEIO_SEED_PRINCIPAL:-false}"
 HOMEIO_VERBOSE="${HOMEIO_VERBOSE:-false}"
+HOMEIO_DRY_RUN="${HOMEIO_DRY_RUN:-false}"
 
 GENERATED_ADMIN_PASSWORD="false"
 EFFECTIVE_ADMIN_USERNAME=""
@@ -39,18 +40,25 @@ EFFECTIVE_DB_USER=""
 
 print_status() { echo -e "${GREEN}[+]${NC} $1"; }
 print_error() { echo -e "${RED}[!]${NC} $1" >&2; }
-print_info() { echo -e "${BLUE}[i]${NC} $1"; }
 print_dry() { echo -e "${BLUE}[DRY]${NC} Would: $1"; }
 
-log() { print_info "$*"; }
-die() { print_error "$*"; exit 1; }
+run_step() {
+	local label="${1}"
+	shift
+	if [[ "${HOMEIO_DRY_RUN}" == "true" ]]; then
+		print_dry "${label}"
+		return 0
+	fi
+	print_status "${label}"
+	"$@"
+}
 
 command_exists() {
 	command -v "$1" >/dev/null 2>&1
 }
 
 require_root() {
-	[[ "${EUID}" -eq 0 ]] || die "Run this installer as root (for example: sudo bash install.sh)."
+	[[ "${EUID}" -eq 0 ]] || { print_error "Run this installer as root (for example: sudo bash install.sh)."; exit 1; }
 }
 
 run_as_app() {
@@ -63,12 +71,13 @@ validate_identifiers() {
 	local db_name="${HOMEIO_DB_NAME:-home_server}"
 	local admin_username="${HOMEIO_ADMIN_USERNAME:-auto}"
 
-	[[ "${db_user}" =~ ^[a-z_][a-z0-9_]{0,62}$ ]] || die "Invalid HOMEIO_DB_USER: ${db_user}"
-	[[ "${db_name}" =~ ^[a-z_][a-z0-9_]{0,62}$ ]] || die "Invalid HOMEIO_DB_NAME: ${db_name}"
-	[[ "${HOMEIO_SEED_PRINCIPAL}" == "true" || "${HOMEIO_SEED_PRINCIPAL}" == "false" ]] || die "Invalid HOMEIO_SEED_PRINCIPAL: ${HOMEIO_SEED_PRINCIPAL} (expected true|false)"
-	[[ "${HOMEIO_VERBOSE}" == "true" || "${HOMEIO_VERBOSE}" == "false" ]] || die "Invalid HOMEIO_VERBOSE: ${HOMEIO_VERBOSE} (expected true|false)"
+	[[ "${db_user}" =~ ^[a-z_][a-z0-9_]{0,62}$ ]] || { print_error "Invalid HOMEIO_DB_USER: ${db_user}"; exit 1; }
+	[[ "${db_name}" =~ ^[a-z_][a-z0-9_]{0,62}$ ]] || { print_error "Invalid HOMEIO_DB_NAME: ${db_name}"; exit 1; }
+	[[ "${HOMEIO_SEED_PRINCIPAL}" == "true" || "${HOMEIO_SEED_PRINCIPAL}" == "false" ]] || { print_error "Invalid HOMEIO_SEED_PRINCIPAL: ${HOMEIO_SEED_PRINCIPAL} (expected true|false)"; exit 1; }
+	[[ "${HOMEIO_VERBOSE}" == "true" || "${HOMEIO_VERBOSE}" == "false" ]] || { print_error "Invalid HOMEIO_VERBOSE: ${HOMEIO_VERBOSE} (expected true|false)"; exit 1; }
+	[[ "${HOMEIO_DRY_RUN}" == "true" || "${HOMEIO_DRY_RUN}" == "false" ]] || { print_error "Invalid HOMEIO_DRY_RUN: ${HOMEIO_DRY_RUN} (expected true|false)"; exit 1; }
 	if [[ "${admin_username}" != "auto" ]]; then
-		[[ "${admin_username}" =~ ^[a-zA-Z0-9._-]{3,64}$ ]] || die "Invalid HOMEIO_ADMIN_USERNAME: ${admin_username}"
+		[[ "${admin_username}" =~ ^[a-zA-Z0-9._-]{3,64}$ ]] || { print_error "Invalid HOMEIO_ADMIN_USERNAME: ${admin_username}"; exit 1; }
 	fi
 }
 
@@ -81,13 +90,14 @@ detect_arch() {
 			echo "arm64"
 			;;
 		*)
-			die "Unsupported architecture: $(uname -m). Supported: x86_64, aarch64."
+			print_error "Unsupported architecture: $(uname -m). Supported: x86_64, aarch64."
+			exit 1
 			;;
 	esac
 }
 
 ensure_apt() {
-	command_exists apt-get || die "This installer supports Debian/Ubuntu/Raspberry Pi OS only (apt-get required)."
+	command_exists apt-get || { print_error "This installer supports Debian/Ubuntu/Raspberry Pi OS only (apt-get required)."; exit 1; }
 }
 
 normalize_hostname() {
@@ -104,7 +114,8 @@ normalize_hostname() {
 	fi
 	# Basic validation (allow dots for FQDN)
 	if ! [[ "${input}" =~ ^[a-z0-9][a-z0-9.-]{0,62}$ ]]; then
-		die "Invalid hostname: ${input}. Use letters, numbers, hyphens, and dots."
+		print_error "Invalid hostname: ${input}. Use letters, numbers, hyphens, and dots."
+		exit 1
 	fi
 	echo "${input}"
 }
@@ -138,14 +149,14 @@ configure_hostname() {
 	fi
 
 	if [[ "${desired}" == *.* ]]; then
-		log "Hostname set to ${desired}. Configure DNS to point this name to the server."
+		print_status "Hostname set to ${desired}. Configure DNS to point this name to the server."
 	else
-		log "Hostname set to ${desired}. Access via http://${desired}.local"
+		print_status "Hostname set to ${desired}. Access via http://${desired}.local"
 	fi
 }
 
 install_packages() {
-	log "Installing system dependencies..."
+	print_status "Installing system dependencies..."
 	if [[ "${HOMEIO_VERBOSE}" == "true" ]]; then
 		apt-get update -y
 		apt-get install -y \
@@ -189,7 +200,7 @@ install_packages() {
 
 install_extras() {
 
-	log "Installing full extras..."
+	print_status "Installing full extras..."
 	if [[ "${HOMEIO_VERBOSE}" == "true" ]]; then
 		apt-get install -y \
 			network-manager \
@@ -279,11 +290,11 @@ install_extras() {
 install_docker() {
 
 	if command_exists docker; then
-		log "Docker already installed."
+		print_status "Docker already installed."
 		return
 	fi
 
-	log "Installing Docker ${DOCKER_VERSION}..."
+	print_status "Installing Docker ${DOCKER_VERSION}..."
 	curl -fsSL "https://raw.githubusercontent.com/docker/docker-install/${DOCKER_INSTALL_SCRIPT_COMMIT}/install.sh" -o /tmp/install-docker.sh
 	if [[ "${HOMEIO_VERBOSE}" == "true" ]]; then
 		sh /tmp/install-docker.sh --version "v${DOCKER_VERSION}"
@@ -302,15 +313,15 @@ install_node() {
 	if command_exists node; then
 		local current
 		current="$(node -v | sed 's/^v//')"
-		if [[ "${current}" == "${NODE_VERSION}" ]]; then
-			log "Node ${NODE_VERSION} already installed."
+			if [[ "${current}" == "${NODE_VERSION}" ]]; then
+			print_status "Node ${NODE_VERSION} already installed."
 			return
 		fi
 		if [[ "${HOMEIO_ALLOW_OTHER_NODE}" == "true" ]]; then
-			log "Using existing Node ${current} (HOMEIO_ALLOW_OTHER_NODE=true)."
+			print_status "Using existing Node ${current} (HOMEIO_ALLOW_OTHER_NODE=true)."
 			return
 		fi
-		log "Existing Node ${current} detected; installing Node ${NODE_VERSION}."
+		print_status "Existing Node ${current} detected; installing Node ${NODE_VERSION}."
 	fi
 
 	local node_tar="node-v${NODE_VERSION}-linux-${arch}.tar.gz"
@@ -318,10 +329,10 @@ install_node() {
 	local checksums_url="https://nodejs.org/dist/v${NODE_VERSION}/SHASUMS256.txt"
 	local sha_expected=""
 
-	log "Installing Node ${NODE_VERSION}..."
+	print_status "Installing Node ${NODE_VERSION}..."
 	curl -fsSL "${checksums_url}" -o /tmp/SHASUMS256.txt
 	sha_expected="$(grep " ${node_tar}\$" /tmp/SHASUMS256.txt | awk '{print $1}')"
-	[[ -n "${sha_expected}" ]] || die "Could not find checksum for ${node_tar}"
+	[[ -n "${sha_expected}" ]] || { print_error "Could not find checksum for ${node_tar}"; exit 1; }
 
 	curl -fsSL "${node_url}" -o "/tmp/${node_tar}"
 	if [[ "${HOMEIO_VERBOSE}" == "true" ]]; then
@@ -335,12 +346,12 @@ install_node() {
 
 install_yq() {
 	if [[ "${HOMEIO_INSTALL_YQ}" != "true" ]]; then
-		log "Skipping yq install (HOMEIO_INSTALL_YQ=${HOMEIO_INSTALL_YQ})."
+		print_status "Skipping yq install (HOMEIO_INSTALL_YQ=${HOMEIO_INSTALL_YQ})."
 		return
 	fi
 
 	if command_exists yq; then
-		log "yq already installed."
+		print_status "yq already installed."
 		return
 	fi
 
@@ -352,10 +363,10 @@ install_yq() {
 		yq_arch="amd64"
 	fi
 
-	log "Installing yq ${YQ_VERSION}..."
+	print_status "Installing yq ${YQ_VERSION}..."
 	curl -fsSL "https://github.com/mikefarah/yq/releases/download/v${YQ_VERSION}/checksums" -o /tmp/yq-checksums.txt
 	yq_sha="$(grep " yq_linux_${yq_arch}\$" /tmp/yq-checksums.txt | awk '{print $1}')"
-	[[ -n "${yq_sha}" ]] || die "Could not find checksum for yq_linux_${yq_arch}"
+	[[ -n "${yq_sha}" ]] || { print_error "Could not find checksum for yq_linux_${yq_arch}"; exit 1; }
 
 	curl -fsSL "https://github.com/mikefarah/yq/releases/download/v${YQ_VERSION}/yq_linux_${yq_arch}" -o /usr/local/bin/yq
 	if [[ "${HOMEIO_VERBOSE}" == "true" ]]; then
@@ -368,7 +379,7 @@ install_yq() {
 }
 
 ensure_user_and_data_dir() {
-	log "Ensuring system user and directories..."
+	print_status "Ensuring system user and directories..."
 
 	if ! getent group "${APP_GROUP}" >/dev/null 2>&1; then
 		groupadd --system "${APP_GROUP}"
@@ -391,7 +402,7 @@ ensure_user_and_data_dir() {
 }
 
 clone_or_update_repo() {
-	log "Syncing repository (${REPO_BRANCH})..."
+	print_status "Syncing repository (${REPO_BRANCH})..."
 
 	if [[ -d "${INSTALL_DIR}/.git" ]]; then
 		run_as_app "git -C '${INSTALL_DIR}' fetch --depth=1 origin '${REPO_BRANCH}' --quiet"
@@ -400,7 +411,8 @@ clone_or_update_repo() {
 	fi
 
 	if [[ -n "$(ls -A "${INSTALL_DIR}" 2>/dev/null || true)" ]]; then
-		die "Install directory is not empty and is not a git repo: ${INSTALL_DIR}"
+		print_error "Install directory is not empty and is not a git repo: ${INSTALL_DIR}"
+		exit 1
 	fi
 
 	run_as_app "git clone --depth=1 --branch '${REPO_BRANCH}' '${REPO_URL}' '${INSTALL_DIR}' --quiet"
@@ -457,7 +469,7 @@ set_env_key() {
 }
 
 ensure_env_file() {
-	log "Preparing environment file at ${ENV_FILE}..."
+	print_status "Preparing environment file at ${ENV_FILE}..."
 	mkdir -p "${ENV_DIR}"
 
 	local db_name="${HOMEIO_DB_NAME:-}"
@@ -519,7 +531,7 @@ EOF
 	if [[ -z "${admin_username}" || "${admin_username}" == "auto" ]]; then
 		admin_username="homeio-$(openssl rand -hex 2)"
 	fi
-	[[ "${admin_username}" =~ ^[a-zA-Z0-9._-]{3,64}$ ]] || die "Invalid generated HOMEIO_ADMIN_USERNAME: ${admin_username}"
+	[[ "${admin_username}" =~ ^[a-zA-Z0-9._-]{3,64}$ ]] || { print_error "Invalid generated HOMEIO_ADMIN_USERNAME: ${admin_username}"; exit 1; }
 
 	if [[ "${HOMEIO_SEED_PRINCIPAL}" == "true" ]]; then
 		if [[ -z "${admin_password}" ]]; then
@@ -529,7 +541,7 @@ EOF
 			admin_password="$(openssl rand -hex 12)"
 			generated_admin_password="true"
 		fi
-		[[ "${#admin_password}" -ge 8 ]] || die "Admin password must be at least 8 characters."
+		[[ "${#admin_password}" -ge 8 ]] || { print_error "Admin password must be at least 8 characters."; exit 1; }
 	else
 		admin_password=""
 	fi
@@ -571,15 +583,15 @@ EOF
 	GENERATED_ADMIN_PASSWORD="${generated_admin_password}"
 
 	if [[ "${generated_admin_password}" == "true" ]]; then
-		log "Generated app credentials for first login."
+		print_status "Generated app credentials for first login."
 	fi
 	if [[ "${generated_db_password}" == "true" ]]; then
-		log "Generated PostgreSQL password for ${db_user}."
+		print_status "Generated PostgreSQL password for ${db_user}."
 	fi
 }
 
 configure_local_postgres() {
-	log "Configuring local PostgreSQL..."
+	print_status "Configuring local PostgreSQL..."
 	systemctl enable --now postgresql
 
 	local db_user
@@ -588,10 +600,11 @@ configure_local_postgres() {
 	db_user="$(get_env_value HOMEIO_DB_USER "${ENV_FILE}" || true)"
 	db_pass="$(get_env_value HOMEIO_DB_PASSWORD "${ENV_FILE}" || true)"
 	db_name="$(get_env_value HOMEIO_DB_NAME "${ENV_FILE}" || true)"
-	[[ -n "${db_user}" ]] || die "HOMEIO_DB_USER is missing in ${ENV_FILE}"
-	[[ -n "${db_pass}" ]] || die "HOMEIO_DB_PASSWORD is missing in ${ENV_FILE}"
-	[[ -n "${db_name}" ]] || die "HOMEIO_DB_NAME is missing in ${ENV_FILE}"
+	[[ -n "${db_user}" ]] || { print_error "HOMEIO_DB_USER is missing in ${ENV_FILE}"; exit 1; }
+	[[ -n "${db_pass}" ]] || { print_error "HOMEIO_DB_PASSWORD is missing in ${ENV_FILE}"; exit 1; }
+	[[ -n "${db_name}" ]] || { print_error "HOMEIO_DB_NAME is missing in ${ENV_FILE}"; exit 1; }
 
+	print_status "Ensuring PostgreSQL role '${db_user}'..."
 	if [[ "${HOMEIO_VERBOSE}" == "true" ]]; then
 		runuser -u postgres -- psql -v ON_ERROR_STOP=1 --set=db_user="${db_user}" --set=db_pass="${db_pass}" <<'SQL'
 SELECT format('CREATE ROLE %I LOGIN PASSWORD %L', :'db_user', :'db_pass')
@@ -614,29 +627,36 @@ WHERE EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'db_user')
 SQL
 	fi
 
+	print_status "Ensuring PostgreSQL database '${db_name}'..."
 	if ! runuser -u postgres -- psql -tAc "SELECT 1 FROM pg_database WHERE datname='${db_name}'" | grep -q 1; then
 		runuser -u postgres -- createdb --owner="${db_user}" "${db_name}"
 	fi
 }
 
 install_homeio() {
-	log "Installing ${APP_NAME} dependencies and building..."
+	print_status "Installing ${APP_NAME}..."
 	if [[ "${HOMEIO_VERBOSE}" == "true" ]]; then
+		print_status "Installing npm dependencies..."
 		run_as_app "cd '${INSTALL_DIR}' && npm ci"
+		print_status "Initializing database schema..."
 		run_as_app "cd '${INSTALL_DIR}' && set -a && source '${ENV_FILE}' && set +a && npm run db:init"
+		print_status "Building Next.js application..."
 		run_as_app "cd '${INSTALL_DIR}' && npm run build"
 	else
+		print_status "Installing npm dependencies..."
 		run_as_app "cd '${INSTALL_DIR}' && npm ci --silent --no-audit --no-fund" >/dev/null
+		print_status "Initializing database schema..."
 		run_as_app "cd '${INSTALL_DIR}' && set -a && source '${ENV_FILE}' && set +a && npm run db:init --silent" >/dev/null
+		print_status "Building Next.js application..."
 		run_as_app "cd '${INSTALL_DIR}' && npm run build --silent" >/dev/null
 	fi
 }
 
 install_systemd_service() {
-	command_exists systemctl || die "systemd is required but systemctl is not available."
+	command_exists systemctl || { print_error "systemd is required but systemctl is not available."; exit 1; }
 
 	local unit_file="/etc/systemd/system/${SERVICE_NAME}.service"
-	log "Installing systemd unit ${SERVICE_NAME}.service..."
+	print_status "Installing systemd unit ${SERVICE_NAME}.service..."
 
 	cat >"${unit_file}" <<EOF
 [Unit]
@@ -665,13 +685,13 @@ EOF
 }
 
 install_reverse_proxy() {
-	command_exists systemctl || die "systemd is required but systemctl is not available."
-	command_exists nginx || die "nginx is required but was not found."
+	command_exists systemctl || { print_error "systemd is required but systemctl is not available."; exit 1; }
+	command_exists nginx || { print_error "nginx is required but was not found."; exit 1; }
 
 	local nginx_conf="/etc/nginx/sites-available/${NGINX_SITE_NAME}.conf"
 	local nginx_enabled="/etc/nginx/sites-enabled/${NGINX_SITE_NAME}.conf"
 
-	log "Configuring nginx reverse proxy on :${PUBLIC_PORT} -> 127.0.0.1:${APP_PORT}..."
+	print_status "Configuring nginx reverse proxy on :${PUBLIC_PORT} -> 127.0.0.1:${APP_PORT}..."
 
 	cat >"${nginx_conf}" <<EOF
 server {
@@ -705,10 +725,10 @@ EOF
 }
 
 install_dbus_helper_service() {
-	command_exists systemctl || die "systemd is required but systemctl is not available."
+	command_exists systemctl || { print_error "systemd is required but systemctl is not available."; exit 1; }
 
 	local unit_file="/etc/systemd/system/${DBUS_SERVICE_NAME}.service"
-	log "Installing systemd unit ${DBUS_SERVICE_NAME}.service..."
+	print_status "Installing systemd unit ${DBUS_SERVICE_NAME}.service..."
 
 	cat >"${unit_file}" <<EOF
 [Unit]
@@ -746,47 +766,46 @@ print_summary() {
 	print_status "${APP_NAME} installation complete."
 
 	if [[ "${PUBLIC_PORT}" == "80" ]]; then
-		print_info "Open: http://${host}.local"
+		print_status "Open: http://${host}.local"
 	else
-		print_info "Open: http://${host}.local:${PUBLIC_PORT}"
+		print_status "Open: http://${host}.local:${PUBLIC_PORT}"
 	fi
 
-	print_info "App runtime: 127.0.0.1:${APP_PORT}"
-	print_info "Service: systemctl status ${SERVICE_NAME}.service"
-	print_info "DBus helper: systemctl status ${DBUS_SERVICE_NAME}.service"
-	print_info "Environment: ${ENV_FILE}"
+	print_status "App runtime: 127.0.0.1:${APP_PORT}"
+	print_status "Service: systemctl status ${SERVICE_NAME}.service"
+	print_status "DBus helper: systemctl status ${DBUS_SERVICE_NAME}.service"
+	print_status "Environment: ${ENV_FILE}"
 
 	if [[ "${HOMEIO_SEED_PRINCIPAL}" == "true" ]]; then
-		print_info "Auth entry: /login (principal user seeded)"
-		print_info "Principal username: ${EFFECTIVE_ADMIN_USERNAME}"
+		print_status "Auth entry: /login (principal user seeded)"
+		print_status "Principal username: ${EFFECTIVE_ADMIN_USERNAME}"
 		if [[ "${GENERATED_ADMIN_PASSWORD}" == "true" ]]; then
-			print_info "Principal password: ${EFFECTIVE_ADMIN_PASSWORD}"
+			print_status "Principal password: ${EFFECTIVE_ADMIN_PASSWORD}"
 		fi
 	else
-		print_info "Auth entry: /register (no user seeded)"
+		print_status "Auth entry: /register (no user seeded)"
 	fi
 }
 
 main() {
-	require_root
-	ensure_apt
-	validate_identifiers
-
-	configure_hostname
-	install_packages
-	install_extras
-	install_docker
-	install_node
-	install_yq
-	ensure_user_and_data_dir
-	clone_or_update_repo
-	ensure_env_file
-	configure_local_postgres
-	install_homeio
-	install_systemd_service
-	install_reverse_proxy
-	install_dbus_helper_service
-	print_summary
+	run_step "Checking root privileges..." require_root
+	run_step "Checking apt availability..." ensure_apt
+	run_step "Validating installer configuration..." validate_identifiers
+	run_step "Configuring hostname..." configure_hostname
+	run_step "Installing base packages..." install_packages
+	run_step "Installing extras packages..." install_extras
+	run_step "Installing Docker..." install_docker
+	run_step "Installing Node.js..." install_node
+	run_step "Installing yq (optional)..." install_yq
+	run_step "Ensuring application user and directories..." ensure_user_and_data_dir
+	run_step "Syncing repository..." clone_or_update_repo
+	run_step "Preparing environment file..." ensure_env_file
+	run_step "Configuring PostgreSQL..." configure_local_postgres
+	run_step "Installing application..." install_homeio
+	run_step "Installing app systemd service..." install_systemd_service
+	run_step "Configuring reverse proxy..." install_reverse_proxy
+	run_step "Installing DBus helper service..." install_dbus_helper_service
+	run_step "Printing installation summary..." print_summary
 }
 
 main "$@"

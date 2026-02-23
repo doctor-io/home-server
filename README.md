@@ -22,7 +22,7 @@ curl -fsSL https://raw.githubusercontent.com/doctor-io/home-server/main/scripts/
 ```
 
 Installer defaults:
-- `HOMEIO_SEED_PRINCIPAL=true`: creates a principal user and routes first access to `/login`.
+- `HOMEIO_SEED_PRINCIPAL=false`: does not create a principal user; first access goes to `/register`.
 - `HOMEIO_VERBOSE=false`: keeps installer output concise.
 
 Common install variants:
