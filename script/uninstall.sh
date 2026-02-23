@@ -138,12 +138,9 @@ purge_database() {
 
 	log "Dropping PostgreSQL role '${db_user}'..."
 	runuser -u postgres -- psql -v ON_ERROR_STOP=1 --set=db_user="${db_user}" <<'SQL'
-DO $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'db_user') THEN
-    EXECUTE format('DROP ROLE %I', :'db_user');
-  END IF;
-END $$;
+SELECT format('DROP ROLE %I', :'db_user')
+WHERE EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'db_user')
+\gexec
 SQL
 }
 
