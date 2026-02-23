@@ -36,7 +36,7 @@ function simulateCommand(
   const parts = input.trim().split(/\s+/)
   const cmd = parts[0]
   const args = parts.slice(1)
-  let newCwd = cwd
+  const newCwd = cwd
 
   if (!cmd) return { output: [], newCwd }
 

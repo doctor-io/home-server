@@ -206,11 +206,6 @@ const appSeed: AppItem[] = [
   },
 ];
 
-const categories = [
-  "All",
-  ...Array.from(new Set(appSeed.map((a) => a.category))),
-];
-
 type AppGridProps = {
   iconSize?: "small" | "medium" | "large";
   animationsEnabled?: boolean;
@@ -220,7 +215,6 @@ export function AppGrid({
   iconSize = "medium",
   animationsEnabled = true,
 }: AppGridProps) {
-  const [selectedCategory, setSelectedCategory] = useState("All");
   const [apps, setApps] = useState(appSeed);
   const [activeAppName, setActiveAppName] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{
@@ -229,10 +223,7 @@ export function AppGrid({
     appName: string;
   } | null>(null);
 
-  const filtered =
-    selectedCategory === "All"
-      ? apps
-      : apps.filter((a) => a.category === selectedCategory);
+  const filtered = apps;
   const iconContainerClass =
     iconSize === "small"
       ? "size-12 rounded-xl"

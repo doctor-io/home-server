@@ -36,7 +36,6 @@ export const ACCENT_COLORS: AccentColorOption[] = [
 ]
 
 export const WALLPAPER_OPTIONS: WallpaperOption[] = [
-  { id: "wallpaper-default", name: "Default", src: "/images/wallpaper.jpg" },
   ...Array.from({ length: 21 }).map((_, index) => {
     const imageNumber = index + 1
     return {
@@ -45,6 +44,7 @@ export const WALLPAPER_OPTIONS: WallpaperOption[] = [
       src: `/images/${imageNumber}.jpg`,
     }
   }),
+  { id: "wallpaper-classic", name: "Classic", src: "/images/wallpaper.jpg" },
 ]
 
 export const DEFAULT_APPEARANCE_SETTINGS: AppearanceSettings = {

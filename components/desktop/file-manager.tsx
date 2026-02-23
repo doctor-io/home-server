@@ -670,14 +670,47 @@ Modified: ${entry.modified}
 
 const MONACO_CDN_BASE =
   "https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min";
-let monacoLoaderPromise: Promise<any> | null = null;
 
-function loadMonacoFromCdn() {
+type MonacoSubscription = { dispose: () => void };
+type MonacoModel = { dispose: () => void };
+type MonacoEditorInstance = {
+  onDidChangeModelContent: (listener: () => void) => MonacoSubscription;
+  getValue: () => string;
+  layout: () => void;
+  getModel: () => MonacoModel | null;
+  dispose: () => void;
+  __changeSub?: MonacoSubscription;
+};
+type MonacoNamespace = {
+  editor: {
+    createModel: (value: string, language: string) => MonacoModel;
+    create: (
+      container: HTMLElement,
+      options: Record<string, unknown>,
+    ) => MonacoEditorInstance;
+    setTheme: (theme: string) => void;
+  };
+};
+type MonacoRequire = {
+  config: (config: { paths: { vs: string } }) => void;
+  (
+    deps: string[],
+    onLoad: () => void,
+    onError: (error: unknown) => void,
+  ): void;
+};
+
+let monacoLoaderPromise: Promise<MonacoNamespace> | null = null;
+
+function loadMonacoFromCdn(): Promise<MonacoNamespace> {
   if (typeof window === "undefined") {
     return Promise.reject(new Error("Monaco can only load in the browser"));
   }
 
-  const win = window as typeof window & { monaco?: any; require?: any };
+  const win = window as typeof window & {
+    monaco?: MonacoNamespace;
+    require?: MonacoRequire;
+  };
   if (win.monaco?.editor) return Promise.resolve(win.monaco);
   if (monacoLoaderPromise) return monacoLoaderPromise;
 
@@ -1274,7 +1307,7 @@ function MonacoEditorPane({
 
   useEffect(() => {
     let mounted = true;
-    let editor: any;
+    let editor: MonacoEditorInstance | undefined;
     let resizeObserver: ResizeObserver | null = null;
     let themeObserver: MutationObserver | null = null;
 
@@ -1328,6 +1361,8 @@ function MonacoEditorPane({
       if (editor?.getModel?.()) editor.getModel().dispose();
       if (editor?.dispose) editor.dispose();
     };
+    // Monaco model is initialized once per language to avoid recreating editor per keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [language]);
 
   if (fallbackMode) {

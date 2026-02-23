@@ -1,6 +1,11 @@
 "use client";
 
 import { useDesktopAppearance } from "@/hooks/useDesktopAppearance";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import {
+  readLockState,
+  writeLockState,
+} from "@/lib/desktop/lock-state";
 import {
   Activity,
   FolderOpen,
@@ -9,6 +14,7 @@ import {
   ShoppingBag,
   TerminalSquare,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppGrid } from "./app-grid";
 import { AppStore } from "./app-store";
@@ -39,15 +45,20 @@ const SETTINGS_SEARCH_SECTIONS = [
 ] as const;
 
 export function DesktopShell() {
+  const router = useRouter();
+  const { data: currentUser, isLoading: isLoadingUser, isError: isCurrentUserError } =
+    useCurrentUser();
   const [openWindows, setOpenWindows] = useState<string[]>([]);
   const [closingWindows, setClosingWindows] = useState<string[]>([]);
   const [focusedWindow, setFocusedWindow] = useState<string | null>(null);
   const [isLocked, setIsLocked] = useState(false);
+  const [isLockStateHydrated, setIsLockStateHydrated] = useState(false);
+  const [isLogoutPending, setIsLogoutPending] = useState(false);
   const [isSettingsSearchOpen, setIsSettingsSearchOpen] = useState(false);
   const [settingsSearchQuery, setSettingsSearchQuery] = useState("");
   const [settingsSectionRequest, setSettingsSectionRequest] = useState<string | null>(null);
   const [displayWallpaper, setDisplayWallpaper] = useState(
-    "/images/wallpaper.jpg",
+    "/images/1.jpg",
   );
   const [nextWallpaper, setNextWallpaper] = useState<string | null>(null);
   const [isWallpaperFading, setIsWallpaperFading] = useState(false);
@@ -63,6 +74,26 @@ export function DesktopShell() {
     accentColors,
     appIconSize,
   } = useDesktopAppearance();
+
+  const setLockState = useCallback((value: boolean) => {
+    setIsLocked(value);
+    if (typeof window !== "undefined") {
+      writeLockState(window.localStorage, value);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    setIsLocked(readLockState(window.localStorage));
+    setIsLockStateHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (isCurrentUserError) {
+      router.replace("/login");
+    }
+  }, [isCurrentUserError, router]);
 
   const filteredSettingsSections = useMemo(() => {
     const query = settingsSearchQuery.trim().toLowerCase();
@@ -118,6 +149,7 @@ export function DesktopShell() {
 
   useEffect(() => {
     setDisplayWallpaper(appearance.wallpaper);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -232,7 +264,7 @@ export function DesktopShell() {
     function handleKeyboardShortcut(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "l") {
         e.preventDefault();
-        setIsLocked(true);
+        setLockState(true);
         return;
       }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
@@ -251,7 +283,41 @@ export function DesktopShell() {
     return () => {
       window.removeEventListener("keydown", handleKeyboardShortcut, true);
     };
-  }, [isSettingsSearchOpen]);
+  }, [isSettingsSearchOpen, setLockState]);
+
+  const handleLogout = useCallback(async () => {
+    setIsLogoutPending(true);
+
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+      });
+    } finally {
+      setLockState(false);
+      setIsLogoutPending(false);
+      router.replace("/login");
+      router.refresh();
+    }
+  }, [router, setLockState]);
+
+  const handleUnlock = useCallback(async (password: string) => {
+    const response = await fetch("/api/auth/unlock", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ password }),
+    });
+
+    if (!response.ok) {
+      const json = (await response.json().catch(() => ({}))) as {
+        error?: string;
+      };
+      throw new Error(json.error ?? "Invalid password");
+    }
+
+    setLockState(false);
+  }, [setLockState]);
 
   useEffect(() => {
     if (!isSettingsSearchOpen) return;
@@ -260,6 +326,14 @@ export function DesktopShell() {
     });
     return () => window.cancelAnimationFrame(frame);
   }, [isSettingsSearchOpen]);
+
+  if (isLoadingUser || !isLockStateHydrated) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-background text-sm text-muted-foreground">
+        Loading session...
+      </div>
+    );
+  }
 
   return (
     <div className="relative h-screen w-screen overflow-hidden">
@@ -346,7 +420,11 @@ export function DesktopShell() {
         )}
 
         {/* Status Bar */}
-        <StatusBar />
+        <StatusBar
+          onLock={() => setLockState(true)}
+          onLogout={handleLogout}
+          isLogoutPending={isLogoutPending}
+        />
 
         {/* Main Desktop Area */}
         <div className="flex flex-1 m-12 overflow-hidden">
@@ -458,7 +536,9 @@ export function DesktopShell() {
         {isLocked && (
           <LockScreen
             wallpaper={appearance.wallpaper}
-            onUnlock={() => setIsLocked(false)}
+            username={currentUser?.username ?? "user"}
+            onUnlock={handleUnlock}
+            onLogout={handleLogout}
           />
         )}
       </div>

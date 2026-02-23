@@ -1,0 +1,191 @@
+name: CI and Release
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Lint, Test, Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Build
+        run: NODE_ENV=production npm run build
+
+  check-version:
+    needs: verify
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    name: Check version
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      should_release: ${{ steps.check.outputs.should_release }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read version from package.json
+        id: version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Check if tag already exists
+        id: check
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          if git rev-parse "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "Tag ${TAG} already exists — skipping release"
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Tag ${TAG} does not exist — will release"
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: check-version
+    if: needs.check-version.outputs.should_release == 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+
+    runs-on: ${{ matrix.runner }}
+    name: Build (${{ matrix.arch }})
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Build Next.js
+        run: NODE_ENV=production npm run build
+
+      - name: Create tarball
+        id: tarball
+        run: |
+          VERSION="${{ needs.check-version.outputs.tag }}"
+          ARCH="${{ matrix.arch }}"
+          TARBALL="homeio-${VERSION}-linux-${ARCH}.tar.gz"
+
+          INCLUDE_PATHS=(
+            ".next/"
+            "src/"
+            "node_modules/"
+            "public/"
+            "installed-apps/"
+            "store/"
+            "server.ts"
+            "proxy.ts"
+            "package.json"
+            "next.config.ts"
+            "tsconfig.json"
+            "components.json"
+            "scripts/install.sh"
+            "scripts/uninstall.sh"
+            "scripts/update.sh"
+          )
+
+          EXISTING_PATHS=()
+          for path in "${INCLUDE_PATHS[@]}"; do
+            if [ -e "$path" ]; then
+              EXISTING_PATHS+=("$path")
+            fi
+          done
+
+          tar czf "${TARBALL}" \
+            --exclude='.next/cache' \
+            "${EXISTING_PATHS[@]}"
+
+          sha256sum "${TARBALL}" > "${TARBALL}.sha256"
+
+          echo "tarball=${TARBALL}" >> "$GITHUB_OUTPUT"
+          echo "checksum=${TARBALL}.sha256" >> "$GITHUB_OUTPUT"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: homeio-${{ matrix.arch }}
+          path: |
+            ${{ steps.tarball.outputs.tarball }}
+            ${{ steps.tarball.outputs.checksum }}
+
+  release:
+    needs: [check-version, build]
+    if: needs.check-version.outputs.should_release == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    name: Publish Release
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - name: Create tag
+        run: |
+          TAG="${{ needs.check-version.outputs.tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "${TAG}"
+          git push origin "${TAG}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.check-version.outputs.tag }}
+          name: Homeio ${{ needs.check-version.outputs.tag }}
+          generate_release_notes: true
+          files: |
+            homeio-*.tar.gz
+            homeio-*.tar.gz.sha256
