@@ -559,7 +559,7 @@ EOF
 	set_env_key PG_MAX_CONNECTIONS "10" "${ENV_FILE}"
 	set_env_key METRICS_CACHE_TTL_MS "2000" "${ENV_FILE}"
 	set_env_key METRICS_PUBLISH_INTERVAL_MS "2000" "${ENV_FILE}"
-	set_env_key SSE_HEARTBEAT_MS "15000" "${ENV_FILE}"
+	set_env_key SSE_HEARTBEAT_MS "8000" "${ENV_FILE}"
 	set_env_key WEBSOCKET_ENABLED "true" "${ENV_FILE}"
 	set_env_key LOG_LEVEL "info" "${ENV_FILE}"
 	set_env_key LOG_FILE_PATH "${DATA_DIR}/logs/home-server.log" "${ENV_FILE}"

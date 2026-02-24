@@ -54,6 +54,8 @@ export type InstalledStackConfig = {
   status: InstalledStackStatus;
   webUiPort: number | null;
   env: Record<string, string>;
+  displayName: string | null;
+  iconUrl: string | null;
   installedAt: string | null;
   updatedAt: string;
 };

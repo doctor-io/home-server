@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyWebUiPortOverride,
   buildRawStackFileUrl,
+  normalizeComposeStorageBindings,
   sanitizeStackName,
 } from "@/lib/server/modules/store/compose-runner";
 
@@ -32,5 +33,32 @@ services:
 
   it("sanitizes stack names", () => {
     expect(sanitizeStackName("AdGuard Home!")).toBe("adguard-home");
+  });
+
+  it("converts named volumes to bind mounts under DATA/Apps", () => {
+    const compose = `
+services:
+  twofauth:
+    image: 2fauth/2fauth:latest
+    volumes:
+      - "big-bear-2fauth_data:/2fauth"
+      - "./config:/config"
+volumes:
+  big-bear-2fauth_data:
+`;
+
+    const normalized = normalizeComposeStorageBindings(
+      compose,
+      "/Users/ahmedtabib/Code/home-server/DATA/Apps",
+    );
+
+    expect(normalized.composeContent).toContain(
+      '- "/Users/ahmedtabib/Code/home-server/DATA/Apps/big-bear-2fauth_data:/2fauth"',
+    );
+    expect(normalized.composeContent).toContain('- "./config:/config"');
+    expect(normalized.composeContent).not.toContain("\nvolumes:\n  big-bear-2fauth_data:");
+    expect(Array.from(normalized.bindMountDirectories)).toContain(
+      "/Users/ahmedtabib/Code/home-server/DATA/Apps/big-bear-2fauth_data",
+    );
   });
 });

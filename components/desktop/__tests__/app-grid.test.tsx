@@ -2,33 +2,21 @@
 
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { StoreAppSummary } from "@/lib/shared/contracts/apps";
-
+const useStoreActionsMock = vi.fn();
+const useInstalledAppsMock = vi.fn();
 const useStoreCatalogMock = vi.fn();
 
+vi.mock("@/hooks/useStoreActions", () => ({
+  useStoreActions: (...args: unknown[]) => useStoreActionsMock(...args),
+}));
+vi.mock("@/hooks/useInstalledApps", () => ({
+  useInstalledApps: (...args: unknown[]) => useInstalledAppsMock(...args),
+}));
 vi.mock("@/hooks/useStoreCatalog", () => ({
   useStoreCatalog: (...args: unknown[]) => useStoreCatalogMock(...args),
 }));
 
 import { AppGrid } from "@/components/desktop/app-grid";
-
-const installedAppsFixture: StoreAppSummary[] = [
-  {
-    id: "plex",
-    name: "Plex",
-    description: "Media server",
-    platform: "Docker",
-    categories: ["Media"],
-    logoUrl: null,
-    repositoryUrl: "https://github.com/plexinc/pms-docker",
-    stackFile: "Apps/Plex/docker-compose.yml",
-    status: "installed",
-    webUiPort: 32400,
-    updateAvailable: false,
-    localDigest: null,
-    remoteDigest: null,
-  },
-];
 
 function openContextMenuFor(appName: string) {
   const iconButton = screen.getByRole("button", { name: `Open ${appName}` });
@@ -37,9 +25,44 @@ function openContextMenuFor(appName: string) {
 
 describe("AppGrid context menu", () => {
   beforeEach(() => {
+    useStoreActionsMock.mockReset();
+    useInstalledAppsMock.mockReset();
     useStoreCatalogMock.mockReset();
+
+    useStoreActionsMock.mockReturnValue({
+      operationsByApp: {},
+      uninstallApp: vi.fn().mockResolvedValue(undefined),
+    });
+    useInstalledAppsMock.mockReturnValue({
+      data: [
+        {
+          id: "plex",
+          name: "Plex",
+          status: "running",
+          updatedAt: "2026-02-24T00:00:00.000Z",
+        },
+      ],
+      isLoading: false,
+      isError: false,
+    });
     useStoreCatalogMock.mockReturnValue({
-      data: installedAppsFixture,
+      data: [
+        {
+          id: "plex",
+          name: "Plex",
+          description: "Plex media server",
+          platform: "linux",
+          categories: ["Media"],
+          logoUrl: null,
+          repositoryUrl: "https://example.com",
+          stackFile: "Apps/plex/docker-compose.yml",
+          status: "installed",
+          webUiPort: 32400,
+          updateAvailable: false,
+          localDigest: null,
+          remoteDigest: null,
+        },
+      ],
       isLoading: false,
       isError: false,
     });
@@ -148,14 +171,28 @@ describe("AppGrid context menu", () => {
     expect(screen.getByRole("button", { name: "Start Container" })).toBeTruthy();
   });
 
-  it("removes app from grid when remove action is clicked", () => {
+  it("opens uninstall dialog and triggers backend uninstall from remove action", async () => {
+    const uninstallApp = vi.fn().mockResolvedValue(undefined);
+    useStoreActionsMock.mockReturnValue({
+      operationsByApp: {},
+      uninstallApp,
+    });
+
     render(<AppGrid animationsEnabled={false} />);
 
     expect(screen.getByRole("button", { name: "Open Plex" })).toBeTruthy();
     openContextMenuFor("Plex");
     fireEvent.click(screen.getByRole("button", { name: "Remove App" }));
 
-    expect(screen.queryByRole("button", { name: "Open Plex" })).toBeNull();
+    expect(screen.getByText("Uninstall Plex?")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Uninstall" }));
+
+    await waitFor(() => {
+      expect(uninstallApp).toHaveBeenCalledWith({
+        appId: "plex",
+        removeVolumes: false,
+      });
+    });
   });
 
   it("disables restart and update while app is updating", () => {
@@ -184,15 +221,4 @@ describe("AppGrid context menu", () => {
     vi.useRealTimers();
   });
 
-  it("shows empty state when no installed apps exist", () => {
-    useStoreCatalogMock.mockReturnValueOnce({
-      data: [],
-      isLoading: false,
-      isError: false,
-    });
-
-    render(<AppGrid animationsEnabled={false} />);
-
-    expect(screen.getByText("No installed apps found.")).toBeTruthy();
-  });
 });

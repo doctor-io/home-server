@@ -4,10 +4,14 @@ describe("postgres pool", () => {
   beforeEach(() => {
     vi.resetModules();
     delete (globalThis as { __homeioPgPool?: unknown }).__homeioPgPool;
+    delete (globalThis as { __homeioPgPoolErrorListenerAttached?: unknown }).__homeioPgPoolErrorListenerAttached;
+    delete (globalThis as { __homeioPgPoolInitLogged?: unknown }).__homeioPgPoolInitLogged;
   });
 
   afterEach(() => {
     delete (globalThis as { __homeioPgPool?: unknown }).__homeioPgPool;
+    delete (globalThis as { __homeioPgPoolErrorListenerAttached?: unknown }).__homeioPgPoolErrorListenerAttached;
+    delete (globalThis as { __homeioPgPoolInitLogged?: unknown }).__homeioPgPoolInitLogged;
   });
 
   it("creates a pool using server env", async () => {

@@ -6,6 +6,8 @@ import { logServerAction } from "@/lib/server/logging/logger";
 
 declare global {
   var __homeioPgPool: Pool | undefined;
+  var __homeioPgPoolErrorListenerAttached: boolean | undefined;
+  var __homeioPgPoolInitLogged: boolean | undefined;
 }
 
 export const pgPool =
@@ -21,22 +23,28 @@ if (serverEnv.NODE_ENV !== "production") {
   globalThis.__homeioPgPool = pgPool;
 }
 
-pgPool.on("error", (error) => {
-  logServerAction({
-    level: "error",
-    layer: "db",
-    action: "pg.pool.error",
-    status: "error",
-    error,
+if (!globalThis.__homeioPgPoolErrorListenerAttached) {
+  pgPool.on("error", (error) => {
+    logServerAction({
+      level: "error",
+      layer: "db",
+      action: "pg.pool.error",
+      status: "error",
+      error,
+    });
   });
-});
+  globalThis.__homeioPgPoolErrorListenerAttached = true;
+}
 
-logServerAction({
-  level: "info",
-  layer: "db",
-  action: "pg.pool.init",
-  status: "success",
-  meta: {
-    maxConnections: serverEnv.PG_MAX_CONNECTIONS,
-  },
-});
+if (!globalThis.__homeioPgPoolInitLogged) {
+  logServerAction({
+    level: "info",
+    layer: "db",
+    action: "pg.pool.init",
+    status: "success",
+    meta: {
+      maxConnections: serverEnv.PG_MAX_CONNECTIONS,
+    },
+  });
+  globalThis.__homeioPgPoolInitLogged = true;
+}

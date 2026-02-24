@@ -20,9 +20,15 @@ vi.mock("@/lib/server/modules/auth/service", () => {
   };
 });
 
+vi.mock("@/lib/server/storage/data-root", () => ({
+  ensureDataRootDirectories: vi.fn(),
+  resolveDataRootDirectory: vi.fn(() => "/DATA"),
+}));
+
 import { POST } from "@/app/api/auth/register/route";
 import { hasAnyUsers } from "@/lib/server/modules/auth/repository";
 import { registerUser } from "@/lib/server/modules/auth/service";
+import { ensureDataRootDirectories } from "@/lib/server/storage/data-root";
 
 describe("POST /api/auth/register", () => {
   it("returns 403 when registration is disabled", async () => {
@@ -43,6 +49,7 @@ describe("POST /api/auth/register", () => {
     expect(response.status).toBe(403);
     expect(json.error).toContain("disabled");
     expect(registerUser).not.toHaveBeenCalled();
+    expect(ensureDataRootDirectories).not.toHaveBeenCalled();
   });
 
   it("allows first registration when no users exist", async () => {
@@ -68,5 +75,6 @@ describe("POST /api/auth/register", () => {
 
     expect(response.status).toBe(201);
     expect(json.data.username).toBe("admin");
+    expect(ensureDataRootDirectories).toHaveBeenCalledTimes(1);
   });
 });

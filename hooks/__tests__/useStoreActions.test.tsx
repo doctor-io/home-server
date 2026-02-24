@@ -252,4 +252,96 @@ describe("useStoreActions", () => {
       "Unable to start install operation [helper_unavailable]",
     );
   });
+
+  it(
+    "updates operation state from snapshot polling when stream events are missing",
+    async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ operationId: "op-install-poll" }),
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      fetchStoreOperationSnapshotMock
+        .mockResolvedValueOnce({
+          id: "op-install-poll",
+          appId: "2fauth",
+          action: "install",
+          status: "running",
+          progressPercent: 1,
+          currentStep: "start",
+          errorMessage: null,
+          startedAt: "2026-02-24T19:00:00.000Z",
+          finishedAt: null,
+          updatedAt: "2026-02-24T19:00:00.000Z",
+        })
+        .mockResolvedValueOnce({
+          id: "op-install-poll",
+          appId: "2fauth",
+          action: "install",
+          status: "running",
+          progressPercent: 85,
+          currentStep: "compose-up",
+          errorMessage: null,
+          startedAt: "2026-02-24T19:00:00.000Z",
+          finishedAt: null,
+          updatedAt: "2026-02-24T19:00:02.000Z",
+        })
+        .mockResolvedValueOnce({
+          id: "op-install-poll",
+          appId: "2fauth",
+          action: "install",
+          status: "success",
+          progressPercent: 100,
+          currentStep: "completed",
+          errorMessage: null,
+          startedAt: "2026-02-24T19:00:00.000Z",
+          finishedAt: "2026-02-24T19:00:04.000Z",
+          updatedAt: "2026-02-24T19:00:04.000Z",
+        });
+
+      const cleanup = vi.fn();
+      subscribeToStoreOperationEventsMock.mockReturnValue(cleanup);
+
+      const client = createTestQueryClient();
+      const invalidateSpy = vi.spyOn(client, "invalidateQueries");
+
+      const { result } = renderHook(() => useStoreActions(), {
+        wrapper: createWrapper(client),
+      });
+
+      await act(async () => {
+        await result.current.installApp({
+          appId: "2fauth",
+        });
+      });
+
+      await waitFor(() => {
+        expect(result.current.operationsByApp["2fauth"]?.progressPercent).toBe(1);
+      });
+
+      await waitFor(
+        () => {
+          expect(result.current.operationsByApp["2fauth"]?.progressPercent).toBe(85);
+        },
+        { timeout: 4_000 },
+      );
+
+      await waitFor(
+        () => {
+          expect(result.current.operationsByApp["2fauth"]?.status).toBe("success");
+          expect(result.current.operationsByApp["2fauth"]?.progressPercent).toBe(100);
+        },
+        { timeout: 4_000 },
+      );
+
+      expect(cleanup).toHaveBeenCalledTimes(1);
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.storeCatalog });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.storeApp("2fauth") });
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: queryKeys.storeOperation("op-install-poll"),
+      });
+    },
+    12_000,
+  );
 });

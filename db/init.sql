@@ -34,6 +34,8 @@ CREATE TABLE IF NOT EXISTS app_stacks (
   status TEXT NOT NULL DEFAULT 'not_installed',
   web_ui_port INTEGER,
   env_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+  display_name TEXT,
+  icon_url TEXT,
   installed_at TIMESTAMPTZ,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -72,3 +74,12 @@ CREATE TABLE IF NOT EXISTS custom_store_apps (
 );
 
 CREATE INDEX IF NOT EXISTS custom_store_apps_updated_at_idx ON custom_store_apps (updated_at DESC);
+
+-- Migrations for existing installations
+DO $$
+BEGIN
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'app_stacks') THEN
+    ALTER TABLE app_stacks ADD COLUMN IF NOT EXISTS display_name TEXT;
+    ALTER TABLE app_stacks ADD COLUMN IF NOT EXISTS icon_url TEXT;
+  END IF;
+END $$;

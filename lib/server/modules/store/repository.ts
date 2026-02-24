@@ -21,6 +21,8 @@ type AppStackRow = {
   status: string;
   web_ui_port: number | null;
   env_json: unknown;
+  display_name: string | null;
+  icon_url: string | null;
   installed_at: string | Date | null;
   updated_at: string | Date;
 };
@@ -113,6 +115,8 @@ function mapStackRow(row: AppStackRow): InstalledStackConfig {
     status: toInstalledStackStatus(row.status),
     webUiPort: row.web_ui_port,
     env: parseEnvJson(row.env_json),
+    displayName: row.display_name ?? null,
+    iconUrl: row.icon_url ?? null,
     installedAt: toIso(row.installed_at),
     updatedAt: toIso(row.updated_at) ?? new Date().toISOString(),
   };
@@ -147,6 +151,8 @@ export async function listInstalledStacksFromDb(): Promise<InstalledStackConfig[
       status,
       web_ui_port,
       env_json,
+      display_name,
+      icon_url,
       installed_at,
       updated_at
     FROM app_stacks
@@ -170,6 +176,8 @@ export async function findInstalledStackByAppId(appId: string): Promise<Installe
       status,
       web_ui_port,
       env_json,
+      display_name,
+      icon_url,
       installed_at,
       updated_at
     FROM app_stacks
@@ -199,6 +207,8 @@ export async function findStackByWebUiPort(
       status,
       web_ui_port,
       env_json,
+      display_name,
+      icon_url,
       installed_at,
       updated_at
     FROM app_stacks
@@ -274,13 +284,11 @@ export async function upsertInstalledStack(input: {
   );
 }
 
-export async function markStackAsNotInstalled(appId: string) {
+export async function deleteInstalledStackByAppId(appId: string) {
   if (!(await hasTable("app_stacks"))) return;
 
   await timedPgQuery(
-    `UPDATE app_stacks
-    SET status = 'not_installed',
-      updated_at = NOW()
+    `DELETE FROM app_stacks
     WHERE app_id = $1`,
     [appId],
   );
@@ -408,4 +416,36 @@ export async function findStoreOperationById(id: string): Promise<StoreOperation
 
   const row = result.rows[0];
   return row ? mapOperationRow(row) : null;
+}
+
+export async function patchInstalledStackMeta(
+  appId: string,
+  input: {
+    displayName?: string;
+    iconUrl?: string | null;
+  },
+) {
+  if (!(await hasTable("app_stacks"))) return;
+
+  const sets: string[] = [];
+  const values: unknown[] = [appId];
+
+  if (input.displayName !== undefined) {
+    values.push(input.displayName);
+    sets.push(`display_name = $${values.length}`);
+  }
+
+  if (input.iconUrl !== undefined) {
+    values.push(input.iconUrl ?? null);
+    sets.push(`icon_url = $${values.length}`);
+  }
+
+  if (sets.length === 0) return;
+
+  sets.push("updated_at = NOW()");
+
+  await timedPgQuery(
+    `UPDATE app_stacks SET ${sets.join(", ")} WHERE app_id = $1`,
+    values,
+  );
 }

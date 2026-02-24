@@ -50,7 +50,7 @@ const envSchema = z.object({
       "https://raw.githubusercontent.com/bigbeartechworld/big-bear-portainer/main/templates.json",
     ),
   STORE_CATALOG_TTL_MS: z.coerce.number().int().min(5_000).default(5 * 60_000),
-  STORE_STACKS_ROOT: z.string().default("/DATA/Apps"),
+  STORE_STACKS_ROOT: z.string().optional(),
   DOCKER_SOCKET_PATH: z.string().default("/var/run/docker.sock"),
   DBUS_HELPER_SOCKET_PATH: z.string().default("/run/home-server/dbus-helper.sock"),
 });
@@ -64,4 +64,10 @@ if (!parsedEnv.success) {
   throw new Error(`Invalid server environment: ${issues}`);
 }
 
-export const serverEnv = parsedEnv.data;
+const defaultStacksRoot =
+  parsedEnv.data.NODE_ENV === "production" ? "/DATA/Apps" : "DATA/Apps";
+
+export const serverEnv = {
+  ...parsedEnv.data,
+  STORE_STACKS_ROOT: parsedEnv.data.STORE_STACKS_ROOT ?? defaultStacksRoot,
+};

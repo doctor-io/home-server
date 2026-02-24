@@ -10,17 +10,21 @@ import {
   RefreshCw,
   Search,
   Trash2,
+  Wrench,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { AppSettingsPanel } from "@/components/desktop/app-settings-panel";
 import { AppStoreInstallMenu } from "@/components/desktop/app-store-install-menu";
 import {
   CustomAppInstallDialog,
   type CustomAppInstallDialogInput,
 } from "@/components/desktop/custom-app-install-dialog";
+import { UninstallAppDialog } from "@/components/desktop/uninstall-app-dialog";
 import { useStoreActions } from "@/hooks/useStoreActions";
 import { useStoreApp } from "@/hooks/useStoreApp";
 import { useStoreCatalog } from "@/hooks/useStoreCatalog";
 import { useStoreOperation } from "@/hooks/useStoreOperation";
+import type { AppActionTarget } from "@/components/desktop/app-grid";
 import type { AppOperationState } from "@/hooks/useStoreActions";
 import type { StoreAppDetail, StoreAppSummary } from "@/lib/shared/contracts/apps";
 
@@ -132,6 +136,7 @@ type AppStoreDetailPanelProps = {
   onUpdate: () => void;
   onRedeploy: () => void;
   onUninstall: () => void;
+  onCustomInstall: () => void;
 };
 
 function AppStoreDetailPanel({
@@ -145,6 +150,7 @@ function AppStoreDetailPanel({
   onUpdate,
   onRedeploy,
   onUninstall,
+  onCustomInstall,
 }: AppStoreDetailPanelProps) {
   return (
     <div className="flex flex-col h-full">
@@ -262,6 +268,13 @@ function AppStoreDetailPanel({
                 </button>
               </>
             )}
+            <button
+              onClick={onCustomInstall}
+              disabled={isOperationBusy(operation)}
+              className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium border border-glass-border text-foreground rounded-lg hover:bg-secondary/40 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <Wrench className="size-3.5" /> Custom Install
+            </button>
           </div>
         </div>
       )}
@@ -277,6 +290,10 @@ export function AppStore() {
   const [customDialogOpen, setCustomDialogOpen] = useState(false);
   const [customActionError, setCustomActionError] = useState<string | null>(null);
   const [customInstallPending, setCustomInstallPending] = useState(false);
+  const [customInstallTemplate, setCustomInstallTemplate] = useState<StoreAppDetail | null>(null);
+  const [uninstallDialogApp, setUninstallDialogApp] = useState<StoreAppSummary | null>(null);
+  const [uninstallError, setUninstallError] = useState<string | null>(null);
+  const [uninstallPending, setUninstallPending] = useState(false);
 
   const {
     operationsByApp,
@@ -347,14 +364,8 @@ export function AppStore() {
 
   async function startUninstall(app: StoreAppSummary) {
     setActionError(null);
-
-    try {
-      await uninstallApp({
-        appId: app.id,
-      });
-    } catch (error) {
-      setActionError(error instanceof Error ? error.message : "Unable to start uninstall.");
-    }
+    setUninstallError(null);
+    setUninstallDialogApp(app);
   }
 
   async function submitDetailAction(action: "install" | "update" | "redeploy" | "uninstall") {
@@ -363,9 +374,8 @@ export function AppStore() {
 
     try {
       if (action === "uninstall") {
-        await uninstallApp({
-          appId: selectedSummary.id,
-        });
+        setUninstallError(null);
+        setUninstallDialogApp(selectedSummary);
         return;
       }
 
@@ -399,20 +409,82 @@ export function AppStore() {
     }
   }
 
+  async function confirmUninstall(input: { deleteData: boolean }) {
+    if (!uninstallDialogApp) return;
+
+    setUninstallError(null);
+    setUninstallPending(true);
+
+    try {
+      await uninstallApp({
+        appId: uninstallDialogApp.id,
+        removeVolumes: input.deleteData,
+      });
+      setUninstallDialogApp(null);
+    } catch (error) {
+      setUninstallError(error instanceof Error ? error.message : "Unable to start uninstall.");
+    } finally {
+      setUninstallPending(false);
+    }
+  }
+
+  const uninstallDialog = (
+    <UninstallAppDialog
+      open={Boolean(uninstallDialogApp)}
+      appName={uninstallDialogApp?.name ?? null}
+      isSubmitting={uninstallPending}
+      error={uninstallError}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
+          setUninstallDialogApp(null);
+          setUninstallError(null);
+        }
+      }}
+      onConfirm={confirmUninstall}
+    />
+  );
+
+  function openCustomInstallSettings() {
+    if (!selectedDetail) return;
+    setCustomInstallTemplate(selectedDetail);
+  }
+
   if (selectedAppId) {
     return (
-      <AppStoreDetailPanel
-        app={selectedSummary}
-        detail={selectedDetail}
-        isLoading={detailQuery.isLoading}
-        operation={selectedOperation}
-        actionError={actionError}
-        onBack={() => setSelectedAppId(null)}
-        onInstall={() => void submitDetailAction("install")}
-        onUpdate={() => void submitDetailAction("update")}
-        onRedeploy={() => void submitDetailAction("redeploy")}
-        onUninstall={() => void submitDetailAction("uninstall")}
-      />
+      <div className="relative h-full">
+        <AppStoreDetailPanel
+          app={selectedSummary}
+          detail={selectedDetail}
+          isLoading={detailQuery.isLoading}
+          operation={selectedOperation}
+          actionError={actionError}
+          onBack={() => setSelectedAppId(null)}
+          onInstall={() => void submitDetailAction("install")}
+          onUpdate={() => void submitDetailAction("update")}
+          onRedeploy={() => void submitDetailAction("redeploy")}
+          onUninstall={() => void submitDetailAction("uninstall")}
+          onCustomInstall={openCustomInstallSettings}
+        />
+        {customInstallTemplate ? (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm">
+            <div className="relative h-[min(92vh,760px)] w-[min(96vw,980px)] overflow-hidden rounded-2xl border border-glass-border bg-card shadow-2xl">
+              <button
+                type="button"
+                aria-label="Close install settings"
+                onClick={() => setCustomInstallTemplate(null)}
+                className="absolute right-3 top-3 z-30 rounded-md border border-glass-border bg-card/90 px-2 py-1 text-xs text-foreground hover:bg-secondary/40 cursor-pointer"
+              >
+                Close
+              </button>
+              <AppSettingsPanel
+                template={customInstallTemplate}
+                onClose={() => setCustomInstallTemplate(null)}
+              />
+            </div>
+          </div>
+        ) : null}
+        {uninstallDialog}
+      </div>
     );
   }
 
@@ -470,6 +542,7 @@ export function AppStore() {
         isSubmitting={customInstallPending}
         error={customActionError}
       />
+      {uninstallDialog}
 
       <div className="flex flex-1 overflow-hidden">
         <div className="flex-1 overflow-y-auto p-4">

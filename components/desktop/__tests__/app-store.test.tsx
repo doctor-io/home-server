@@ -1,6 +1,6 @@
 /* @vitest-environment jsdom */
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppOperationState } from "@/hooks/useStoreActions";
 import type { StoreAppDetail, StoreAppSummary } from "@/lib/shared/contracts/apps";
@@ -173,7 +173,7 @@ describe("AppStore", () => {
     expect(installApp).toHaveBeenCalledWith({ appId: "plex" });
   });
 
-  it("triggers redeploy and uninstall from detail actions", () => {
+  it("triggers redeploy and uninstall from detail actions", async () => {
     const { redeployApp, uninstallApp } = setup({
       apps: [installedSummaryApp],
       detail: appDetail,
@@ -187,8 +187,17 @@ describe("AppStore", () => {
     expect(screen.getByText("Platform")).toBeTruthy();
     expect(screen.getByText("Docker")).toBeTruthy();
     expect(screen.getByText("https://github.com/plex")).toBeTruthy();
+    expect(screen.getByText("Uninstall Plex?")).toBeTruthy();
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Uninstall" }));
+
     expect(redeployApp).toHaveBeenCalledWith({ appId: "plex" });
-    expect(uninstallApp).toHaveBeenCalledWith({ appId: "plex" });
+
+    await waitFor(() => {
+      expect(uninstallApp).toHaveBeenCalledWith({
+        appId: "plex",
+        removeVolumes: false,
+      });
+    });
   });
 
   it("shows update action and triggers redeploy when update is available", () => {
@@ -203,6 +212,21 @@ describe("AppStore", () => {
 
     expect(screen.getByText("Update available")).toBeTruthy();
     expect(redeployApp).toHaveBeenCalledWith({ appId: "plex" });
+  });
+
+  it("opens custom install settings panel from app detail", () => {
+    setup({
+      apps: [installedSummaryApp],
+      detail: appDetail,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /plex/i }));
+    fireEvent.click(screen.getByRole("button", { name: /custom install/i }));
+
+    expect(screen.getByText("Plex Settings")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /close.*install.*settings/i }));
+    expect(screen.queryByText("Plex Settings")).toBeNull();
   });
 
   it("shows operation progress from backend state", () => {

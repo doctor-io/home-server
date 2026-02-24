@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/server/modules/network/helper-client", () => ({
   connectWifiFromHelper: vi.fn(),
@@ -29,6 +29,10 @@ import {
 import { getSystemMetricsSnapshot } from "@/lib/server/modules/system/service";
 
 describe("network service", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("returns helper network status when helper is available", async () => {
     vi.mocked(getNetworkStatusFromHelper).mockResolvedValueOnce({
       connected: true,
@@ -123,6 +127,78 @@ describe("network service", () => {
     expect(statusResult.data.ssid).toBe("FallbackNet");
     expect(networksResult.source).toBe("fallback");
     expect(networksResult.data[0]?.ssid).toBe("FallbackNet");
+  });
+
+  it("reuses fallback cache between network status requests", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-02-24T19:00:00.000Z"));
+
+    vi.mocked(getNetworkStatusFromHelper).mockRejectedValue(new Error("helper down"));
+    vi.mocked(isNetworkHelperUnavailableError).mockReturnValue(true);
+    vi.mocked(getSystemMetricsSnapshot).mockResolvedValue({
+      timestamp: "2026-02-23T00:00:00.000Z",
+      hostname: "homeio",
+      platform: "linux",
+      uptimeSeconds: 1_000,
+      cpu: {
+        oneMinute: 0,
+        fiveMinute: 0,
+        fifteenMinute: 0,
+        normalizedPercent: 0,
+      },
+      memory: {
+        totalBytes: 1,
+        freeBytes: 1,
+        usedBytes: 0,
+        usedPercent: 0,
+      },
+      temperature: {
+        mainCelsius: null,
+        maxCelsius: null,
+        coresCelsius: [],
+      },
+      battery: {
+        hasBattery: false,
+        isCharging: false,
+        percent: null,
+        timeRemainingMinutes: null,
+        acConnected: null,
+        manufacturer: null,
+        cycleCount: null,
+        designedCapacityWh: null,
+        maxCapacityWh: null,
+        designToMaxCapacityPercent: null,
+      },
+      wifi: {
+        connected: true,
+        iface: "wlan0",
+        ssid: "FallbackNet",
+        bssid: null,
+        signalPercent: 55,
+        txRateMbps: null,
+        downloadMbps: null,
+        uploadMbps: null,
+        ipv4: "192.168.1.12",
+        ipv6: null,
+        availableNetworks: [],
+      },
+      process: {
+        pid: 1,
+        uptimeSeconds: 1,
+        nodeVersion: "v22",
+      },
+    });
+
+    try {
+      const first = await getNetworkStatus();
+      const second = await getNetworkStatus();
+
+      expect(first.source).toBe("fallback");
+      expect(second.source).toBe("fallback");
+      expect(vi.mocked(getSystemMetricsSnapshot).mock.calls.length).toBeLessThanOrEqual(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("validates connect payload and maps helper errors", async () => {

@@ -16,7 +16,8 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AppGrid } from "./app-grid";
+import { AppGrid, type AppActionTarget } from "./app-grid";
+import { AppSettingsPanel } from "./app-settings-panel";
 import { AppStore } from "./app-store";
 import { Dock } from "./dock";
 import { FileManager } from "./file-manager";
@@ -61,6 +62,7 @@ export function DesktopShell() {
     id: number;
     command: string;
   } | null>(null);
+  const [appSettingsTarget, setAppSettingsTarget] = useState<AppActionTarget | null>(null);
   const terminalCommandIdRef = useRef(0);
   const [displayWallpaper, setDisplayWallpaper] = useState(
     "/images/1.jpg",
@@ -243,7 +245,8 @@ export function DesktopShell() {
       id !== "settings" &&
       id !== "app-store" &&
       id !== "terminal" &&
-      id !== "monitor"
+      id !== "monitor" &&
+      id !== "app-settings"
     )
       return;
 
@@ -457,7 +460,10 @@ export function DesktopShell() {
                 `docker exec ${containerName} /bin/sh -c "pwd && ls"`,
               )
             }
-            onOpenSettings={() => openSettingsSection("docker")}
+            onOpenSettings={(target) => {
+              setAppSettingsTarget(target);
+              openWindow("app-settings");
+            }}
           />
 
           {/* System Widgets (right sidebar) */}
@@ -532,6 +538,25 @@ export function DesktopShell() {
             animationsEnabled={appearance.animationsEnabled}
           >
             <AppStore />
+          </Window>
+        )}
+
+        {openWindows.includes("app-settings") && appSettingsTarget && (
+          <Window
+            title={`${appSettingsTarget.appName} Settings`}
+            icon={<Settings className="size-4 text-primary" />}
+            onClose={() => {
+              closeWindow("app-settings");
+              setAppSettingsTarget(null);
+            }}
+            defaultWidth={920}
+            defaultHeight={700}
+            zIndex={getWindowZ("app-settings")}
+            onFocus={() => setFocusedWindow("app-settings")}
+            isClosing={closingWindows.includes("app-settings")}
+            animationsEnabled={appearance.animationsEnabled}
+          >
+            <AppSettingsPanel target={appSettingsTarget} />
           </Window>
         )}
 

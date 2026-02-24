@@ -2,6 +2,7 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import {
+  cleanupComposeDataOnUninstall,
   extractComposeImages,
   materializeInlineStackFiles,
   materializeStackFiles,
@@ -17,10 +18,10 @@ import {
 import { pullDockerImage } from "@/lib/server/modules/store/docker-client";
 import {
   createStoreOperation,
+  deleteInstalledStackByAppId,
   findInstalledStackByAppId,
   findStackByWebUiPort,
   findStoreOperationById,
-  markStackAsNotInstalled,
   updateStoreOperation,
   upsertInstalledStack,
 } from "@/lib/server/modules/store/repository";
@@ -347,6 +348,7 @@ async function runUninstallOperation(operationId: string, params: OperationParam
       step: "noop",
       message: "Application already uninstalled",
     });
+    await deleteInstalledStackByAppId(params.appId);
     return;
   }
 
@@ -374,12 +376,31 @@ async function runUninstallOperation(operationId: string, params: OperationParam
     action: params.action,
     status: "running",
     eventType: "operation.step",
-    progressPercent: 80,
+    progressPercent: params.removeVolumes ? 70 : 90,
     step: "cleanup",
-    message: "Marking stack uninstalled",
+    message: params.removeVolumes
+      ? "Removing app data"
+      : "Removing installed stack record",
   });
 
-  await markStackAsNotInstalled(params.appId);
+  if (params.removeVolumes) {
+    await cleanupComposeDataOnUninstall({
+      composePath: stack.composePath,
+    });
+  }
+
+  await patchOperationAndEmit({
+    operationId,
+    appId: params.appId,
+    action: params.action,
+    status: "running",
+    eventType: "operation.step",
+    progressPercent: 95,
+    step: "cleanup",
+    message: "Removing installed stack record",
+  });
+
+  await deleteInstalledStackByAppId(params.appId);
 }
 
 async function executeStoreOperation(operationId: string, params: OperationParams) {

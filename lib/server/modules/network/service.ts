@@ -35,6 +35,22 @@ type WifiNetworksResult = {
   source: NetworkSource;
 };
 
+const NETWORK_FALLBACK_CACHE_TTL_MS = 30_000;
+
+let fallbackStatusCache:
+  | {
+      value: NetworkStatus;
+      expiresAt: number;
+    }
+  | null = null;
+
+let fallbackWifiNetworksCache:
+  | {
+      value: WifiAccessPoint[];
+      expiresAt: number;
+    }
+  | null = null;
+
 const connectNetworkSchema = z.object({
   ssid: z.string().trim().min(1).max(128),
   password: z.string().min(1).max(128).optional(),
@@ -87,6 +103,38 @@ function mapFallbackNetworksFromMetrics(snapshot: Awaited<ReturnType<typeof getS
       security: network.security,
     }))
     .sort((left, right) => (right.signalPercent ?? 0) - (left.signalPercent ?? 0));
+}
+
+function readCachedFallbackStatus() {
+  if (!fallbackStatusCache) return null;
+  if (fallbackStatusCache.expiresAt <= Date.now()) {
+    fallbackStatusCache = null;
+    return null;
+  }
+
+  return fallbackStatusCache.value;
+}
+
+function readCachedFallbackWifiNetworks() {
+  if (!fallbackWifiNetworksCache) return null;
+  if (fallbackWifiNetworksCache.expiresAt <= Date.now()) {
+    fallbackWifiNetworksCache = null;
+    return null;
+  }
+
+  return fallbackWifiNetworksCache.value;
+}
+
+function writeFallbackCaches(snapshot: Awaited<ReturnType<typeof getSystemMetricsSnapshot>>) {
+  const expiresAt = Date.now() + NETWORK_FALLBACK_CACHE_TTL_MS;
+  fallbackStatusCache = {
+    value: mapFallbackStatusFromMetrics(snapshot),
+    expiresAt,
+  };
+  fallbackWifiNetworksCache = {
+    value: mapFallbackNetworksFromMetrics(snapshot),
+    expiresAt,
+  };
 }
 
 function mapKnownServiceError(error: unknown) {
@@ -156,21 +204,39 @@ export async function getNetworkStatus(context?: RequestContext): Promise<Networ
           throw mapKnownServiceError(error);
         }
 
+        const cached = readCachedFallbackStatus();
+        if (cached) {
+          logServerAction({
+            level: "warn",
+            layer: "service",
+            action: "network.status.get.fallback",
+            status: "info",
+            requestId: context?.requestId,
+            message: "DBus helper unavailable; using in-memory fallback cache",
+          });
+
+          return {
+            data: cached,
+            source: "fallback",
+          } satisfies NetworkStatusResult;
+        }
+
         logServerAction({
           level: "warn",
           layer: "service",
           action: "network.status.get.fallback",
-          status: "error",
+          status: "info",
           requestId: context?.requestId,
           message:
-            "DBus helper unavailable; using cached system metrics fallback for network status",
+            "DBus helper unavailable; refreshing fallback cache from system metrics",
           error,
         });
 
         const snapshot = await getSystemMetricsSnapshot();
+        writeFallbackCaches(snapshot);
 
         return {
-          data: mapFallbackStatusFromMetrics(snapshot),
+          data: readCachedFallbackStatus() ?? mapFallbackStatusFromMetrics(snapshot),
           source: "fallback",
         } satisfies NetworkStatusResult;
       }
@@ -202,21 +268,41 @@ export async function getWifiNetworks(
           throw mapKnownServiceError(error);
         }
 
+        const cached = readCachedFallbackWifiNetworks();
+        if (cached) {
+          logServerAction({
+            level: "warn",
+            layer: "service",
+            action: "network.networks.get.fallback",
+            status: "info",
+            requestId: context?.requestId,
+            message: "DBus helper unavailable; using in-memory fallback cache",
+          });
+
+          return {
+            data: cached,
+            source: "fallback",
+          } satisfies WifiNetworksResult;
+        }
+
         logServerAction({
           level: "warn",
           layer: "service",
           action: "network.networks.get.fallback",
-          status: "error",
+          status: "info",
           requestId: context?.requestId,
           message:
-            "DBus helper unavailable; using cached system metrics fallback for Wi-Fi list",
+            "DBus helper unavailable; refreshing fallback cache from system metrics",
           error,
         });
 
         const snapshot = await getSystemMetricsSnapshot();
+        writeFallbackCaches(snapshot);
 
         return {
-          data: mapFallbackNetworksFromMetrics(snapshot),
+          data:
+            readCachedFallbackWifiNetworks() ??
+            mapFallbackNetworksFromMetrics(snapshot),
           source: "fallback",
         } satisfies WifiNetworksResult;
       }

@@ -16,6 +16,7 @@ describe("server env", () => {
     delete process.env.DATABASE_URL;
     delete process.env.PG_MAX_CONNECTIONS;
     delete process.env.METRICS_CACHE_TTL_MS;
+    delete process.env.STORE_STACKS_ROOT;
 
     const { serverEnv } = await import("@/lib/server/env");
 
@@ -23,6 +24,16 @@ describe("server env", () => {
     expect(serverEnv.PG_MAX_CONNECTIONS).toBe(10);
     expect(serverEnv.WEBSOCKET_ENABLED).toBe(true);
     expect(serverEnv.AUTH_COOKIE_SECURE).toBe(false);
+    expect(serverEnv.STORE_STACKS_ROOT).toBe("DATA/Apps");
+  });
+
+  it("uses /DATA/Apps as default stacks root in production", async () => {
+    process.env.NODE_ENV = "production";
+    delete process.env.STORE_STACKS_ROOT;
+
+    const { serverEnv } = await import("@/lib/server/env");
+
+    expect(serverEnv.STORE_STACKS_ROOT).toBe("/DATA/Apps");
   });
 
   it("parses AUTH_COOKIE_SECURE=true", async () => {

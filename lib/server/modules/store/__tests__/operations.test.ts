@@ -5,6 +5,7 @@ vi.mock("@/lib/server/modules/store/catalog", () => ({
 }));
 
 vi.mock("@/lib/server/modules/store/compose-runner", () => ({
+  cleanupComposeDataOnUninstall: vi.fn(),
   extractComposeImages: vi.fn(),
   materializeInlineStackFiles: vi.fn(),
   materializeStackFiles: vi.fn(),
@@ -24,25 +25,28 @@ vi.mock("@/lib/server/modules/store/docker-client", () => ({
 
 vi.mock("@/lib/server/modules/store/repository", () => ({
   createStoreOperation: vi.fn(),
+  deleteInstalledStackByAppId: vi.fn(),
   findInstalledStackByAppId: vi.fn(),
   findStackByWebUiPort: vi.fn(),
   findStoreOperationById: vi.fn(),
-  markStackAsNotInstalled: vi.fn(),
   updateStoreOperation: vi.fn(),
   upsertInstalledStack: vi.fn(),
 }));
 
 import { findStoreCatalogTemplateByAppId } from "@/lib/server/modules/store/catalog";
 import {
+  cleanupComposeDataOnUninstall,
   extractComposeImages,
   materializeInlineStackFiles,
   materializeStackFiles,
+  runComposeDown,
   runComposeUp,
 } from "@/lib/server/modules/store/compose-runner";
 import { findCustomStoreTemplateByAppId } from "@/lib/server/modules/store/custom-apps";
 import { pullDockerImage } from "@/lib/server/modules/store/docker-client";
 import {
   createStoreOperation,
+  deleteInstalledStackByAppId,
   findInstalledStackByAppId,
   findStackByWebUiPort,
   updateStoreOperation,
@@ -72,12 +76,14 @@ describe("store operations", () => {
   beforeEach(() => {
     vi.mocked(findStoreCatalogTemplateByAppId).mockReset();
     vi.mocked(findCustomStoreTemplateByAppId).mockReset();
+    vi.mocked(cleanupComposeDataOnUninstall).mockReset();
     vi.mocked(materializeInlineStackFiles).mockReset();
     vi.mocked(materializeStackFiles).mockReset();
     vi.mocked(extractComposeImages).mockReset();
     vi.mocked(pullDockerImage).mockReset();
     vi.mocked(runComposeUp).mockReset();
     vi.mocked(createStoreOperation).mockReset();
+    vi.mocked(deleteInstalledStackByAppId).mockReset();
     vi.mocked(findInstalledStackByAppId).mockReset();
     vi.mocked(findStackByWebUiPort).mockReset();
     vi.mocked(updateStoreOperation).mockReset();
@@ -219,5 +225,57 @@ describe("store operations", () => {
 
     const latest = await waitForLatestEventType(operationId, "operation.failed");
     expect(latest?.status).toBe("error");
+  });
+
+  it("hard-deletes stack record on uninstall and removes data when requested", async () => {
+    vi.mocked(findInstalledStackByAppId).mockResolvedValue({
+      appId: "2fauth",
+      templateName: "2fauth",
+      stackName: "big-bear-2fauth",
+      composePath: "/tmp/store/stacks/2fauth/docker-compose.yml",
+      status: "installed",
+      webUiPort: 8000,
+      env: {},
+      installedAt: "2026-02-24T00:00:00.000Z",
+      updatedAt: "2026-02-24T00:00:00.000Z",
+    });
+
+    vi.mocked(createStoreOperation).mockResolvedValue(undefined);
+    vi.mocked(updateStoreOperation).mockResolvedValue(undefined);
+    vi.mocked(runComposeDown).mockResolvedValue(undefined);
+    vi.mocked(cleanupComposeDataOnUninstall).mockResolvedValue(undefined);
+    vi.mocked(deleteInstalledStackByAppId).mockResolvedValue(undefined);
+
+    let finished = false;
+    const done = new Promise<void>((resolve) => {
+      vi.mocked(updateStoreOperation).mockImplementation(async (_id, patch) => {
+        if (!finished && patch.status === "success") {
+          finished = true;
+          resolve();
+        }
+      });
+    });
+
+    const { operationId } = await startStoreOperation({
+      appId: "2fauth",
+      action: "uninstall",
+      removeVolumes: true,
+    });
+
+    await done;
+
+    expect(runComposeDown).toHaveBeenCalledWith({
+      composePath: "/tmp/store/stacks/2fauth/docker-compose.yml",
+      envPath: "/tmp/store/stacks/2fauth/.env",
+      stackName: "big-bear-2fauth",
+      removeVolumes: true,
+    });
+    expect(cleanupComposeDataOnUninstall).toHaveBeenCalledWith({
+      composePath: "/tmp/store/stacks/2fauth/docker-compose.yml",
+    });
+    expect(deleteInstalledStackByAppId).toHaveBeenCalledWith("2fauth");
+
+    const latest = await waitForLatestEventType(operationId, "operation.completed");
+    expect(latest?.status).toBe("success");
   });
 });

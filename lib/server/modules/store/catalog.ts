@@ -209,15 +209,24 @@ export async function listStoreCatalogTemplates(options?: { bypassCache?: boolea
       if (metadata.lastModified) headers.set("If-Modified-Since", metadata.lastModified);
 
       try {
-        const response = await fetch(serverEnv.STORE_TEMPLATE_URL, {
+        let response = await fetch(serverEnv.STORE_TEMPLATE_URL, {
           method: "GET",
           headers,
           cache: "no-store",
         });
 
-        if (response.status === 304 && cached) {
-          catalogCache.set("bigbear-catalog", cached, serverEnv.STORE_CATALOG_TTL_MS);
-          return cached;
+        if (response.status === 304) {
+          if (cached) {
+            catalogCache.set("bigbear-catalog", cached, serverEnv.STORE_CATALOG_TTL_MS);
+            return cached;
+          }
+
+          // Metadata can outlive in-memory cache; retry once without validators.
+          metadata = { etag: null, lastModified: null };
+          response = await fetch(serverEnv.STORE_TEMPLATE_URL, {
+            method: "GET",
+            cache: "no-store",
+          });
         }
 
         if (!response.ok) {

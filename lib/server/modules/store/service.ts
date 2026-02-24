@@ -21,6 +21,7 @@ import type {
   StoreOperationAction,
 } from "@/lib/shared/contracts/apps";
 import { startStoreOperation } from "@/lib/server/modules/store/operations";
+import { patchInstalledStackMeta } from "@/lib/server/modules/store/repository";
 
 function includesSearch(text: string, search: string) {
   return text.toLowerCase().includes(search.toLowerCase());
@@ -39,11 +40,11 @@ function toSummary(
 ): StoreAppSummary {
   return {
     id: template.appId,
-    name: template.name,
+    name: installed?.displayName ?? template.name,
     description: template.description,
     platform: template.platform,
     categories: template.categories,
-    logoUrl: template.logoUrl,
+    logoUrl: installed?.iconUrl ?? template.logoUrl,
     repositoryUrl: template.repositoryUrl,
     stackFile: template.stackFile,
     status: installed?.status ?? "not_installed",
@@ -228,5 +229,46 @@ export async function startAppLifecycleAction(input: {
         webUiPort: input.webUiPort,
         removeVolumes: input.removeVolumes,
       }),
+  );
+}
+
+export async function saveAppSettings(input: {
+  appId: string;
+  displayName?: string;
+  iconUrl?: string | null;
+  env?: Record<string, string>;
+  webUiPort?: number;
+}): Promise<{ operationId?: string }> {
+  return withServerTiming(
+    {
+      layer: "service",
+      action: "store.apps.settings.save",
+      meta: {
+        appId: input.appId,
+        hasEnv: Boolean(input.env),
+        hasPort: Boolean(input.webUiPort !== undefined),
+      },
+    },
+    async () => {
+      const { appId, displayName, iconUrl, env, webUiPort } = input;
+
+      // 1. Always save metadata immediately
+      if (displayName !== undefined || iconUrl !== undefined) {
+        await patchInstalledStackMeta(appId, { displayName, iconUrl });
+      }
+
+      // 2. Trigger redeploy if config changed
+      if (env !== undefined || webUiPort !== undefined) {
+        const result = await startStoreOperation({
+          appId,
+          action: "redeploy",
+          env,
+          webUiPort,
+        });
+        return { operationId: result.operationId };
+      }
+
+      return {};
+    },
   );
 }

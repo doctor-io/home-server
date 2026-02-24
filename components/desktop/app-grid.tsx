@@ -33,9 +33,11 @@ import {
   Trash2,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { UninstallAppDialog } from "@/components/desktop/uninstall-app-dialog";
+import { useInstalledApps } from "@/hooks/useInstalledApps";
+import { useStoreActions } from "@/hooks/useStoreActions";
 import { useStoreCatalog } from "@/hooks/useStoreCatalog";
 import { logClientAction } from "@/lib/client/logger";
-import type { StoreAppSummary } from "@/lib/shared/contracts/apps";
 
 type AppItem = {
   id: string;
@@ -48,176 +50,49 @@ type AppItem = {
   webUiPort: number | null;
 };
 
-type AppVisualSeedItem = Omit<AppItem, "id" | "webUiPort">;
-
-type AppActionTarget = {
+export type AppActionTarget = {
   appName: string;
   dashboardUrl: string;
   containerName: string;
 };
 
-const appSeed: AppVisualSeedItem[] = [
-  {
-    name: "Plex",
-    icon: Film,
-    color: "text-amber-400",
-    bgColor: "bg-amber-500/20",
-    status: "running",
-    category: "Media",
-  },
-  {
-    name: "Nextcloud",
-    icon: Cloud,
-    color: "text-sky-400",
-    bgColor: "bg-sky-500/20",
-    status: "running",
-    category: "Productivity",
-  },
-  {
-    name: "Pi-hole",
-    icon: Shield,
-    color: "text-red-400",
-    bgColor: "bg-red-500/20",
-    status: "running",
-    category: "Network",
-  },
-  {
-    name: "Home Asst.",
-    icon: Home,
-    color: "text-cyan-400",
-    bgColor: "bg-cyan-500/20",
-    status: "running",
-    category: "Automation",
-  },
-  {
-    name: "Portainer",
-    icon: Container,
-    color: "text-blue-400",
-    bgColor: "bg-blue-500/20",
-    status: "running",
-    category: "System",
-  },
-  {
-    name: "Grafana",
-    icon: BarChart3,
-    color: "text-orange-400",
-    bgColor: "bg-orange-500/20",
-    status: "running",
-    category: "System",
-  },
-  {
-    name: "Nginx Proxy",
-    icon: Globe,
-    color: "text-emerald-400",
-    bgColor: "bg-emerald-500/20",
-    status: "running",
-    category: "Network",
-  },
-  {
-    name: "Vaultwarden",
-    icon: Lock,
-    color: "text-indigo-400",
-    bgColor: "bg-indigo-500/20",
-    status: "running",
-    category: "Security",
-  },
-  {
-    name: "qBittorrent",
-    icon: Download,
-    color: "text-teal-400",
-    bgColor: "bg-teal-500/20",
-    status: "stopped",
-    category: "Downloads",
-  },
-  {
-    name: "PostgreSQL",
-    icon: Database,
-    color: "text-blue-300",
-    bgColor: "bg-blue-600/20",
-    status: "running",
-    category: "System",
-  },
-  {
-    name: "Jellyfin",
-    icon: Music,
-    color: "text-sky-300",
-    bgColor: "bg-sky-600/20",
-    status: "running",
-    category: "Media",
-  },
-  {
-    name: "Gitea",
-    icon: Code,
-    color: "text-green-400",
-    bgColor: "bg-green-600/20",
-    status: "running",
-    category: "Development",
-  },
-  {
-    name: "Immich",
-    icon: Camera,
-    color: "text-pink-400",
-    bgColor: "bg-pink-500/20",
-    status: "updating",
-    category: "Media",
-  },
-  {
-    name: "Bookstack",
-    icon: BookOpen,
-    color: "text-yellow-400",
-    bgColor: "bg-yellow-600/20",
-    status: "running",
-    category: "Productivity",
-  },
-  {
-    name: "File Browser",
-    icon: FolderOpen,
-    color: "text-stone-400",
-    bgColor: "bg-stone-500/20",
-    status: "running",
-    category: "Productivity",
-  },
-  {
-    name: "Uptime Kuma",
-    icon: Server,
-    color: "text-lime-400",
-    bgColor: "bg-lime-500/20",
-    status: "running",
-    category: "System",
-  },
-  {
-    name: "Mailcow",
-    icon: Mail,
-    color: "text-rose-400",
-    bgColor: "bg-rose-500/20",
-    status: "stopped",
-    category: "Communication",
-  },
-  {
-    name: "Matrix",
-    icon: MessageSquare,
-    color: "text-emerald-300",
-    bgColor: "bg-emerald-600/20",
-    status: "running",
-    category: "Communication",
-  },
-  {
-    name: "FreshRSS",
-    icon: Rss,
-    color: "text-orange-300",
-    bgColor: "bg-orange-600/20",
-    status: "running",
-    category: "Productivity",
-  },
-  {
-    name: "Minecraft",
-    icon: Gamepad2,
-    color: "text-green-400",
-    bgColor: "bg-green-500/20",
-    status: "stopped",
-    category: "Gaming",
-  },
+const iconByKeyword: Array<{
+  keywords: string[];
+  icon: React.ComponentType<{ className?: string }>;
+  category: string;
+}> = [
+  { keywords: ["plex", "jellyfin"], icon: Film, category: "Media" },
+  { keywords: ["nextcloud", "cloud"], icon: Cloud, category: "Productivity" },
+  { keywords: ["pihole", "pi-hole"], icon: Shield, category: "Network" },
+  { keywords: ["home assistant", "home-asst"], icon: Home, category: "Automation" },
+  { keywords: ["portainer", "docker"], icon: Container, category: "System" },
+  { keywords: ["grafana"], icon: BarChart3, category: "System" },
+  { keywords: ["proxy", "nginx"], icon: Globe, category: "Network" },
+  { keywords: ["vaultwarden", "auth", "2fauth"], icon: Lock, category: "Security" },
+  { keywords: ["qbittorrent", "torrent"], icon: Download, category: "Downloads" },
+  { keywords: ["postgres", "mysql", "database"], icon: Database, category: "System" },
+  { keywords: ["music", "audio"], icon: Music, category: "Media" },
+  { keywords: ["gitea", "git"], icon: Code, category: "Development" },
+  { keywords: ["immich", "photo"], icon: Camera, category: "Media" },
+  { keywords: ["book", "wiki"], icon: BookOpen, category: "Productivity" },
+  { keywords: ["file"], icon: FolderOpen, category: "Productivity" },
+  { keywords: ["uptime", "kuma"], icon: Server, category: "System" },
+  { keywords: ["mail"], icon: Mail, category: "Communication" },
+  { keywords: ["matrix", "chat"], icon: MessageSquare, category: "Communication" },
+  { keywords: ["rss"], icon: Rss, category: "Productivity" },
+  { keywords: ["minecraft", "game"], icon: Gamepad2, category: "Gaming" },
 ];
+
+const visualPalette = [
+  { color: "text-sky-300", bgColor: "bg-sky-600/20" },
+  { color: "text-emerald-300", bgColor: "bg-emerald-600/20" },
+  { color: "text-amber-300", bgColor: "bg-amber-600/20" },
+  { color: "text-violet-300", bgColor: "bg-violet-600/20" },
+  { color: "text-rose-300", bgColor: "bg-rose-600/20" },
+  { color: "text-cyan-300", bgColor: "bg-cyan-600/20" },
+  { color: "text-lime-300", bgColor: "bg-lime-600/20" },
+  { color: "text-orange-300", bgColor: "bg-orange-600/20" },
+] as const;
 
 const appConnectionMap: Record<
   string,
@@ -226,30 +101,57 @@ const appConnectionMap: Record<
     containerName: string;
   }
 > = {
-  Plex: { dashboardUrl: "http://localhost:32400/web", containerName: "plex" },
-  Nextcloud: { dashboardUrl: "http://localhost:8080", containerName: "nextcloud" },
-  "Pi-hole": { dashboardUrl: "http://localhost:8053/admin", containerName: "pihole" },
-  "Home Asst.": { dashboardUrl: "http://localhost:8123", containerName: "home-assistant" },
-  Portainer: { dashboardUrl: "http://localhost:9443", containerName: "portainer" },
-  Grafana: { dashboardUrl: "http://localhost:3000", containerName: "grafana" },
-  "Nginx Proxy": { dashboardUrl: "http://localhost:81", containerName: "nginx-proxy" },
-  Vaultwarden: { dashboardUrl: "http://localhost:8222", containerName: "vaultwarden" },
-  qBittorrent: { dashboardUrl: "http://localhost:8081", containerName: "qbittorrent" },
-  PostgreSQL: { dashboardUrl: "http://localhost:5432", containerName: "postgres" },
-  Jellyfin: { dashboardUrl: "http://localhost:8096", containerName: "jellyfin" },
-  Gitea: { dashboardUrl: "http://localhost:3001", containerName: "gitea" },
-  Immich: { dashboardUrl: "http://localhost:2283", containerName: "immich-server" },
-  Bookstack: { dashboardUrl: "http://localhost:6875", containerName: "bookstack" },
-  "File Browser": { dashboardUrl: "http://localhost:8082", containerName: "filebrowser" },
-  "Uptime Kuma": { dashboardUrl: "http://localhost:3002", containerName: "uptime-kuma" },
-  Mailcow: { dashboardUrl: "http://localhost:8090", containerName: "mailcow" },
-  Matrix: { dashboardUrl: "http://localhost:8008", containerName: "matrix-synapse" },
-  FreshRSS: { dashboardUrl: "http://localhost:8083", containerName: "freshrss" },
-  Minecraft: { dashboardUrl: "http://localhost:25565", containerName: "minecraft" },
+  plex: { dashboardUrl: "http://localhost:32400/web", containerName: "plex" },
+  nextcloud: { dashboardUrl: "http://localhost:8080", containerName: "nextcloud" },
+  "pi-hole": { dashboardUrl: "http://localhost:8053/admin", containerName: "pihole" },
+  pihole: { dashboardUrl: "http://localhost:8053/admin", containerName: "pihole" },
+  "home-asst": { dashboardUrl: "http://localhost:8123", containerName: "home-assistant" },
+  "home-assistant": { dashboardUrl: "http://localhost:8123", containerName: "home-assistant" },
+  portainer: { dashboardUrl: "http://localhost:9443", containerName: "portainer" },
+  grafana: { dashboardUrl: "http://localhost:3000", containerName: "grafana" },
+  "nginx-proxy": { dashboardUrl: "http://localhost:81", containerName: "nginx-proxy" },
+  vaultwarden: { dashboardUrl: "http://localhost:8222", containerName: "vaultwarden" },
+  qbittorrent: { dashboardUrl: "http://localhost:8081", containerName: "qbittorrent" },
+  postgresql: { dashboardUrl: "http://localhost:5432", containerName: "postgres" },
+  postgres: { dashboardUrl: "http://localhost:5432", containerName: "postgres" },
+  jellyfin: { dashboardUrl: "http://localhost:8096", containerName: "jellyfin" },
+  gitea: { dashboardUrl: "http://localhost:3001", containerName: "gitea" },
+  immich: { dashboardUrl: "http://localhost:2283", containerName: "immich-server" },
+  bookstack: { dashboardUrl: "http://localhost:6875", containerName: "bookstack" },
+  "file-browser": { dashboardUrl: "http://localhost:8082", containerName: "filebrowser" },
+  "uptime-kuma": { dashboardUrl: "http://localhost:3002", containerName: "uptime-kuma" },
+  mailcow: { dashboardUrl: "http://localhost:8090", containerName: "mailcow" },
+  matrix: { dashboardUrl: "http://localhost:8008", containerName: "matrix-synapse" },
+  freshrss: { dashboardUrl: "http://localhost:8083", containerName: "freshrss" },
+  minecraft: { dashboardUrl: "http://localhost:25565", containerName: "minecraft" },
 };
 
 function toSlug(value: string) {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-");
+}
+
+function hashText(value: string) {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash << 5) - hash + value.charCodeAt(index);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+function pickVisual(appName: string, appId: string) {
+  const name = appName.toLowerCase();
+  const matched =
+    iconByKeyword.find((entry) => entry.keywords.some((keyword) => name.includes(keyword))) ??
+    null;
+  const palette = visualPalette[hashText(appId) % visualPalette.length];
+
+  return {
+    icon: matched?.icon ?? Container,
+    category: matched?.category ?? "Apps",
+    color: palette.color,
+    bgColor: palette.bgColor,
+  };
 }
 
 function extractUrlPath(value: string) {
@@ -273,35 +175,19 @@ function toCurrentHostUrl(value: string) {
   }
 }
 
-function toGridStatus(status: StoreAppSummary["status"]): AppItem["status"] {
-  if (status === "installing" || status === "updating" || status === "uninstalling") {
-    return "updating";
+function parsePortFromUrl(value: string): number | null {
+  try {
+    const parsed = new URL(value);
+    if (!parsed.port) return null;
+    const port = Number.parseInt(parsed.port, 10);
+    return Number.isInteger(port) ? port : null;
+  } catch {
+    return null;
   }
-
-  if (status === "installed") {
-    return "running";
-  }
-
-  return "stopped";
-}
-
-function mapStoreAppToGridItem(app: StoreAppSummary): AppItem {
-  const visual = appSeed.find((item) => item.name === app.name);
-
-  return {
-    id: app.id,
-    name: app.name,
-    icon: visual?.icon ?? Container,
-    color: visual?.color ?? "text-blue-300",
-    bgColor: visual?.bgColor ?? "bg-blue-600/20",
-    status: toGridStatus(app.status),
-    category: app.categories[0] ?? visual?.category ?? "Apps",
-    webUiPort: app.webUiPort,
-  };
 }
 
 function resolveAppActionTarget(app: AppItem): AppActionTarget {
-  const mapped = appConnectionMap[app.name];
+  const mapped = appConnectionMap[app.id] ?? appConnectionMap[toSlug(app.name)];
 
   if (app.webUiPort !== null) {
     const protocol = typeof window !== "undefined" ? window.location.protocol : "http:";
@@ -311,7 +197,7 @@ function resolveAppActionTarget(app: AppItem): AppActionTarget {
     return {
       appName: app.name,
       dashboardUrl: `${protocol}//${hostname}:${app.webUiPort}${path}`,
-      containerName: mapped?.containerName ?? toSlug(app.name),
+      containerName: mapped?.containerName ?? app.id,
     };
   }
 
@@ -330,7 +216,7 @@ function resolveAppActionTarget(app: AppItem): AppActionTarget {
   return {
     appName: app.name,
     dashboardUrl: `${protocol}//${hostname}`,
-    containerName: toSlug(app.name),
+    containerName: app.id,
   };
 }
 
@@ -353,12 +239,16 @@ export function AppGrid({
   onOpenSettings,
   onCopyUrl,
 }: AppGridProps) {
-  const installedAppsQuery = useStoreCatalog({
+  const installedAppsQuery = useInstalledApps();
+  const installedCatalogQuery = useStoreCatalog({
     installedOnly: true,
   });
+  const { operationsByApp, uninstallApp } = useStoreActions();
   const [statusByAppId, setStatusByAppId] = useState<Record<string, AppItem["status"]>>({});
-  const [removedAppIds, setRemovedAppIds] = useState<Record<string, boolean>>({});
   const [activeAppId, setActiveAppId] = useState<string | null>(null);
+  const [uninstallAppId, setUninstallAppId] = useState<string | null>(null);
+  const [uninstallError, setUninstallError] = useState<string | null>(null);
+  const [uninstallPending, setUninstallPending] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -366,16 +256,46 @@ export function AppGrid({
   } | null>(null);
 
   const apps = useMemo(() => {
-    const source = installedAppsQuery.data ?? [];
+    const installedApps = installedAppsQuery.data ?? [];
+    const installedCatalog = installedCatalogQuery.data ?? [];
+    const installedById = new Map(installedApps.map((app) => [app.id, app]));
+    const catalogById = new Map(installedCatalog.map((app) => [app.id, app]));
+    const ids = Array.from(new Set([...installedById.keys(), ...catalogById.keys()]));
 
-    return source
-      .map(mapStoreAppToGridItem)
-      .filter((app) => !removedAppIds[app.id])
-      .map((app) => ({
-        ...app,
-        status: statusByAppId[app.id] ?? app.status,
-      }));
-  }, [installedAppsQuery.data, removedAppIds, statusByAppId]);
+    return ids
+      .map((appId) => {
+        const installed = installedById.get(appId);
+        const catalog = catalogById.get(appId);
+        const name = catalog?.name ?? installed?.name ?? appId;
+        const mapped = appConnectionMap[appId] ?? appConnectionMap[toSlug(name)];
+        const fallbackPort = mapped ? parsePortFromUrl(mapped.dashboardUrl) : null;
+        const visual = pickVisual(name, appId);
+
+        let derivedStatus: AppItem["status"] = "stopped";
+        if (catalog?.status === "installing" || catalog?.status === "updating") {
+          derivedStatus = "updating";
+        } else if (installed?.status === "running") {
+          derivedStatus = "running";
+        } else if (installed?.status === "stopped") {
+          derivedStatus = "stopped";
+        }
+
+        return {
+          id: appId,
+          name,
+          icon: visual.icon,
+          color: visual.color,
+          bgColor: visual.bgColor,
+          status: statusByAppId[appId] ?? derivedStatus,
+          category: catalog?.categories[0] ?? visual.category,
+          webUiPort: catalog?.webUiPort ?? fallbackPort,
+        } satisfies AppItem;
+      })
+      .sort((left, right) => left.name.localeCompare(right.name));
+  }, [installedAppsQuery.data, installedCatalogQuery.data, statusByAppId]);
+
+  const isAppsLoading = installedAppsQuery.isLoading || installedCatalogQuery.isLoading;
+  const isAppsError = installedAppsQuery.isError && installedCatalogQuery.isError;
 
   const filtered = apps;
   const iconContainerClass =
@@ -394,6 +314,14 @@ export function AppGrid({
   const menuApp = contextMenu
     ? (apps.find((a) => a.id === contextMenu.appId) ?? null)
     : null;
+  const uninstallTarget = uninstallAppId
+    ? (apps.find((app) => app.id === uninstallAppId) ?? null)
+    : null;
+  const menuOperation = menuApp ? operationsByApp[menuApp.id] : undefined;
+  const isMenuAppBusy = Boolean(
+    menuOperation &&
+      (menuOperation.status === "queued" || menuOperation.status === "running"),
+  );
 
   function closeContextMenu() {
     setContextMenu(null);
@@ -508,10 +436,8 @@ export function AppGrid({
           await navigator.clipboard.writeText(target.dashboardUrl);
         }
       } else if (action === "remove") {
-        setRemovedAppIds((previous) => ({
-          ...previous,
-          [menuApp.id]: true,
-        }));
+        setUninstallError(null);
+        setUninstallAppId(menuApp.id);
       }
 
       logClientAction({
@@ -540,6 +466,25 @@ export function AppGrid({
     closeContextMenu();
   }
 
+  async function confirmUninstall(input: { deleteData: boolean }) {
+    if (!uninstallAppId) return;
+
+    setUninstallError(null);
+    setUninstallPending(true);
+
+    try {
+      await uninstallApp({
+        appId: uninstallAppId,
+        removeVolumes: input.deleteData,
+      });
+      setUninstallAppId(null);
+    } catch (error) {
+      setUninstallError(error instanceof Error ? error.message : "Unable to start uninstall.");
+    } finally {
+      setUninstallPending(false);
+    }
+  }
+
   return (
     <section
       className="flex-1 px-6 pt-4 pb-6 overflow-y-auto"
@@ -563,12 +508,12 @@ export function AppGrid({
       </nav> */}
 
       {/* App icon grid - like a real desktop */}
-      {installedAppsQuery.isLoading ? (
-        <div className="mt-24 text-xs text-muted-foreground">Loading installed apps...</div>
-      ) : installedAppsQuery.isError ? (
-        <div className="mt-24 text-xs text-status-red">Unable to load installed apps.</div>
+      {isAppsLoading && filtered.length === 0 ? (
+        <div className="mt-24 text-xs text-muted-foreground">Loading apps...</div>
+      ) : isAppsError && filtered.length === 0 ? (
+        <div className="mt-24 text-xs text-status-red">Unable to load apps.</div>
       ) : filtered.length === 0 ? (
-        <div className="mt-24 text-xs text-muted-foreground">No installed apps found.</div>
+        <div className="mt-24 text-xs text-muted-foreground">No apps found.</div>
       ) : (
         <div className="grid grid-cols-4 sm:grid-cols-5 mt-24 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-x-2 gap-y-5">
           {filtered.map((app) => (
@@ -682,10 +627,25 @@ export function AppGrid({
             icon={<Trash2 className="size-3.5 text-status-red" />}
             label="Remove App"
             danger
+            disabled={isMenuAppBusy}
             onClick={() => void handleDockerAction("remove")}
           />
         </div>
       )}
+
+      <UninstallAppDialog
+        open={Boolean(uninstallAppId)}
+        appName={uninstallTarget?.name ?? null}
+        isSubmitting={uninstallPending}
+        error={uninstallError}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            setUninstallAppId(null);
+            setUninstallError(null);
+          }
+        }}
+        onConfirm={confirmUninstall}
+      />
     </section>
   );
 }

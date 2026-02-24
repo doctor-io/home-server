@@ -8,6 +8,10 @@ import {
 } from "@/lib/server/logging/logger";
 import { hasAnyUsers } from "@/lib/server/modules/auth/repository";
 import { AuthError, registerUser } from "@/lib/server/modules/auth/service";
+import {
+  ensureDataRootDirectories,
+  resolveDataRootDirectory,
+} from "@/lib/server/storage/data-root";
 
 export const runtime = "nodejs";
 
@@ -42,6 +46,18 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
+
+    await withServerTiming(
+      {
+        layer: "system",
+        action: "storage.data.bootstrap",
+        requestId,
+        meta: {
+          dataRoot: resolveDataRootDirectory(),
+        },
+      },
+      async () => ensureDataRootDirectories(),
+    );
 
     const user = await withServerTiming(
       {
