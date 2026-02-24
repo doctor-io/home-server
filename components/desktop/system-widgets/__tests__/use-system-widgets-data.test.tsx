@@ -107,7 +107,7 @@ describe("useSystemWidgetsData", () => {
     mockUseCurrentWeather.mockReturnValue({
       data: {
         timestamp: "2026-02-22T23:08:00.000Z",
-        source: "ip",
+        source: "navigator",
         location: {
           label: "Tunis, Tunisia",
           latitude: 36.8,

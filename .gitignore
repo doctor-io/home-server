@@ -9,4 +9,6 @@ node_modules/
 .env*.local
 .DS_Store
 logs/
+!app/api/v1/logs/
+!app/api/v1/logs/**
 .husky/_/

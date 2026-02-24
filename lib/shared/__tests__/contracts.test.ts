@@ -94,7 +94,7 @@ describe("shared contracts", () => {
     }>();
 
     expectTypeOf<WeatherSnapshot>().toMatchTypeOf<{
-      source: "navigator" | "ip";
+      source: "navigator";
       location: {
         label: string;
       };

@@ -29,6 +29,17 @@ type AppOperationState = {
   message: string | null;
 };
 
+type StartActionResult = {
+  appId: string;
+  operationId: string;
+  action: StoreOperationAction;
+};
+
+type ErrorResponsePayload = {
+  error?: string;
+  code?: string;
+};
+
 function isTerminalStatus(status: StoreOperation["status"]) {
   return status === "success" || status === "error";
 }
@@ -57,6 +68,25 @@ function mapEventToState(event: StoreOperationEvent): AppOperationState {
   };
 }
 
+function toStoreActionErrorMessage(
+  endpoint: string,
+  status: number,
+  payload: ErrorResponsePayload | null,
+) {
+  const baseMessage = payload?.error?.trim() || `Failed request (${status}) for ${endpoint}`;
+  const code = payload?.code?.trim();
+  if (!code) return baseMessage;
+  return `${baseMessage} [${code}]`;
+}
+
+async function parseErrorPayload(response: Response) {
+  try {
+    return (await response.json()) as ErrorResponsePayload;
+  } catch {
+    return null;
+  }
+}
+
 async function startLifecycleRequest(
   endpoint: string,
   payload: Record<string, unknown>,
@@ -80,7 +110,10 @@ async function startLifecycleRequest(
       });
 
       if (!response.ok) {
-        throw new Error(`Failed request (${response.status}) for ${endpoint}`);
+        const errorPayload = await parseErrorPayload(response);
+        throw new Error(
+          toStoreActionErrorMessage(endpoint, response.status, errorPayload),
+        );
       }
 
       return (await response.json()) as StartOperationResponse;
@@ -105,13 +138,30 @@ export function useStoreActions() {
   }, []);
 
   const attachOperationTracking = useCallback(
-    async (appId: string, operationId: string) => {
-      const snapshot = await fetchStoreOperationSnapshot(operationId);
-      if (snapshot) {
-        setOperationsByApp((previous) => ({
-          ...previous,
-          [appId]: mapOperationToState(snapshot),
-        }));
+    async ({ appId, operationId, action }: StartActionResult) => {
+      setOperationsByApp((previous) => ({
+        ...previous,
+        [appId]: {
+          operationId,
+          appId,
+          action,
+          status: "queued",
+          progressPercent: 0,
+          step: "queued",
+          message: null,
+        },
+      }));
+
+      try {
+        const snapshot = await fetchStoreOperationSnapshot(operationId);
+        if (snapshot) {
+          setOperationsByApp((previous) => ({
+            ...previous,
+            [appId]: mapOperationToState(snapshot),
+          }));
+        }
+      } catch {
+        // Keep optimistic queued state and continue with SSE subscription.
       }
 
       const cleanup = subscribeToStoreOperationEvents(operationId, {
@@ -175,10 +225,15 @@ export function useStoreActions() {
       return {
         appId: input.appId,
         operationId: response.operationId,
+        action: "install" as const,
       };
     },
-    onSuccess: ({ appId, operationId }) => {
-      void attachOperationTracking(appId, operationId);
+    onSuccess: ({ appId, operationId, action }) => {
+      void attachOperationTracking({
+        appId,
+        operationId,
+        action,
+      });
     },
   });
 
@@ -200,10 +255,15 @@ export function useStoreActions() {
       return {
         appId: input.appId,
         operationId: response.operationId,
+        action: "redeploy" as const,
       };
     },
-    onSuccess: ({ appId, operationId }) => {
-      void attachOperationTracking(appId, operationId);
+    onSuccess: ({ appId, operationId, action }) => {
+      void attachOperationTracking({
+        appId,
+        operationId,
+        action,
+      });
     },
   });
 
@@ -223,10 +283,15 @@ export function useStoreActions() {
       return {
         appId: input.appId,
         operationId: response.operationId,
+        action: "uninstall" as const,
       };
     },
-    onSuccess: ({ appId, operationId }) => {
-      void attachOperationTracking(appId, operationId);
+    onSuccess: ({ appId, operationId, action }) => {
+      void attachOperationTracking({
+        appId,
+        operationId,
+        action,
+      });
     },
   });
 
@@ -258,7 +323,14 @@ export function useStoreActions() {
           });
 
           if (!result.ok) {
-            throw new Error(`Failed request (${result.status}) for /api/v1/store/custom-apps/install`);
+            const errorPayload = await parseErrorPayload(result);
+            throw new Error(
+              toStoreActionErrorMessage(
+                "/api/v1/store/custom-apps/install",
+                result.status,
+                errorPayload,
+              ),
+            );
           }
 
           return (await result.json()) as StartCustomOperationResponse;
@@ -270,7 +342,11 @@ export function useStoreActions() {
     onSuccess: ({ appId, operationId }) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.storeCatalog });
       void queryClient.invalidateQueries({ queryKey: queryKeys.storeApp(appId) });
-      void attachOperationTracking(appId, operationId);
+      void attachOperationTracking({
+        appId,
+        operationId,
+        action: "install",
+      });
     },
   });
 

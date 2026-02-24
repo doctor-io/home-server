@@ -80,4 +80,30 @@ describe("useNetworkActions", () => {
       queryKey: queryKeys.networkNetworks,
     });
   });
+
+  it("surfaces helper unavailable error message from API payload", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 503,
+      json: async () => ({
+        error: "DBus helper unavailable",
+        code: "helper_unavailable",
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = createTestQueryClient();
+    const { result } = renderHook(() => useNetworkActions(), {
+      wrapper: createWrapper(client),
+    });
+
+    await expect(
+      act(async () => {
+        await result.current.connectNetwork({
+          ssid: "HomeNet",
+          password: "secret",
+        });
+      }),
+    ).rejects.toThrow("DBus helper unavailable. Check home-server-dbus service status.");
+  });
 });

@@ -222,4 +222,34 @@ describe("useStoreActions", () => {
       expect(result.current.operationsByApp["custom-my-app"]?.operationId).toBe("op-custom-1");
     });
   });
+
+  it("surfaces API error message and code for install failures", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 503,
+      json: async () => ({
+        error: "Unable to start install operation",
+        code: "helper_unavailable",
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    fetchStoreOperationSnapshotMock.mockResolvedValue(null);
+    subscribeToStoreOperationEventsMock.mockReturnValue(() => undefined);
+
+    const client = createTestQueryClient();
+    const { result } = renderHook(() => useStoreActions(), {
+      wrapper: createWrapper(client),
+    });
+
+    await expect(
+      act(async () => {
+        await result.current.installApp({
+          appId: "plex",
+        });
+      }),
+    ).rejects.toThrow(
+      "Unable to start install operation [helper_unavailable]",
+    );
+  });
 });

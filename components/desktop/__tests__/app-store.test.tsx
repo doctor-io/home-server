@@ -248,4 +248,39 @@ describe("AppStore", () => {
       });
     });
   });
+
+  it("shows action error banner in list when install request fails", async () => {
+    const installApp = vi.fn().mockRejectedValue(new Error("Unable to start install operation"));
+    useStoreCatalogMock.mockReturnValue({
+      data: [summaryApp],
+      isLoading: false,
+      isError: false,
+    });
+    useStoreAppMock.mockReturnValue({
+      data: null,
+      isLoading: false,
+    });
+    useStoreActionsMock.mockReturnValue({
+      operationsByApp: {},
+      installApp,
+      installCustomApp: vi.fn(),
+      redeployApp: vi.fn(),
+      uninstallApp: vi.fn(),
+    });
+    useStoreOperationMock.mockReturnValue({
+      operation: null,
+      latestEvent: null,
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    render(<AppStore />);
+
+    fireEvent.click(screen.getByRole("button", { name: /^install$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Unable to start install operation")).toBeTruthy();
+    });
+  });
 });

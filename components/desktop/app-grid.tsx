@@ -262,6 +262,17 @@ function extractUrlPath(value: string) {
   }
 }
 
+function toCurrentHostUrl(value: string) {
+  try {
+    const parsed = new URL(value);
+    const protocol = typeof window !== "undefined" ? window.location.protocol : parsed.protocol;
+    const hostname = typeof window !== "undefined" ? window.location.hostname : parsed.hostname;
+    return `${protocol}//${hostname}${parsed.port ? `:${parsed.port}` : ""}${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return value;
+  }
+}
+
 function toGridStatus(status: StoreAppSummary["status"]): AppItem["status"] {
   if (status === "installing" || status === "updating" || status === "uninstalling") {
     return "updating";
@@ -305,16 +316,20 @@ function resolveAppActionTarget(app: AppItem): AppActionTarget {
   }
 
   if (mapped) {
+    const dashboardUrl = toCurrentHostUrl(mapped.dashboardUrl);
     return {
       appName: app.name,
-      dashboardUrl: mapped.dashboardUrl,
+      dashboardUrl,
       containerName: mapped.containerName,
     };
   }
 
+  const protocol = typeof window !== "undefined" ? window.location.protocol : "http:";
+  const hostname = typeof window !== "undefined" ? window.location.hostname : "localhost";
+
   return {
     appName: app.name,
-    dashboardUrl: "http://localhost",
+    dashboardUrl: `${protocol}//${hostname}`,
     containerName: toSlug(app.name),
   };
 }
@@ -400,6 +415,48 @@ export function AppGrid({
     }));
   }
 
+  function openDashboardForApp(app: AppItem) {
+    const target = resolveAppActionTarget(app);
+
+    logClientAction({
+      layer: "hook",
+      action: "desktop.appGrid.open",
+      status: "start",
+      meta: {
+        appName: target.appName,
+      },
+    });
+
+    try {
+      if (onOpenDashboard) {
+        onOpenDashboard(target);
+      } else {
+        window.open(target.dashboardUrl, "_blank", "noopener,noreferrer");
+      }
+
+      logClientAction({
+        layer: "hook",
+        action: "desktop.appGrid.open",
+        status: "success",
+        meta: {
+          appName: target.appName,
+          dashboardUrl: target.dashboardUrl,
+        },
+      });
+    } catch (error) {
+      logClientAction({
+        level: "error",
+        layer: "hook",
+        action: "desktop.appGrid.open",
+        status: "error",
+        meta: {
+          appName: target.appName,
+        },
+        error,
+      });
+    }
+  }
+
   async function handleDockerAction(
     action:
       | "open"
@@ -428,11 +485,7 @@ export function AppGrid({
 
     try {
       if (action === "open") {
-        if (onOpenDashboard) {
-          onOpenDashboard(target);
-        } else {
-          window.open(target.dashboardUrl, "_blank", "noopener,noreferrer");
-        }
+        openDashboardForApp(menuApp);
       } else if (action === "start") {
         updateAppStatus(menuApp.id, "running");
       } else if (action === "stop") {
@@ -521,6 +574,7 @@ export function AppGrid({
           {filtered.map((app) => (
             <button
               key={app.id}
+              onClick={() => openDashboardForApp(app)}
               onContextMenu={(e) => openContextMenu(e, app)}
               className={`group flex flex-col items-center gap-2 p-2 rounded-xl cursor-pointer ${
                 activeAppId === app.id

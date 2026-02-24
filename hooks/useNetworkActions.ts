@@ -9,6 +9,43 @@ type NetworkMutationResponse = {
   data: NetworkStatus;
 };
 
+type ErrorResponsePayload = {
+  error?: string;
+  code?: string;
+};
+
+function toNetworkActionErrorMessage(
+  endpoint: string,
+  status: number,
+  payload: ErrorResponsePayload | null,
+) {
+  const baseMessage = payload?.error?.trim() || `Network action failed (${status}) for ${endpoint}`;
+  const code = payload?.code?.trim();
+  if (!code) return baseMessage;
+
+  if (code === "helper_unavailable") {
+    return "DBus helper unavailable. Check home-server-dbus service status.";
+  }
+
+  if (code === "network_manager_unavailable") {
+    return "NetworkManager is unavailable on this server.";
+  }
+
+  if (code === "auth_failed") {
+    return "Wi-Fi authentication failed. Check the network password.";
+  }
+
+  return `${baseMessage} [${code}]`;
+}
+
+async function parseErrorPayload(response: Response) {
+  try {
+    return (await response.json()) as ErrorResponsePayload;
+  } catch {
+    return null;
+  }
+}
+
 async function postNetworkAction(
   endpoint: string,
   payload: Record<string, unknown>,
@@ -32,7 +69,10 @@ async function postNetworkAction(
       });
 
       if (!response.ok) {
-        throw new Error(`Network action failed (${response.status}) for ${endpoint}`);
+        const errorPayload = await parseErrorPayload(response);
+        throw new Error(
+          toNetworkActionErrorMessage(endpoint, response.status, errorPayload),
+        );
       }
 
       const json = (await response.json()) as NetworkMutationResponse;

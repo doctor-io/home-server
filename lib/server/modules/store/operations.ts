@@ -24,6 +24,7 @@ import {
   updateStoreOperation,
   upsertInstalledStack,
 } from "@/lib/server/modules/store/repository";
+import { logServerAction } from "@/lib/server/logging/logger";
 import type {
   InstalledStackConfig,
   StoreOperation,
@@ -122,6 +123,24 @@ async function patchOperationAndEmit(input: {
     markStarted: input.markStarted,
     markFinished: input.markFinished,
   });
+
+  if (input.eventType !== "operation.pull.progress" || input.status === "error") {
+    logServerAction({
+      level: input.status === "error" ? "error" : "info",
+      layer: "service",
+      action: "store.apps.operation",
+      status: input.status === "error" ? "error" : "info",
+      message: input.message,
+      meta: {
+        operationId: input.operationId,
+        appId: input.appId,
+        action: input.action,
+        eventType: input.eventType,
+        step: input.step,
+        progressPercent,
+      },
+    });
+  }
 
   emitEvent({
     type: input.eventType,
@@ -426,6 +445,18 @@ export async function startStoreOperation(params: OperationParams) {
     progressPercent: 0,
     currentStep: "queued",
     startedAt: false,
+  });
+
+  logServerAction({
+    layer: "service",
+    action: "store.apps.operation",
+    status: "start",
+    message: "Queued store operation",
+    meta: {
+      operationId,
+      appId: params.appId,
+      action: params.action,
+    },
   });
 
   queueMicrotask(() => {

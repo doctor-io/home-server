@@ -1,4 +1,4 @@
-export type WeatherSource = "navigator" | "ip";
+export type WeatherSource = "navigator";
 
 export type WeatherLocation = {
   label: string;
