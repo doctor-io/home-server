@@ -27,7 +27,3 @@ export type StructuredLogEntry = {
     stack?: string;
   };
 };
-
-export type ClientLogIngestPayload = Omit<StructuredLogEntry, "runtime"> & {
-  runtime?: "client";
-};

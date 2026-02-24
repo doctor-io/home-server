@@ -5,7 +5,6 @@ import { appendFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 import { serverEnv } from "@/lib/server/env";
 import type {
-  ClientLogIngestPayload,
   LogLevel,
   LogLayer,
   LogStatus,
@@ -203,21 +202,6 @@ export async function withServerTiming<T>(
 
     throw error;
   }
-}
-
-export function ingestClientLog(payload: ClientLogIngestPayload) {
-  logServerAction({
-    runtime: "client",
-    level: payload.level,
-    layer: payload.layer,
-    action: payload.action,
-    status: payload.status,
-    durationMs: payload.durationMs,
-    requestId: payload.requestId,
-    message: payload.message,
-    meta: payload.meta,
-    error: payload.error,
-  });
 }
 
 export function createRequestId() {
