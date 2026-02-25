@@ -1,6 +1,7 @@
 "use client";
 
 import type { AppActionTarget } from "@/components/desktop/app-grid";
+import { useAppCompose } from "@/hooks/useAppCompose";
 import { useStoreActions } from "@/hooks/useStoreActions";
 import { useStoreApp } from "@/hooks/useStoreApp";
 import type { StoreAppDetail } from "@/lib/shared/contracts/apps";
@@ -183,7 +184,7 @@ function toDefaultPortRows(port: string): PortRow[] {
 
 function toEnvRows(env: Record<string, string>): EnvRow[] {
   return Object.entries(env)
-    .filter(([key]) => key !== "APP_URL")
+    .filter(([key]) => key !== "APP_URL" && key !== "VOLUMES")
     .slice(0, 8)
     .map(([key, value], index) => ({
       id: `env-${index + 1}`,
@@ -196,12 +197,28 @@ function buildInitialState(input: {
   target?: AppActionTarget;
   template?: StoreAppDetail;
   customDefaults?: { name?: string; iconUrl?: string };
+  composeData?: {
+    image?: string;
+    ports?: string[];
+    environment?: Record<string, string>;
+    volumes?: string[];
+    networkMode?: string;
+    restart?: string;
+    privileged?: boolean;
+    capAdd?: string[];
+    hostname?: string;
+  };
 }): AppSettingsState {
-  const { target, template, customDefaults } = input;
+  const { target, template, customDefaults, composeData } = input;
 
   // Priority: installed config > template > target > custom defaults > fallback
   const installed = template?.installedConfig;
-  const env = installed?.env ?? {};
+
+  // Merge env from installed config and template defaults
+  const templateDefaults = Object.fromEntries(
+    (template?.env ?? []).map(envDef => [envDef.name, envDef.default ?? ""])
+  );
+  const env = { ...templateDefaults, ...(installed?.env ?? {}) };
 
   // Determine appId
   const appId =
@@ -230,9 +247,19 @@ function buildInitialState(input: {
     ? toHostname(installed.stackName)
     : toHostname(name || appId);
 
-  // Parse volumes from VOLUMES env var (JSON array)
+  // Parse volumes from compose data or VOLUMES env var
   let volumes: VolumeRow[] = [];
-  if (env.VOLUMES) {
+  if (composeData?.volumes && composeData.volumes.length > 0) {
+    volumes = composeData.volumes.map((volume, index) => {
+      // Parse "host:container" format
+      const [host, container] = volume.split(":");
+      return {
+        id: nextId(`volume-${index}`),
+        host: host || "",
+        container: container || "",
+      };
+    });
+  } else if (env.VOLUMES) {
     try {
       const parsed = JSON.parse(env.VOLUMES) as Array<{ host: string; container: string }>;
       volumes = parsed.map((v, index) => ({
@@ -245,8 +272,30 @@ function buildInitialState(input: {
     }
   }
 
+  // Parse ports from compose data
+  let ports: PortRow[] = [];
+  if (composeData?.ports && composeData.ports.length > 0) {
+    ports = composeData.ports.map((port, index) => {
+      // Parse "host:container" or "host:container/protocol" format
+      const [hostPort, rest] = port.split(":");
+      const containerPort = rest?.split("/")[0] || hostPort;
+      return {
+        id: nextId(`port-${index}`),
+        host: hostPort || "",
+        container: containerPort || "",
+        protocol: "TCP" as const,
+      };
+    });
+  } else {
+    ports = toDefaultPortRows(resolvedPort);
+  }
+
+  // Merge environment from compose and template
+  const composeEnv = composeData?.environment ?? {};
+  const mergedEnv = { ...composeEnv, ...env };
+
   return {
-    dockerImage: env.DOCKER_IMAGE || env.IMAGE || `${appId}/${appId}:latest`,
+    dockerImage: composeData?.image || env.DOCKER_IMAGE || env.IMAGE || `${appId}/${appId}:latest`,
     title: name,
     iconUrl,
     webUi: {
@@ -254,16 +303,16 @@ function buildInitialState(input: {
       port: resolvedPort,
     },
     network: NETWORK_OPTIONS.includes(
-      (env.NETWORK_MODE ?? "").toLowerCase() as "bridge" | "host",
+      (composeData?.networkMode?.toLowerCase() ?? env.NETWORK_MODE?.toLowerCase() ?? "bridge") as "bridge" | "host",
     )
-      ? env.NETWORK_MODE.toLowerCase()
+      ? (composeData?.networkMode?.toLowerCase() ?? env.NETWORK_MODE?.toLowerCase() ?? "bridge")
       : "bridge",
-    ports: toDefaultPortRows(resolvedPort),
+    ports,
     volumes,
-    envVars: toEnvRows(env),
+    envVars: toEnvRows(mergedEnv),
     devices: [],
     containerCommands: [],
-    privileged: toBoolean(env.PRIVILEGED, false),
+    privileged: composeData?.privileged ?? toBoolean(env.PRIVILEGED, false),
     memoryLimit: parseMemoryLimit(env.MEMORY_LIMIT, 4096),
     cpuShares: parseCpuShares(env.CPU_SHARES),
     restartPolicy: parseRestartPolicy(env.RESTART_POLICY),
@@ -292,6 +341,9 @@ export function AppSettingsPanel({
   // Fetch installed config only if we have an appId
   const { data: detail } = useStoreApp(appId!);
 
+  // Fetch docker-compose defaults when installing
+  const { data: composeData } = useAppCompose(appId, !!appId && !detail?.installedConfig);
+
   // Determine mode based on available data
   const mode = useMemo<AppSettingsPanelMode>(() => {
     if (detail?.installedConfig) return "edit";
@@ -308,8 +360,9 @@ export function AppSettingsPanel({
         target,
         template: template ?? detail ?? undefined,
         customDefaults,
+        composeData,
       }),
-    [target, template, detail, customDefaults],
+    [target, template, detail, customDefaults, composeData],
   );
 
   const [state, setState] = useState<AppSettingsState>(initialState);

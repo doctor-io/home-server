@@ -10,7 +10,7 @@ import {
   getLatestStoreOperationEvent,
   getStoreOperation,
   subscribeToStoreOperation,
-} from "@/lib/server/modules/store/operations";
+} from "@/lib/server/modules/apps/operations";
 import type { StoreOperationEvent } from "@/lib/shared/contracts/apps";
 
 export const runtime = "nodejs";

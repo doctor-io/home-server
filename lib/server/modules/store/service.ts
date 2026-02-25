@@ -12,7 +12,7 @@ import {
 import {
   findInstalledStackByAppId,
   listInstalledStacksFromDb,
-} from "@/lib/server/modules/store/repository";
+} from "@/lib/server/modules/apps/stacks-repository";
 import { resolveStoreAppUpdateState } from "@/lib/server/modules/store/update-check";
 import type {
   InstalledStackConfig,
@@ -20,8 +20,8 @@ import type {
   StoreAppSummary,
   StoreOperationAction,
 } from "@/lib/shared/contracts/apps";
-import { startStoreOperation } from "@/lib/server/modules/store/operations";
-import { patchInstalledStackMeta } from "@/lib/server/modules/store/repository";
+import { startStoreOperation } from "@/lib/server/modules/apps/operations";
+import { patchInstalledStackMeta } from "@/lib/server/modules/apps/stacks-repository";
 
 function includesSearch(text: string, search: string) {
   return text.toLowerCase().includes(search.toLowerCase());
@@ -70,36 +70,12 @@ async function resolveUpdateState(
     };
   }
 
-  try {
-    const resolved = await resolveStoreAppUpdateState({
-      composePath: installed.composePath,
-      stackName: installed.stackName,
-    });
-
-    return {
-      updateAvailable: resolved.updateAvailable,
-      localDigest: resolved.localDigest,
-      remoteDigest: resolved.remoteDigest,
-    };
-  } catch (error) {
-    logServerAction({
-      level: "warn",
-      layer: "service",
-      action: "store.apps.update.check",
-      status: "error",
-      message: "Unable to resolve update status for installed app",
-      meta: {
-        appId: installed.appId,
-      },
-      error,
-    });
-
-    return {
-      updateAvailable: false,
-      localDigest: null,
-      remoteDigest: null,
-    };
-  }
+  // Use cached update status from database instead of checking Docker every time
+  return {
+    updateAvailable: !installed.isUpToDate,
+    localDigest: installed.localDigest,
+    remoteDigest: installed.remoteDigest,
+  };
 }
 
 export async function listStoreApps(options?: {
@@ -269,6 +245,65 @@ export async function saveAppSettings(input: {
       }
 
       return {};
+    },
+  );
+}
+
+export async function checkAllAppsForUpdates() {
+  return withServerTiming(
+    {
+      layer: "service",
+      action: "store.apps.check-updates",
+    },
+    async () => {
+      const installed = await listInstalledStacksFromDb();
+      const results: Array<{
+        appId: string;
+        updateAvailable: boolean;
+        localDigest: string | null;
+        remoteDigest: string | null;
+      }> = [];
+
+      for (const app of installed) {
+        if (app.status === "not_installed") {
+          continue;
+        }
+
+        try {
+          const updateState = await resolveStoreAppUpdateState({
+            composePath: app.composePath,
+            stackName: app.stackName,
+          });
+
+          // Update DB with fresh check results
+          const { updateStackUpdateStatus } = await import("@/lib/server/modules/apps/stacks-repository");
+          await updateStackUpdateStatus({
+            appId: app.appId,
+            isUpToDate: !updateState.updateAvailable,
+            localDigest: updateState.localDigest,
+            remoteDigest: updateState.remoteDigest,
+          });
+
+          results.push({
+            appId: app.appId,
+            updateAvailable: updateState.updateAvailable,
+            localDigest: updateState.localDigest,
+            remoteDigest: updateState.remoteDigest,
+          });
+        } catch (error) {
+          logServerAction({
+            level: "warn",
+            layer: "service",
+            action: "store.apps.check-updates.app",
+            status: "error",
+            message: "Failed to check updates for app",
+            meta: { appId: app.appId },
+            error,
+          });
+        }
+      }
+
+      return results;
     },
   );
 }

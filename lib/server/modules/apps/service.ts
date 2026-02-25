@@ -4,7 +4,7 @@ import path from "node:path";
 import { LruCache } from "@/lib/server/cache/lru";
 import { logServerAction, withServerTiming } from "@/lib/server/logging/logger";
 import { listInstalledAppsFromDb } from "@/lib/server/modules/apps/repository";
-import { getComposeStatus } from "@/lib/server/modules/store/compose-runner";
+import { getComposeStatus } from "@/lib/server/modules/docker/compose-runner";
 import type { InstalledApp } from "@/lib/shared/contracts/apps";
 
 const appsCache = new LruCache<InstalledApp[]>(4, 5_000);

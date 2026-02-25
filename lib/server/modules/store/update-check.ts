@@ -5,7 +5,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { LruCache } from "@/lib/server/cache/lru";
 import { logServerAction, withServerTiming } from "@/lib/server/logging/logger";
-import { extractComposeImages } from "@/lib/server/modules/store/compose-runner";
+import { extractComposeImages } from "@/lib/server/modules/docker/compose-runner";
 
 const execFileAsync = promisify(execFile);
 

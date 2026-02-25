@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/server/modules/store/compose-runner", () => ({
+vi.mock("@/lib/server/modules/docker/compose-runner", () => ({
   extractComposeImages: vi.fn(),
 }));
 
-import { extractComposeImages } from "@/lib/server/modules/store/compose-runner";
+import { extractComposeImages } from "@/lib/server/modules/docker/compose-runner";
 import {
   extractDigestFromRepoDigest,
   parseRemoteDigestFromManifestOutput,

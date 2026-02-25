@@ -60,6 +60,10 @@ export type InstalledStackConfig = {
   iconUrl: string | null;
   installedAt: string | null;
   updatedAt: string;
+  isUpToDate: boolean;
+  lastUpdateCheck: string | null;
+  localDigest: string | null;
+  remoteDigest: string | null;
 };
 
 export type DockerPullProgressDetail = {

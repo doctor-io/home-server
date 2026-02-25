@@ -4,13 +4,13 @@ vi.mock("@/lib/server/modules/apps/repository", () => ({
   listInstalledAppsFromDb: vi.fn(),
 }));
 
-vi.mock("@/lib/server/modules/store/compose-runner", () => ({
+vi.mock("@/lib/server/modules/docker/compose-runner", () => ({
   getComposeStatus: vi.fn(),
 }));
 
 import { listInstalledAppsFromDb } from "@/lib/server/modules/apps/repository";
 import { listInstalledApps } from "@/lib/server/modules/apps/service";
-import { getComposeStatus } from "@/lib/server/modules/store/compose-runner";
+import { getComposeStatus } from "@/lib/server/modules/docker/compose-runner";
 
 describe("apps service", () => {
   const repositoryMock = vi.mocked(listInstalledAppsFromDb);

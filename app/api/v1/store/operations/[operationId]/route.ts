@@ -4,7 +4,7 @@ import {
   logServerAction,
   withServerTiming,
 } from "@/lib/server/logging/logger";
-import { getStoreOperation } from "@/lib/server/modules/store/operations";
+import { getStoreOperation } from "@/lib/server/modules/apps/operations";
 
 export const runtime = "nodejs";
 

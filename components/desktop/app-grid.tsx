@@ -32,7 +32,7 @@ import {
   TerminalSquare,
   Trash2,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type SyntheticEvent } from "react";
 import { UninstallAppDialog } from "@/components/desktop/uninstall-app-dialog";
 import { useInstalledApps } from "@/hooks/useInstalledApps";
 import { useStoreActions } from "@/hooks/useStoreActions";
@@ -255,6 +255,7 @@ export function AppGrid({
     y: number;
     appId: string;
   } | null>(null);
+  const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
 
   const apps = useMemo(() => {
     const installedApps = installedAppsQuery.data ?? [];
@@ -542,10 +543,22 @@ export function AppGrid({
                 >
                   {app.logoUrl ? (
                     <>
+                      {!loadedImages.has(app.logoUrl) && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className={`${iconGlyphClass} animate-pulse`}>
+                            <app.icon className="w-full h-full opacity-30" />
+                          </div>
+                        </div>
+                      )}
                       <img
                         src={app.logoUrl}
                         alt={`${app.name} logo`}
                         className="w-full h-full object-contain p-1.5 rounded-xl"
+                        loading="lazy"
+                        decoding="async"
+                        onLoad={() => {
+                          setLoadedImages((prev) => new Set(prev).add(app.logoUrl!));
+                        }}
                         onError={(e) => {
                           const img = e.currentTarget;
                           const container = img.parentElement;

@@ -4,7 +4,7 @@ vi.mock("@/lib/server/modules/store/catalog", () => ({
   findStoreCatalogTemplateByAppId: vi.fn(),
 }));
 
-vi.mock("@/lib/server/modules/store/compose-runner", () => ({
+vi.mock("@/lib/server/modules/docker/compose-runner", () => ({
   cleanupComposeDataOnUninstall: vi.fn(),
   extractComposeImages: vi.fn(),
   materializeInlineStackFiles: vi.fn(),
@@ -23,7 +23,7 @@ vi.mock("@/lib/server/modules/store/docker-client", () => ({
   pullDockerImage: vi.fn(),
 }));
 
-vi.mock("@/lib/server/modules/store/repository", () => ({
+vi.mock("@/lib/server/modules/apps/stacks-repository", () => ({
   createStoreOperation: vi.fn(),
   deleteInstalledStackByAppId: vi.fn(),
   findInstalledStackByAppId: vi.fn(),
@@ -41,7 +41,7 @@ import {
   materializeStackFiles,
   runComposeDown,
   runComposeUp,
-} from "@/lib/server/modules/store/compose-runner";
+} from "@/lib/server/modules/docker/compose-runner";
 import { findCustomStoreTemplateByAppId } from "@/lib/server/modules/store/custom-apps";
 import { pullDockerImage } from "@/lib/server/modules/store/docker-client";
 import {
@@ -51,11 +51,11 @@ import {
   findStackByWebUiPort,
   updateStoreOperation,
   upsertInstalledStack,
-} from "@/lib/server/modules/store/repository";
+} from "@/lib/server/modules/apps/stacks-repository";
 import {
   getLatestStoreOperationEvent,
   startStoreOperation,
-} from "@/lib/server/modules/store/operations";
+} from "@/lib/server/modules/apps/operations";
 
 async function waitForLatestEventType(operationId: string, expectedType: string) {
   for (let index = 0; index < 50; index += 1) {

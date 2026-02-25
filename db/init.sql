@@ -37,7 +37,11 @@ CREATE TABLE IF NOT EXISTS app_stacks (
   display_name TEXT,
   icon_url TEXT,
   installed_at TIMESTAMPTZ,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  is_up_to_date BOOLEAN DEFAULT true,
+  last_update_check TIMESTAMPTZ,
+  local_digest TEXT,
+  remote_digest TEXT
 );
 
 CREATE INDEX IF NOT EXISTS app_stacks_status_idx ON app_stacks (status);
@@ -81,5 +85,9 @@ BEGIN
   IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'app_stacks') THEN
     ALTER TABLE app_stacks ADD COLUMN IF NOT EXISTS display_name TEXT;
     ALTER TABLE app_stacks ADD COLUMN IF NOT EXISTS icon_url TEXT;
+    ALTER TABLE app_stacks ADD COLUMN IF NOT EXISTS is_up_to_date BOOLEAN DEFAULT true;
+    ALTER TABLE app_stacks ADD COLUMN IF NOT EXISTS last_update_check TIMESTAMPTZ;
+    ALTER TABLE app_stacks ADD COLUMN IF NOT EXISTS local_digest TEXT;
+    ALTER TABLE app_stacks ADD COLUMN IF NOT EXISTS remote_digest TEXT;
   END IF;
 END $$;

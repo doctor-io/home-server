@@ -6,7 +6,7 @@ vi.mock("@/lib/server/env", () => ({
   },
 }));
 
-vi.mock("@/lib/server/modules/store/operations", () => ({
+vi.mock("@/lib/server/modules/apps/operations", () => ({
   getLatestStoreOperationEvent: vi.fn(),
   getStoreOperation: vi.fn(),
   subscribeToStoreOperation: vi.fn(),
@@ -17,7 +17,7 @@ import {
   getLatestStoreOperationEvent,
   getStoreOperation,
   subscribeToStoreOperation,
-} from "@/lib/server/modules/store/operations";
+} from "@/lib/server/modules/apps/operations";
 import type { StoreOperationEvent } from "@/lib/shared/contracts/apps";
 
 describe("GET /api/v1/store/operations/:operationId/stream", () => {

@@ -6,6 +6,10 @@ import { logServerAction } from "@/lib/server/logging/logger";
 import type { SystemMetricsSnapshot } from "@/lib/shared/contracts/system";
 import os from "node:os";
 import si from "systeminformation";
+import {
+  getNetworkStatusFromHelper,
+  isNetworkHelperUnavailableError,
+} from "@/lib/server/modules/network/helper-client";
 
 const metricsCache = new LruCache<SystemMetricsSnapshot>(
   8,
@@ -118,6 +122,23 @@ async function collectSnapshot(): Promise<SystemMetricsSnapshot> {
     .filter((coreTemp): coreTemp is number => coreTemp !== null);
   const maxTemperature = toNullableMetric(cpuTemperature?.max);
 
+  // Try to get WiFi status from NetworkManager D-Bus helper first (more reliable)
+  let helperStatus: Awaited<ReturnType<typeof getNetworkStatusFromHelper>> | null = null;
+  try {
+    helperStatus = await getNetworkStatusFromHelper();
+  } catch (error) {
+    if (!isNetworkHelperUnavailableError(error)) {
+      logServerAction({
+        level: "warn",
+        layer: "service",
+        action: "system.metrics.network.helper",
+        status: "error",
+        message: "Failed to get network status from D-Bus helper",
+        error,
+      });
+    }
+  }
+
   const primaryWifiConnection =
     wifiConnections.find(
       (connection) =>
@@ -131,10 +152,11 @@ async function collectSnapshot(): Promise<SystemMetricsSnapshot> {
     : (networkInterfaces.find((networkInterface) => networkInterface.default) ??
       null);
 
-  const connectedSsid = primaryWifiConnection?.ssid.trim() ?? "";
+  // Prefer D-Bus helper data for WiFi status (more reliable with NetworkManager)
+  const connectedSsid = helperStatus?.ssid?.trim() ?? primaryWifiConnection?.ssid.trim() ?? "";
   const isWifiConnected = connectedSsid.length > 0;
   const preferredIface =
-    primaryNetworkInterface?.iface ?? primaryWifiConnection?.iface ?? null;
+    helperStatus?.iface ?? primaryNetworkInterface?.iface ?? primaryWifiConnection?.iface ?? null;
   const primaryNetworkStats =
     networkStats.find((stats) => stats.iface === preferredIface) ??
     networkStats.find((stats) => stats.operstate === "up") ??
@@ -223,12 +245,12 @@ async function collectSnapshot(): Promise<SystemMetricsSnapshot> {
       ),
     },
     wifi: {
-      connected: isWifiConnected,
+      connected: helperStatus?.connected ?? isWifiConnected,
       iface:
-        primaryWifiConnection?.iface || primaryNetworkInterface?.iface || null,
-      ssid: isWifiConnected ? connectedSsid : null,
+        helperStatus?.iface ?? (primaryWifiConnection?.iface || primaryNetworkInterface?.iface || null),
+      ssid: helperStatus?.ssid ?? (isWifiConnected ? connectedSsid : null),
       bssid: primaryWifiConnection?.bssid || null,
-      signalPercent: toNullablePercent(primaryWifiConnection?.quality),
+      signalPercent: helperStatus?.signalPercent ?? toNullablePercent(primaryWifiConnection?.quality),
       txRateMbps: toNullableMetric(primaryWifiConnection?.txRate, {
         precision: 1,
         allowZero: true,
@@ -252,9 +274,9 @@ async function collectSnapshot(): Promise<SystemMetricsSnapshot> {
         },
       ),
       ipv4:
-        primaryNetworkInterface && primaryNetworkInterface.ip4.length > 0
+        helperStatus?.ipv4 ?? (primaryNetworkInterface && primaryNetworkInterface.ip4.length > 0
           ? primaryNetworkInterface.ip4
-          : null,
+          : null),
       ipv6:
         primaryNetworkInterface && primaryNetworkInterface.ip6.length > 0
           ? primaryNetworkInterface.ip6

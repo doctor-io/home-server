@@ -4,6 +4,7 @@ import { execFile } from "node:child_process";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
+import { serverEnv } from "@/lib/server/env";
 import { withServerTiming } from "@/lib/server/logging/logger";
 import { resolveStoreStacksRoot } from "@/lib/server/storage/data-root";
 
@@ -369,7 +370,11 @@ function collectComposeStorageReferences(composeContent: string, stacksRoot: str
   };
 }
 
-export function normalizeComposeStorageBindings(composeContent: string, stacksRoot: string) {
+export function normalizeComposeStorageBindings(
+  composeContent: string,
+  stacksRoot: string,
+  appDataRoot: string,
+) {
   const lines = composeContent.split(/\r?\n/);
   const pathStack: Array<{ indent: number; key: string }> = [];
   const bindMountDirectories = new Set<string>();
@@ -417,7 +422,7 @@ export function normalizeComposeStorageBindings(composeContent: string, stacksRo
       continue;
     }
 
-    const bindSource = path.join(stacksRoot, volumeSpec.source);
+    const bindSource = path.join(appDataRoot, volumeSpec.source);
     const rewrittenSpec = volumeSpec.mode
       ? `${bindSource}:${volumeSpec.target}:${volumeSpec.mode}`
       : `${bindSource}:${volumeSpec.target}`;
@@ -461,7 +466,8 @@ export async function materializeStackFiles(input: {
   }
 
   const stacksRoot = resolveStoreStacksRoot();
-  const normalized = normalizeComposeStorageBindings(composeContent, stacksRoot);
+  const appDataRoot = serverEnv.STORE_APP_DATA_ROOT;
+  const normalized = normalizeComposeStorageBindings(composeContent, stacksRoot, appDataRoot);
 
   const stackDir = path.join(stacksRoot, input.appId);
   const composePath = path.join(stackDir, "docker-compose.yml");
@@ -498,7 +504,8 @@ export async function materializeInlineStackFiles(input: {
   }
 
   const stacksRoot = resolveStoreStacksRoot();
-  const normalized = normalizeComposeStorageBindings(composeContent, stacksRoot);
+  const appDataRoot = serverEnv.STORE_APP_DATA_ROOT;
+  const normalized = normalizeComposeStorageBindings(composeContent, stacksRoot, appDataRoot);
 
   const stackDir = path.join(stacksRoot, input.appId);
   const composePath = path.join(stackDir, "docker-compose.yml");

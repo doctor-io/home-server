@@ -25,6 +25,10 @@ type AppStackRow = {
   icon_url: string | null;
   installed_at: string | Date | null;
   updated_at: string | Date;
+  is_up_to_date: boolean | null;
+  last_update_check: string | Date | null;
+  local_digest: string | null;
+  remote_digest: string | null;
 };
 
 type OperationRow = {
@@ -119,6 +123,10 @@ function mapStackRow(row: AppStackRow): InstalledStackConfig {
     iconUrl: row.icon_url ?? null,
     installedAt: toIso(row.installed_at),
     updatedAt: toIso(row.updated_at) ?? new Date().toISOString(),
+    isUpToDate: row.is_up_to_date ?? true,
+    lastUpdateCheck: toIso(row.last_update_check),
+    localDigest: row.local_digest ?? null,
+    remoteDigest: row.remote_digest ?? null,
   };
 }
 
@@ -154,7 +162,11 @@ export async function listInstalledStacksFromDb(): Promise<InstalledStackConfig[
       display_name,
       icon_url,
       installed_at,
-      updated_at
+      updated_at,
+      is_up_to_date,
+      last_update_check,
+      local_digest,
+      remote_digest
     FROM app_stacks
     ORDER BY app_id ASC`,
   );
@@ -179,7 +191,11 @@ export async function findInstalledStackByAppId(appId: string): Promise<Installe
       display_name,
       icon_url,
       installed_at,
-      updated_at
+      updated_at,
+      is_up_to_date,
+      last_update_check,
+      local_digest,
+      remote_digest
     FROM app_stacks
     WHERE app_id = $1
     LIMIT 1`,
@@ -447,5 +463,26 @@ export async function patchInstalledStackMeta(
   await timedPgQuery(
     `UPDATE app_stacks SET ${sets.join(", ")} WHERE app_id = $1`,
     values,
+  );
+}
+
+export async function updateStackUpdateStatus(input: {
+  appId: string;
+  isUpToDate: boolean;
+  localDigest: string | null;
+  remoteDigest: string | null;
+}) {
+  if (!(await hasTable("app_stacks"))) return;
+
+  await timedPgQuery(
+    `UPDATE app_stacks
+    SET
+      is_up_to_date = $2,
+      local_digest = $3,
+      remote_digest = $4,
+      last_update_check = NOW(),
+      updated_at = NOW()
+    WHERE app_id = $1`,
+    [input.appId, input.isUpToDate, input.localDigest, input.remoteDigest],
   );
 }

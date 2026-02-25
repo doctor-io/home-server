@@ -9,7 +9,7 @@ import {
   runComposeDown,
   runComposeUp,
   sanitizeStackName,
-} from "@/lib/server/modules/store/compose-runner";
+} from "@/lib/server/modules/docker/compose-runner";
 import { findStoreCatalogTemplateByAppId } from "@/lib/server/modules/store/catalog";
 import {
   findCustomStoreTemplateByAppId,
@@ -24,7 +24,7 @@ import {
   findStoreOperationById,
   updateStoreOperation,
   upsertInstalledStack,
-} from "@/lib/server/modules/store/repository";
+} from "@/lib/server/modules/apps/stacks-repository";
 import { logServerAction } from "@/lib/server/logging/logger";
 import type {
   InstalledStackConfig,
@@ -423,6 +423,17 @@ async function executeStoreOperation(operationId: string, params: OperationParam
       await runInstallOrRedeployOperation(operationId, params, existingStack);
     } else {
       await runUninstallOperation(operationId, params);
+    }
+
+    // Mark app as up-to-date after successful install/redeploy
+    if (params.action === "install" || params.action === "redeploy") {
+      const { updateStackUpdateStatus } = await import("@/lib/server/modules/apps/stacks-repository");
+      await updateStackUpdateStatus({
+        appId: params.appId,
+        isUpToDate: true,
+        localDigest: null,
+        remoteDigest: null,
+      });
     }
 
     await patchOperationAndEmit({

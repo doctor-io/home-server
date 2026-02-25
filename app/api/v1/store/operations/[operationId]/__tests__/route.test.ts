@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/server/modules/store/operations", () => ({
+vi.mock("@/lib/server/modules/apps/operations", () => ({
   getStoreOperation: vi.fn(),
 }));
 
 import { GET } from "@/app/api/v1/store/operations/[operationId]/route";
-import { getStoreOperation } from "@/lib/server/modules/store/operations";
+import { getStoreOperation } from "@/lib/server/modules/apps/operations";
 
 describe("GET /api/v1/store/operations/:operationId", () => {
   it("returns operation snapshot", async () => {

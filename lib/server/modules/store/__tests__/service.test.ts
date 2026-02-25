@@ -10,12 +10,12 @@ vi.mock("@/lib/server/modules/store/custom-apps", () => ({
   listCustomStoreTemplates: vi.fn(),
 }));
 
-vi.mock("@/lib/server/modules/store/repository", () => ({
+vi.mock("@/lib/server/modules/apps/stacks-repository", () => ({
   findInstalledStackByAppId: vi.fn(),
   listInstalledStacksFromDb: vi.fn(),
 }));
 
-vi.mock("@/lib/server/modules/store/operations", () => ({
+vi.mock("@/lib/server/modules/apps/operations", () => ({
   startStoreOperation: vi.fn(),
 }));
 
@@ -31,11 +31,11 @@ import {
   findCustomStoreTemplateByAppId,
   listCustomStoreTemplates,
 } from "@/lib/server/modules/store/custom-apps";
-import { startStoreOperation } from "@/lib/server/modules/store/operations";
+import { startStoreOperation } from "@/lib/server/modules/apps/operations";
 import {
   findInstalledStackByAppId,
   listInstalledStacksFromDb,
-} from "@/lib/server/modules/store/repository";
+} from "@/lib/server/modules/apps/stacks-repository";
 import { resolveStoreAppUpdateState } from "@/lib/server/modules/store/update-check";
 import {
   getStoreAppDetail,

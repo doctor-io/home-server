@@ -8,7 +8,7 @@ import { timedPgQuery } from "@/lib/server/db/query";
 import {
   findStoreOperationById,
   listInstalledStacksFromDb,
-} from "@/lib/server/modules/store/repository";
+} from "@/lib/server/modules/apps/stacks-repository";
 
 describe("store repository", () => {
   const queryMock = vi.mocked(timedPgQuery);
