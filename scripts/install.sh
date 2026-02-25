@@ -287,6 +287,36 @@ install_extras() {
 	systemctl enable --now avahi-daemon >/dev/null 2>&1 || true
 }
 
+deploy_os_configs() {
+	print_status "Deploying OS configuration overlays..."
+
+	local overlay_src="${INSTALL_DIR}/packages/os/overlay-common"
+
+	if [[ ! -d "${overlay_src}" ]]; then
+		print_status "No OS overlays found at ${overlay_src}, skipping."
+		return
+	fi
+
+	# Deploy NetworkManager config
+	if [[ -f "${overlay_src}/etc/NetworkManager/NetworkManager.conf" ]]; then
+		mkdir -p /etc/NetworkManager
+		cp "${overlay_src}/etc/NetworkManager/NetworkManager.conf" /etc/NetworkManager/NetworkManager.conf
+		# Restart NetworkManager if already running
+		if systemctl is-active NetworkManager >/dev/null 2>&1; then
+			systemctl restart NetworkManager >/dev/null 2>&1 || true
+		fi
+		print_status "Deployed NetworkManager.conf"
+	fi
+
+	# Deploy systemd logind configs
+	if [[ -d "${overlay_src}/etc/systemd/logind.conf.d" ]]; then
+		mkdir -p /etc/systemd/logind.conf.d
+		cp "${overlay_src}/etc/systemd/logind.conf.d/"*.conf /etc/systemd/logind.conf.d/ 2>/dev/null || true
+		systemctl restart systemd-logind >/dev/null 2>&1 || true
+		print_status "Deployed logind configurations"
+	fi
+}
+
 install_docker() {
 
 	if command_exists docker; then
@@ -851,6 +881,7 @@ main() {
 	run_step "Installing yq (optional)..." install_yq
 	run_step "Ensuring application user and directories..." ensure_user_and_data_dir
 	run_step "Syncing repository..." clone_or_update_repo
+	run_step "Deploying OS configurations..." deploy_os_configs
 	run_step "Preparing environment file..." ensure_env_file
 	run_step "Configuring PostgreSQL..." configure_local_postgres
 	run_step "Installing application..." install_homeio
