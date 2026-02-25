@@ -17,9 +17,13 @@ It is designed as an alternative to other home server managers, focused on a mod
 
 ## Install
 
+**Quick install (one command):**
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/doctor-io/home-server/main/scripts/install.sh | sudo bash
 ```
+
+**Note:** The installer automatically changes to `/tmp` to avoid directory errors. You can run it from anywhere.
 
 Installer defaults:
 - `HOMEIO_SEED_PRINCIPAL=false`: does not create a principal user; first access goes to `/register`.

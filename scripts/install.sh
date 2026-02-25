@@ -593,23 +593,35 @@ install_homeio() {
 
 	cd "${INSTALL_DIR}" || { print_error "Failed to enter installation directory"; exit 1; }
 
+	# Install dependencies (skip optional native modules for now)
+	print_status "Installing npm dependencies (this may take a few minutes)..."
 	if [[ "${HOMEIO_VERBOSE}" == "true" ]]; then
-		print_status "Installing npm dependencies (this may take a few minutes)..."
-		npm ci || { print_error "npm ci failed"; exit 1; }
+		npm ci --ignore-scripts || { print_error "npm ci failed"; exit 1; }
+	else
+		npm ci --ignore-scripts --loglevel=error --no-audit --no-fund || { print_error "npm ci failed"; exit 1; }
+	fi
 
-		print_status "Initializing database schema..."
+	# Build native modules separately (optional - terminal feature)
+	print_status "Building native modules (node-pty for terminal)..."
+	npm rebuild node-pty --build-from-source 2>&1 | tee /tmp/node-pty-build.log || {
+		print_warn "node-pty build failed. Terminal feature will not be available."
+		print_warn "Check /tmp/node-pty-build.log for details"
+		print_warn "The application will still work without terminal functionality"
+	}
+
+	# Initialize database
+	print_status "Initializing database schema..."
+	if [[ "${HOMEIO_VERBOSE}" == "true" ]]; then
 		(set -a && source "${ENV_FILE}" && set +a && npm run db:init) || { print_error "Database initialization failed"; exit 1; }
+	else
+		(set -a && source "${ENV_FILE}" && set +a && npm run db:init --silent) || { print_error "Database initialization failed"; exit 1; }
+	fi
 
-		print_status "Building Next.js application..."
+	# Build application
+	print_status "Building Next.js application..."
+	if [[ "${HOMEIO_VERBOSE}" == "true" ]]; then
 		npm run build || { print_error "Build failed"; exit 1; }
 	else
-		print_status "Installing npm dependencies (this may take a few minutes)..."
-		npm ci --loglevel=error --no-audit --no-fund || { print_error "npm ci failed"; exit 1; }
-
-		print_status "Initializing database schema..."
-		(set -a && source "${ENV_FILE}" && set +a && npm run db:init --silent) || { print_error "Database initialization failed"; exit 1; }
-
-		print_status "Building Next.js application..."
 		npm run build --silent || { print_error "Build failed"; exit 1; }
 	fi
 
