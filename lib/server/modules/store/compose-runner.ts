@@ -601,6 +601,45 @@ export async function runComposeDown(input: {
   });
 }
 
+export async function getComposeStatus(input: {
+  composePath: string;
+  envPath: string;
+  stackName: string;
+}): Promise<"running" | "stopped" | "unknown"> {
+  try {
+    const stdout = await runComposeCommand({
+      ...input,
+      args: ["ps", "--format", "json"],
+    });
+
+    if (!stdout.trim()) {
+      return "stopped";
+    }
+
+    const lines = stdout.trim().split("\n");
+    const containers = lines.map((line) => {
+      try {
+        return JSON.parse(line) as { State?: string };
+      } catch {
+        return null;
+      }
+    }).filter((c): c is { State?: string } => c !== null);
+
+    if (containers.length === 0) {
+      return "stopped";
+    }
+
+    const allRunning = containers.every((c) => c.State === "running");
+    const anyRunning = containers.some((c) => c.State === "running");
+
+    if (allRunning) return "running";
+    if (anyRunning) return "running"; // Partially running still counts as running
+    return "stopped";
+  } catch {
+    return "unknown";
+  }
+}
+
 export async function cleanupComposeDataOnUninstall(input: {
   composePath: string;
 }) {

@@ -14,7 +14,7 @@ describe("apps repository", () => {
     queryMock.mockReset();
   });
 
-  it("returns empty list when apps table is not present", async () => {
+  it("returns empty list when app_stacks table is not present", async () => {
     queryMock.mockResolvedValueOnce({ rows: [{ table_exists: null }] } as never);
 
     const result = await listInstalledAppsFromDb();
@@ -25,21 +25,25 @@ describe("apps repository", () => {
 
   it("maps db rows to installed apps contract", async () => {
     queryMock.mockResolvedValueOnce({
-      rows: [{ table_exists: "apps" }],
+      rows: [{ table_exists: "app_stacks" }],
     } as never);
 
     queryMock.mockResolvedValueOnce({
       rows: [
         {
-          id: "a1",
-          name: "Plex",
-          status: "running",
+          app_id: "plex",
+          template_name: "plex",
+          stack_name: "plex-stack",
+          compose_path: "/DATA/Apps/plex/docker-compose.yml",
+          display_name: "Plex Media Server",
           updated_at: new Date("2026-02-22T12:00:00.000Z"),
         },
         {
-          id: "a2",
-          name: "Unknown App",
-          status: "mystery",
+          app_id: "home-assistant",
+          template_name: "home-assistant",
+          stack_name: "home-assistant",
+          compose_path: "/DATA/Apps/home-assistant/docker-compose.yml",
+          display_name: null,
           updated_at: "2026-02-22T12:10:00.000Z",
         },
       ],
@@ -49,14 +53,18 @@ describe("apps repository", () => {
 
     expect(result).toEqual([
       {
-        id: "a1",
-        name: "Plex",
-        status: "running",
+        id: "plex",
+        name: "Plex Media Server",
+        stackName: "plex-stack",
+        composePath: "/DATA/Apps/plex/docker-compose.yml",
+        status: "unknown",
         updatedAt: "2026-02-22T12:00:00.000Z",
       },
       {
-        id: "a2",
-        name: "Unknown App",
+        id: "home-assistant",
+        name: "home-assistant",
+        stackName: "home-assistant",
+        composePath: "/DATA/Apps/home-assistant/docker-compose.yml",
         status: "unknown",
         updatedAt: "2026-02-22T12:10:00.000Z",
       },

@@ -43,6 +43,7 @@ type AppItem = {
   id: string;
   name: string;
   icon: React.ComponentType<{ className?: string }>;
+  logoUrl: string | null;
   color: string;
   bgColor: string;
   status: "running" | "stopped" | "updating";
@@ -284,6 +285,7 @@ export function AppGrid({
           id: appId,
           name,
           icon: visual.icon,
+          logoUrl: catalog?.logoUrl ?? null,
           color: visual.color,
           bgColor: visual.bgColor,
           status: statusByAppId[appId] ?? derivedStatus,
@@ -532,13 +534,37 @@ export function AppGrid({
             >
               <div className="relative">
                 <div
-                  className={`${iconContainerClass} flex items-center justify-center ${app.bgColor} ${app.color} shadow-lg shadow-black/20 ${
+                  className={`${iconContainerClass} flex items-center justify-center ${!app.logoUrl ? `${app.bgColor} ${app.color}` : "bg-white/90"} shadow-lg shadow-black/20 ${
                     animationsEnabled
                       ? "transition-transform duration-200 group-hover:scale-110"
                       : ""
-                  }`}
+                  } overflow-hidden`}
                 >
-                  <app.icon className={iconGlyphClass} />
+                  {app.logoUrl ? (
+                    <>
+                      <img
+                        src={app.logoUrl}
+                        alt={`${app.name} logo`}
+                        className="w-full h-full object-contain p-1.5 rounded-xl"
+                        onError={(e) => {
+                          const img = e.currentTarget;
+                          const container = img.parentElement;
+                          if (container) {
+                            img.style.display = "none";
+                            container.classList.remove("bg-white/90");
+                            container.classList.add(app.bgColor, app.color);
+                            const fallback = container.querySelector("[data-fallback-icon]");
+                            if (fallback instanceof HTMLElement) {
+                              fallback.style.display = "block";
+                            }
+                          }
+                        }}
+                      />
+                      <app.icon className={`${iconGlyphClass} hidden`} data-fallback-icon />
+                    </>
+                  ) : (
+                    <app.icon className={iconGlyphClass} />
+                  )}
                 </div>
                 <span
                   className={`absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-background ${

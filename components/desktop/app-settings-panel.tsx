@@ -230,6 +230,21 @@ function buildInitialState(input: {
     ? toHostname(installed.stackName)
     : toHostname(name || appId);
 
+  // Parse volumes from VOLUMES env var (JSON array)
+  let volumes: VolumeRow[] = [];
+  if (env.VOLUMES) {
+    try {
+      const parsed = JSON.parse(env.VOLUMES) as Array<{ host: string; container: string }>;
+      volumes = parsed.map((v, index) => ({
+        id: nextId(`volume-${index}`),
+        host: v.host || "",
+        container: v.container || "",
+      }));
+    } catch {
+      // Invalid JSON, ignore
+    }
+  }
+
   return {
     dockerImage: env.DOCKER_IMAGE || env.IMAGE || `${appId}/${appId}:latest`,
     title: name,
@@ -244,7 +259,7 @@ function buildInitialState(input: {
       ? env.NETWORK_MODE.toLowerCase()
       : "bridge",
     ports: toDefaultPortRows(resolvedPort),
-    volumes: [],
+    volumes,
     envVars: toEnvRows(env),
     devices: [],
     containerCommands: [],
@@ -320,6 +335,16 @@ export function AppSettingsPanel({
           .filter((row) => row.key.trim())
           .map((row) => [row.key, row.value]),
       );
+
+      // Add volumes to env as JSON
+      if (state.volumes.length > 0) {
+        const volumesData = state.volumes
+          .filter((v) => v.host.trim() && v.container.trim())
+          .map((v) => ({ host: v.host, container: v.container }));
+        if (volumesData.length > 0) {
+          currentEnv.VOLUMES = JSON.stringify(volumesData);
+        }
+      }
 
       const currentPort = state.webUi.port
         ? Number.parseInt(state.webUi.port, 10)

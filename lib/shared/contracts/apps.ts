@@ -1,6 +1,8 @@
 export type InstalledApp = {
   id: string;
   name: string;
+  stackName: string;
+  composePath: string;
   status: "running" | "stopped" | "unknown";
   updatedAt: string;
 };

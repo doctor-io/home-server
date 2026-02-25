@@ -4,22 +4,32 @@ vi.mock("@/lib/server/modules/apps/repository", () => ({
   listInstalledAppsFromDb: vi.fn(),
 }));
 
+vi.mock("@/lib/server/modules/store/compose-runner", () => ({
+  getComposeStatus: vi.fn(),
+}));
+
 import { listInstalledAppsFromDb } from "@/lib/server/modules/apps/repository";
 import { listInstalledApps } from "@/lib/server/modules/apps/service";
+import { getComposeStatus } from "@/lib/server/modules/store/compose-runner";
 
 describe("apps service", () => {
   const repositoryMock = vi.mocked(listInstalledAppsFromDb);
+  const statusMock = vi.mocked(getComposeStatus);
 
   beforeEach(() => {
     repositoryMock.mockReset();
+    statusMock.mockReset();
+    statusMock.mockResolvedValue("running");
   });
 
   it("caches installed apps", async () => {
     repositoryMock.mockResolvedValueOnce([
       {
-        id: "1",
+        id: "nextcloud",
         name: "Nextcloud",
-        status: "running",
+        stackName: "nextcloud",
+        composePath: "/DATA/Apps/nextcloud/docker-compose.yml",
+        status: "unknown",
         updatedAt: "2026-02-22T10:00:00.000Z",
       },
     ]);
@@ -34,9 +44,11 @@ describe("apps service", () => {
   it("bypasses cache when requested", async () => {
     repositoryMock.mockResolvedValue([
       {
-        id: "2",
+        id: "immich",
         name: "Immich",
-        status: "stopped",
+        stackName: "immich",
+        composePath: "/DATA/Apps/immich/docker-compose.yml",
+        status: "unknown",
         updatedAt: "2026-02-22T11:00:00.000Z",
       },
     ]);

@@ -1,8 +1,10 @@
 import "server-only";
 
+import path from "node:path";
 import { LruCache } from "@/lib/server/cache/lru";
 import { logServerAction, withServerTiming } from "@/lib/server/logging/logger";
 import { listInstalledAppsFromDb } from "@/lib/server/modules/apps/repository";
+import { getComposeStatus } from "@/lib/server/modules/store/compose-runner";
 import type { InstalledApp } from "@/lib/shared/contracts/apps";
 
 const appsCache = new LruCache<InstalledApp[]>(4, 5_000);
@@ -45,6 +47,25 @@ export async function listInstalledApps(options?: { bypassCache?: boolean }) {
       try {
         apps = await listInstalledAppsFromDb();
         dbUnavailableUntil = 0;
+
+        // Get real Docker status for each app
+        const appsWithStatus = await Promise.all(
+          apps.map(async (app) => {
+            const envPath = path.join(path.dirname(app.composePath), ".env");
+            try {
+              const status = await getComposeStatus({
+                composePath: app.composePath,
+                envPath,
+                stackName: app.stackName,
+              });
+              return { ...app, status };
+            } catch {
+              return { ...app, status: "unknown" as const };
+            }
+          }),
+        );
+
+        apps = appsWithStatus;
       } catch (error) {
         if (!isDatabaseUnavailableError(error)) {
           throw error;
