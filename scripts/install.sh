@@ -301,11 +301,10 @@ deploy_os_configs() {
 	if [[ -f "${overlay_src}/etc/NetworkManager/NetworkManager.conf" ]]; then
 		mkdir -p /etc/NetworkManager
 		cp "${overlay_src}/etc/NetworkManager/NetworkManager.conf" /etc/NetworkManager/NetworkManager.conf
-		# Restart NetworkManager if already running
-		if systemctl is-active NetworkManager >/dev/null 2>&1; then
-			systemctl restart NetworkManager >/dev/null 2>&1 || true
-		fi
-		print_status "Deployed NetworkManager.conf"
+		# Restart NetworkManager to apply the new configuration
+		systemctl restart NetworkManager >/dev/null 2>&1 || true
+		sleep 2  # Give NetworkManager time to reinitialize devices
+		print_status "Deployed NetworkManager.conf and restarted NetworkManager"
 	fi
 
 	# Deploy systemd logind configs
