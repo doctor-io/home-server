@@ -585,23 +585,35 @@ SQL
 
 install_homeio() {
 	print_status "Installing ${APP_NAME}..."
-	cd "${INSTALL_DIR}"
+
+	if [[ ! -d "${INSTALL_DIR}" ]]; then
+		print_error "Installation directory not found: ${INSTALL_DIR}"
+		exit 1
+	fi
+
+	cd "${INSTALL_DIR}" || { print_error "Failed to enter installation directory"; exit 1; }
 
 	if [[ "${HOMEIO_VERBOSE}" == "true" ]]; then
-		print_status "Installing npm dependencies..."
-		npm ci
+		print_status "Installing npm dependencies (this may take a few minutes)..."
+		npm ci || { print_error "npm ci failed"; exit 1; }
+
 		print_status "Initializing database schema..."
-		set -a && source "${ENV_FILE}" && set +a && npm run db:init
+		(set -a && source "${ENV_FILE}" && set +a && npm run db:init) || { print_error "Database initialization failed"; exit 1; }
+
 		print_status "Building Next.js application..."
-		npm run build
+		npm run build || { print_error "Build failed"; exit 1; }
 	else
-		print_status "Installing npm dependencies..."
-		npm ci --silent --no-audit --no-fund
+		print_status "Installing npm dependencies (this may take a few minutes)..."
+		npm ci --loglevel=error --no-audit --no-fund || { print_error "npm ci failed"; exit 1; }
+
 		print_status "Initializing database schema..."
-		set -a && source "${ENV_FILE}" && set +a && npm run db:init --silent
+		(set -a && source "${ENV_FILE}" && set +a && npm run db:init --silent) || { print_error "Database initialization failed"; exit 1; }
+
 		print_status "Building Next.js application..."
-		npm run build --silent
+		npm run build --silent || { print_error "Build failed"; exit 1; }
 	fi
+
+	print_status "Installation completed successfully!"
 }
 
 install_systemd_service() {
