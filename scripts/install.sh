@@ -395,10 +395,22 @@ ensure_user_and_data_dir() {
 			"${APP_USER}"
 	fi
 
+	# Add homeio user to docker group for socket access
+	if getent group docker >/dev/null 2>&1; then
+		usermod -aG docker "${APP_USER}"
+		print_status "Added ${APP_USER} to docker group"
+	fi
+
 	mkdir -p "${INSTALL_DIR}" "${DATA_DIR}/logs" "${ENV_DIR}"
 	chown -R "${APP_USER}:${APP_GROUP}" "${INSTALL_DIR}" "${DATA_DIR}"
 	chown "root:${APP_GROUP}" "${ENV_DIR}"
 	chmod 750 "${ENV_DIR}"
+
+	# Create /DATA directory for app stacks storage
+	print_status "Creating /DATA directory for app storage..."
+	mkdir -p /DATA/{Apps,Documents,Media,Download}
+	chown -R "${APP_USER}:${APP_GROUP}" /DATA
+	chmod 755 /DATA
 }
 
 clone_or_update_repo() {
