@@ -297,6 +297,18 @@ deploy_os_configs() {
 		return
 	fi
 
+	# Deploy netplan config to use NetworkManager
+	if [[ -f "${overlay_src}/etc/netplan/01-netcfg.yaml" ]]; then
+		mkdir -p /etc/netplan
+		cp "${overlay_src}/etc/netplan/01-netcfg.yaml" /etc/netplan/01-netcfg.yaml
+		chmod 600 /etc/netplan/01-netcfg.yaml
+		print_status "Deployed netplan config to use NetworkManager renderer"
+
+		# Apply netplan configuration
+		netplan apply >/dev/null 2>&1 || true
+		sleep 2
+	fi
+
 	# Deploy NetworkManager config
 	if [[ -f "${overlay_src}/etc/NetworkManager/NetworkManager.conf" ]]; then
 		mkdir -p /etc/NetworkManager

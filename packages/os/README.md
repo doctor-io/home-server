@@ -8,6 +8,8 @@ This directory contains system configuration files that are deployed during inst
 packages/os/
 ├── overlay-common/          # Files applied to all systems
 │   └── etc/
+│       ├── netplan/
+│       │   └── 01-netcfg.yaml
 │       ├── NetworkManager/
 │       │   └── NetworkManager.conf
 │       └── systemd/
@@ -18,6 +20,12 @@ packages/os/
 ```
 
 ## Files
+
+### 01-netcfg.yaml
+- **Purpose**: Configure netplan to use NetworkManager as the network renderer
+- **Key settings**:
+  - `renderer: NetworkManager`: Use NetworkManager instead of systemd-networkd
+- **Why needed**: Ubuntu Server defaults to systemd-networkd, which prevents NetworkManager from managing WiFi
 
 ### NetworkManager.conf
 - **Purpose**: Configure NetworkManager to manage all network interfaces
