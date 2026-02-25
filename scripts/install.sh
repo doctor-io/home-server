@@ -791,6 +791,8 @@ print_summary() {
 	echo ""
 }
 
+
+
 main() {
 	run_step "Checking root privileges..." require_root
 	run_step "Checking apt availability..." ensure_apt
