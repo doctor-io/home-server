@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
 APP_NAME="home-server"
 APP_USER="${HOMEIO_USER:-homeio}"
 APP_GROUP="${HOMEIO_GROUP:-${APP_USER}}"
@@ -26,21 +32,16 @@ if [[ "${DBUS_SERVICE_UNIT}" != *.service ]]; then
 	DBUS_SERVICE_UNIT="${DBUS_SERVICE_UNIT}.service"
 fi
 
-log() {
-	printf "[%s] %s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
-}
-
-die() {
-	echo "ERROR: $*" >&2
-	exit 1
-}
+print_status() { echo -e "${GREEN}[+]${NC} $1"; }
+print_error() { echo -e "${RED}[!]${NC} $1" >&2; }
+print_warn() { echo -e "${YELLOW}[*]${NC} $1"; }
 
 command_exists() {
 	command -v "$1" >/dev/null 2>&1
 }
 
 require_root() {
-	[[ "${EUID}" -eq 0 ]] || die "Run this uninstall script as root (for example: sudo bash uninstall.sh)."
+	[[ "${EUID}" -eq 0 ]] || { print_error "Run this uninstall script as root (for example: sudo bash uninstall.sh)."; exit 1; }
 }
 
 get_env_value() {
@@ -55,7 +56,20 @@ confirm() {
 	if [[ "${ASSUME_YES}" == "true" ]]; then
 		return 0
 	fi
-	read -r -p "${message} [y/N]: " reply
+
+	# Check if we have a terminal to read from
+	if [[ ! -t 0 ]] && [[ -e /dev/tty ]]; then
+		# stdin is not a terminal (e.g., piped script), use /dev/tty
+		read -r -p "${message} [y/N]: " reply </dev/tty
+	elif [[ ! -t 0 ]]; then
+		# No terminal available and script is piped - require --yes flag
+		print_error "Script is running non-interactively. Use --yes flag to proceed without confirmation."
+		exit 1
+	else
+		# Normal interactive mode
+		read -r -p "${message} [y/N]: " reply
+	fi
+
 	[[ "${reply}" == "y" || "${reply}" == "Y" ]]
 }
 
@@ -91,28 +105,31 @@ parse_args() {
 				exit 0
 				;;
 			*)
-				die "Unknown option: ${1}"
+				print_error "Unknown option: ${1}"
+				exit 1
 				;;
 		esac
 	done
 
 	if [[ "${REMOVE_SYSTEM_USER}" == "true" && "${PURGE}" != "true" ]]; then
-		die "--remove-user requires --purge."
+		print_error "--remove-user requires --purge."
+		exit 1
 	fi
 }
 
 stop_and_remove_service() {
 	if command_exists systemctl; then
-		log "Stopping and disabling ${SERVICE_UNIT}..."
+		print_status "Stopping and disabling ${SERVICE_UNIT}..."
 		systemctl stop "${SERVICE_UNIT}" >/dev/null 2>&1 || true
 		systemctl disable "${SERVICE_UNIT}" >/dev/null 2>&1 || true
-		log "Stopping and disabling ${DBUS_SERVICE_UNIT}..."
+		print_status "Stopping and disabling ${DBUS_SERVICE_UNIT}..."
 		systemctl stop "${DBUS_SERVICE_UNIT}" >/dev/null 2>&1 || true
 		systemctl disable "${DBUS_SERVICE_UNIT}" >/dev/null 2>&1 || true
 	fi
 
 	local unit_file="/etc/systemd/system/${SERVICE_UNIT}"
 	if [[ -f "${unit_file}" ]]; then
+		print_status "Removing systemd service files..."
 		rm -f "${unit_file}"
 	fi
 	local dbus_unit_file="/etc/systemd/system/${DBUS_SERVICE_UNIT}"
@@ -131,6 +148,7 @@ stop_and_remove_service() {
 
 remove_reverse_proxy() {
 	if ! command_exists nginx; then
+		print_warn "nginx is not installed; skipping reverse proxy removal."
 		return
 	fi
 
@@ -140,12 +158,13 @@ remove_reverse_proxy() {
 	local default_enabled="/etc/nginx/sites-enabled/default"
 
 	if [[ -f "${nginx_conf}" || -L "${nginx_enabled}" ]]; then
-		log "Removing nginx site ${NGINX_SITE_NAME}..."
+		print_status "Removing nginx site ${NGINX_SITE_NAME}..."
 		rm -f "${nginx_enabled}" >/dev/null 2>&1 || true
 		rm -f "${nginx_conf}" >/dev/null 2>&1 || true
 	fi
 
 	if [[ -f "${default_available}" && ! -e "${default_enabled}" ]]; then
+		print_status "Restoring nginx default site..."
 		ln -sf "${default_available}" "${default_enabled}"
 	fi
 
@@ -154,8 +173,10 @@ remove_reverse_proxy() {
 
 remove_app_files() {
 	if [[ -d "${INSTALL_DIR}" ]]; then
-		log "Removing app files from ${INSTALL_DIR}..."
+		print_status "Removing app files from ${INSTALL_DIR}..."
 		rm -rf "${INSTALL_DIR}"
+	else
+		print_warn "Install directory ${INSTALL_DIR} not found; skipping."
 	fi
 }
 
@@ -169,15 +190,15 @@ purge_database() {
 	[[ -n "${db_user}" ]] || db_user="home_server"
 
 	if ! id -u postgres >/dev/null 2>&1; then
-		log "PostgreSQL OS user not found; skipping DB purge."
+		print_warn "PostgreSQL OS user not found; skipping DB purge."
 		return
 	fi
 
-	log "Dropping PostgreSQL database '${db_name}'..."
-	runuser -u postgres -- dropdb --if-exists --force "${db_name}" || true
+	print_status "Dropping PostgreSQL database '${db_name}'..."
+	runuser -u postgres -- dropdb --if-exists --force "${db_name}" >/dev/null 2>&1 || true
 
-	log "Dropping PostgreSQL role '${db_user}'..."
-	runuser -u postgres -- psql -v ON_ERROR_STOP=1 --set=db_user="${db_user}" <<'SQL'
+	print_status "Dropping PostgreSQL role '${db_user}'..."
+	runuser -u postgres -- psql -v ON_ERROR_STOP=1 --set=db_user="${db_user}" >/dev/null 2>&1 <<'SQL' || true
 SELECT format('DROP ROLE %I', :'db_user')
 WHERE EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'db_user')
 \gexec
@@ -186,12 +207,12 @@ SQL
 
 purge_data_and_env() {
 	if [[ -d "${DATA_DIR}" ]]; then
-		log "Removing data directory ${DATA_DIR}..."
+		print_status "Removing data directory ${DATA_DIR}..."
 		rm -rf "${DATA_DIR}"
 	fi
 
 	if [[ -f "${ENV_FILE}" ]]; then
-		log "Removing env file ${ENV_FILE}..."
+		print_status "Removing env file ${ENV_FILE}..."
 		rm -f "${ENV_FILE}"
 	fi
 
@@ -206,14 +227,36 @@ remove_system_user_group() {
 	fi
 
 	if id -u "${APP_USER}" >/dev/null 2>&1; then
-		log "Removing system user ${APP_USER}..."
+		print_status "Removing system user ${APP_USER}..."
 		userdel "${APP_USER}" >/dev/null 2>&1 || true
 	fi
 
 	if getent group "${APP_GROUP}" >/dev/null 2>&1; then
-		log "Removing system group ${APP_GROUP}..."
+		print_status "Removing system group ${APP_GROUP}..."
 		groupdel "${APP_GROUP}" >/dev/null 2>&1 || true
 	fi
+}
+
+print_summary() {
+	echo ""
+	if [[ "${PURGE}" == "true" ]]; then
+		echo -e "${GREEN}╭────────────────────────────────────────────────────╮${NC}"
+		echo -e "${GREEN}│         Uninstall Complete (Purge)                │${NC}"
+		echo -e "${GREEN}├────────────────────────────────────────────────────┤${NC}"
+		echo -e "${GREEN}│${NC}  ${APP_NAME} has been completely removed.          ${GREEN}│${NC}"
+		echo -e "${GREEN}│${NC}  All data, database, and configuration deleted.${GREEN}│${NC}"
+		echo -e "${GREEN}╰────────────────────────────────────────────────────╯${NC}"
+	else
+		echo -e "${GREEN}╭────────────────────────────────────────────────────╮${NC}"
+		echo -e "${GREEN}│         Uninstall Complete                        │${NC}"
+		echo -e "${GREEN}├────────────────────────────────────────────────────┤${NC}"
+		echo -e "${GREEN}│${NC}  ${APP_NAME} has been removed.                     ${GREEN}│${NC}"
+		echo -e "${GREEN}│${NC}                                                  ${GREEN}│${NC}"
+		echo -e "${YELLOW}│${NC}  ${YELLOW}Note:${NC} Database and data were preserved.        ${GREEN}│${NC}"
+		echo -e "${GREEN}│${NC}  Run with ${BLUE}--purge${NC} to remove everything.        ${GREEN}│${NC}"
+		echo -e "${GREEN}╰────────────────────────────────────────────────────╯${NC}"
+	fi
+	echo ""
 }
 
 main() {
@@ -226,7 +269,8 @@ main() {
 	fi
 
 	if ! confirm "Uninstall ${APP_NAME} (${mode})?"; then
-		die "Cancelled."
+		print_warn "Cancelled."
+		exit 0
 	fi
 
 	stop_and_remove_service
@@ -237,10 +281,9 @@ main() {
 		purge_database
 		purge_data_and_env
 		remove_system_user_group
-		log "Uninstall completed with purge."
-	else
-		log "Uninstall completed. Database, data, and env were kept."
 	fi
+
+	print_summary
 }
 
 main "$@"

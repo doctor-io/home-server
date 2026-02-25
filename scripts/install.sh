@@ -7,12 +7,8 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 APP_NAME="home-server"
-APP_USER="${HOMEIO_USER:-homeio}"
-APP_GROUP="${HOMEIO_GROUP:-${APP_USER}}"
 INSTALL_DIR="${HOMEIO_INSTALL_DIR:-/opt/home-server}"
-DATA_DIR="${HOMEIO_DATA_DIR:-/var/lib/home-server}"
-ENV_DIR="${HOMEIO_ENV_DIR:-/etc/home-server}"
-ENV_FILE="${HOMEIO_ENV_FILE:-${ENV_DIR}/home-server.env}"
+ENV_FILE="${INSTALL_DIR}/.env"
 SERVICE_NAME="${HOMEIO_SERVICE_NAME:-home-server}"
 DBUS_SERVICE_NAME="${HOMEIO_DBUS_SERVICE_NAME:-home-server-dbus}"
 APP_PORT="${HOMEIO_APP_PORT:-${HOMEIO_PORT:-12026}}"
@@ -61,9 +57,9 @@ require_root() {
 	[[ "${EUID}" -eq 0 ]] || { print_error "Run this installer as root (for example: sudo bash install.sh)."; exit 1; }
 }
 
-run_as_app() {
+run_cmd() {
 	local cmd="${1}"
-	runuser -u "${APP_USER}" -- bash -lc "${cmd}"
+	bash -c "${cmd}"
 }
 
 validate_identifiers() {
@@ -419,56 +415,29 @@ install_yq() {
 	rm -f /tmp/yq-checksums.txt
 }
 
-ensure_user_and_data_dir() {
-	print_status "Ensuring system user and directories..."
+ensure_directories() {
+	print_status "Ensuring installation directories..."
 
-	if ! getent group "${APP_GROUP}" >/dev/null 2>&1; then
-		groupadd --system "${APP_GROUP}"
-	fi
-
-	if ! id -u "${APP_USER}" >/dev/null 2>&1; then
-		useradd \
-			--system \
-			--gid "${APP_GROUP}" \
-			--home-dir "${DATA_DIR}" \
-			--create-home \
-			--shell /usr/sbin/nologin \
-			"${APP_USER}"
-	fi
-
-	# Add homeio user to docker group for socket access
-	if getent group docker >/dev/null 2>&1; then
-		usermod -aG docker "${APP_USER}"
-		print_status "Added ${APP_USER} to docker group"
-	fi
-
-	mkdir -p "${INSTALL_DIR}" "${DATA_DIR}/logs" "${ENV_DIR}"
-	chown -R "${APP_USER}:${APP_GROUP}" "${INSTALL_DIR}" "${DATA_DIR}"
-	chown "root:${APP_GROUP}" "${ENV_DIR}"
-	chmod 750 "${ENV_DIR}"
+	mkdir -p "${INSTALL_DIR}"
 
 	# Create /DATA directory for app stacks storage
 	print_status "Creating /DATA directory for app storage..."
 	mkdir -p /DATA/{Apps,Documents,Media,Download}
-	chown -R "${APP_USER}:${APP_GROUP}" /DATA
 	chmod 755 /DATA
 }
 
 clone_or_update_repo() {
 	print_status "Syncing repository (${REPO_BRANCH})..."
 
-	if [[ -d "${INSTALL_DIR}/.git" ]]; then
-		run_as_app "git -C '${INSTALL_DIR}' fetch --depth=1 origin '${REPO_BRANCH}' --quiet"
-		run_as_app "git -C '${INSTALL_DIR}' checkout --force FETCH_HEAD --quiet"
-		return
+	# Remove existing installation if present
+	if [[ -d "${INSTALL_DIR}" ]]; then
+		cd /tmp || cd /
+		print_status "Removing existing installation..."
+		rm -rf "${INSTALL_DIR}"
 	fi
 
-	if [[ -n "$(ls -A "${INSTALL_DIR}" 2>/dev/null || true)" ]]; then
-		print_error "Install directory is not empty and is not a git repo: ${INSTALL_DIR}"
-		exit 1
-	fi
-
-	run_as_app "git clone --depth=1 --branch '${REPO_BRANCH}' '${REPO_URL}' '${INSTALL_DIR}' --quiet"
+	print_status "Cloning repository (branch: ${REPO_BRANCH})..."
+	git clone --depth=1 --branch "${REPO_BRANCH}" "${REPO_URL}" "${INSTALL_DIR}" --quiet
 }
 
 unset_env_key() {
@@ -521,146 +490,84 @@ set_env_key() {
 	rm -f "${tmp_file}"
 }
 
-ensure_env_file() {
-	print_status "Preparing environment file at ${ENV_FILE}..."
-	mkdir -p "${ENV_DIR}"
+create_env_file() {
+	print_status "Creating .env file..."
 
-	local db_name="${HOMEIO_DB_NAME:-}"
-	local db_user="${HOMEIO_DB_USER:-}"
-	local db_password="${HOMEIO_DB_PASSWORD:-}"
-	local admin_username="${HOMEIO_ADMIN_USERNAME:-auto}"
-	local admin_password="${HOMEIO_ADMIN_PASSWORD:-}"
+	# Generate auth session secret if not provided
 	local auth_session_secret="${HOMEIO_AUTH_SESSION_SECRET:-}"
-	local generated_admin_password="false"
-	local generated_db_password="false"
-
-	local is_new="false"
-	if [[ ! -f "${ENV_FILE}" ]]; then
-		is_new="true"
-		touch "${ENV_FILE}"
-	fi
-
-	chown "root:${APP_GROUP}" "${ENV_FILE}"
-	chmod 640 "${ENV_FILE}"
-
-	if [[ "${is_new}" == "true" ]]; then
-		cat >>"${ENV_FILE}" <<EOF
-# ${APP_NAME} environment
-EOF
-	fi
-
-	if [[ -z "${db_name}" ]]; then
-		db_name="$(get_env_value HOMEIO_DB_NAME "${ENV_FILE}" || true)"
-	fi
-	if [[ -z "${db_name}" ]]; then
-		db_name="home_server"
-	fi
-
-	if [[ -z "${db_user}" ]]; then
-		db_user="$(get_env_value HOMEIO_DB_USER "${ENV_FILE}" || true)"
-	fi
-	if [[ -z "${db_user}" ]]; then
-		db_user="home_server"
-	fi
-
 	if [[ -z "${auth_session_secret}" ]]; then
-		auth_session_secret="$(get_env_value AUTH_SESSION_SECRET "${ENV_FILE}" || true)"
-	fi
-	if [[ -z "${auth_session_secret}" ]]; then
-		auth_session_secret="$(openssl rand -hex 32)"
-	fi
-
-	if [[ -z "${db_password}" ]]; then
-		db_password="$(get_env_value HOMEIO_DB_PASSWORD "${ENV_FILE}" || true)"
-	fi
-	if [[ -z "${db_password}" ]]; then
-		db_password="$(openssl rand -hex 24)"
-		generated_db_password="true"
-	fi
-
-	if [[ -z "${admin_username}" || "${admin_username}" == "auto" ]]; then
-		admin_username="$(get_env_value AUTH_PRIMARY_USERNAME "${ENV_FILE}" || true)"
-	fi
-	if [[ -z "${admin_username}" || "${admin_username}" == "auto" ]]; then
-		admin_username="homeio-$(openssl rand -hex 2)"
-	fi
-	[[ "${admin_username}" =~ ^[a-zA-Z0-9._-]{3,64}$ ]] || { print_error "Invalid generated HOMEIO_ADMIN_USERNAME: ${admin_username}"; exit 1; }
-
-	if [[ "${HOMEIO_SEED_PRINCIPAL}" == "true" ]]; then
-		if [[ -z "${admin_password}" ]]; then
-			admin_password="$(get_env_value AUTH_PRIMARY_PASSWORD "${ENV_FILE}" || true)"
+		if command -v openssl >/dev/null 2>&1; then
+			auth_session_secret="$(openssl rand -hex 32)"
+			print_status "Generated AUTH_SESSION_SECRET"
+		else
+			print_error "openssl not found; unable to auto-generate AUTH_SESSION_SECRET"
+			exit 1
 		fi
-		if [[ -z "${admin_password}" ]]; then
-			admin_password="$(openssl rand -hex 12)"
-			generated_admin_password="true"
-		fi
-		[[ "${#admin_password}" -ge 8 ]] || { print_error "Admin password must be at least 8 characters."; exit 1; }
-	else
-		admin_password=""
 	fi
 
+	# Generate database password
+	local db_password="$(openssl rand -hex 24)"
+	local db_user="home_server"
+	local db_name="home_server"
 	local database_url="postgresql://${db_user}:${db_password}@127.0.0.1:5432/${db_name}"
-	set_env_key NODE_ENV "production" "${ENV_FILE}"
-	set_env_key HOMEIO_DB_NAME "${db_name}" "${ENV_FILE}"
-	set_env_key HOMEIO_DB_USER "${db_user}" "${ENV_FILE}"
-	set_env_key HOMEIO_DB_PASSWORD "${db_password}" "${ENV_FILE}"
-	set_env_key DATABASE_URL "${database_url}" "${ENV_FILE}"
-	set_env_key AUTH_SESSION_SECRET "${auth_session_secret}" "${ENV_FILE}"
-	set_env_key AUTH_PRIMARY_USERNAME "${admin_username}" "${ENV_FILE}"
-	set_env_key AUTH_ALLOW_REGISTRATION "false" "${ENV_FILE}"
-	set_env_key AUTH_COOKIE_SECURE "false" "${ENV_FILE}"
-	set_env_key PG_MAX_CONNECTIONS "10" "${ENV_FILE}"
-	set_env_key METRICS_CACHE_TTL_MS "2000" "${ENV_FILE}"
-	set_env_key METRICS_PUBLISH_INTERVAL_MS "2000" "${ENV_FILE}"
-	set_env_key SSE_HEARTBEAT_MS "8000" "${ENV_FILE}"
-	set_env_key WEBSOCKET_ENABLED "true" "${ENV_FILE}"
-	set_env_key LOG_LEVEL "info" "${ENV_FILE}"
-	set_env_key LOG_FILE_PATH "${DATA_DIR}/logs/home-server.log" "${ENV_FILE}"
-	set_env_key LOG_TO_FILE "true" "${ENV_FILE}"
-	set_env_key NEXT_PUBLIC_LOG_LEVEL "info" "${ENV_FILE}"
-	set_env_key NEXT_PUBLIC_CLIENT_LOG_INGEST "true" "${ENV_FILE}"
-	set_env_key DBUS_HELPER_SOCKET_PATH "/run/home-server/dbus-helper.sock" "${ENV_FILE}"
-	set_env_key HOMEIO_APP_PORT "${APP_PORT}" "${ENV_FILE}"
-	set_env_key HOMEIO_PUBLIC_PORT "${PUBLIC_PORT}" "${ENV_FILE}"
 
-	if [[ "${HOMEIO_SEED_PRINCIPAL}" == "true" ]]; then
-		set_env_key AUTH_PRIMARY_PASSWORD "${admin_password}" "${ENV_FILE}"
-		set_env_key NEXT_PUBLIC_PRIMARY_USERNAME "${admin_username}" "${ENV_FILE}"
-	else
-		unset_env_key AUTH_PRIMARY_PASSWORD "${ENV_FILE}"
-		set_env_key NEXT_PUBLIC_PRIMARY_USERNAME "" "${ENV_FILE}"
-	fi
+	cat > "${ENV_FILE}" <<EOF
+# Home Server Configuration
+# Generated on $(date)
 
+# Server Configuration
+PORT=${APP_PORT}
+NODE_ENV=production
+
+# Database Configuration
+DATABASE_URL="${database_url}"
+PG_MAX_CONNECTIONS=10
+
+# Authentication
+AUTH_SESSION_SECRET="${auth_session_secret}"
+AUTH_ALLOW_REGISTRATION=true
+AUTH_COOKIE_SECURE=false
+
+# System Metrics
+METRICS_CACHE_TTL_MS=2000
+METRICS_PUBLISH_INTERVAL_MS=2000
+SSE_HEARTBEAT_MS=8000
+
+# WebSocket
+WEBSOCKET_ENABLED=true
+
+# Logging
+LOG_LEVEL=info
+LOG_TO_FILE=true
+LOG_FILE_PATH=${INSTALL_DIR}/logs/home-server.log
+NEXT_PUBLIC_LOG_LEVEL=info
+
+# D-Bus Helper
+DBUS_HELPER_SOCKET_PATH=/run/home-server/dbus-helper.sock
+
+# Docker/App Stacks
+STORE_STACKS_ROOT=/var/lib/home-server/stacks
+STORE_DATA_ROOT=/DATA/AppData
+EOF
+
+	# Store for postgres setup
 	EFFECTIVE_DB_USER="${db_user}"
-	EFFECTIVE_ADMIN_USERNAME="${admin_username}"
-	EFFECTIVE_ADMIN_PASSWORD="${admin_password}"
-	GENERATED_ADMIN_PASSWORD="${generated_admin_password}"
+	EFFECTIVE_DB_PASSWORD="${db_password}"
+	EFFECTIVE_DB_NAME="${db_name}"
 
-	if [[ "${generated_admin_password}" == "true" ]]; then
-		print_status "Generated app credentials for first login."
-	fi
-	if [[ "${generated_db_password}" == "true" ]]; then
-		print_status "Generated PostgreSQL password for ${db_user}."
-	fi
+	print_status ".env file created successfully"
 }
 
 configure_local_postgres() {
 	print_status "Configuring local PostgreSQL..."
 	systemctl enable --now postgresql
 
-	local db_user
-	local db_pass
-	local db_name
-	db_user="$(get_env_value HOMEIO_DB_USER "${ENV_FILE}" || true)"
-	db_pass="$(get_env_value HOMEIO_DB_PASSWORD "${ENV_FILE}" || true)"
-	db_name="$(get_env_value HOMEIO_DB_NAME "${ENV_FILE}" || true)"
-	[[ -n "${db_user}" ]] || { print_error "HOMEIO_DB_USER is missing in ${ENV_FILE}"; exit 1; }
-	[[ -n "${db_pass}" ]] || { print_error "HOMEIO_DB_PASSWORD is missing in ${ENV_FILE}"; exit 1; }
-	[[ -n "${db_name}" ]] || { print_error "HOMEIO_DB_NAME is missing in ${ENV_FILE}"; exit 1; }
+	local db_user="${EFFECTIVE_DB_USER}"
+	local db_pass="${EFFECTIVE_DB_PASSWORD}"
+	local db_name="${EFFECTIVE_DB_NAME}"
 
 	print_status "Ensuring PostgreSQL role '${db_user}'..."
-	if [[ "${HOMEIO_VERBOSE}" == "true" ]]; then
-		runuser -u postgres -- psql -v ON_ERROR_STOP=1 --set=db_user="${db_user}" --set=db_pass="${db_pass}" <<'SQL'
+	runuser -u postgres -- psql -v ON_ERROR_STOP=1 --set=db_user="${db_user}" --set=db_pass="${db_pass}" 2>&1 <<'SQL' || true
 SELECT format('CREATE ROLE %I LOGIN PASSWORD %L', :'db_user', :'db_pass')
 WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'db_user')
 \gexec
@@ -669,17 +576,6 @@ SELECT format('ALTER ROLE %I WITH LOGIN PASSWORD %L', :'db_user', :'db_pass')
 WHERE EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'db_user')
 \gexec
 SQL
-	else
-		runuser -u postgres -- psql -v ON_ERROR_STOP=1 --set=db_user="${db_user}" --set=db_pass="${db_pass}" >/dev/null <<'SQL'
-SELECT format('CREATE ROLE %I LOGIN PASSWORD %L', :'db_user', :'db_pass')
-WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'db_user')
-\gexec
-
-SELECT format('ALTER ROLE %I WITH LOGIN PASSWORD %L', :'db_user', :'db_pass')
-WHERE EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'db_user')
-\gexec
-SQL
-	fi
 
 	print_status "Ensuring PostgreSQL database '${db_name}'..."
 	if ! runuser -u postgres -- psql -tAc "SELECT 1 FROM pg_database WHERE datname='${db_name}'" | grep -q 1; then
@@ -689,20 +585,22 @@ SQL
 
 install_homeio() {
 	print_status "Installing ${APP_NAME}..."
+	cd "${INSTALL_DIR}"
+
 	if [[ "${HOMEIO_VERBOSE}" == "true" ]]; then
 		print_status "Installing npm dependencies..."
-		run_as_app "cd '${INSTALL_DIR}' && npm ci"
+		npm ci
 		print_status "Initializing database schema..."
-		run_as_app "cd '${INSTALL_DIR}' && set -a && source '${ENV_FILE}' && set +a && npm run db:init"
+		set -a && source "${ENV_FILE}" && set +a && npm run db:init
 		print_status "Building Next.js application..."
-		run_as_app "cd '${INSTALL_DIR}' && npm run build"
+		npm run build
 	else
 		print_status "Installing npm dependencies..."
-		run_as_app "cd '${INSTALL_DIR}' && npm ci --silent --no-audit --no-fund" >/dev/null
+		npm ci --silent --no-audit --no-fund
 		print_status "Initializing database schema..."
-		run_as_app "cd '${INSTALL_DIR}' && set -a && source '${ENV_FILE}' && set +a && npm run db:init --silent" >/dev/null
+		set -a && source "${ENV_FILE}" && set +a && npm run db:init --silent
 		print_status "Building Next.js application..."
-		run_as_app "cd '${INSTALL_DIR}' && npm run build --silent" >/dev/null
+		npm run build --silent
 	fi
 }
 
@@ -715,27 +613,40 @@ install_systemd_service() {
 	cat >"${unit_file}" <<EOF
 [Unit]
 Description=${APP_NAME}
-After=network.target postgresql.service
-Wants=postgresql.service
+After=network-online.target postgresql.service docker.service
+Wants=network-online.target postgresql.service
 
 [Service]
 Type=simple
-User=${APP_USER}
-Group=${APP_GROUP}
+User=root
 WorkingDirectory=${INSTALL_DIR}
 EnvironmentFile=${ENV_FILE}
-Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ExecStart=/usr/bin/env npm run start -- -H 127.0.0.1 -p ${APP_PORT}
-Restart=on-failure
-RestartSec=5
-TimeoutStopSec=30
+Restart=always
+RestartSec=10
+KillMode=process
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=${SERVICE_NAME}
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
 	systemctl daemon-reload
-	systemctl enable --now "${SERVICE_NAME}.service"
+	systemctl enable "${SERVICE_NAME}.service"
+	systemctl start "${SERVICE_NAME}.service"
+
+	# Wait a moment for service to start
+	sleep 2
+
+	# Check service status
+	if systemctl is-active --quiet "${SERVICE_NAME}"; then
+		print_status "${APP_NAME} service started successfully!"
+	else
+		print_error "${APP_NAME} service failed to start. Check logs with: journalctl -u ${SERVICE_NAME} -n 50"
+		exit 1
+	fi
 }
 
 install_reverse_proxy() {
@@ -890,10 +801,10 @@ main() {
 	run_step "Installing Docker..." install_docker
 	run_step "Installing Node.js..." install_node
 	run_step "Installing yq (optional)..." install_yq
-	run_step "Ensuring application user and directories..." ensure_user_and_data_dir
+	run_step "Ensuring directories..." ensure_directories
 	run_step "Syncing repository..." clone_or_update_repo
 	run_step "Deploying OS configurations..." deploy_os_configs
-	run_step "Preparing environment file..." ensure_env_file
+	run_step "Creating environment file..." create_env_file
 	run_step "Configuring PostgreSQL..." configure_local_postgres
 	run_step "Installing application..." install_homeio
 	run_step "Installing app systemd service..." install_systemd_service
