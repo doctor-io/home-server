@@ -13,12 +13,8 @@ import {
   Wrench,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { AppSettingsPanel } from "@/components/desktop/app-settings-panel";
+import { AppSettingsPanel } from "@/components/desktop/apps/app-settings-panel";
 import { AppStoreInstallMenu } from "@/components/desktop/app-store-install-menu";
-import {
-  CustomAppInstallDialog,
-  type CustomAppInstallDialogInput,
-} from "@/components/desktop/custom-app-install-dialog";
 import { UninstallAppDialog } from "@/components/desktop/uninstall-app-dialog";
 import { useStoreActions } from "@/hooks/useStoreActions";
 import { useStoreApp } from "@/hooks/useStoreApp";
@@ -288,14 +284,11 @@ function AppStoreDetailPanel({
   );
 }
 
-export function AppStore() {
+export function AppStore({ onOpenCustomInstall }: { onOpenCustomInstall: () => void }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "installed">("all");
   const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [customDialogOpen, setCustomDialogOpen] = useState(false);
-  const [customActionError, setCustomActionError] = useState<string | null>(null);
-  const [customInstallPending, setCustomInstallPending] = useState(false);
   const [customInstallTemplate, setCustomInstallTemplate] = useState<StoreAppDetail | null>(null);
   const [uninstallDialogApp, setUninstallDialogApp] = useState<StoreAppSummary | null>(null);
   const [uninstallError, setUninstallError] = useState<string | null>(null);
@@ -304,7 +297,6 @@ export function AppStore() {
   const {
     operationsByApp,
     installApp,
-    installCustomApp,
     redeployApp,
     uninstallApp,
   } = useStoreActions();
@@ -399,21 +391,6 @@ export function AppStore() {
       });
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "Request failed.");
-    }
-  }
-
-  async function startCustomInstall(input: CustomAppInstallDialogInput) {
-    setCustomActionError(null);
-    setCustomInstallPending(true);
-
-    try {
-      await installCustomApp(input);
-      setCustomDialogOpen(false);
-    } catch (error) {
-      setCustomActionError(error instanceof Error ? error.message : "Unable to install custom app.");
-      throw error;
-    } finally {
-      setCustomInstallPending(false);
     }
   }
 
@@ -524,7 +501,7 @@ export function AppStore() {
 
         <div className="flex-1" />
 
-        <AppStoreInstallMenu onInstallCustomClick={() => setCustomDialogOpen(true)} />
+        <AppStoreInstallMenu onInstallCustomClick={onOpenCustomInstall} />
 
         <div className="relative w-56">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
@@ -538,18 +515,6 @@ export function AppStore() {
         </div>
       </div>
 
-      <CustomAppInstallDialog
-        open={customDialogOpen}
-        onOpenChange={(nextOpen) => {
-          setCustomDialogOpen(nextOpen);
-          if (!nextOpen) {
-            setCustomActionError(null);
-          }
-        }}
-        onSubmit={startCustomInstall}
-        isSubmitting={customInstallPending}
-        error={customActionError}
-      />
       {uninstallDialog}
 
       <div className="flex flex-1 overflow-hidden">

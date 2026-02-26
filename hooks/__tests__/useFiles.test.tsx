@@ -134,6 +134,7 @@ describe("useFiles hooks", () => {
 
   it("exports path helpers", () => {
     expect(toFilePath(["Documents", "notes.txt"])).toBe("Documents/notes.txt");
+    expect(toFilePath(["Trash", "notes.txt"])).toBe("Trash/notes.txt");
     expect(buildAssetUrl("Media/photo.png")).toBe(
       "/api/v1/files/asset?path=Media%2Fphoto.png",
     );

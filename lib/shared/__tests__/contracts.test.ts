@@ -9,9 +9,19 @@ import type {
   StoreOperationEvent,
 } from "@/lib/shared/contracts/apps";
 import type {
+  CreateNetworkShareRequest,
+  DiscoverServersResponse,
+  DiscoverSharesRequest,
+  DiscoverSharesResponse,
   FileListEntry,
   FileReadResponse,
   FileServiceErrorCode,
+  NetworkShare,
+  NetworkShareStatus,
+  TrashMoveRequest,
+  TrashMoveResponse,
+  TrashRestoreRequest,
+  TrashRestoreResponse,
   FileWriteRequest,
   FileWriteResponse,
 } from "@/lib/shared/contracts/files";
@@ -174,6 +184,58 @@ describe("shared contracts", () => {
       mtimeMs: number;
     }>();
 
+    expectTypeOf<NetworkShare>().toMatchTypeOf<{
+      id: string;
+      host: string;
+      share: string;
+      username: string;
+      mountPath: string;
+    }>();
+
+    expectTypeOf<NetworkShareStatus>().toMatchTypeOf<{
+      isMounted: boolean;
+    }>();
+
+    expectTypeOf<CreateNetworkShareRequest>().toMatchTypeOf<{
+      host: string;
+      share: string;
+      username: string;
+      password: string;
+    }>();
+
+    expectTypeOf<DiscoverServersResponse>().toMatchTypeOf<{
+      servers: string[];
+    }>();
+
+    expectTypeOf<DiscoverSharesRequest>().toMatchTypeOf<{
+      host: string;
+      username: string;
+      password: string;
+    }>();
+
+    expectTypeOf<DiscoverSharesResponse>().toMatchTypeOf<{
+      shares: string[];
+    }>();
+
+    expectTypeOf<TrashMoveRequest>().toMatchTypeOf<{
+      path: string;
+    }>();
+
+    expectTypeOf<TrashMoveResponse>().toMatchTypeOf<{
+      trashPath: string;
+      originalPath: string;
+    }>();
+
+    expectTypeOf<TrashRestoreRequest>().toMatchTypeOf<{
+      path: string;
+      collision?: "keep-both" | "replace" | "fail";
+    }>();
+
+    expectTypeOf<TrashRestoreResponse>().toMatchTypeOf<{
+      restoredPath: string;
+      sourceTrashPath: string;
+    }>();
+
     expectTypeOf<FileServiceErrorCode>().toMatchTypeOf<
       | "invalid_path"
       | "path_outside_root"
@@ -185,6 +247,12 @@ describe("shared contracts", () => {
       | "unsupported_file"
       | "payload_too_large"
       | "write_conflict"
+      | "share_exists"
+      | "share_not_found"
+      | "mount_failed"
+      | "unmount_failed"
+      | "trash_meta_missing"
+      | "destination_exists"
       | "internal_error"
     >();
   });

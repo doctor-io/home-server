@@ -17,7 +17,7 @@ vi.mock("@/hooks/useStoreActions", () => ({
   }),
 }));
 
-import { AppSettingsPanel } from "@/components/desktop/app-settings-panel";
+import { AppSettingsPanel } from "@/components/desktop/apps/app-settings-panel";
 
 function createTestQueryClient() {
   return new QueryClient({

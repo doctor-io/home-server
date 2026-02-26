@@ -98,10 +98,10 @@ cp .env.example .env.local
 createdb home_server
 ```
 
-4. Initialize schema and seed first app user:
+4. Initialize database schema with Drizzle:
 
 ```bash
-AUTH_PRIMARY_PASSWORD='change-me-strong' npm run db:init
+npm run db:init
 ```
 
 5. Start development server:

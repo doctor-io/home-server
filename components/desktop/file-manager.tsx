@@ -31,6 +31,8 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFilesDirectory, useFileContent, useSaveFileContent, toFilePath, buildAssetUrl } from "@/hooks/useFiles";
+import { useDeleteFromTrash, useMoveToTrash, useRestoreFromTrash } from "@/hooks/useTrashActions";
+import { NetworkStorageDialog } from "@/components/desktop/network-storage-dialog";
 import { formatBytesCompact } from "@/lib/client/format";
 import type { FileListEntry } from "@/lib/shared/contracts/files";
 
@@ -336,9 +338,14 @@ export function FileManager() {
   const [openFile, setOpenFile] = useState<OpenFileState | null>(null);
   const [fileDrafts, setFileDrafts] = useState<Record<string, string>>({});
   const [editorNotice, setEditorNotice] = useState<string | null>(null);
+  const [statusNotice, setStatusNotice] = useState<string | null>(null);
+  const [showNetworkDialog, setShowNetworkDialog] = useState(false);
 
   const directoryQuery = useFilesDirectory(currentPath);
   const saveFileContentMutation = useSaveFileContent();
+  const moveToTrashMutation = useMoveToTrash();
+  const restoreFromTrashMutation = useRestoreFromTrash();
+  const deleteFromTrashMutation = useDeleteFromTrash();
   const openFilePath = openFile ? toFilePath(openFile.path) : null;
   const fileContentQuery = useFileContent(openFilePath);
 
@@ -395,6 +402,7 @@ export function FileManager() {
       !fileContentQuery.isLoading &&
       !saveFileContentMutation.isPending,
   );
+  const isTrashView = currentPath[0] === "Trash";
 
   useEffect(() => {
     if (!openFileKey || !openFileViewer || openFileViewer.mode !== "text") return;
@@ -433,6 +441,7 @@ export function FileManager() {
     setSelectedFile(null);
     setSearchQuery("");
     setOpenFile(null);
+    setStatusNotice(null);
   }
 
   function navigateUp() {
@@ -477,6 +486,52 @@ export function FileManager() {
     } catch (error) {
       setEditorNotice(
         error instanceof Error ? error.message : "Failed to save file",
+      );
+    }
+  }
+
+  async function handleMoveSelectedToTrash(entry: FileEntry) {
+    try {
+      const result = await moveToTrashMutation.mutateAsync({
+        path: entry.path,
+      });
+      if (openFile && toFilePath(openFile.path) === entry.path) {
+        setOpenFile(null);
+      }
+      setSelectedFile(null);
+      setStatusNotice(`Moved to Trash: ${result.trashPath}`);
+    } catch (error) {
+      setStatusNotice(
+        error instanceof Error ? error.message : "Failed to move item to Trash",
+      );
+    }
+  }
+
+  async function handleRestoreFromTrash(entry: FileEntry) {
+    try {
+      const result = await restoreFromTrashMutation.mutateAsync({
+        path: entry.path,
+        collision: "keep-both",
+      });
+      setSelectedFile(null);
+      setStatusNotice(`Restored: ${result.restoredPath}`);
+    } catch (error) {
+      setStatusNotice(
+        error instanceof Error ? error.message : "Failed to restore item from Trash",
+      );
+    }
+  }
+
+  async function handleDeleteFromTrash(entry: FileEntry) {
+    try {
+      await deleteFromTrashMutation.mutateAsync({
+        path: entry.path,
+      });
+      setSelectedFile(null);
+      setStatusNotice(`Deleted permanently: ${entry.name}`);
+    } catch (error) {
+      setStatusNotice(
+        error instanceof Error ? error.message : "Failed to permanently delete item",
       );
     }
   }
@@ -529,11 +584,21 @@ export function FileManager() {
           {/* Bottom shortcuts + storage */}
           <div className="mt-auto p-3 border-t border-glass-border">
             <div className="mb-3 flex flex-col gap-0.5">
-              <button className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/40 transition-colors cursor-pointer">
+              <button
+                onClick={() => setShowNetworkDialog(true)}
+                className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/40 transition-colors cursor-pointer"
+              >
                 <Users className="size-3.5 text-sky-400" />
                 <span>Shared</span>
               </button>
-              <button className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/40 transition-colors cursor-pointer">
+              <button
+                onClick={() => navigateToPath(["Trash"])}
+                className={`flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
+                  isTrashView
+                    ? "bg-primary/15 text-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/40"
+                }`}
+              >
                 <Trash2 className="size-3.5 text-status-red" />
                 <span>Trash</span>
               </button>
@@ -852,7 +917,12 @@ export function FileManager() {
             {folderCount > 0 && fileCount > 0 && ", "}
             {fileCount > 0 && `${fileCount} file${fileCount > 1 ? "s" : ""}`}
           </span>
-          <span className="font-mono">/{currentPath.join("/")}</span>
+          <div className="flex items-center gap-3">
+            {statusNotice ? (
+              <span className="max-w-72 truncate text-status-amber">{statusNotice}</span>
+            ) : null}
+            <span className="font-mono">/{currentPath.join("/")}</span>
+          </div>
         </div>
       </div>
 
@@ -898,14 +968,50 @@ export function FileManager() {
             label="Toggle Star"
             onClick={() => setShowContextMenu(null)}
           />
-          <ContextMenuItem
-            icon={<Trash2 className="size-3.5 text-status-red" />}
-            label="Move to Trash"
-            danger
-            onClick={() => setShowContextMenu(null)}
-          />
+          {isTrashView ? (
+            <>
+              <ContextMenuItem
+                icon={<ArrowUp className="size-3.5" />}
+                label="Restore"
+                onClick={() => {
+                  const entry = showContextMenu.entry;
+                  setShowContextMenu(null);
+                  void handleRestoreFromTrash(entry);
+                }}
+              />
+              <ContextMenuItem
+                icon={<Trash2 className="size-3.5 text-status-red" />}
+                label="Delete Permanently"
+                danger
+                onClick={() => {
+                  const entry = showContextMenu.entry;
+                  setShowContextMenu(null);
+                  void handleDeleteFromTrash(entry);
+                }}
+              />
+            </>
+          ) : (
+            <ContextMenuItem
+              icon={<Trash2 className="size-3.5 text-status-red" />}
+              label="Move to Trash"
+              danger
+              onClick={() => {
+                const entry = showContextMenu.entry;
+                setShowContextMenu(null);
+                void handleMoveSelectedToTrash(entry);
+              }}
+            />
+          )}
         </div>
       )}
+      <NetworkStorageDialog
+        isOpen={showNetworkDialog}
+        onClose={() => setShowNetworkDialog(false)}
+        onNavigateToNetwork={() => {
+          setShowNetworkDialog(false);
+          navigateToPath(["Network"]);
+        }}
+      />
     </div>
   );
 }

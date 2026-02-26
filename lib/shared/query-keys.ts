@@ -10,6 +10,8 @@ export const queryKeys = {
     ["store", "operation", operationId] as const,
   filesList: (filePath: string) => ["files", "list", filePath] as const,
   fileContent: (filePath: string) => ["files", "content", filePath] as const,
+  networkShares: ["files", "network", "shares"] as const,
+  trashEntries: (filePath: string) => ["files", "trash", "entries", filePath] as const,
   currentWeather: (latitude: number | null, longitude: number | null) =>
     ["weather", "current", latitude, longitude] as const,
 };

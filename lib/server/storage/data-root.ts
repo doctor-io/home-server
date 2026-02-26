@@ -4,7 +4,14 @@ import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { serverEnv } from "@/lib/server/env";
 
-const DATA_SUBDIRECTORIES = ["Apps", "Documents", "Media", "Download"] as const;
+const DATA_SUBDIRECTORIES = [
+  "Apps",
+  "Documents",
+  "Media",
+  "Download",
+  "Network",
+  "Trash",
+] as const;
 
 let resolvedDataRoot: string | null = null;
 

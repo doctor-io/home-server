@@ -10,7 +10,8 @@ npm run build        # Production build
 npm run lint         # ESLint
 npm run test         # Run all tests once (Vitest)
 npm run test:watch   # Vitest in watch mode
-npm run db:init      # Bootstrap database schema
+npm run db:init      # Apply schema directly (drizzle-kit push)
+npm run db:migrate   # Run SQL migrations (drizzle-kit migrate)
 ```
 
 Run a single test file:
@@ -28,7 +29,7 @@ npx vitest run --reporter=verbose -t "test name pattern"
 1. Requires Node 22.x, npm, PostgreSQL
 2. `cp .env.example .env.local` — fill in required values
 3. `createdb home_server`
-4. `AUTH_PRIMARY_PASSWORD='your-password' npm run db:init`
+4. `npm run db:init`
 5. `npm run dev`
 
 ## Architecture
@@ -51,7 +52,7 @@ This is a **home server management dashboard** — a desktop-like UI (dock, wind
 - `components/desktop/` — The main UI: shell, dock, app grid, app store, system widgets, terminal, file manager.
 - `components/ui/` — Radix UI primitives (shadcn-style). Don't modify these.
 - `hooks/` — All custom React hooks. SSE-based real-time data (`useSystemSse`), store operations (`useStoreActions`), network/apps/auth state.
-- `db/init.sql` — Database schema: `apps`, `users`, `sessions`, `app_stacks`, `app_operations`, `custom_store_apps`.
+- `lib/server/db/schema-definitions.ts` — Drizzle schema definitions.
 
 ### Key Patterns
 

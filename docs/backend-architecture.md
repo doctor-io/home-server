@@ -56,8 +56,7 @@
 
 ## Setup
 1. Copy `.env.example` values into your runtime env.
-2. Initialize DB schema and principal user:
-   - optional: set `AUTH_PRIMARY_PASSWORD` if you want to seed principal user automatically
+2. Initialize DB schema:
    - run `npm run db:init`
 3. Install dependencies and run:
    - `npm install`

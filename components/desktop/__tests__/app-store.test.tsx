@@ -126,7 +126,7 @@ function setup({
     error: null,
   });
 
-  render(<AppStore />);
+  render(<AppStore onOpenCustomInstall={() => {}} />);
 
   return {
     installApp,
@@ -299,7 +299,7 @@ describe("AppStore", () => {
       error: null,
     });
 
-    render(<AppStore />);
+    render(<AppStore onOpenCustomInstall={() => {}} />);
 
     fireEvent.click(screen.getByRole("button", { name: /^install$/i }));
 

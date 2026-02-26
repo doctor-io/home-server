@@ -419,7 +419,7 @@ ensure_directories() {
 
 	# App data directories
 	print_status "Creating /DATA directories..."
-	mkdir -p /DATA/{Documents,Media,Download}
+	mkdir -p /DATA/{Apps,Documents,Media,Download}
 	chmod 755 /DATA
 
 	# Stack storage (STORE_STACKS_ROOT) and logs

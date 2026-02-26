@@ -13,6 +13,7 @@ const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
 app.prepare().then(() => {
+  const shutdownHooks = [];
   const server = createServer(async (req, res) => {
     try {
       const parsedUrl = parse(req.url || "", true);
@@ -38,6 +39,53 @@ app.prepare().then(() => {
         "  To enable terminal, run: npm install @lydell/node-pty",
       );
     });
+
+  import("./lib/server/modules/files/network-storage.ts")
+    .then((module) => {
+      if (typeof module.startNetworkStorageWatcher === "function") {
+        module.startNetworkStorageWatcher();
+      }
+      if (typeof module.stopNetworkStorageWatcher === "function") {
+        shutdownHooks.push(() => module.stopNetworkStorageWatcher());
+      }
+      console.log("✓ Files network storage watcher initialized");
+    })
+    .catch((err) => {
+      console.warn("⚠ Files network storage watcher not available:", err.message);
+    });
+
+  let shuttingDown = false;
+  const shutdown = async (signal) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+
+    console.log(`> Received ${signal}, shutting down...`);
+
+    await Promise.allSettled(
+      shutdownHooks.map(async (hook) => {
+        try {
+          await hook();
+        } catch (error) {
+          console.error("Shutdown hook failed", error);
+        }
+      }),
+    );
+
+    await new Promise((resolve) => {
+      server.close(() => {
+        resolve(undefined);
+      });
+    });
+
+    process.exit(0);
+  };
+
+  process.on("SIGINT", () => {
+    void shutdown("SIGINT");
+  });
+  process.on("SIGTERM", () => {
+    void shutdown("SIGTERM");
+  });
 
   server.listen(port, hostname, (err) => {
     if (err) throw err;

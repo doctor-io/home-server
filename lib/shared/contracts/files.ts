@@ -9,6 +9,12 @@ export type FileServiceErrorCode =
   | "unsupported_file"
   | "payload_too_large"
   | "write_conflict"
+  | "share_exists"
+  | "share_not_found"
+  | "mount_failed"
+  | "unmount_failed"
+  | "trash_meta_missing"
+  | "destination_exists"
   | "internal_error";
 
 export type FileEntryType = "folder" | "file";
@@ -61,4 +67,60 @@ export type FileWriteResponse = {
   sizeBytes: number;
   modifiedAt: string;
   mtimeMs: number;
+};
+
+export type NetworkShare = {
+  id: string;
+  host: string;
+  share: string;
+  username: string;
+  mountPath: string;
+};
+
+export type NetworkShareStatus = NetworkShare & {
+  isMounted: boolean;
+};
+
+export type CreateNetworkShareRequest = {
+  host: string;
+  share: string;
+  username: string;
+  password: string;
+};
+
+export type DiscoverServersResponse = {
+  servers: string[];
+};
+
+export type DiscoverSharesRequest = {
+  host: string;
+  username: string;
+  password: string;
+};
+
+export type DiscoverSharesResponse = {
+  shares: string[];
+};
+
+export type TrashMoveRequest = {
+  path: string;
+};
+
+export type TrashMoveResponse = {
+  trashPath: string;
+  originalPath: string;
+};
+
+export type TrashRestoreRequest = {
+  path: string;
+  collision?: "keep-both" | "replace" | "fail";
+};
+
+export type TrashRestoreResponse = {
+  restoredPath: string;
+  sourceTrashPath: string;
+};
+
+export type TrashDeleteRequest = {
+  path: string;
 };

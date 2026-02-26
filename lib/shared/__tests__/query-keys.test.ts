@@ -29,6 +29,13 @@ describe("query keys", () => {
       "content",
       "Documents/notes.txt",
     ]);
+    expect(queryKeys.networkShares).toEqual(["files", "network", "shares"]);
+    expect(queryKeys.trashEntries("Trash")).toEqual([
+      "files",
+      "trash",
+      "entries",
+      "Trash",
+    ]);
     expect(queryKeys.currentWeather(1, 2)).toEqual(["weather", "current", 1, 2]);
   });
 });
