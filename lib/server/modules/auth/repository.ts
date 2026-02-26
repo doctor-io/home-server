@@ -1,29 +1,8 @@
 import "server-only";
 
-import { timedPgQuery } from "@/lib/server/db/query";
-
-type UserRow = {
-  id: string;
-  username: string;
-  password_hash: string;
-  created_at: string | Date;
-};
-
-type SessionWithUserRow = {
-  session_id: string;
-  user_id: string;
-  username: string;
-  password_hash: string;
-  expires_at: string | Date;
-};
-
-type CountRow = {
-  total: string | number;
-};
-
-type ExistsRow = {
-  exists: boolean;
-};
+import { and, count, eq, gt, sql } from "drizzle-orm";
+import { db } from "@/lib/server/db/drizzle";
+import { sessions, users } from "@/lib/server/db/schema";
 
 export type AuthUser = {
   id: string;
@@ -40,36 +19,31 @@ export type AuthSessionWithUser = {
 };
 
 export async function findUserByUsername(username: string) {
-  const result = await timedPgQuery<UserRow>(
-    "SELECT id, username, password_hash, created_at FROM users WHERE username = $1 LIMIT 1",
-    [username],
-  );
+  const rows = await db
+    .select({
+      id: users.id,
+      username: users.username,
+      passwordHash: users.passwordHash,
+    })
+    .from(users)
+    .where(eq(users.username, username))
+    .limit(1);
 
-  const row = result.rows[0];
+  const row = rows[0];
   if (!row) return null;
 
-  return {
-    id: row.id,
-    username: row.username,
-    passwordHash: row.password_hash,
-  } satisfies AuthUser;
+  return row satisfies AuthUser;
 }
 
 export async function hasAnyUsers() {
-  const existsResult = await timedPgQuery<ExistsRow>(
-    "SELECT to_regclass('public.users') IS NOT NULL AS exists",
+  const tableCheck = await db.execute<{ table_exists: string | null }>(
+    sql`SELECT to_regclass('public.users') AS table_exists`,
   );
-  const tableExists = existsResult.rows[0]?.exists ?? false;
-  if (!tableExists) return false;
+  if (!tableCheck.rows[0]?.table_exists) return false;
 
-  const result = await timedPgQuery<CountRow>("SELECT COUNT(*)::int AS total FROM users");
-  const row = result.rows[0];
-  if (!row) return false;
-
-  const count =
-    typeof row.total === "number" ? row.total : Number.parseInt(row.total, 10);
-
-  return Number.isFinite(count) && count > 0;
+  const result = await db.select({ total: count() }).from(users);
+  const total = result[0]?.total ?? 0;
+  return total > 0;
 }
 
 export async function createUser(params: {
@@ -77,10 +51,11 @@ export async function createUser(params: {
   username: string;
   passwordHash: string;
 }) {
-  await timedPgQuery(
-    "INSERT INTO users (id, username, password_hash) VALUES ($1, $2, $3)",
-    [params.id, params.username, params.passwordHash],
-  );
+  await db.insert(users).values({
+    id: params.id,
+    username: params.username,
+    passwordHash: params.passwordHash,
+  });
 }
 
 export async function createSession(params: {
@@ -88,42 +63,39 @@ export async function createSession(params: {
   userId: string;
   expiresAt: Date;
 }) {
-  await timedPgQuery(
-    "INSERT INTO sessions (id, user_id, expires_at) VALUES ($1, $2, $3)",
-    [params.id, params.userId, params.expiresAt.toISOString()],
-  );
+  await db.insert(sessions).values({
+    id: params.id,
+    userId: params.userId,
+    expiresAt: params.expiresAt,
+  });
 }
 
 export async function deleteSessionById(sessionId: string) {
-  await timedPgQuery("DELETE FROM sessions WHERE id = $1", [sessionId]);
+  await db.delete(sessions).where(eq(sessions.id, sessionId));
 }
 
 export async function findSessionWithUser(sessionId: string) {
-  const result = await timedPgQuery<SessionWithUserRow>(
-    `SELECT
-      s.id AS session_id,
-      s.user_id AS user_id,
-      s.expires_at AS expires_at,
-      u.username AS username,
-      u.password_hash AS password_hash
-    FROM sessions s
-    JOIN users u ON u.id = s.user_id
-    WHERE s.id = $1 AND s.expires_at > NOW()
-    LIMIT 1`,
-    [sessionId],
-  );
+  const rows = await db
+    .select({
+      sessionId: sessions.id,
+      userId: sessions.userId,
+      expiresAt: sessions.expiresAt,
+      username: users.username,
+      passwordHash: users.passwordHash,
+    })
+    .from(sessions)
+    .innerJoin(users, eq(users.id, sessions.userId))
+    .where(and(eq(sessions.id, sessionId), gt(sessions.expiresAt, new Date())))
+    .limit(1);
 
-  const row = result.rows[0];
+  const row = rows[0];
   if (!row) return null;
 
   return {
-    sessionId: row.session_id,
-    userId: row.user_id,
+    sessionId: row.sessionId,
+    userId: row.userId,
     username: row.username,
-    passwordHash: row.password_hash,
-    expiresAt:
-      typeof row.expires_at === "string"
-        ? new Date(row.expires_at)
-        : row.expires_at,
+    passwordHash: row.passwordHash,
+    expiresAt: row.expiresAt instanceof Date ? row.expiresAt : new Date(row.expiresAt),
   } satisfies AuthSessionWithUser;
 }

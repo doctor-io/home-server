@@ -8,6 +8,13 @@ import type {
   StoreOperation,
   StoreOperationEvent,
 } from "@/lib/shared/contracts/apps";
+import type {
+  FileListEntry,
+  FileReadResponse,
+  FileServiceErrorCode,
+  FileWriteRequest,
+  FileWriteResponse,
+} from "@/lib/shared/contracts/files";
 import type { SystemMetricsSnapshot } from "@/lib/shared/contracts/system";
 import type { WeatherSnapshot } from "@/lib/shared/contracts/weather";
 import type {
@@ -142,5 +149,43 @@ describe("shared contracts", () => {
       }>;
       exitCode: number | null;
     }>();
+
+    expectTypeOf<FileListEntry>().toMatchTypeOf<{
+      path: string;
+      type: "folder" | "file";
+      sizeBytes: number | null;
+    }>();
+
+    expectTypeOf<FileReadResponse>().toMatchTypeOf<{
+      mode: "text" | "image" | "pdf" | "binary_unsupported" | "too_large";
+      content: string | null;
+      mimeType: string | null;
+    }>();
+
+    expectTypeOf<FileWriteRequest>().toMatchTypeOf<{
+      path: string;
+      content: string;
+      expectedMtimeMs?: number;
+    }>();
+
+    expectTypeOf<FileWriteResponse>().toMatchTypeOf<{
+      sizeBytes: number;
+      modifiedAt: string;
+      mtimeMs: number;
+    }>();
+
+    expectTypeOf<FileServiceErrorCode>().toMatchTypeOf<
+      | "invalid_path"
+      | "path_outside_root"
+      | "not_found"
+      | "not_a_file"
+      | "not_a_directory"
+      | "hidden_blocked"
+      | "symlink_blocked"
+      | "unsupported_file"
+      | "payload_too_large"
+      | "write_conflict"
+      | "internal_error"
+    >();
   });
 });

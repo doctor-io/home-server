@@ -30,407 +30,56 @@ import {
   X
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useFilesDirectory, useFileContent, useSaveFileContent, toFilePath, buildAssetUrl } from "@/hooks/useFiles";
+import { formatBytesCompact } from "@/lib/client/format";
+import type { FileListEntry } from "@/lib/shared/contracts/files";
 
 // --- Types ---
 
 type FileEntry = {
   name: string;
+  path: string;
   type: "folder" | "file";
   ext?: string;
   size?: string;
+  sizeBytes?: number | null;
   modified: string;
+  modifiedAt: string;
+  mtimeMs: number;
   starred?: boolean;
-  children?: FileEntry[];
 };
 
-// --- Mock File System ---
-
-const fileSystem: FileEntry[] = [
-  {
-    name: "Documents",
-    type: "folder",
-    modified: "Feb 20, 2026",
-    children: [
-      {
-        name: "Server Notes",
-        type: "folder",
-        modified: "Feb 18, 2026",
-        children: [
-          {
-            name: "setup-guide.md",
-            type: "file",
-            ext: "md",
-            size: "12 KB",
-            modified: "Feb 18, 2026",
-          },
-          {
-            name: "backup-plan.md",
-            type: "file",
-            ext: "md",
-            size: "8 KB",
-            modified: "Feb 15, 2026",
-          },
-          {
-            name: "network-diagram.png",
-            type: "file",
-            ext: "png",
-            size: "340 KB",
-            modified: "Feb 12, 2026",
-          },
-        ],
-      },
-      {
-        name: "docker-compose.yml",
-        type: "file",
-        ext: "yml",
-        size: "4.2 KB",
-        modified: "Feb 19, 2026",
-        starred: true,
-      },
-      {
-        name: "inventory.csv",
-        type: "file",
-        ext: "csv",
-        size: "1.8 KB",
-        modified: "Feb 17, 2026",
-      },
-      {
-        name: "readme.md",
-        type: "file",
-        ext: "md",
-        size: "2.1 KB",
-        modified: "Feb 14, 2026",
-      },
-    ],
-  },
-  {
-    name: "Media",
-    type: "folder",
-    modified: "Feb 21, 2026",
-    children: [
-      {
-        name: "Movies",
-        type: "folder",
-        modified: "Feb 21, 2026",
-        children: [
-          {
-            name: "inception.mkv",
-            type: "file",
-            ext: "mkv",
-            size: "4.2 GB",
-            modified: "Jan 10, 2026",
-          },
-          {
-            name: "interstellar.mkv",
-            type: "file",
-            ext: "mkv",
-            size: "3.8 GB",
-            modified: "Jan 12, 2026",
-          },
-          {
-            name: "the-matrix.mkv",
-            type: "file",
-            ext: "mkv",
-            size: "2.9 GB",
-            modified: "Dec 28, 2025",
-          },
-        ],
-      },
-      {
-        name: "Music",
-        type: "folder",
-        modified: "Feb 19, 2026",
-        children: [
-          {
-            name: "playlist.m3u",
-            type: "file",
-            ext: "m3u",
-            size: "1.2 KB",
-            modified: "Feb 19, 2026",
-          },
-          {
-            name: "album-art.jpg",
-            type: "file",
-            ext: "jpg",
-            size: "280 KB",
-            modified: "Feb 18, 2026",
-          },
-        ],
-      },
-      {
-        name: "Photos",
-        type: "folder",
-        modified: "Feb 20, 2026",
-        children: [
-          {
-            name: "vacation-2025",
-            type: "folder",
-            modified: "Feb 20, 2026",
-            children: [
-              {
-                name: "IMG_0001.jpg",
-                type: "file",
-                ext: "jpg",
-                size: "5.2 MB",
-                modified: "Dec 22, 2025",
-              },
-              {
-                name: "IMG_0002.jpg",
-                type: "file",
-                ext: "jpg",
-                size: "4.8 MB",
-                modified: "Dec 22, 2025",
-              },
-              {
-                name: "IMG_0003.jpg",
-                type: "file",
-                ext: "jpg",
-                size: "6.1 MB",
-                modified: "Dec 23, 2025",
-              },
-            ],
-          },
-          {
-            name: "server-rack.jpg",
-            type: "file",
-            ext: "jpg",
-            size: "3.4 MB",
-            modified: "Jan 5, 2026",
-          },
-        ],
-      },
-    ],
-  },
-  {
-    name: "Backups",
-    type: "folder",
-    modified: "Feb 22, 2026",
-    starred: true,
-    children: [
-      {
-        name: "db-backup-2026-02-22.sql.gz",
-        type: "file",
-        ext: "gz",
-        size: "128 MB",
-        modified: "Feb 22, 2026",
-      },
-      {
-        name: "db-backup-2026-02-21.sql.gz",
-        type: "file",
-        ext: "gz",
-        size: "127 MB",
-        modified: "Feb 21, 2026",
-      },
-      {
-        name: "config-backup.tar.gz",
-        type: "file",
-        ext: "gz",
-        size: "42 MB",
-        modified: "Feb 20, 2026",
-      },
-      {
-        name: "nextcloud-data.tar.gz",
-        type: "file",
-        ext: "gz",
-        size: "2.4 GB",
-        modified: "Feb 19, 2026",
-      },
-    ],
-  },
-  {
-    name: "Configs",
-    type: "folder",
-    modified: "Feb 21, 2026",
-    starred: true,
-    children: [
-      {
-        name: "nginx",
-        type: "folder",
-        modified: "Feb 21, 2026",
-        children: [
-          {
-            name: "nginx.conf",
-            type: "file",
-            ext: "conf",
-            size: "3.2 KB",
-            modified: "Feb 21, 2026",
-          },
-          {
-            name: "sites-enabled",
-            type: "folder",
-            modified: "Feb 20, 2026",
-            children: [
-              {
-                name: "plex.conf",
-                type: "file",
-                ext: "conf",
-                size: "1.1 KB",
-                modified: "Feb 18, 2026",
-              },
-              {
-                name: "nextcloud.conf",
-                type: "file",
-                ext: "conf",
-                size: "1.4 KB",
-                modified: "Feb 19, 2026",
-              },
-              {
-                name: "grafana.conf",
-                type: "file",
-                ext: "conf",
-                size: "0.9 KB",
-                modified: "Feb 17, 2026",
-              },
-            ],
-          },
-        ],
-      },
-      {
-        name: "docker",
-        type: "folder",
-        modified: "Feb 20, 2026",
-        children: [
-          {
-            name: "daemon.json",
-            type: "file",
-            ext: "json",
-            size: "520 B",
-            modified: "Feb 15, 2026",
-          },
-        ],
-      },
-      {
-        name: ".env",
-        type: "file",
-        ext: "env",
-        size: "1.8 KB",
-        modified: "Feb 20, 2026",
-      },
-      {
-        name: "ssh_config",
-        type: "file",
-        ext: "conf",
-        size: "640 B",
-        modified: "Feb 10, 2026",
-      },
-    ],
-  },
-  {
-    name: "Downloads",
-    type: "folder",
-    modified: "Feb 22, 2026",
-    children: [
-      {
-        name: "portainer-agent.deb",
-        type: "file",
-        ext: "deb",
-        size: "18 MB",
-        modified: "Feb 22, 2026",
-      },
-      {
-        name: "ubuntu-22.04.iso",
-        type: "file",
-        ext: "iso",
-        size: "3.6 GB",
-        modified: "Feb 15, 2026",
-      },
-      {
-        name: "wireguard-tools.tar.gz",
-        type: "file",
-        ext: "gz",
-        size: "540 KB",
-        modified: "Feb 12, 2026",
-      },
-    ],
-  },
-  {
-    name: "Scripts",
-    type: "folder",
-    modified: "Feb 19, 2026",
-    children: [
-      {
-        name: "backup.sh",
-        type: "file",
-        ext: "sh",
-        size: "2.4 KB",
-        modified: "Feb 19, 2026",
-        starred: true,
-      },
-      {
-        name: "deploy.sh",
-        type: "file",
-        ext: "sh",
-        size: "1.8 KB",
-        modified: "Feb 17, 2026",
-      },
-      {
-        name: "health-check.py",
-        type: "file",
-        ext: "py",
-        size: "3.1 KB",
-        modified: "Feb 16, 2026",
-      },
-      {
-        name: "cleanup-logs.sh",
-        type: "file",
-        ext: "sh",
-        size: "980 B",
-        modified: "Feb 14, 2026",
-      },
-      {
-        name: "ssl-renew.sh",
-        type: "file",
-        ext: "sh",
-        size: "1.2 KB",
-        modified: "Feb 10, 2026",
-      },
-    ],
-  },
-  {
-    name: "Logs",
-    type: "folder",
-    modified: "Feb 22, 2026",
-    children: [
-      {
-        name: "access.log",
-        type: "file",
-        ext: "log",
-        size: "48 MB",
-        modified: "Feb 22, 2026",
-      },
-      {
-        name: "error.log",
-        type: "file",
-        ext: "log",
-        size: "2.1 MB",
-        modified: "Feb 22, 2026",
-      },
-      {
-        name: "docker.log",
-        type: "file",
-        ext: "log",
-        size: "14 MB",
-        modified: "Feb 22, 2026",
-      },
-    ],
-  },
-  {
-    name: ".bashrc",
-    type: "file",
-    ext: "sh",
-    size: "3.2 KB",
-    modified: "Feb 8, 2026",
-  },
-  {
-    name: "notes.txt",
-    type: "file",
-    ext: "txt",
-    size: "1.4 KB",
-    modified: "Feb 20, 2026",
-  },
-];
-
 // --- Helpers ---
+
+const PATH_ALIAS_MAP: Record<string, string> = {
+  Downloads: "Download",
+};
+
+function normalizePathForBackend(pathSegments: string[]) {
+  return pathSegments.map((segment) => PATH_ALIAS_MAP[segment] ?? segment);
+}
+
+function toUiFileEntry(entry: FileListEntry): FileEntry {
+  const modifiedDate = new Date(entry.modifiedAt);
+
+  return {
+    name: entry.name,
+    path: entry.path,
+    type: entry.type,
+    ext: entry.ext ?? undefined,
+    size: entry.sizeBytes === null ? undefined : formatBytesCompact(entry.sizeBytes),
+    sizeBytes: entry.sizeBytes,
+    modified: Number.isNaN(modifiedDate.getTime())
+      ? "--"
+      : modifiedDate.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        }),
+    modifiedAt: entry.modifiedAt,
+    mtimeMs: entry.mtimeMs,
+  };
+}
 
 function getFileIcon(entry: FileEntry) {
   if (entry.type === "folder") {
@@ -502,21 +151,6 @@ function getLargeFileIcon(entry: FileEntry) {
   return <File className="size-10 text-muted-foreground" />;
 }
 
-function resolvePath(path: string[]): FileEntry[] {
-  let current = fileSystem;
-  for (const segment of path) {
-    const found = current.find(
-      (f) => f.name === segment && f.type === "folder",
-    );
-    if (found?.children) {
-      current = found.children;
-    } else {
-      break;
-    }
-  }
-  return current;
-}
-
 function getEditorLanguage(entry: FileEntry): string {
   const ext = entry.ext?.toLowerCase();
   if (!ext) return "plaintext";
@@ -536,10 +170,6 @@ function getEditorLanguage(entry: FileEntry): string {
   return "plaintext";
 }
 
-function makeFileKey(path: string[]) {
-  return path.join("/");
-}
-
 function getMonacoTheme() {
   if (typeof document === "undefined") return "vs-dark";
 
@@ -550,122 +180,6 @@ function getMonacoTheme() {
   return window.matchMedia("(prefers-color-scheme: dark)").matches
     ? "vs-dark"
     : "vs";
-}
-
-function getInitialFileContent(entry: FileEntry, path: string[]) {
-  const ext = entry.ext?.toLowerCase();
-  const fullPath = "/" + path.join("/");
-
-  if (entry.name === "docker-compose.yml") {
-    return `version: "3.8"
-services:
-  nextcloud:
-    image: nextcloud:latest
-    restart: unless-stopped
-    ports:
-      - "8080:80"
-    volumes:
-      - ./data:/var/www/html
-`;
-  }
-
-  if (entry.name === "daemon.json") {
-    return `{
-  "log-driver": "json-file",
-  "log-opts": {
-    "max-size": "10m",
-    "max-file": "5"
-  },
-  "features": {
-    "buildkit": true
-  }
-}`;
-  }
-
-  if (entry.name === ".env") {
-    return `TZ=UTC
-PUID=1000
-PGID=1000
-DOMAIN=home.local
-`;
-  }
-
-  if (ext === "md") {
-    return `# ${entry.name}
-
-This is a mock markdown file opened in Monaco Editor.
-
-- Path: \`${fullPath}\`
-- Updated: ${entry.modified}
-`;
-  }
-
-  if (ext === "py") {
-    return `#!/usr/bin/env python3
-
-def health_check():
-    services = ["nextcloud", "grafana", "portainer"]
-    for svc in services:
-        print(f"[ok] {svc}")
-
-if __name__ == "__main__":
-    health_check()
-`;
-  }
-
-  if (ext === "sh") {
-    return `#!/bin/bash
-set -euo pipefail
-
-echo "Running ${entry.name}"
-docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-`;
-  }
-
-  if (ext === "json") {
-    return `{
-  "name": "${entry.name}",
-  "path": "${fullPath}",
-  "updated": "${entry.modified}"
-}`;
-  }
-
-  if (ext === "conf") {
-    return `server {
-  listen 80;
-  server_name home.local;
-
-  location / {
-    proxy_pass http://127.0.0.1:3000;
-  }
-}
-`;
-  }
-
-  if (ext === "log") {
-    return `[2026-02-22 11:01:42] INFO  Service started
-[2026-02-22 11:03:08] INFO  Health check passed
-[2026-02-22 11:05:34] WARN  Slow query detected (182ms)
-`;
-  }
-
-  if (ext === "csv") {
-    return `name,ip,status
-nextcloud,192.168.1.10,healthy
-grafana,192.168.1.20,healthy
-portainer,192.168.1.30,degraded
-`;
-  }
-
-  if (ext === "txt") {
-    return `File: ${entry.name}
-Path: ${fullPath}
-Modified: ${entry.modified}
-`;
-  }
-
-  return `# ${entry.name}
-# Binary/unsupported preview content`;
 }
 
 const MONACO_CDN_BASE =
@@ -821,8 +335,17 @@ export function FileManager() {
   const [sidebarCollapsed] = useState(false);
   const [openFile, setOpenFile] = useState<OpenFileState | null>(null);
   const [fileDrafts, setFileDrafts] = useState<Record<string, string>>({});
+  const [editorNotice, setEditorNotice] = useState<string | null>(null);
 
-  const currentEntries = useMemo(() => resolvePath(currentPath), [currentPath]);
+  const directoryQuery = useFilesDirectory(currentPath);
+  const saveFileContentMutation = useSaveFileContent();
+  const openFilePath = openFile ? toFilePath(openFile.path) : null;
+  const fileContentQuery = useFileContent(openFilePath);
+
+  const currentEntries = useMemo(
+    () => (directoryQuery.data?.entries ?? []).map(toUiFileEntry),
+    [directoryQuery.data?.entries],
+  );
 
   const sortedEntries = useMemo(() => {
     let entries = [...currentEntries];
@@ -839,47 +362,74 @@ export function FileManager() {
 
     const sortFn = (a: FileEntry, b: FileEntry) => {
       if (sortBy === "name") return a.name.localeCompare(b.name);
-      if (sortBy === "modified") return b.modified.localeCompare(a.modified);
-      if (sortBy === "size") return (a.size ?? "").localeCompare(b.size ?? "");
+      if (sortBy === "modified") {
+        return (
+          new Date(b.modifiedAt).getTime() - new Date(a.modifiedAt).getTime()
+        );
+      }
+      if (sortBy === "size") return (b.sizeBytes ?? 0) - (a.sizeBytes ?? 0);
       return 0;
     };
 
     return [...folders.sort(sortFn), ...files.sort(sortFn)];
   }, [currentEntries, searchQuery, sortBy]);
 
-  const openFileKey = openFile ? makeFileKey(openFile.path) : null;
+  const openFileKey = openFilePath;
   const openFileLanguage = openFile
     ? getEditorLanguage(openFile.entry)
     : "plaintext";
-  const openFileContent = openFileKey ? (fileDrafts[openFileKey] ?? "") : "";
+  const openFileViewer = fileContentQuery.data ?? null;
+  const openFileContent =
+    openFileKey && openFileViewer?.mode === "text"
+      ? fileDrafts[openFileKey] ?? (openFileViewer.content ?? "")
+      : "";
+  const openFileBadgeLabel = openFileViewer
+    ? openFileViewer.mode === "text"
+      ? openFileLanguage
+      : openFileViewer.mode.replaceAll("_", " ")
+    : openFileLanguage;
+  const openFileAssetUrl = openFileKey ? buildAssetUrl(openFileKey) : "";
+  const canSaveOpenFile = Boolean(
+    openFileKey &&
+      openFileViewer?.mode === "text" &&
+      !fileContentQuery.isLoading &&
+      !saveFileContentMutation.isPending,
+  );
 
-  function ensureDraft(path: string[], entry: FileEntry) {
-    const key = makeFileKey(path);
+  useEffect(() => {
+    if (!openFileKey || !openFileViewer || openFileViewer.mode !== "text") return;
+
     setFileDrafts((prev) => {
-      if (prev[key] !== undefined) return prev;
-      return { ...prev, [key]: getInitialFileContent(entry, path) };
+      if (prev[openFileKey] !== undefined) return prev;
+      return {
+        ...prev,
+        [openFileKey]: openFileViewer.content ?? "",
+      };
     });
-  }
+  }, [openFileKey, openFileViewer]);
+
+  useEffect(() => {
+    setEditorNotice(null);
+  }, [openFileKey]);
 
   function openFileInEditor(path: string[], entry: FileEntry) {
-    ensureDraft(path, entry);
     setOpenFile({ path, entry });
     setSelectedFile(entry.name);
   }
 
   function navigateTo(entry: FileEntry) {
     if (entry.type === "folder") {
-      setCurrentPath((prev) => [...prev, entry.name]);
+      setCurrentPath(entry.path.split("/").filter(Boolean));
       setSelectedFile(null);
       setOpenFile(null);
       return;
     }
 
-    openFileInEditor([...currentPath, entry.name], entry);
+    openFileInEditor(entry.path.split("/").filter(Boolean), entry);
   }
 
-  function navigateToPath(path: string[]) {
-    setCurrentPath(path);
+  function navigateToPath(pathSegments: string[]) {
+    setCurrentPath(normalizePathForBackend(pathSegments));
     setSelectedFile(null);
     setSearchQuery("");
     setOpenFile(null);
@@ -911,6 +461,26 @@ export function FileManager() {
     setSelectedFile(entry.name);
   }
 
+  async function handleSaveOpenFile() {
+    if (!openFileKey || !openFileViewer || openFileViewer.mode !== "text") {
+      return;
+    }
+
+    const nextContent = fileDrafts[openFileKey] ?? openFileViewer.content ?? "";
+    try {
+      await saveFileContentMutation.mutateAsync({
+        path: openFileKey,
+        content: nextContent,
+        expectedMtimeMs: openFileViewer.mtimeMs,
+      });
+      setEditorNotice("Saved");
+    } catch (error) {
+      setEditorNotice(
+        error instanceof Error ? error.message : "Failed to save file",
+      );
+    }
+  }
+
   // Count items
   const folderCount = sortedEntries.filter((e) => e.type === "folder").length;
   const fileCount = sortedEntries.filter((e) => e.type === "file").length;
@@ -933,7 +503,8 @@ export function FileManager() {
                 <div className="flex flex-col gap-0.5 mt-1.5">
                   {section.items.map((item) => {
                     const isActive =
-                      JSON.stringify(item.path) === JSON.stringify(currentPath);
+                      JSON.stringify(normalizePathForBackend(item.path)) ===
+                      JSON.stringify(currentPath);
                     return (
                       <button
                         key={item.name}
@@ -1097,19 +668,16 @@ export function FileManager() {
                     {openFile.entry.name}
                   </span>
                   <span className="rounded bg-primary/10 px-1.5 py-0.5 text-xs uppercase tracking-wider text-primary">
-                    {openFileLanguage}
+                    {openFileBadgeLabel}
                   </span>
                 </div>
                 <div className="flex-1" />
                 <button
                   onClick={() => {
-                    if (!openFileKey) return;
-                    setFileDrafts((prev) => ({
-                      ...prev,
-                      [openFileKey]: prev[openFileKey] ?? "",
-                    }));
+                    void handleSaveOpenFile();
                   }}
-                  className="flex items-center gap-1 rounded-md bg-primary/20 px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/30"
+                  disabled={!canSaveOpenFile}
+                  className="flex items-center gap-1 rounded-md bg-primary/20 px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/30 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Save className="size-3" /> Save
                 </button>
@@ -1123,19 +691,73 @@ export function FileManager() {
               </div>
 
               <div className="min-h-0 flex-1">
-                <MonacoEditorPane
-                  key={openFileKey ?? "editor"}
-                  language={openFileLanguage}
-                  value={openFileContent}
-                  onChange={(value) => {
-                    if (!openFileKey) return;
-                    setFileDrafts((prev) => ({
-                      ...prev,
-                      [openFileKey]: value,
-                    }));
-                  }}
-                />
+                {fileContentQuery.isLoading ? (
+                  <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                    Loading file...
+                  </div>
+                ) : fileContentQuery.isError ? (
+                  <div className="flex h-full items-center justify-center p-6 text-center text-sm text-status-red">
+                    {fileContentQuery.error instanceof Error
+                      ? fileContentQuery.error.message
+                      : "Failed to open file"}
+                  </div>
+                ) : openFileViewer?.mode === "text" ? (
+                  <MonacoEditorPane
+                    key={openFileKey ?? "editor"}
+                    language={openFileLanguage}
+                    value={openFileContent}
+                    onChange={(value) => {
+                      if (!openFileKey) return;
+                      setFileDrafts((prev) => ({
+                        ...prev,
+                        [openFileKey]: value,
+                      }));
+                    }}
+                  />
+                ) : openFileViewer?.mode === "image" ? (
+                  <div className="flex h-full items-center justify-center overflow-auto bg-card/90 p-4">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={openFileAssetUrl}
+                      alt={openFile.entry.name}
+                      className="max-h-full max-w-full object-contain"
+                    />
+                  </div>
+                ) : openFileViewer?.mode === "pdf" ? (
+                  <iframe
+                    title={openFile.entry.name}
+                    src={openFileAssetUrl}
+                    className="h-full w-full border-0 bg-card/90"
+                  />
+                ) : openFileViewer?.mode === "too_large" ? (
+                  <div className="flex h-full items-center justify-center p-6 text-center text-sm text-muted-foreground">
+                    This file is too large to open in the editor.
+                  </div>
+                ) : (
+                  <div className="flex h-full items-center justify-center p-6 text-center text-sm text-muted-foreground">
+                    This file type is not supported for in-app preview.
+                  </div>
+                )}
               </div>
+              {editorNotice && (
+                <div className="border-t border-glass-border px-3 py-2 text-xs text-muted-foreground">
+                  {editorNotice}
+                </div>
+              )}
+            </div>
+          ) : directoryQuery.isLoading ? (
+            <div className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground">
+              <FolderOpen className="size-12 opacity-30" />
+              <span className="text-sm">Loading files...</span>
+            </div>
+          ) : directoryQuery.isError ? (
+            <div className="flex flex-col items-center justify-center h-full gap-3 text-status-red">
+              <FolderOpen className="size-12 opacity-50" />
+              <span className="text-sm text-center">
+                {directoryQuery.error instanceof Error
+                  ? directoryQuery.error.message
+                  : "Failed to load files"}
+              </span>
             </div>
           ) : sortedEntries.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground">
@@ -1204,18 +826,18 @@ export function FileManager() {
                   <div className="flex items-center gap-2.5 flex-1 min-w-0">
                     {getFileIcon(entry)}
                     <span className="text-xs text-foreground truncate">
-                      {entry.name}
-                    </span>
-                    {entry.starred && (
-                      <Star className="size-3 text-amber-400 fill-amber-400 shrink-0" />
-                    )}
-                  </div>
-                  <span className="w-20 text-right text-xs text-muted-foreground shrink-0 hidden sm:block">
-                    {entry.size ?? `${entry.children?.length ?? 0} items`}
+                    {entry.name}
                   </span>
-                  <span className="w-32 text-right text-xs text-muted-foreground shrink-0 hidden md:block">
-                    {entry.modified}
-                  </span>
+                  {entry.starred && (
+                    <Star className="size-3 text-amber-400 fill-amber-400 shrink-0" />
+                  )}
+                </div>
+                <span className="w-20 text-right text-xs text-muted-foreground shrink-0 hidden sm:block">
+                    {entry.type === "folder" ? "—" : (entry.size ?? "0 B")}
+                </span>
+                <span className="w-32 text-right text-xs text-muted-foreground shrink-0 hidden md:block">
+                  {entry.modified}
+                </span>
                 </button>
               ))}
             </div>

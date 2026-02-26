@@ -1,50 +1,37 @@
-import "server-only"
+import "server-only";
 
-import { randomUUID } from "node:crypto"
-import { timedPgQuery } from "@/lib/server/db/query"
-import { withServerTiming } from "@/lib/server/logging/logger"
-import type { StoreCatalogTemplate } from "@/lib/server/modules/store/catalog"
+import { randomUUID } from "node:crypto";
+import { desc, eq, sql } from "drizzle-orm";
+import { db } from "@/lib/server/db/drizzle";
+import { customStoreApps } from "@/lib/server/db/schema";
+import { withServerTiming } from "@/lib/server/logging/logger";
+import type { StoreCatalogTemplate } from "@/lib/server/modules/store/catalog";
 
-export type CustomStoreSourceType = "docker-compose" | "docker-run"
+export type CustomStoreSourceType = "docker-compose" | "docker-run";
 
 export type CustomStoreTemplate = StoreCatalogTemplate & {
-  isCustom: true
-  sourceType: CustomStoreSourceType
-  composeContent: string
-  sourceText: string
-  webUiUrl: string | null
-}
+  isCustom: true;
+  sourceType: CustomStoreSourceType;
+  composeContent: string;
+  sourceText: string;
+  webUiUrl: string | null;
+};
 
-export type StoreTemplateSource = StoreCatalogTemplate | CustomStoreTemplate
-
-type TableExistsRow = {
-  table_exists: string | null
-}
-
-type CustomStoreAppRow = {
-  app_id: string
-  name: string
-  icon_url: string | null
-  web_ui_url: string | null
-  source_type: string
-  source_text: string
-  compose_content: string
-  repository_url: string | null
-}
+export type StoreTemplateSource = StoreCatalogTemplate | CustomStoreTemplate;
 
 type UpsertCustomStoreTemplateInput = {
-  name: string
-  iconUrl?: string
-  webUiUrl?: string
-  sourceType: CustomStoreSourceType
-  sourceText: string
-  repositoryUrl?: string
-}
+  name: string;
+  iconUrl?: string;
+  webUiUrl?: string;
+  sourceType: CustomStoreSourceType;
+  sourceText: string;
+  repositoryUrl?: string;
+};
 
 function normalize(value: string | undefined) {
-  if (!value) return null
-  const trimmed = value.trim()
-  return trimmed.length > 0 ? trimmed : null
+  if (!value) return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 function slugify(value: string) {
@@ -52,7 +39,7 @@ function slugify(value: string) {
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
+    .replace(/^-+|-+$/g, "");
 }
 
 function sanitizeServiceName(value: string) {
@@ -60,322 +47,329 @@ function sanitizeServiceName(value: string) {
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9-]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-  return sanitized || "app"
+    .replace(/^-+|-+$/g, "");
+  return sanitized || "app";
 }
 
 function quoteYaml(value: string) {
-  return `'${value.replace(/'/g, "''")}'`
+  return `'${value.replace(/'/g, "''")}'`;
 }
 
 function splitShellCommand(input: string) {
-  const tokens: string[] = []
-  let current = ""
-  let quote: "'" | '"' | null = null
+  const tokens: string[] = [];
+  let current = "";
+  let quote: "'" | '"' | null = null;
 
   for (let index = 0; index < input.length; index += 1) {
-    const char = input[index]
+    const char = input[index];
 
     if (quote) {
       if (char === quote) {
-        quote = null
-        continue
+        quote = null;
+        continue;
       }
 
       if (char === "\\" && quote === '"' && index + 1 < input.length) {
-        current += input[index + 1]
-        index += 1
-        continue
+        current += input[index + 1];
+        index += 1;
+        continue;
       }
 
-      current += char
-      continue
+      current += char;
+      continue;
     }
 
     if (char === "'" || char === '"') {
-      quote = char
-      continue
+      quote = char;
+      continue;
     }
 
     if (/\s/.test(char)) {
       if (current.length > 0) {
-        tokens.push(current)
-        current = ""
+        tokens.push(current);
+        current = "";
       }
-      continue
+      continue;
     }
 
     if (char === "\\" && index + 1 < input.length) {
-      current += input[index + 1]
-      index += 1
-      continue
+      current += input[index + 1];
+      index += 1;
+      continue;
     }
 
-    current += char
+    current += char;
   }
 
   if (quote) {
-    throw new Error("Invalid docker run command: unmatched quote")
+    throw new Error("Invalid docker run command: unmatched quote");
   }
 
   if (current.length > 0) {
-    tokens.push(current)
+    tokens.push(current);
   }
 
-  return tokens
+  return tokens;
 }
 
 function readOptionValue(tokens: string[], index: number) {
   if (index + 1 >= tokens.length) {
-    throw new Error(`Invalid docker run command: missing value for ${tokens[index]}`)
+    throw new Error(`Invalid docker run command: missing value for ${tokens[index]}`);
   }
-  return tokens[index + 1]
+  return tokens[index + 1];
 }
 
 export function convertDockerRunToCompose(command: string, fallbackServiceName: string) {
-  const tokens = splitShellCommand(command.trim())
-  let index = 0
+  const tokens = splitShellCommand(command.trim());
+  let index = 0;
 
   if (tokens[index] === "docker") {
-    index += 1
+    index += 1;
   }
 
   if (tokens[index] === "container" && tokens[index + 1] === "run") {
-    index += 2
+    index += 2;
   } else if (tokens[index] === "run") {
-    index += 1
+    index += 1;
   } else {
-    throw new Error("Invalid docker run command: must start with `docker run`")
+    throw new Error("Invalid docker run command: must start with `docker run`");
   }
 
-  const env: string[] = []
-  const ports: string[] = []
-  const volumes: string[] = []
-  let containerName = ""
+  const env: string[] = [];
+  const ports: string[] = [];
+  const volumes: string[] = [];
+  let containerName = "";
 
   while (index < tokens.length) {
-    const token = tokens[index]
+    const token = tokens[index];
 
     if (token === "--") {
-      index += 1
-      break
+      index += 1;
+      break;
     }
 
     if (!token.startsWith("-")) {
-      break
+      break;
     }
 
     if (token === "--name") {
-      containerName = readOptionValue(tokens, index)
-      index += 2
-      continue
+      containerName = readOptionValue(tokens, index);
+      index += 2;
+      continue;
     }
 
     if (token.startsWith("--name=")) {
-      containerName = token.slice("--name=".length)
-      index += 1
-      continue
+      containerName = token.slice("--name=".length);
+      index += 1;
+      continue;
     }
 
     if (token === "-p" || token === "--publish") {
-      ports.push(readOptionValue(tokens, index))
-      index += 2
-      continue
+      ports.push(readOptionValue(tokens, index));
+      index += 2;
+      continue;
     }
 
     if (token.startsWith("--publish=")) {
-      ports.push(token.slice("--publish=".length))
-      index += 1
-      continue
+      ports.push(token.slice("--publish=".length));
+      index += 1;
+      continue;
     }
 
     if (token.startsWith("-p") && token.length > 2) {
-      ports.push(token.slice(2))
-      index += 1
-      continue
+      ports.push(token.slice(2));
+      index += 1;
+      continue;
     }
 
     if (token === "-e" || token === "--env") {
-      env.push(readOptionValue(tokens, index))
-      index += 2
-      continue
+      env.push(readOptionValue(tokens, index));
+      index += 2;
+      continue;
     }
 
     if (token.startsWith("--env=")) {
-      env.push(token.slice("--env=".length))
-      index += 1
-      continue
+      env.push(token.slice("--env=".length));
+      index += 1;
+      continue;
     }
 
     if (token.startsWith("-e") && token.length > 2) {
-      env.push(token.slice(2))
-      index += 1
-      continue
+      env.push(token.slice(2));
+      index += 1;
+      continue;
     }
 
     if (token === "-v" || token === "--volume") {
-      volumes.push(readOptionValue(tokens, index))
-      index += 2
-      continue
+      volumes.push(readOptionValue(tokens, index));
+      index += 2;
+      continue;
     }
 
     if (token.startsWith("--volume=")) {
-      volumes.push(token.slice("--volume=".length))
-      index += 1
-      continue
+      volumes.push(token.slice("--volume=".length));
+      index += 1;
+      continue;
     }
 
     if (token.startsWith("-v") && token.length > 2) {
-      volumes.push(token.slice(2))
-      index += 1
-      continue
+      volumes.push(token.slice(2));
+      index += 1;
+      continue;
     }
 
     if (token.includes("=")) {
-      index += 1
-      continue
+      index += 1;
+      continue;
     }
 
     if (token.startsWith("--") && index + 1 < tokens.length && !tokens[index + 1].startsWith("-")) {
-      index += 2
-      continue
+      index += 2;
+      continue;
     }
 
-    index += 1
+    index += 1;
   }
 
-  const image = tokens[index]
+  const image = tokens[index];
   if (!image) {
-    throw new Error("Invalid docker run command: image is required")
+    throw new Error("Invalid docker run command: image is required");
   }
-  index += 1
+  index += 1;
 
-  const commandArgs = tokens.slice(index)
-  const serviceName = sanitizeServiceName(containerName || fallbackServiceName)
+  const commandArgs = tokens.slice(index);
+  const serviceName = sanitizeServiceName(containerName || fallbackServiceName);
 
-  const lines = ["services:", `  ${serviceName}:`, `    image: ${quoteYaml(image)}`, "    restart: unless-stopped"]
+  const lines = [
+    "services:",
+    `  ${serviceName}:`,
+    `    image: ${quoteYaml(image)}`,
+    "    restart: unless-stopped",
+  ];
 
   if (containerName) {
-    lines.push(`    container_name: ${quoteYaml(containerName)}`)
+    lines.push(`    container_name: ${quoteYaml(containerName)}`);
   }
 
   if (env.length > 0) {
-    lines.push("    environment:")
+    lines.push("    environment:");
     for (const item of env) {
-      lines.push(`      - ${quoteYaml(item)}`)
+      lines.push(`      - ${quoteYaml(item)}`);
     }
   }
 
   if (ports.length > 0) {
-    lines.push("    ports:")
+    lines.push("    ports:");
     for (const port of ports) {
-      lines.push(`      - ${quoteYaml(port)}`)
+      lines.push(`      - ${quoteYaml(port)}`);
     }
   }
 
   if (volumes.length > 0) {
-    lines.push("    volumes:")
+    lines.push("    volumes:");
     for (const volume of volumes) {
-      lines.push(`      - ${quoteYaml(volume)}`)
+      lines.push(`      - ${quoteYaml(volume)}`);
     }
   }
 
   if (commandArgs.length > 0) {
-    lines.push(`    command: ${quoteYaml(commandArgs.join(" "))}`)
+    lines.push(`    command: ${quoteYaml(commandArgs.join(" "))}`);
   }
 
-  return lines.join("\n")
+  return lines.join("\n");
 }
 
 export function extractPortFromWebUi(webUi: string | null | undefined) {
-  if (!webUi) return undefined
-  const raw = webUi.trim()
-  if (!raw) return undefined
+  if (!webUi) return undefined;
+  const raw = webUi.trim();
+  if (!raw) return undefined;
 
   if (/^\d+$/.test(raw)) {
-    const port = Number(raw)
+    const port = Number(raw);
     if (!Number.isInteger(port) || port < 1 || port > 65535) {
-      throw new Error("webUi must contain a valid port between 1 and 65535")
+      throw new Error("webUi must contain a valid port between 1 and 65535");
     }
-    return port
+    return port;
   }
 
-  const withProtocol = raw.includes("://") ? raw : `http://${raw}`
+  const withProtocol = raw.includes("://") ? raw : `http://${raw}`;
   try {
-    const parsed = new URL(withProtocol)
-    const port = parsed.port ? Number(parsed.port) : undefined
+    const parsed = new URL(withProtocol);
+    const port = parsed.port ? Number(parsed.port) : undefined;
 
     if (port === undefined) {
-      return undefined
+      return undefined;
     }
 
     if (!Number.isInteger(port) || port < 1 || port > 65535) {
-      throw new Error("webUi must contain a valid port between 1 and 65535")
+      throw new Error("webUi must contain a valid port between 1 and 65535");
     }
 
-    return port
+    return port;
   } catch {
-    throw new Error("webUi must be a valid URL, host:port, or plain port")
+    throw new Error("webUi must be a valid URL, host:port, or plain port");
   }
 }
 
-function mapCustomRow(row: CustomStoreAppRow): CustomStoreTemplate {
+function mapRow(row: typeof customStoreApps.$inferSelect): CustomStoreTemplate {
   const sourceType =
-    row.source_type === "docker-run" || row.source_type === "docker-compose"
-      ? row.source_type
-      : "docker-compose"
+    row.sourceType === "docker-run" || row.sourceType === "docker-compose"
+      ? row.sourceType
+      : "docker-compose";
 
   return {
-    appId: row.app_id,
+    appId: row.appId,
     templateName: row.name,
     name: row.name,
     description:
-      sourceType === "docker-run" ? "Custom app installed from docker run" : "Custom app installed from docker compose",
+      sourceType === "docker-run"
+        ? "Custom app installed from docker run"
+        : "Custom app installed from docker compose",
     platform: sourceType === "docker-run" ? "Docker Run" : "Docker Compose",
     note: "Custom app definition managed from App Store.",
     categories: ["Custom"],
-    logoUrl: row.icon_url,
-    repositoryUrl: row.repository_url ?? "custom://local",
-    stackFile: `custom/${row.app_id}/docker-compose.yml`,
+    logoUrl: row.iconUrl,
+    repositoryUrl: row.repositoryUrl ?? "custom://local",
+    stackFile: `custom/${row.appId}/docker-compose.yml`,
     env: [],
     isCustom: true,
     sourceType,
-    composeContent: row.compose_content,
-    sourceText: row.source_text,
-    webUiUrl: row.web_ui_url,
-  }
+    composeContent: row.composeContent,
+    sourceText: row.sourceText,
+    webUiUrl: row.webUiUrl,
+  };
 }
 
 async function hasCustomStoreAppsTable() {
-  const check = await timedPgQuery<TableExistsRow>(
-    "SELECT to_regclass('public.custom_store_apps') AS table_exists",
-  )
-  return Boolean(check.rows[0]?.table_exists)
+  const check = await db.execute<{ table_exists: string | null }>(
+    sql`SELECT to_regclass('public.custom_store_apps') AS table_exists`,
+  );
+  return Boolean(check.rows[0]?.table_exists);
 }
 
 function normalizeComposeContent(input: {
-  sourceType: CustomStoreSourceType
-  sourceText: string
-  fallbackServiceName: string
+  sourceType: CustomStoreSourceType;
+  sourceText: string;
+  fallbackServiceName: string;
 }) {
-  const sourceText = input.sourceText.trim()
+  const sourceText = input.sourceText.trim();
   if (!sourceText) {
-    throw new Error("Custom app source cannot be empty")
+    throw new Error("Custom app source cannot be empty");
   }
 
   if (input.sourceType === "docker-run") {
-    return convertDockerRunToCompose(sourceText, input.fallbackServiceName)
+    return convertDockerRunToCompose(sourceText, input.fallbackServiceName);
   }
 
   if (!sourceText.includes("services:")) {
-    throw new Error("Docker compose source must include a services section")
+    throw new Error("Docker compose source must include a services section");
   }
 
-  return sourceText
+  return sourceText;
 }
 
 export function isCustomStoreTemplate(template: StoreTemplateSource): template is CustomStoreTemplate {
-  return "isCustom" in template && template.isCustom === true
+  return "isCustom" in template && template.isCustom === true;
 }
 
 export async function listCustomStoreTemplates() {
@@ -385,27 +379,16 @@ export async function listCustomStoreTemplates() {
       action: "store.customApps.list",
     },
     async () => {
-      if (!(await hasCustomStoreAppsTable())) {
-        return []
-      }
+      if (!(await hasCustomStoreAppsTable())) return [];
 
-      const result = await timedPgQuery<CustomStoreAppRow>(
-        `SELECT
-          app_id,
-          name,
-          icon_url,
-          web_ui_url,
-          source_type,
-          source_text,
-          compose_content,
-          repository_url
-        FROM custom_store_apps
-        ORDER BY updated_at DESC`,
-      )
+      const rows = await db
+        .select()
+        .from(customStoreApps)
+        .orderBy(desc(customStoreApps.updatedAt));
 
-      return result.rows.map(mapCustomRow)
+      return rows.map(mapRow);
     },
-  )
+  );
 }
 
 export async function findCustomStoreTemplateByAppId(appId: string) {
@@ -413,35 +396,21 @@ export async function findCustomStoreTemplateByAppId(appId: string) {
     {
       layer: "service",
       action: "store.customApps.findById",
-      meta: {
-        appId,
-      },
+      meta: { appId },
     },
     async () => {
-      if (!(await hasCustomStoreAppsTable())) {
-        return null
-      }
+      if (!(await hasCustomStoreAppsTable())) return null;
 
-      const result = await timedPgQuery<CustomStoreAppRow>(
-        `SELECT
-          app_id,
-          name,
-          icon_url,
-          web_ui_url,
-          source_type,
-          source_text,
-          compose_content,
-          repository_url
-        FROM custom_store_apps
-        WHERE app_id = $1
-        LIMIT 1`,
-        [appId],
-      )
+      const rows = await db
+        .select()
+        .from(customStoreApps)
+        .where(eq(customStoreApps.appId, appId))
+        .limit(1);
 
-      const row = result.rows[0]
-      return row ? mapCustomRow(row) : null
+      const row = rows[0];
+      return row ? mapRow(row) : null;
     },
-  )
+  );
 }
 
 export async function upsertCustomStoreTemplate(input: UpsertCustomStoreTemplateInput) {
@@ -449,73 +418,55 @@ export async function upsertCustomStoreTemplate(input: UpsertCustomStoreTemplate
     {
       layer: "service",
       action: "store.customApps.upsert",
-      meta: {
-        sourceType: input.sourceType,
-      },
+      meta: { sourceType: input.sourceType },
     },
     async () => {
       if (!(await hasCustomStoreAppsTable())) {
-        throw new Error("custom_store_apps table is missing. Run `npm run db:init`.")
+        throw new Error("custom_store_apps table is missing. Run `npm run db:init`.");
       }
 
-      const name = input.name.trim()
+      const name = input.name.trim();
       if (!name) {
-        throw new Error("Custom app name is required")
+        throw new Error("Custom app name is required");
       }
 
-      const slug = slugify(name)
-      const appId = slug ? `custom-${slug}` : `custom-${randomUUID().slice(0, 8)}`
+      const slug = slugify(name);
+      const appId = slug ? `custom-${slug}` : `custom-${randomUUID().slice(0, 8)}`;
       const composeContent = normalizeComposeContent({
         sourceType: input.sourceType,
         sourceText: input.sourceText,
         fallbackServiceName: name,
-      })
+      });
 
-      const result = await timedPgQuery<CustomStoreAppRow>(
-        `INSERT INTO custom_store_apps (
-          app_id,
-          name,
-          icon_url,
-          web_ui_url,
-          source_type,
-          source_text,
-          compose_content,
-          repository_url,
-          updated_at
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
-        ON CONFLICT (app_id)
-        DO UPDATE SET
-          name = EXCLUDED.name,
-          icon_url = EXCLUDED.icon_url,
-          web_ui_url = EXCLUDED.web_ui_url,
-          source_type = EXCLUDED.source_type,
-          source_text = EXCLUDED.source_text,
-          compose_content = EXCLUDED.compose_content,
-          repository_url = EXCLUDED.repository_url,
-          updated_at = NOW()
-        RETURNING
-          app_id,
-          name,
-          icon_url,
-          web_ui_url,
-          source_type,
-          source_text,
-          compose_content,
-          repository_url`,
-        [
+      const rows = await db
+        .insert(customStoreApps)
+        .values({
           appId,
           name,
-          normalize(input.iconUrl),
-          normalize(input.webUiUrl),
-          input.sourceType,
-          input.sourceText.trim(),
+          iconUrl: normalize(input.iconUrl),
+          webUiUrl: normalize(input.webUiUrl),
+          sourceType: input.sourceType,
+          sourceText: input.sourceText.trim(),
           composeContent,
-          normalize(input.repositoryUrl),
-        ],
-      )
+          repositoryUrl: normalize(input.repositoryUrl),
+          updatedAt: sql`NOW()`,
+        })
+        .onConflictDoUpdate({
+          target: customStoreApps.appId,
+          set: {
+            name,
+            iconUrl: normalize(input.iconUrl),
+            webUiUrl: normalize(input.webUiUrl),
+            sourceType: input.sourceType,
+            sourceText: input.sourceText.trim(),
+            composeContent,
+            repositoryUrl: normalize(input.repositoryUrl),
+            updatedAt: sql`NOW()`,
+          },
+        })
+        .returning();
 
-      return mapCustomRow(result.rows[0])
+      return mapRow(rows[0]);
     },
-  )
+  );
 }

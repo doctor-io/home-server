@@ -48,7 +48,7 @@ function toSummary(
     repositoryUrl: template.repositoryUrl,
     stackFile: template.stackFile,
     status: installed?.status ?? "not_installed",
-    webUiPort: installed?.webUiPort ?? null,
+    webUiPort: installed?.webUiPort ?? template.port ?? null,
     updateAvailable: updateState?.updateAvailable ?? false,
     localDigest: updateState?.localDigest ?? null,
     remoteDigest: updateState?.remoteDigest ?? null,

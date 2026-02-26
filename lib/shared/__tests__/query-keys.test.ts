@@ -19,6 +19,16 @@ describe("query keys", () => {
       "operation",
       "op-1",
     ]);
+    expect(queryKeys.filesList("Documents")).toEqual([
+      "files",
+      "list",
+      "Documents",
+    ]);
+    expect(queryKeys.fileContent("Documents/notes.txt")).toEqual([
+      "files",
+      "content",
+      "Documents/notes.txt",
+    ]);
     expect(queryKeys.currentWeather(1, 2)).toEqual(["weather", "current", 1, 2]);
   });
 });

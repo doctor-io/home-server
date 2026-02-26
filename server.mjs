@@ -3,7 +3,7 @@ import next from "next";
 import { parse } from "url";
 
 const dev = process.env.NODE_ENV !== "production";
-const hostname = "localhost";
+const hostname = process.env.HOMEIO_HTTP_HOST || (dev ? "localhost" : "127.0.0.1");
 const port = parseInt(
   process.env.HOMEIO_HTTP_PORT || process.env.PORT || "3000",
   10,
@@ -35,11 +35,11 @@ app.prepare().then(() => {
       console.warn("⚠ Terminal feature not available:", err.message);
       console.log("  The application will work without terminal functionality");
       console.log(
-        "  To enable terminal, run: npm install node-pty && npm rebuild node-pty",
+        "  To enable terminal, run: npm install @lydell/node-pty",
       );
     });
 
-  server.listen(port, (err) => {
+  server.listen(port, hostname, (err) => {
     if (err) throw err;
     console.log(`> Ready on http://${hostname}:${port}`);
   });

@@ -212,6 +212,12 @@ function AppStoreDetailPanel({
               <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Platform</p>
               <p className="mt-1 text-xs text-foreground font-medium">{detail.platform}</p>
             </div>
+            {detail.webUiPort ? (
+              <div className="p-3 rounded-xl bg-glass border border-glass-border">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Web UI Port</p>
+                <p className="mt-1 text-xs text-foreground font-mono font-medium">{detail.webUiPort}</p>
+              </div>
+            ) : null}
             <div className="p-3 rounded-xl bg-glass border border-glass-border">
               <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Repository URL</p>
               {detail.repositoryUrl.startsWith("http://") || detail.repositoryUrl.startsWith("https://") ? (
@@ -344,6 +350,7 @@ export function AppStore() {
     try {
       await installApp({
         appId: app.id,
+        webUiPort: app.webUiPort ?? undefined,
       });
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "Unable to start install.");
@@ -382,6 +389,7 @@ export function AppStore() {
       if (action === "install") {
         await installApp({
           appId: selectedSummary.id,
+          webUiPort: selectedSummary.webUiPort ?? undefined,
         });
         return;
       }
@@ -593,6 +601,11 @@ export function AppStore() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-foreground truncate">{app.name}</span>
+                        {app.webUiPort ? (
+                          <span className="shrink-0 text-[10px] font-mono px-1.5 py-0.5 rounded bg-glass border border-glass-border text-muted-foreground">
+                            :{app.webUiPort}
+                          </span>
+                        ) : null}
                       </div>
                       <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
                         {app.description}

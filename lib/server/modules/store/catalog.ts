@@ -26,6 +26,7 @@ type UpstreamTemplate = {
   platform?: unknown;
   categories?: unknown;
   logo?: unknown;
+  port?: unknown;
   repository?: UpstreamTemplateRepository;
   env?: unknown;
 };
@@ -48,6 +49,7 @@ export type StoreCatalogTemplate = {
   note: string;
   categories: string[];
   logoUrl: string | null;
+  port: number | null;
   repositoryUrl: string;
   stackFile: string;
   env: StoreAppEnvDefinition[];
@@ -144,6 +146,11 @@ function normalizeTemplate(item: UpstreamTemplate, index: number): StoreCatalogT
   const appIdBase = slugify(templateName || displayName || `app-${index + 1}`);
   const appId = appIdBase.length > 0 ? appIdBase : `app-${index + 1}`;
 
+  const port =
+    typeof item.port === "number" && Number.isInteger(item.port) && item.port > 0
+      ? item.port
+      : null;
+
   return {
     appId,
     templateName,
@@ -153,6 +160,7 @@ function normalizeTemplate(item: UpstreamTemplate, index: number): StoreCatalogT
     note,
     categories: toCategories(item.categories),
     logoUrl: toStringValue(item.logo) || null,
+    port,
     repositoryUrl,
     stackFile,
     env: toEnvDefinitions(item.env),

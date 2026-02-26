@@ -8,6 +8,8 @@ export const queryKeys = {
   storeApp: (appId: string) => ["store", "app", appId] as const,
   storeOperation: (operationId: string) =>
     ["store", "operation", operationId] as const,
+  filesList: (filePath: string) => ["files", "list", filePath] as const,
+  fileContent: (filePath: string) => ["files", "content", filePath] as const,
   currentWeather: (latitude: number | null, longitude: number | null) =>
     ["weather", "current", latitude, longitude] as const,
 };

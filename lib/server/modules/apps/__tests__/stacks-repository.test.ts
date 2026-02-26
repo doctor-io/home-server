@@ -1,24 +1,37 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/server/db/query", () => ({
-  timedPgQuery: vi.fn(),
+vi.mock("@/lib/server/db/drizzle", () => ({
+  db: {
+    execute: vi.fn(),
+    select: vi.fn(),
+  },
 }));
 
-import { timedPgQuery } from "@/lib/server/db/query";
+import { db } from "@/lib/server/db/drizzle";
 import {
   findStoreOperationById,
   listInstalledStacksFromDb,
 } from "@/lib/server/modules/apps/stacks-repository";
 
-describe("store repository", () => {
-  const queryMock = vi.mocked(timedPgQuery);
+function makeSelectChain(rows: unknown[]) {
+  const chain: Record<string, unknown> = {};
+  for (const method of ["from", "where", "orderBy", "limit", "innerJoin"]) {
+    chain[method] = vi.fn().mockReturnValue(chain);
+  }
+  chain.then = (resolve: (v: unknown) => unknown) => Promise.resolve(rows).then(resolve);
+  chain.catch = (reject: (r: unknown) => unknown) => Promise.resolve(rows).catch(reject);
+  chain.finally = (cb: () => void) => Promise.resolve(rows).finally(cb);
+  return chain;
+}
 
+describe("store repository", () => {
   beforeEach(() => {
-    queryMock.mockReset();
+    vi.mocked(db.execute).mockReset();
+    vi.mocked(db.select).mockReset();
   });
 
   it("returns empty stacks list when app_stacks table is absent", async () => {
-    queryMock.mockResolvedValueOnce({
+    vi.mocked(db.execute).mockResolvedValueOnce({
       rows: [{ table_exists: null }],
     } as never);
 
@@ -28,25 +41,26 @@ describe("store repository", () => {
   });
 
   it("maps operation row from database contract", async () => {
-    queryMock.mockResolvedValueOnce({
+    vi.mocked(db.execute).mockResolvedValueOnce({
       rows: [{ table_exists: "app_operations" }],
     } as never);
-    queryMock.mockResolvedValueOnce({
-      rows: [
+
+    vi.mocked(db.select).mockReturnValue(
+      makeSelectChain([
         {
           id: "op-1",
-          app_id: "adguard-home",
+          appId: "adguard-home",
           action: "install",
           status: "running",
-          progress_percent: 46,
-          current_step: "pull-images",
-          error_message: null,
-          started_at: new Date("2026-02-23T00:00:00.000Z"),
-          finished_at: null,
-          updated_at: "2026-02-23T00:01:00.000Z",
+          progressPercent: 46,
+          currentStep: "pull-images",
+          errorMessage: null,
+          startedAt: new Date("2026-02-23T00:00:00.000Z"),
+          finishedAt: null,
+          updatedAt: new Date("2026-02-23T00:01:00.000Z"),
         },
-      ],
-    } as never);
+      ]) as never,
+    );
 
     const result = await findStoreOperationById("op-1");
 

@@ -4,6 +4,7 @@ set -Eeuo pipefail
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
 NC='\033[0m'
 
 APP_NAME="home-server"
@@ -25,17 +26,14 @@ DOCKER_INSTALL_SCRIPT_COMMIT="${DOCKER_INSTALL_SCRIPT_COMMIT:-master}"
 HOMEIO_INSTALL_YQ="${HOMEIO_INSTALL_YQ:-false}"
 HOMEIO_HOSTNAME="${HOMEIO_HOSTNAME:-}"
 HOMEIO_ALLOW_OTHER_NODE="${HOMEIO_ALLOW_OTHER_NODE:-false}"
-HOMEIO_SEED_PRINCIPAL="${HOMEIO_SEED_PRINCIPAL:-false}"
 HOMEIO_VERBOSE="${HOMEIO_VERBOSE:-false}"
 HOMEIO_DRY_RUN="${HOMEIO_DRY_RUN:-false}"
 
-GENERATED_ADMIN_PASSWORD="false"
-EFFECTIVE_ADMIN_USERNAME=""
-EFFECTIVE_ADMIN_PASSWORD=""
 EFFECTIVE_DB_USER=""
 
 print_status() { echo -e "${GREEN}[+]${NC} $1"; }
 print_error() { echo -e "${RED}[!]${NC} $1" >&2; }
+print_warn() { echo -e "${YELLOW}[*]${NC} $1"; }
 print_dry() { echo -e "${BLUE}[DRY]${NC} Would: $1"; }
 
 run_step() {
@@ -69,7 +67,6 @@ validate_identifiers() {
 
 	[[ "${db_user}" =~ ^[a-z_][a-z0-9_]{0,62}$ ]] || { print_error "Invalid HOMEIO_DB_USER: ${db_user}"; exit 1; }
 	[[ "${db_name}" =~ ^[a-z_][a-z0-9_]{0,62}$ ]] || { print_error "Invalid HOMEIO_DB_NAME: ${db_name}"; exit 1; }
-	[[ "${HOMEIO_SEED_PRINCIPAL}" == "true" || "${HOMEIO_SEED_PRINCIPAL}" == "false" ]] || { print_error "Invalid HOMEIO_SEED_PRINCIPAL: ${HOMEIO_SEED_PRINCIPAL} (expected true|false)"; exit 1; }
 	[[ "${HOMEIO_VERBOSE}" == "true" || "${HOMEIO_VERBOSE}" == "false" ]] || { print_error "Invalid HOMEIO_VERBOSE: ${HOMEIO_VERBOSE} (expected true|false)"; exit 1; }
 	[[ "${HOMEIO_DRY_RUN}" == "true" || "${HOMEIO_DRY_RUN}" == "false" ]] || { print_error "Invalid HOMEIO_DRY_RUN: ${HOMEIO_DRY_RUN} (expected true|false)"; exit 1; }
 	if [[ "${admin_username}" != "auto" ]]; then
@@ -420,10 +417,14 @@ ensure_directories() {
 
 	mkdir -p "${INSTALL_DIR}"
 
-	# Create /DATA directory for app stacks storage
-	print_status "Creating /DATA directory for app storage..."
-	mkdir -p /DATA/{Apps,Documents,Media,Download}
+	# App data directories
+	print_status "Creating /DATA directories..."
+	mkdir -p /DATA/{Documents,Media,Download}
 	chmod 755 /DATA
+
+	# Stack storage (STORE_STACKS_ROOT) and logs
+	mkdir -p /var/lib/home-server/stacks
+	mkdir -p "${INSTALL_DIR}/logs"
 }
 
 clone_or_update_repo() {
@@ -496,30 +497,27 @@ create_env_file() {
 	# Generate auth session secret if not provided
 	local auth_session_secret="${HOMEIO_AUTH_SESSION_SECRET:-}"
 	if [[ -z "${auth_session_secret}" ]]; then
-		if command -v openssl >/dev/null 2>&1; then
-			auth_session_secret="$(openssl rand -hex 32)"
-			print_status "Generated AUTH_SESSION_SECRET"
-		else
-			print_error "openssl not found; unable to auto-generate AUTH_SESSION_SECRET"
-			exit 1
-		fi
+		auth_session_secret="$(openssl rand -hex 32)"
+		print_status "Generated AUTH_SESSION_SECRET"
 	fi
 
 	# Generate database password
-	local db_password="$(openssl rand -hex 24)"
-	local db_user="home_server"
-	local db_name="home_server"
+	local db_password
+	db_password="$(openssl rand -hex 24)"
+	local db_user="${HOMEIO_DB_USER:-home_server}"
+	local db_name="${HOMEIO_DB_NAME:-home_server}"
 	local database_url="postgresql://${db_user}:${db_password}@127.0.0.1:5432/${db_name}"
 
 	cat > "${ENV_FILE}" <<EOF
 # Home Server Configuration
 # Generated on $(date)
 
-# Server Configuration
+# Server
 PORT=${APP_PORT}
 NODE_ENV=production
+HOMEIO_HTTP_HOST=127.0.0.1
 
-# Database Configuration
+# Database
 DATABASE_URL="${database_url}"
 PG_MAX_CONNECTIONS=10
 
@@ -550,7 +548,7 @@ STORE_STACKS_ROOT=/var/lib/home-server/stacks
 STORE_DATA_ROOT=/DATA/AppData
 EOF
 
-	# Store for postgres setup
+	# Store for downstream steps
 	EFFECTIVE_DB_USER="${db_user}"
 	EFFECTIVE_DB_PASSWORD="${db_password}"
 	EFFECTIVE_DB_NAME="${db_name}"
@@ -558,9 +556,25 @@ EOF
 	print_status ".env file created successfully"
 }
 
+wait_for_postgres() {
+	print_status "Waiting for PostgreSQL to be ready..."
+	local attempts=0
+	local max_attempts=20
+	until runuser -u postgres -- psql -c "SELECT 1" >/dev/null 2>&1; do
+		attempts=$((attempts + 1))
+		if [[ "${attempts}" -ge "${max_attempts}" ]]; then
+			print_error "PostgreSQL did not become ready after ${max_attempts} attempts"
+			exit 1
+		fi
+		sleep 2
+	done
+	print_status "PostgreSQL is ready"
+}
+
 configure_local_postgres() {
 	print_status "Configuring local PostgreSQL..."
 	systemctl enable --now postgresql
+	wait_for_postgres
 
 	local db_user="${EFFECTIVE_DB_USER}"
 	local db_pass="${EFFECTIVE_DB_PASSWORD}"
@@ -593,23 +607,15 @@ install_homeio() {
 
 	cd "${INSTALL_DIR}" || { print_error "Failed to enter installation directory"; exit 1; }
 
-	# Install dependencies (skip optional native modules for now)
+	# Install dependencies
 	print_status "Installing npm dependencies (this may take a few minutes)..."
 	if [[ "${HOMEIO_VERBOSE}" == "true" ]]; then
-		npm ci --ignore-scripts || { print_error "npm ci failed"; exit 1; }
+		npm ci || { print_error "npm ci failed"; exit 1; }
 	else
-		npm ci --ignore-scripts --loglevel=error --no-audit --no-fund || { print_error "npm ci failed"; exit 1; }
+		npm ci --loglevel=error --no-audit --no-fund || { print_error "npm ci failed"; exit 1; }
 	fi
 
-	# Build native modules separately (optional - terminal feature)
-	print_status "Building native modules (node-pty for terminal)..."
-	npm rebuild node-pty --build-from-source 2>&1 | tee /tmp/node-pty-build.log || {
-		print_warn "node-pty build failed. Terminal feature will not be available."
-		print_warn "Check /tmp/node-pty-build.log for details"
-		print_warn "The application will still work without terminal functionality"
-	}
-
-	# Initialize database
+	# Initialize database schema
 	print_status "Initializing database schema..."
 	if [[ "${HOMEIO_VERBOSE}" == "true" ]]; then
 		(set -a && source "${ENV_FILE}" && set +a && npm run db:init) || { print_error "Database initialization failed"; exit 1; }
@@ -645,7 +651,7 @@ Type=simple
 User=root
 WorkingDirectory=${INSTALL_DIR}
 EnvironmentFile=${ENV_FILE}
-ExecStart=/usr/bin/env npm run start -- -H 127.0.0.1 -p ${APP_PORT}
+ExecStart=/usr/bin/env node ${INSTALL_DIR}/server.mjs
 Restart=always
 RestartSec=10
 KillMode=process
@@ -730,7 +736,6 @@ Type=simple
 User=root
 Group=root
 WorkingDirectory=${INSTALL_DIR}
-Environment=HOMEIO_GROUP=${APP_GROUP}
 Environment=DBUS_HELPER_SOCKET_PATH=/run/home-server/dbus-helper.sock
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ExecStart=/usr/bin/env node ${INSTALL_DIR}/services/dbus-helper/index.mjs
@@ -749,7 +754,7 @@ EOF
 }
 
 print_summary() {
-	local host primary_ip local_url network_url auth_entry
+	local host primary_ip local_url network_url
 	host="$(hostnamectl --static 2>/dev/null || hostname)"
 	primary_ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
 
@@ -767,11 +772,7 @@ print_summary() {
 		fi
 	fi
 
-	if [[ "${HOMEIO_SEED_PRINCIPAL}" == "true" ]]; then
-		auth_entry="/login (principal user seeded)"
-	else
-		auth_entry="/register (no user seeded)"
-	fi
+	auth_entry="/register"
 
 	if [[ "${HOMEIO_DRY_RUN}" == "true" ]]; then
 		print_status "Dry run complete. Above actions would be performed during actual installation."
@@ -806,12 +807,6 @@ print_summary() {
 	echo -e "  Environment: ${ENV_FILE}"
 	echo -e "  App runtime: 127.0.0.1:${APP_PORT}"
 	echo -e "  Auth entry:  ${auth_entry}"
-	if [[ "${HOMEIO_SEED_PRINCIPAL}" == "true" ]]; then
-		echo -e "  Username:    ${EFFECTIVE_ADMIN_USERNAME}"
-		if [[ "${GENERATED_ADMIN_PASSWORD}" == "true" ]]; then
-			echo -e "  Password:    ${EFFECTIVE_ADMIN_PASSWORD}"
-		fi
-	fi
 	echo ""
 }
 

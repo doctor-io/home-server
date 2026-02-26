@@ -1,49 +1,38 @@
 import "server-only";
 
-import { timedPgQuery } from "@/lib/server/db/query";
+import { asc, eq, sql } from "drizzle-orm";
+import { db } from "@/lib/server/db/drizzle";
+import { appStacks } from "@/lib/server/db/schema";
 import type { InstalledApp } from "@/lib/shared/contracts/apps";
 
-type AppStackRow = {
-  app_id: string;
-  template_name: string;
-  stack_name: string;
-  compose_path: string;
-  display_name: string | null;
-  updated_at: string | Date;
-};
-
 export async function listInstalledAppsFromDb(): Promise<InstalledApp[]> {
-  const tableCheck = await timedPgQuery<{ table_exists: string | null }>(
-    "SELECT to_regclass('public.app_stacks') AS table_exists",
+  const tableCheck = await db.execute<{ table_exists: string | null }>(
+    sql`SELECT to_regclass('public.app_stacks') AS table_exists`,
   );
-
   if (!tableCheck.rows[0]?.table_exists) {
     return [];
   }
 
-  const result = await timedPgQuery<AppStackRow>(
-    `SELECT
-      app_id,
-      template_name,
-      stack_name,
-      compose_path,
-      display_name,
-      updated_at
-    FROM app_stacks
-    WHERE status = 'installed'
-    ORDER BY COALESCE(display_name, template_name) ASC
-    LIMIT 200`,
-  );
+  const rows = await db
+    .select({
+      appId: appStacks.appId,
+      templateName: appStacks.templateName,
+      stackName: appStacks.stackName,
+      composePath: appStacks.composePath,
+      displayName: appStacks.displayName,
+      updatedAt: appStacks.updatedAt,
+    })
+    .from(appStacks)
+    .where(eq(appStacks.status, "installed"))
+    .orderBy(asc(sql`COALESCE(${appStacks.displayName}, ${appStacks.templateName})`))
+    .limit(200);
 
-  return result.rows.map((row) => ({
-    id: row.app_id,
-    name: row.display_name || row.template_name || row.app_id,
-    stackName: row.stack_name,
-    composePath: row.compose_path,
+  return rows.map((row) => ({
+    id: row.appId,
+    name: row.displayName || row.templateName || row.appId,
+    stackName: row.stackName,
+    composePath: row.composePath,
     status: "unknown" as const,
-    updatedAt:
-      typeof row.updated_at === "string"
-        ? row.updated_at
-        : row.updated_at.toISOString(),
+    updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
   }));
 }

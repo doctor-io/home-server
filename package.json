@@ -1,6 +1,6 @@
 {
   "name": "my-project",
-  "version": "0.1.29",
+  "version": "0.1.30",
   "private": true,
   "scripts": {
     "dev": "node server.mjs",
@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
+    "@lydell/node-pty": "^1.2.0-beta.3",
     "@radix-ui/react-accordion": "1.2.12",
     "@radix-ui/react-alert-dialog": "1.1.15",
     "@radix-ui/react-aspect-ratio": "1.1.8",
@@ -56,13 +57,13 @@
     "cmdk": "1.1.1",
     "date-fns": "4.1.0",
     "dbus-next": "^0.10.2",
+    "drizzle-orm": "^0.45.1",
     "embla-carousel-react": "8.6.0",
     "input-otp": "1.4.2",
     "js-yaml": "^4.1.1",
     "lucide-react": "^0.564.0",
     "next": "16.1.6",
     "next-themes": "^0.4.6",
-    "node-pty": "^1.1.0",
     "openmeteo": "^1.2.3",
     "pg": "^8.14.1",
     "react": "19.2.4",
@@ -93,6 +94,7 @@
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@types/ws": "^8.18.1",
+    "drizzle-kit": "^0.31.9",
     "eslint": "^9.39.3",
     "eslint-config-next": "^16.1.6",
     "husky": "^9.1.7",

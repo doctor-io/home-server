@@ -2,7 +2,7 @@ import type { Server } from "http";
 import type { IncomingMessage } from "http";
 import type { Duplex } from "stream";
 import { WebSocketServer, WebSocket } from "ws";
-import pty from "node-pty";
+import pty from "@lydell/node-pty";
 import os from "node:os";
 import { parse } from "node:url";
 
