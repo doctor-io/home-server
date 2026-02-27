@@ -28,7 +28,8 @@ else
 fi
 
 ENV_DIR="${HOMEIO_ENV_DIR:-/etc/home-server}"
-ENV_FILE="${HOMEIO_ENV_FILE:-${ENV_DIR}/home-server.env}"
+ENV_FILE="${HOMEIO_ENV_FILE:-${INSTALL_DIR}/.env}"
+LEGACY_ENV_FILE="${ENV_DIR}/home-server.env"
 SERVICE_NAME="${HOMEIO_SERVICE_NAME:-home-server}"
 DBUS_SERVICE_NAME="${HOMEIO_DBUS_SERVICE_NAME:-home-server-dbus}"
 APP_PORT="${HOMEIO_APP_PORT:-${HOMEIO_PORT:-12026}}"
@@ -91,20 +92,19 @@ resolve_env_file() {
 		return
 	fi
 
-	# Default path first.
+	# Primary default path (matches install.sh).
 	if [[ -f "${ENV_FILE}" ]]; then
 		return
 	fi
 
-	# Backward-compatible fallback with install.sh default.
-	local install_env_file="${INSTALL_DIR}/.env"
-	if [[ -f "${install_env_file}" ]]; then
-		print_warn "Environment file not found at ${ENV_FILE}. Falling back to ${install_env_file}."
-		ENV_FILE="${install_env_file}"
+	# Backward-compatible legacy fallback.
+	if [[ -f "${LEGACY_ENV_FILE}" ]]; then
+		print_warn "Environment file not found at ${ENV_FILE}. Falling back to ${LEGACY_ENV_FILE}."
+		ENV_FILE="${LEGACY_ENV_FILE}"
 		return
 	fi
 
-	print_error "Environment file not found. Checked: ${ENV_FILE} and ${install_env_file}"
+	print_error "Environment file not found. Checked: ${ENV_FILE} and ${LEGACY_ENV_FILE}"
 	exit 1
 }
 
