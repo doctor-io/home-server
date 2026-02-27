@@ -524,7 +524,7 @@ export function AppGrid({
       ) : filtered.length === 0 ? (
         <div className="mt-24 text-xs text-muted-foreground">No apps found.</div>
       ) : (
-        <div className="grid grid-cols-4 sm:grid-cols-5 mt-24 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-x-2 gap-y-5">
+        <div className="mt-24 grid justify-center gap-x-2 gap-y-5 grid-cols-[repeat(4,minmax(0,5.5rem))] sm:grid-cols-[repeat(5,minmax(0,5.5rem))] md:grid-cols-[repeat(6,minmax(0,5.5rem))] lg:grid-cols-[repeat(8,minmax(0,5.5rem))] xl:grid-cols-[repeat(10,minmax(0,5.5rem))]">
           {filtered.map((app) => (
             <button
               key={app.id}
