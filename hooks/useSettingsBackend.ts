@@ -8,7 +8,9 @@ import type { StoreAppSummary } from "@/lib/shared/contracts/apps";
 import { queryKeys } from "@/lib/shared/query-keys";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useDockerStatsSnapshot } from "@/hooks/useDockerStats";
+import { useLocalFolderShares } from "@/hooks/useLocalFolderShares";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
+import { useNetworkShares } from "@/hooks/useNetworkShares";
 import { useStoreCatalog } from "@/hooks/useStoreCatalog";
 import { useSystemMetrics } from "@/hooks/useSystemMetrics";
 import { useWifiNetworks } from "@/hooks/useWifiNetworks";
@@ -141,6 +143,8 @@ export function useSettingsBackend() {
   const systemMetricsQuery = useSystemMetrics();
   const networkStatusQuery = useNetworkStatus();
   const wifiNetworksQuery = useWifiNetworks();
+  const localFolderSharesQuery = useLocalFolderShares();
+  const networkSharesQuery = useNetworkShares();
   const dockerStatsSnapshot = useDockerStatsSnapshot();
   const updatesQuery = useStoreCatalog({ updatesOnly: true });
 
@@ -248,6 +252,78 @@ export function useSettingsBackend() {
     };
   }, [dockerStatsSnapshot.error, dockerStatsSnapshot.isLoading, dockerStatsSnapshot.stats]);
 
+  const storage = useMemo(() => {
+    const rootStorage = systemMetricsQuery.data?.storage;
+    const localFolderShares = localFolderSharesQuery.data ?? [];
+    const networkShares = networkSharesQuery.data ?? [];
+    const shares = [
+      ...localFolderShares.map((share) => ({
+        id: share.id,
+        name: share.shareName,
+        path: `/${share.sharedPath}`,
+        source: `/${share.sourcePath}`,
+        protocol: "SMB usershare",
+        status:
+          share.isMounted && share.isExported
+            ? "Mounted"
+            : share.isMounted
+              ? "Partially configured"
+              : "Unmounted",
+      })),
+      ...networkShares.map((share) => ({
+        id: share.id,
+        name: `${share.host}/${share.share}`,
+        path: `/${share.mountPath}`,
+        source: `//${share.host}/${share.share}`,
+        protocol: "SMB/CIFS",
+        status: share.isMounted ? "Mounted" : "Unmounted",
+      })),
+    ].sort((left, right) => left.name.localeCompare(right.name));
+
+    const warnings: string[] = [];
+    if (systemMetricsQuery.error) warnings.push("Storage metrics unavailable.");
+    if (localFolderSharesQuery.error) {
+      warnings.push("Local shared folders list unavailable.");
+    }
+    if (networkSharesQuery.error) {
+      warnings.push("Network shares list unavailable.");
+    }
+
+    return {
+      mountPath: rootStorage?.mountPath ?? "--",
+      totalBytes: rootStorage?.totalBytes ?? null,
+      usedBytes: rootStorage?.usedBytes ?? null,
+      availableBytes: rootStorage?.availableBytes ?? null,
+      usedPercent:
+        rootStorage && Number.isFinite(rootStorage.usedPercent)
+          ? Number(rootStorage.usedPercent.toFixed(1))
+          : null,
+      summary:
+        rootStorage && rootStorage.totalBytes > 0
+          ? `${formatBytes(rootStorage.usedBytes)} / ${formatBytes(rootStorage.totalBytes)}`
+          : "--",
+      shares,
+      localShareCount: localFolderShares.length,
+      networkShareCount: networkShares.length,
+      isLoading:
+        systemMetricsQuery.isLoading ||
+        localFolderSharesQuery.isLoading ||
+        networkSharesQuery.isLoading,
+      unavailable: Boolean(systemMetricsQuery.error),
+      warning: warnings.length > 0 ? warnings.join(" ") : null,
+    };
+  }, [
+    localFolderSharesQuery.data,
+    localFolderSharesQuery.error,
+    localFolderSharesQuery.isLoading,
+    networkSharesQuery.data,
+    networkSharesQuery.error,
+    networkSharesQuery.isLoading,
+    systemMetricsQuery.data?.storage,
+    systemMetricsQuery.error,
+    systemMetricsQuery.isLoading,
+  ]);
+
   const updates = useMemo(() => {
     const entries = (updatesQuery.data ?? []).map(mapUpdateToViewModel);
 
@@ -329,6 +405,7 @@ export function useSettingsBackend() {
   return {
     general,
     network,
+    storage,
     docker,
     updates,
     capabilities,

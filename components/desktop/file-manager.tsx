@@ -973,9 +973,9 @@ export function FileManager() {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Toolbar */}
-        <div className="flex items-center gap-2 px-3 py-2 border-b border-glass-border bg-card/65">
+        <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-glass-border bg-card/65">
           {/* Navigation */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={navigateUp}
               disabled={currentPath.length === 0}
@@ -988,7 +988,7 @@ export function FileManager() {
 
           {/* Breadcrumb */}
           <nav
-            className="flex items-center gap-1 flex-1 min-w-0"
+            className="flex items-center gap-1 min-w-0 flex-1 basis-full md:basis-auto"
             aria-label="File path"
           >
             <button
@@ -997,7 +997,7 @@ export function FileManager() {
             >
               <span className="inline-flex items-center gap-1">
                 <HardDrive className="size-3.5" />
-                <span className="hidden sm:inline">{rootLabel}</span>
+                <span className="hidden xl:inline">{rootLabel}</span>
               </span>
             </button>
             {currentPath.map((segment, i) => (
@@ -1005,7 +1005,7 @@ export function FileManager() {
                 <ChevronRight className="size-3 text-muted-foreground/50 shrink-0" />
                 <button
                   onClick={() => navigateToPath(currentPath.slice(0, i + 1))}
-                  className="text-xs text-muted-foreground hover:text-foreground transition-colors px-1.5 py-1 rounded-md hover:bg-secondary/40 truncate max-w-32 cursor-pointer"
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors px-1.5 py-1 rounded-md hover:bg-secondary/40 truncate max-w-24 sm:max-w-28 md:max-w-32 cursor-pointer"
                 >
                   {currentPathForDisplay[i] ?? segment}
                 </button>
@@ -1013,8 +1013,7 @@ export function FileManager() {
             ))}
           </nav>
 
-          {/* Search */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={() => {
                 void handleCreateEntry("folder");
@@ -1024,7 +1023,7 @@ export function FileManager() {
               title="Create folder"
             >
               <Folder className="size-3.5" />
-              <span className="hidden sm:inline">New Folder</span>
+              <span className="hidden lg:inline">New Folder</span>
             </button>
             <button
               onClick={() => {
@@ -1035,24 +1034,23 @@ export function FileManager() {
               title="Create file"
             >
               <File className="size-3.5" />
-              <span className="hidden sm:inline">New File</span>
+              <span className="hidden lg:inline">New File</span>
             </button>
           </div>
 
-          {/* Search */}
-          <div className="relative">
+          <div className="relative min-w-[9rem] flex-1 sm:flex-none sm:w-36 md:w-44">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 size-3 text-muted-foreground" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search..."
-              className="h-7 w-36 pl-7 pr-2 rounded-lg bg-secondary/40 border border-glass-border text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary/40 focus:bg-secondary/60 transition-all"
+              className="h-7 w-full pl-7 pr-2 rounded-lg bg-secondary/40 border border-glass-border text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary/40 focus:bg-secondary/60 transition-all"
             />
           </div>
 
           {/* Sort */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 shrink-0">
             {isTrashView ? (
               <button
                 onClick={() => {
@@ -1067,7 +1065,7 @@ export function FileManager() {
                 title="Permanently delete all items in Trash"
               >
                 <Trash2 className="size-3.5" />
-                <span className="hidden sm:inline">Empty Trash</span>
+                <span className="hidden lg:inline">Empty Trash</span>
               </button>
             ) : null}
             <button
@@ -1080,7 +1078,7 @@ export function FileManager() {
               ) : (
                 <Eye className="size-3.5" />
               )}
-              <span className="hidden sm:inline">
+              <span className="hidden lg:inline">
                 {includeHidden ? "Hide Hidden" : "Show Hidden"}
               </span>
             </button>
@@ -1098,12 +1096,12 @@ export function FileManager() {
               title={`Sort by: ${sortBy}`}
             >
               <SortAsc className="size-3" />
-              <span className="capitalize hidden sm:inline">{sortBy}</span>
+              <span className="capitalize hidden lg:inline">{sortBy}</span>
             </button>
           </div>
 
           {/* View toggle */}
-          <div className="flex items-center bg-secondary/30 rounded-lg p-0.5">
+          <div className="flex items-center bg-secondary/30 rounded-lg p-0.5 shrink-0">
             <button
               onClick={() => setViewMode("grid")}
               className={`p-1 rounded-md transition-colors cursor-pointer ${

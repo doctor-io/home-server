@@ -327,6 +327,69 @@ describe("local sharing service", () => {
     expect(deleteLocalShareFromDb).toHaveBeenCalledWith("local-1");
   });
 
+  it("skips umount when share is already unmounted", async () => {
+    vi.mocked(getLocalShareFromDb).mockResolvedValueOnce({
+      id: "local-2",
+      shareName: "Media",
+      sourcePath: "Media",
+      sharedPath: "Shared/Media",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    vi.mocked(deleteLocalShareFromDb).mockResolvedValueOnce({
+      id: "local-2",
+      shareName: "Media",
+      sourcePath: "Media",
+      sharedPath: "Shared/Media",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    vi.mocked(execFile).mockImplementation((command: string, ...restArgs: unknown[]) => {
+      const { args, callback } = getExecInvocation(restArgs);
+
+      if (command === "net" && args[0] === "usershare" && args[1] === "info") {
+        const error = new Error("usershare does not exist") as Error & {
+          code?: number;
+          stderr?: string;
+        };
+        error.code = 1;
+        error.stderr = "usershare does not exist";
+        callback(error, "", "usershare does not exist");
+        return {} as never;
+      }
+
+      if (command === "mountpoint") {
+        const error = new Error("not mounted") as Error & {
+          code?: number;
+          stderr?: string;
+        };
+        error.code = 1;
+        error.stderr = "not mounted";
+        callback(error, "", "not mounted");
+        return {} as never;
+      }
+
+      if (command === "umount") {
+        callback(new Error("should not call umount"), "", "should not call umount");
+        return {} as never;
+      }
+
+      callback(null, "", "");
+      return {} as never;
+    });
+
+    const result = await removeLocalFolderShare("local-2");
+
+    expect(result.removed).toBe(true);
+    expect(deleteLocalShareFromDb).toHaveBeenCalledWith("local-2");
+    expect(execFile).not.toHaveBeenCalledWith(
+      "umount",
+      expect.any(Array),
+      expect.any(Function),
+    );
+  });
+
   it("serializes concurrent add requests for the same source path", async () => {
     let sourceReserved = false;
 

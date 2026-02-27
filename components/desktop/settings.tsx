@@ -365,34 +365,50 @@ function InfoBanner({
 
 function StorageBar({
   label,
-  used,
-  total,
-  unit,
+  detail,
+  pct,
   color,
 }: {
   label: string;
-  used: number;
-  total: number;
-  unit: string;
+  detail: string;
+  pct: number;
   color: string;
 }) {
-  const pct = Math.round((used / total) * 100);
+  const safePct = Number.isFinite(pct) ? Math.max(0, Math.min(pct, 100)) : 0;
   return (
     <div className="py-2">
       <div className="flex items-center justify-between mb-1.5">
         <span className="text-xs text-foreground">{label}</span>
-        <span className="text-xs text-muted-foreground">
-          {used} {unit} / {total} {unit} ({pct}%)
-        </span>
+        <span className="text-xs text-muted-foreground">{detail}</span>
       </div>
       <div className="h-2 rounded-full bg-secondary/60 overflow-hidden">
         <div
           className="h-full rounded-full transition-all"
-          style={{ width: `${pct}%`, backgroundColor: color }}
+          style={{ width: `${safePct}%`, backgroundColor: color }}
         />
       </div>
     </div>
   );
+}
+
+function formatStorageSize(bytes: number | null | undefined) {
+  if (bytes === null || bytes === undefined || !Number.isFinite(bytes) || bytes < 0) {
+    return "--";
+  }
+
+  if (bytes < 1024 ** 2) {
+    return `${Math.round(bytes / 1024)} KB`;
+  }
+
+  if (bytes < 1024 ** 3) {
+    return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+  }
+
+  if (bytes < 1024 ** 4) {
+    return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
+  }
+
+  return `${(bytes / 1024 ** 4).toFixed(1)} TB`;
 }
 
 // =====================
@@ -923,124 +939,111 @@ function NetworkSection({
   );
 }
 
-function StorageSection() {
+function StorageSection({
+  data,
+}: {
+  data: ReturnType<typeof useSettingsBackend>["storage"];
+}) {
+  const usedPercent =
+    data.usedPercent !== null && data.usedPercent !== undefined
+      ? Number(data.usedPercent.toFixed(1))
+      : 0;
+
   return (
     <div className="flex flex-col gap-1">
-      <SectionDivider title="Disks" />
+      {data.warning && (
+        <InfoBanner text={data.warning} variant={data.unavailable ? "warning" : "info"} />
+      )}
+      <SectionDivider title="Files Root Usage" />
       <StorageBar
-        label="/dev/sda1 - System (NVMe SSD)"
-        used={120}
-        total={500}
-        unit="GB"
+        label={`${data.mountPath} (FILES_ROOT)`}
+        detail={
+          data.summary !== "--"
+            ? `${data.summary} (${Math.round(usedPercent)}%)`
+            : "Usage unavailable"
+        }
+        pct={usedPercent}
         color="oklch(0.72 0.14 190)"
       />
-      <StorageBar
-        label="/dev/sdb1 - Data Pool 1 (HDD)"
-        used={1800}
-        total={4000}
-        unit="GB"
-        color="oklch(0.65 0.15 160)"
-      />
-      <StorageBar
-        label="/dev/sdc1 - Data Pool 2 (HDD)"
-        used={2100}
-        total={4000}
-        unit="GB"
-        color="oklch(0.78 0.12 85)"
-      />
-      <StorageBar
-        label="/dev/sdd1 - Backup (HDD)"
-        used={840}
-        total={2000}
-        unit="GB"
-        color="oklch(0.6 0.2 340)"
-      />
-
-      <SectionDivider title="RAID Configuration" />
-      <div className="rounded-xl border border-glass-border bg-secondary/20 p-3">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm text-foreground font-medium">
-            ZFS Pool: datapool
-          </span>
-          <span className="text-xs px-2 py-0.5 rounded-full bg-status-green/15 text-status-green font-medium">
-            Healthy
-          </span>
+      <div className="grid grid-cols-3 gap-4 text-xs py-2">
+        <div>
+          <span className="text-xs text-muted-foreground block">Used</span>
+          <span className="text-foreground">{formatStorageSize(data.usedBytes)}</span>
         </div>
-        <div className="grid grid-cols-3 gap-4 text-xs">
-          <div>
-            <span className="text-xs text-muted-foreground block">
-              Type
-            </span>
-            <span className="text-foreground">RAID-Z1 (raidz)</span>
-          </div>
-          <div>
-            <span className="text-xs text-muted-foreground block">
-              Total Size
-            </span>
-            <span className="text-foreground">8 TB</span>
-          </div>
-          <div>
-            <span className="text-xs text-muted-foreground block">
-              Redundancy
-            </span>
-            <span className="text-foreground">1 disk parity</span>
-          </div>
+        <div>
+          <span className="text-xs text-muted-foreground block">Available</span>
+          <span className="text-foreground">{formatStorageSize(data.availableBytes)}</span>
+        </div>
+        <div>
+          <span className="text-xs text-muted-foreground block">Total</span>
+          <span className="text-foreground">{formatStorageSize(data.totalBytes)}</span>
         </div>
       </div>
 
       <SectionDivider title="Shared Folders" />
+      <div className="flex items-center justify-between text-xs text-muted-foreground py-1">
+        <span>Local shares: {data.localShareCount}</span>
+        <span>Network shares: {data.networkShareCount}</span>
+      </div>
       <div className="rounded-xl border border-glass-border bg-secondary/20 overflow-hidden">
-        {[
-          {
-            name: "Media",
-            path: "/srv/media",
-            protocol: "SMB / NFS",
-            size: "3.2 TB",
-          },
-          {
-            name: "Documents",
-            path: "/srv/documents",
-            protocol: "SMB",
-            size: "48 GB",
-          },
-          {
-            name: "Backups",
-            path: "/srv/backups",
-            protocol: "NFS",
-            size: "840 GB",
-          },
-          {
-            name: "Public",
-            path: "/srv/public",
-            protocol: "SMB",
-            size: "12 GB",
-          },
-        ].map((share, i, arr) => (
-          <div
-            key={i}
-            className={`flex items-center justify-between px-3 py-2.5 text-xs ${i < arr.length - 1 ? "border-b border-glass-border" : ""}`}
-          >
-            <div className="flex items-center gap-2.5">
-              <HardDrive className="size-3.5 text-primary" />
-              <div>
-                <span className="text-foreground font-medium">
-                  {share.name}
-                </span>
-                <span className="text-muted-foreground font-mono ml-2">
-                  {share.path}
+        {data.shares.length === 0 ? (
+          <div className="px-3 py-3 text-xs text-muted-foreground">
+            No shared folders configured.
+          </div>
+        ) : (
+          data.shares.map((share, index) => (
+            <div
+              key={share.id}
+              className={`flex items-center justify-between px-3 py-2.5 text-xs ${
+                index < data.shares.length - 1 ? "border-b border-glass-border" : ""
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <HardDrive className="size-3.5 text-primary" />
+                <div className="flex flex-col">
+                  <span className="text-foreground font-medium">{share.name}</span>
+                  <span className="text-muted-foreground font-mono">{share.path}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <span className="text-muted-foreground">{share.protocol}</span>
+                <span
+                  className={
+                    share.status === "Mounted"
+                      ? "text-status-green"
+                      : share.status === "Partially configured"
+                        ? "text-status-amber"
+                        : "text-muted-foreground"
+                  }
+                >
+                  {share.status}
                 </span>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <span className="text-muted-foreground">{share.protocol}</span>
-              <span className="text-muted-foreground">{share.size}</span>
-            </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
 
-      <SectionDivider title="S.M.A.R.T. Health" />
-      <InfoBanner text="All drives passed the last S.M.A.R.T. diagnostic check (Feb 21, 2026). Next scheduled check: Feb 28, 2026." />
+      <SectionDivider title="Source Paths" />
+      <div className="rounded-xl border border-glass-border bg-secondary/20 overflow-hidden">
+        {data.shares.length === 0 ? (
+          <div className="px-3 py-3 text-xs text-muted-foreground">
+            No source paths to display.
+          </div>
+        ) : (
+          data.shares.map((share, index) => (
+            <div
+              key={`${share.id}-source`}
+              className={`px-3 py-2.5 text-xs ${
+                index < data.shares.length - 1 ? "border-b border-glass-border" : ""
+              }`}
+            >
+              <span className="text-muted-foreground">{share.name}:</span>{" "}
+              <span className="text-foreground font-mono">{share.source}</span>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }
@@ -2122,16 +2125,7 @@ function renderSection({
         />
       );
     case "storage":
-      return (
-        <ControlAvailabilityContext.Provider value={unsupportedControlContext}>
-          <div className="flex flex-col gap-2">
-            <InfoBanner text={settingsBackend.capabilities.unsupportedSectionReason} />
-            <fieldset disabled className="opacity-70">
-              <StorageSection />
-            </fieldset>
-          </div>
-        </ControlAvailabilityContext.Provider>
-      );
+      return <StorageSection data={settingsBackend.storage} />;
     case "docker":
       return (
         <DockerSection

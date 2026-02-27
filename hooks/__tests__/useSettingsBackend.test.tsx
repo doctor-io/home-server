@@ -9,6 +9,8 @@ const mockUseCurrentUser = vi.fn();
 const mockUseSystemMetrics = vi.fn();
 const mockUseNetworkStatus = vi.fn();
 const mockUseWifiNetworks = vi.fn();
+const mockUseLocalFolderShares = vi.fn();
+const mockUseNetworkShares = vi.fn();
 const mockUseDockerStatsSnapshot = vi.fn();
 const mockUseStoreCatalog = vi.fn();
 
@@ -26,6 +28,14 @@ vi.mock("@/hooks/useNetworkStatus", () => ({
 
 vi.mock("@/hooks/useWifiNetworks", () => ({
   useWifiNetworks: () => mockUseWifiNetworks(),
+}));
+
+vi.mock("@/hooks/useLocalFolderShares", () => ({
+  useLocalFolderShares: () => mockUseLocalFolderShares(),
+}));
+
+vi.mock("@/hooks/useNetworkShares", () => ({
+  useNetworkShares: () => mockUseNetworkShares(),
 }));
 
 vi.mock("@/hooks/useDockerStats", () => ({
@@ -101,6 +111,13 @@ function setDefaultMocks() {
         uptimeSeconds: 7200,
         nodeVersion: "v22.17.0",
       },
+      storage: {
+        mountPath: "/DATA",
+        totalBytes: 4 * 1024 * 1024 * 1024 * 1024,
+        availableBytes: 2200 * 1024 * 1024 * 1024,
+        usedBytes: 1800 * 1024 * 1024 * 1024,
+        usedPercent: 45,
+      },
     },
     isLoading: false,
     error: null,
@@ -161,6 +178,36 @@ function setDefaultMocks() {
     error: null,
   });
 
+  mockUseLocalFolderShares.mockReturnValue({
+    data: [
+      {
+        id: "local-1",
+        shareName: "Media",
+        sourcePath: "Media",
+        sharedPath: "Shared/Media",
+        isMounted: true,
+        isExported: true,
+      },
+    ],
+    isLoading: false,
+    error: null,
+  });
+
+  mockUseNetworkShares.mockReturnValue({
+    data: [
+      {
+        id: "network-1",
+        host: "nas.local",
+        share: "Public",
+        username: "guest",
+        mountPath: "Network/nas.local/Public",
+        isMounted: true,
+      },
+    ],
+    isLoading: false,
+    error: null,
+  });
+
   mockUseStoreCatalog.mockReturnValue({
     data: [
       {
@@ -207,6 +254,8 @@ describe("useSettingsBackend", () => {
     expect(result.current.general.uptime).toContain("1 day");
     expect(result.current.network.iface).toBe("wlan0");
     expect(result.current.network.topSsids).toEqual(["HomeNet", "GuestNet"]);
+    expect(result.current.storage.mountPath).toBe("/DATA");
+    expect(result.current.storage.shares).toHaveLength(2);
     expect(result.current.docker.containers).toHaveLength(1);
     expect(result.current.updates.entries).toHaveLength(1);
     expect(result.current.capabilities.general.telemetry.disabled).toBe(true);

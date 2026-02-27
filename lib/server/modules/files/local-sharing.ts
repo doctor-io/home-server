@@ -416,20 +416,31 @@ async function releaseShareExport(
   },
 ) {
   const exportResolved = await resolveExportPath(record.sharedPath);
+  const tolerateMissing = options?.tolerateMissing ?? false;
+  const usershareExists = tolerateMissing
+    ? await isUsersharePresent(record.shareName)
+    : true;
+  const mountExists = tolerateMissing
+    ? await isMountPoint(exportResolved.absolutePath)
+    : true;
 
-  try {
-    await runCommand("net", ["usershare", "delete", record.shareName]);
-  } catch (error) {
-    if (!(options?.tolerateMissing && isUsershareMissingError(error))) {
-      throw error;
+  if (usershareExists) {
+    try {
+      await runCommand("net", ["usershare", "delete", record.shareName]);
+    } catch (error) {
+      if (!(tolerateMissing && isUsershareMissingError(error))) {
+        throw error;
+      }
     }
   }
 
-  try {
-    await runCommand("umount", [exportResolved.absolutePath]);
-  } catch (error) {
-    if (!(options?.tolerateMissing && isMountMissingError(error))) {
-      throw error;
+  if (mountExists) {
+    try {
+      await runCommand("umount", [exportResolved.absolutePath]);
+    } catch (error) {
+      if (!(tolerateMissing && isMountMissingError(error))) {
+        throw error;
+      }
     }
   }
 

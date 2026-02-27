@@ -52,6 +52,29 @@ function createBackendMock() {
       unavailable: false,
       warning: null,
     },
+    storage: {
+      mountPath: "/DATA",
+      totalBytes: 4 * 1024 * 1024 * 1024 * 1024,
+      usedBytes: 1800 * 1024 * 1024 * 1024,
+      availableBytes: 2200 * 1024 * 1024 * 1024,
+      usedPercent: 45,
+      summary: "1800.00 GB / 4096.00 GB",
+      shares: [
+        {
+          id: "local-1",
+          name: "Media",
+          path: "/Shared/Media",
+          source: "/Media",
+          protocol: "SMB usershare",
+          status: "Mounted",
+        },
+      ],
+      localShareCount: 1,
+      networkShareCount: 0,
+      isLoading: false,
+      unavailable: false,
+      warning: null,
+    },
     docker: {
       containers: [
         {
