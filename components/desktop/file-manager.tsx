@@ -3,13 +3,18 @@
 import { NetworkStorageDialog } from "@/components/desktop/network-storage-dialog";
 import {
   buildAssetUrl,
+  buildDownloadUrl,
   toFilePath,
   useCreateFile,
   useCreateFolder,
+  useFileEntryInfo,
   useFileContent,
   useFilesDirectory,
+  useFilesRoot,
   usePasteFileEntry,
+  useRenameFileEntry,
   useSaveFileContent,
+  useToggleFileStar,
 } from "@/hooks/useFiles";
 import {
   useCreateLocalFolderShare,
@@ -19,6 +24,7 @@ import {
 import { useNetworkShares } from "@/hooks/useNetworkShares";
 import { useSystemMetrics } from "@/hooks/useSystemMetrics";
 import {
+  useEmptyTrash,
   useDeleteFromTrash,
   useMoveToTrash,
   useRestoreFromTrash,
@@ -31,6 +37,8 @@ import {
   ClipboardPaste,
   Copy,
   Download,
+  Eye,
+  EyeOff,
   File,
   FileArchive,
   FileCode,
@@ -114,6 +122,7 @@ function toUiFileEntry(entry: FileListEntry): FileEntry {
         }),
     modifiedAt: entry.modifiedAt,
     mtimeMs: entry.mtimeMs,
+    starred: entry.starred ?? false,
   };
 }
 
@@ -394,8 +403,10 @@ export function FileManager() {
     null,
   );
   const [isEmptyingTrash, setIsEmptyingTrash] = useState(false);
+  const [includeHidden, setIncludeHidden] = useState(false);
 
-  const directoryQuery = useFilesDirectory(currentPath);
+  const filesRootQuery = useFilesRoot();
+  const directoryQuery = useFilesDirectory(currentPath, includeHidden);
   const systemMetricsQuery = useSystemMetrics();
   const networkSharesQuery = useNetworkShares();
   const localSharesQuery = useLocalFolderShares();
@@ -408,6 +419,10 @@ export function FileManager() {
   const moveToTrashMutation = useMoveToTrash();
   const restoreFromTrashMutation = useRestoreFromTrash();
   const deleteFromTrashMutation = useDeleteFromTrash();
+  const emptyTrashMutation = useEmptyTrash();
+  const renameFileEntryMutation = useRenameFileEntry();
+  const getFileInfoMutation = useFileEntryInfo();
+  const toggleStarMutation = useToggleFileStar();
   const openFilePath = openFile ? toFilePath(openFile.path) : null;
   const fileContentQuery = useFileContent(openFilePath);
 
@@ -476,6 +491,8 @@ export function FileManager() {
     () => normalizePathForDisplay(currentPath),
     [currentPath],
   );
+  const filesRootPath = filesRootQuery.data?.rootPath ?? "";
+  const rootLabel = filesRootPath.length > 0 ? filesRootPath : "/DATA";
   const localSharesByPath = useMemo(
     () => {
       const map = new Map<
@@ -758,13 +775,9 @@ export function FileManager() {
 
     setIsEmptyingTrash(true);
     try {
-      for (const entry of currentEntries) {
-        await deleteFromTrashMutation.mutateAsync({
-          path: entry.path,
-        });
-      }
+      const result = await emptyTrashMutation.mutateAsync();
       setStatusNotice(
-        `Trash emptied (${currentEntries.length} item${currentEntries.length > 1 ? "s" : ""})`,
+        `Trash emptied (${result.deletedCount} item${result.deletedCount > 1 ? "s" : ""})`,
       );
     } catch (error) {
       setStatusNotice(
@@ -773,6 +786,57 @@ export function FileManager() {
     } finally {
       setIsEmptyingTrash(false);
     }
+  }
+
+  async function handleRenameEntry(entry: FileEntry) {
+    if (isTrashView) {
+      setStatusNotice("Rename is disabled in Trash");
+      return;
+    }
+    const newName = window.prompt("Rename item", entry.name);
+    if (!newName || newName.trim() === entry.name) {
+      return;
+    }
+
+    try {
+      const result = await renameFileEntryMutation.mutateAsync({
+        path: entry.path,
+        newName: newName.trim(),
+      });
+      setSelectedFile(null);
+      setStatusNotice(`Renamed to ${result.path.split("/").pop() ?? newName.trim()}`);
+    } catch (error) {
+      setStatusNotice(error instanceof Error ? error.message : "Failed to rename item");
+    }
+  }
+
+  async function handleGetInfo(entry: FileEntry) {
+    try {
+      const info = await getFileInfoMutation.mutateAsync(entry.path);
+      setStatusNotice(
+        `${info.name} | ${info.type} | ${formatBytesCompact(info.sizeBytes)} | perms ${info.permissions}`,
+      );
+    } catch (error) {
+      setStatusNotice(error instanceof Error ? error.message : "Failed to get item info");
+    }
+  }
+
+  async function handleToggleStar(entry: FileEntry) {
+    try {
+      const result = await toggleStarMutation.mutateAsync(entry.path);
+      setStatusNotice(result.starred ? `Starred ${entry.name}` : `Unstarred ${entry.name}`);
+    } catch (error) {
+      setStatusNotice(error instanceof Error ? error.message : "Failed to toggle star");
+    }
+  }
+
+  function handleDownloadEntry(entry: FileEntry) {
+    if (entry.type !== "file") {
+      setStatusNotice("Download is only available for files");
+      return;
+    }
+    const downloadUrl = buildDownloadUrl(entry.path);
+    window.open(downloadUrl, "_blank", "noopener,noreferrer");
   }
 
   async function handleShareFolder(entry: FileEntry) {
@@ -931,7 +995,10 @@ export function FileManager() {
               onClick={() => navigateToPath([])}
               className="text-xs text-muted-foreground hover:text-foreground transition-colors px-1.5 py-1 rounded-md hover:bg-secondary/40 cursor-pointer shrink-0"
             >
-              <HardDrive className="size-3.5" />
+              <span className="inline-flex items-center gap-1">
+                <HardDrive className="size-3.5" />
+                <span className="hidden sm:inline">{rootLabel}</span>
+              </span>
             </button>
             {currentPath.map((segment, i) => (
               <div key={i} className="flex items-center gap-1 min-w-0">
@@ -993,7 +1060,7 @@ export function FileManager() {
                 }}
                 disabled={
                   isEmptyingTrash ||
-                  deleteFromTrashMutation.isPending ||
+                  emptyTrashMutation.isPending ||
                   currentEntries.length === 0
                 }
                 className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-status-red/10 text-xs text-status-red transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
@@ -1003,6 +1070,20 @@ export function FileManager() {
                 <span className="hidden sm:inline">Empty Trash</span>
               </button>
             ) : null}
+            <button
+              onClick={() => setIncludeHidden((value) => !value)}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-secondary/50 text-xs text-muted-foreground transition-colors cursor-pointer"
+              title={includeHidden ? "Hide hidden files" : "Show hidden files"}
+            >
+              {includeHidden ? (
+                <EyeOff className="size-3.5" />
+              ) : (
+                <Eye className="size-3.5" />
+              )}
+              <span className="hidden sm:inline">
+                {includeHidden ? "Hide Hidden" : "Show Hidden"}
+              </span>
+            </button>
             <button
               onClick={() =>
                 setSortBy((s) =>
@@ -1262,7 +1343,12 @@ export function FileManager() {
                 {clipboardState.name}
               </span>
             ) : null}
-            <span className="font-mono">/{currentPathForDisplay.join("/")}</span>
+            <span className="font-mono">
+              {rootLabel}
+              {currentPathForDisplay.length > 0
+                ? `/${currentPathForDisplay.join("/")}`
+                : ""}
+            </span>
           </div>
         </div>
       </div>
@@ -1285,8 +1371,23 @@ export function FileManager() {
           <ContextMenuItem
             icon={<Info className="size-3.5" />}
             label="Get Info"
-            onClick={() => setShowContextMenu(null)}
+            onClick={() => {
+              const entry = showContextMenu.entry;
+              setShowContextMenu(null);
+              void handleGetInfo(entry);
+            }}
           />
+          {!isTrashView ? (
+            <ContextMenuItem
+              icon={<FileText className="size-3.5" />}
+              label="Rename"
+              onClick={() => {
+                const entry = showContextMenu.entry;
+                setShowContextMenu(null);
+                void handleRenameEntry(entry);
+              }}
+            />
+          ) : null}
           <div className="h-px bg-border mx-2 my-1" />
           <ContextMenuItem
             icon={<Copy className="size-3.5" />}
@@ -1322,8 +1423,23 @@ export function FileManager() {
           <ContextMenuItem
             icon={<Star className="size-3.5 text-amber-400" />}
             label="Toggle Star"
-            onClick={() => setShowContextMenu(null)}
+            onClick={() => {
+              const entry = showContextMenu.entry;
+              setShowContextMenu(null);
+              void handleToggleStar(entry);
+            }}
           />
+          {showContextMenu.entry.type === "file" ? (
+            <ContextMenuItem
+              icon={<Download className="size-3.5" />}
+              label="Download"
+              onClick={() => {
+                const entry = showContextMenu.entry;
+                setShowContextMenu(null);
+                handleDownloadEntry(entry);
+              }}
+            />
+          ) : null}
           {showContextMenu.entry.type === "folder" && !isTrashView ? (
             <>
               <ContextMenuItem

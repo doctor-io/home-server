@@ -27,6 +27,10 @@ describe("server env", () => {
     expect(serverEnv.STORE_STACKS_ROOT).toBe("DATA/Apps");
     expect(serverEnv.FILES_ROOT).toBe("DATA");
     expect(serverEnv.FILES_ALLOW_HIDDEN).toBe(false);
+    expect(serverEnv.TERMINAL_WS_REQUIRE_AUTH).toBe(true);
+    expect(serverEnv.TERMINAL_MAX_SESSIONS_PER_USER).toBe(2);
+    expect(serverEnv.TERMINAL_IDLE_TIMEOUT_MS).toBe(900000);
+    expect(serverEnv.TERMINAL_MAX_SESSION_MS).toBe(3600000);
   });
 
   it("uses /DATA/Apps as default stacks root in production", async () => {

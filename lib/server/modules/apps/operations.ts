@@ -1,12 +1,18 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import {
   cleanupComposeDataOnUninstall,
   extractComposeImages,
+  getComposeRuntimeInfo,
   materializeInlineStackFiles,
   materializeStackFiles,
   runComposeDown,
+  runComposeRestart,
+  runComposeStart,
+  runComposeStop,
   runComposeUp,
   sanitizeStackName,
 } from "@/lib/server/modules/docker/compose-runner";
@@ -27,6 +33,7 @@ import {
   findInstalledStackByAppId,
   findStackByWebUiPort,
   findStoreOperationById,
+  updateStackUpdateStatus,
   updateStoreOperation,
   upsertInstalledStack,
 } from "@/lib/server/modules/apps/stacks-repository";
@@ -38,6 +45,7 @@ import type {
   StoreOperationEvent,
   StoreOperationStatus,
 } from "@/lib/shared/contracts/apps";
+import { resolveStoreAppUpdateState } from "@/lib/server/modules/store/update-check";
 
 type OperationParams = {
   appId: string;
@@ -47,6 +55,7 @@ type OperationParams = {
   webUiPort?: number;
   composeSource?: string;
   removeVolumes?: boolean;
+  resetToCatalog?: boolean;
 };
 
 type OperationSubscriber = (event: StoreOperationEvent) => void;
@@ -196,8 +205,22 @@ async function runInstallOrRedeployOperation(
     throw new Error(`Cannot redeploy "${params.appId}" because it is not installed`);
   }
 
-  const hasComposeSource = typeof params.composeSource === "string" &&
-    params.composeSource.trim().length > 0;
+  let composeSourceInput = params.composeSource;
+  if (
+    params.action === "install" &&
+    existingStack &&
+    !params.resetToCatalog &&
+    (typeof composeSourceInput !== "string" || composeSourceInput.trim().length === 0)
+  ) {
+    try {
+      composeSourceInput = await readFile(existingStack.composePath, "utf8");
+    } catch {
+      // Keep catalog/template compose fallback when installed compose is unavailable.
+    }
+  }
+
+  const hasComposeSource = typeof composeSourceInput === "string" &&
+    composeSourceInput.trim().length > 0;
   const requestedEnv = params.env ?? {};
 
   let composeSourcePrimary:
@@ -205,7 +228,7 @@ async function runInstallOrRedeployOperation(
     | null = null;
 
   if (hasComposeSource) {
-    const parsedCompose = parseComposeFile(params.composeSource as string);
+    const parsedCompose = parseComposeFile(composeSourceInput as string);
     if (!parsedCompose) {
       throw new Error("Invalid compose source");
     }
@@ -277,10 +300,10 @@ async function runInstallOrRedeployOperation(
   });
 
   const materialized = hasComposeSource
-    ? await materializeInlineStackFiles({
+      ? await materializeInlineStackFiles({
         appId: params.appId,
         stackName,
-        composeContent: params.composeSource as string,
+        composeContent: composeSourceInput as string,
         env: effectiveEnv,
         webUiPort: requestedPort,
         storageMappingStrategy,
@@ -472,6 +495,102 @@ async function runUninstallOperation(operationId: string, params: OperationParam
   await deleteInstalledStackByAppId(params.appId);
 }
 
+function resolveEnvPathFromComposePath(composePath: string) {
+  const composeFileName = path.basename(composePath).toLowerCase();
+  if (composeFileName === "docker-compose.yml" || composeFileName === "docker-compose.yaml") {
+    return path.join(path.dirname(composePath), ".env");
+  }
+  return path.join(path.dirname(composePath), ".env");
+}
+
+async function runRuntimeLifecycleOperation(operationId: string, params: OperationParams) {
+  const stack = await findInstalledStackByAppId(params.appId);
+
+  if (!stack || stack.status === "not_installed") {
+    throw new Error(`Cannot ${params.action} "${params.appId}" because it is not installed`);
+  }
+
+  const composeInput = {
+    composePath: stack.composePath,
+    envPath: resolveEnvPathFromComposePath(stack.composePath),
+    stackName: stack.stackName,
+  };
+
+  await patchOperationAndEmit({
+    operationId,
+    appId: params.appId,
+    action: params.action,
+    status: "running",
+    eventType: "operation.step",
+    progressPercent: 40,
+    step: "compose-action",
+    message: `Running compose ${params.action}`,
+  });
+
+  if (params.action === "start") {
+    await runComposeStart(composeInput);
+  } else if (params.action === "stop") {
+    await runComposeStop(composeInput);
+  } else {
+    await runComposeRestart(composeInput);
+  }
+
+  await patchOperationAndEmit({
+    operationId,
+    appId: params.appId,
+    action: params.action,
+    status: "running",
+    eventType: "operation.step",
+    progressPercent: 85,
+    step: "status-refresh",
+    message: "Refreshing runtime status",
+  });
+
+  await getComposeRuntimeInfo(composeInput);
+}
+
+async function runCheckUpdatesOperation(operationId: string, params: OperationParams) {
+  const stack = await findInstalledStackByAppId(params.appId);
+
+  if (!stack || stack.status === "not_installed") {
+    throw new Error(`Cannot check updates for "${params.appId}" because it is not installed`);
+  }
+
+  await patchOperationAndEmit({
+    operationId,
+    appId: params.appId,
+    action: params.action,
+    status: "running",
+    eventType: "operation.step",
+    progressPercent: 45,
+    step: "inspect-images",
+    message: "Checking Docker image updates",
+  });
+
+  const updateState = await resolveStoreAppUpdateState({
+    composePath: stack.composePath,
+    stackName: stack.stackName,
+  });
+
+  await updateStackUpdateStatus({
+    appId: params.appId,
+    isUpToDate: !updateState.updateAvailable,
+    localDigest: updateState.localDigest,
+    remoteDigest: updateState.remoteDigest,
+  });
+
+  await patchOperationAndEmit({
+    operationId,
+    appId: params.appId,
+    action: params.action,
+    status: "running",
+    eventType: "operation.step",
+    progressPercent: 90,
+    step: "updates-resolved",
+    message: updateState.updateAvailable ? "Updates available" : "Already up to date",
+  });
+}
+
 async function executeStoreOperation(operationId: string, params: OperationParams) {
   await patchOperationAndEmit({
     operationId,
@@ -490,13 +609,16 @@ async function executeStoreOperation(operationId: string, params: OperationParam
 
     if (params.action === "install" || params.action === "redeploy") {
       await runInstallOrRedeployOperation(operationId, params, existingStack);
-    } else {
+    } else if (params.action === "uninstall") {
       await runUninstallOperation(operationId, params);
+    } else if (params.action === "check-updates") {
+      await runCheckUpdatesOperation(operationId, params);
+    } else {
+      await runRuntimeLifecycleOperation(operationId, params);
     }
 
     // Mark app as up-to-date after successful install/redeploy
     if (params.action === "install" || params.action === "redeploy") {
-      const { updateStackUpdateStatus } = await import("@/lib/server/modules/apps/stacks-repository");
       await updateStackUpdateStatus({
         appId: params.appId,
         isUpToDate: true,

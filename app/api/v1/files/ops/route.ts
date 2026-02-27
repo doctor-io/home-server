@@ -10,7 +10,10 @@ import {
   createDirectoryEntry,
   createFileEntry,
   FileServiceError,
+  getEntryInfo,
   pasteEntry,
+  renameEntry,
+  toggleStarEntry,
 } from "@/lib/server/modules/files/service";
 
 export const runtime = "nodejs";
@@ -31,6 +34,19 @@ const opsSchema = z.discriminatedUnion("action", [
     sourcePath: z.string().trim().min(1),
     destinationPath: z.string().trim().default(""),
     operation: z.enum(["copy", "move"]),
+  }),
+  z.object({
+    action: z.literal("rename"),
+    path: z.string().trim().min(1),
+    newName: z.string().trim().min(1),
+  }),
+  z.object({
+    action: z.literal("get_info"),
+    path: z.string().trim().min(1),
+  }),
+  z.object({
+    action: z.literal("toggle_star"),
+    path: z.string().trim().min(1),
   }),
 ]);
 
@@ -78,6 +94,52 @@ export async function POST(request: Request) {
           const data = await createFileEntry({
             parentPath: parsed.data.parentPath,
             name: parsed.data.name,
+            includeHidden,
+          });
+          return NextResponse.json(
+            { data },
+            {
+              headers: {
+                "Cache-Control": "no-store",
+              },
+            },
+          );
+        }
+
+        if (parsed.data.action === "rename") {
+          const data = await renameEntry({
+            path: parsed.data.path,
+            newName: parsed.data.newName,
+            includeHidden,
+          });
+          return NextResponse.json(
+            { data },
+            {
+              headers: {
+                "Cache-Control": "no-store",
+              },
+            },
+          );
+        }
+
+        if (parsed.data.action === "get_info") {
+          const data = await getEntryInfo({
+            path: parsed.data.path,
+            includeHidden,
+          });
+          return NextResponse.json(
+            { data },
+            {
+              headers: {
+                "Cache-Control": "no-store",
+              },
+            },
+          );
+        }
+
+        if (parsed.data.action === "toggle_star") {
+          const data = await toggleStarEntry({
+            path: parsed.data.path,
             includeHidden,
           });
           return NextResponse.json(

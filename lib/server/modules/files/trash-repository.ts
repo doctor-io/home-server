@@ -128,3 +128,33 @@ export async function deleteTrashEntryFromDb(trashPath: string) {
 
   return rows[0] ? toRecord(rows[0]) : null;
 }
+
+export async function listTrashEntriesFromDb() {
+  await ensureTrashEntriesTable();
+
+  const rows = await db
+    .select({
+      id: filesTrashEntries.id,
+      trashPath: filesTrashEntries.trashPath,
+      originalPath: filesTrashEntries.originalPath,
+      deletedAt: filesTrashEntries.deletedAt,
+    })
+    .from(filesTrashEntries);
+
+  return rows.map(toRecord);
+}
+
+export async function deleteAllTrashEntriesFromDb() {
+  await ensureTrashEntriesTable();
+
+  const rows = await db
+    .delete(filesTrashEntries)
+    .returning({
+      id: filesTrashEntries.id,
+      trashPath: filesTrashEntries.trashPath,
+      originalPath: filesTrashEntries.originalPath,
+      deletedAt: filesTrashEntries.deletedAt,
+    });
+
+  return rows.map(toRecord);
+}

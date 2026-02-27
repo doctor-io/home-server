@@ -7,6 +7,7 @@ export type ParsedComposeService = {
   image?: string;
   ports?: string[];
   environment?: Record<string, string>;
+  containerName?: string;
   volumes?: string[];
   networkMode?: string;
   restart?: string;
@@ -198,6 +199,7 @@ export function parseComposeFile(content: string): ParsedComposeFile | null {
         image: config.image,
         ports,
         environment,
+        containerName: typeof config.container_name === "string" ? config.container_name : undefined,
         volumes,
         networkMode: config.network_mode || config.networkMode,
         restart: config.restart,

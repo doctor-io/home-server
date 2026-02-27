@@ -17,7 +17,14 @@ export type InstalledStackStatus =
   | "updating"
   | "uninstalling";
 
-export type StoreOperationAction = "install" | "redeploy" | "uninstall";
+export type StoreOperationAction =
+  | "install"
+  | "redeploy"
+  | "uninstall"
+  | "start"
+  | "stop"
+  | "restart"
+  | "check-updates";
 
 export type StoreOperationStatus = "queued" | "running" | "success" | "error";
 

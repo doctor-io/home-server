@@ -7,6 +7,8 @@ export type FileServiceErrorCode =
   | "hidden_blocked"
   | "symlink_blocked"
   | "permission_denied"
+  | "operation_conflict"
+  | "container_not_found"
   | "unsupported_file"
   | "payload_too_large"
   | "write_conflict"
@@ -35,6 +37,7 @@ export type FileListEntry = {
   sizeBytes: number | null;
   modifiedAt: string;
   mtimeMs: number;
+  starred?: boolean;
 };
 
 export type FileListResponse = {
@@ -86,6 +89,37 @@ export type FileCreateResponse = {
   root: string;
   path: string;
   type: FileEntryType;
+};
+
+export type FileRenameRequest = {
+  path: string;
+  newName: string;
+};
+
+export type FileRenameResponse = {
+  root: string;
+  oldPath: string;
+  path: string;
+  type: FileEntryType;
+};
+
+export type FileInfoResponse = {
+  root: string;
+  path: string;
+  absolutePath: string;
+  name: string;
+  type: FileEntryType;
+  ext: string | null;
+  sizeBytes: number;
+  modifiedAt: string;
+  createdAt: string;
+  permissions: string;
+  starred: boolean;
+};
+
+export type FileToggleStarResponse = {
+  path: string;
+  starred: boolean;
 };
 
 export type FilePasteOperation = "copy" | "move";
@@ -170,4 +204,8 @@ export type TrashRestoreResponse = {
 
 export type TrashDeleteRequest = {
   path: string;
+};
+
+export type TrashEmptyResponse = {
+  deletedCount: number;
 };

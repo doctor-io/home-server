@@ -14,6 +14,7 @@ const installSchema = z.object({
   env: z.record(z.string(), z.string()).optional(),
   webUiPort: z.number().int().min(1).max(65535).optional(),
   composeSource: z.string().trim().min(1).max(500_000).optional(),
+  resetToCatalog: z.boolean().optional(),
 });
 
 type Context = {
@@ -55,6 +56,7 @@ export async function POST(request: Request, context: Context) {
           env: parsed.data.env,
           webUiPort: parsed.data.webUiPort,
           composeSource: parsed.data.composeSource,
+          resetToCatalog: parsed.data.resetToCatalog,
         });
 
         return NextResponse.json(result, { status: 202 });

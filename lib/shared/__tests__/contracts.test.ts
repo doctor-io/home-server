@@ -80,7 +80,14 @@ describe("shared contracts", () => {
 
     expectTypeOf<StoreOperation>().toMatchTypeOf<{
       id: string;
-      action: "install" | "redeploy" | "uninstall";
+      action:
+        | "install"
+        | "redeploy"
+        | "uninstall"
+        | "start"
+        | "stop"
+        | "restart"
+        | "check-updates";
       status: "queued" | "running" | "success" | "error";
       progressPercent: number;
     }>();
@@ -261,6 +268,8 @@ describe("shared contracts", () => {
       | "hidden_blocked"
       | "symlink_blocked"
       | "permission_denied"
+      | "operation_conflict"
+      | "container_not_found"
       | "unsupported_file"
       | "payload_too_large"
       | "write_conflict"

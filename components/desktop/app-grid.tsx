@@ -32,7 +32,7 @@ import {
   TerminalSquare,
   Trash2,
 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { UninstallAppDialog } from "@/components/desktop/uninstall-app-dialog";
 import { useInstalledApps } from "@/hooks/useInstalledApps";
 import { useStoreActions } from "@/hooks/useStoreActions";
@@ -198,6 +198,21 @@ function parsePortFromUrl(value: string): number | null {
   }
 }
 
+function parseHostPortFromMapping(value: string): number | null {
+  const trimmed = value.trim().replace(/^['"]|['"]$/g, "");
+  if (!trimmed) return null;
+
+  const [mappingPart] = trimmed.split("/");
+  const segments = mappingPart.split(":").filter(Boolean);
+  if (segments.length === 0) return null;
+
+  const hostSegment = segments.length >= 2
+    ? segments[segments.length - 2]
+    : segments[0];
+  const port = Number.parseInt(hostSegment ?? "", 10);
+  return Number.isInteger(port) ? port : null;
+}
+
 function parseDashboardUrlFromComposePrimary(primary: {
   ports?: string[];
   environment?: Record<string, string>;
@@ -208,8 +223,8 @@ function parseDashboardUrlFromComposePrimary(primary: {
   }
 
   const firstPort = primary.ports
-    ?.map((entry) => parsePortMapping(entry)?.host ?? "")
-    .find((hostPort) => hostPort.trim().length > 0);
+    ?.map((entry) => parseHostPortFromMapping(entry) ?? 0)
+    .find((hostPort) => hostPort > 0);
 
   if (!firstPort) {
     return "";
@@ -277,14 +292,19 @@ export function AppGrid({
   const installedCatalogQuery = useStoreCatalog({
     installedOnly: true,
   });
-  const { operationsByApp, uninstallApp } = useStoreActions();
+  const {
+    operationsByApp,
+    uninstallApp,
+    startApp,
+    stopApp,
+    restartApp,
+    checkAppUpdates,
+  } = useStoreActions();
   const [statusByAppId, setStatusByAppId] = useState<Record<string, AppItem["status"]>>({});
   const [activeAppId, setActiveAppId] = useState<string | null>(null);
   const [uninstallAppId, setUninstallAppId] = useState<string | null>(null);
   const [uninstallError, setUninstallError] = useState<string | null>(null);
   const [uninstallPending, setUninstallPending] = useState(false);
-  const inferredDashboardUrlByAppIdRef = useRef<Map<string, string>>(new Map());
-  const inferDashboardUrlPromiseByAppIdRef = useRef<Map<string, Promise<string>>>(new Map());
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -316,6 +336,17 @@ export function AppGrid({
         } else if (installed?.status === "stopped") {
           derivedStatus = "stopped";
         }
+        const operationState = operationsByApp[appId];
+        if (
+          operationState &&
+          (operationState.status === "queued" || operationState.status === "running")
+        ) {
+          derivedStatus = "updating";
+        }
+        const optimisticStatus = statusByAppId[appId];
+        if (optimisticStatus) {
+          derivedStatus = optimisticStatus;
+        }
 
         return {
           id: appId,
@@ -324,14 +355,14 @@ export function AppGrid({
           logoUrl: catalog?.logoUrl ?? null,
           color: visual.color,
           bgColor: visual.bgColor,
-          status: statusByAppId[appId] ?? derivedStatus,
+          status: derivedStatus,
           category: catalog?.categories[0] ?? visual.category,
           webUiPort: installed?.webUiPort ?? catalog?.webUiPort ?? fallbackPort,
           containerName: installed?.containerName ?? mapped?.containerName ?? appId,
         } satisfies AppItem;
       })
       .sort((left, right) => left.name.localeCompare(right.name));
-  }, [installedAppsQuery.data, installedCatalogQuery.data, statusByAppId]);
+  }, [installedAppsQuery.data, installedCatalogQuery.data, operationsByApp, statusByAppId]);
 
   const isAppsLoading = installedAppsQuery.isLoading || installedCatalogQuery.isLoading;
   const isAppsError = installedAppsQuery.isError && installedCatalogQuery.isError;
@@ -367,6 +398,13 @@ export function AppGrid({
     setActiveAppId(null);
   }
 
+  function updateAppStatus(appId: string, status: AppItem["status"]) {
+    setStatusByAppId((previous) => ({
+      ...previous,
+      [appId]: status,
+    }));
+  }
+
   function openContextMenu(e: React.MouseEvent, app: AppItem) {
     e.preventDefault();
     setActiveAppId(app.id);
@@ -375,72 +413,60 @@ export function AppGrid({
     setContextMenu({ x, y, appId: app.id });
   }
 
-  function updateAppStatus(appId: string, status: AppItem["status"]) {
-    setStatusByAppId((previous) => ({
-      ...previous,
-      [appId]: status,
-    }));
-  }
-
-  async function inferDashboardUrlFromInstalledCompose(appId: string) {
-    const cached = inferredDashboardUrlByAppIdRef.current.get(appId);
-    if (cached !== undefined) {
-      return cached;
-    }
-
-    const inflight = inferDashboardUrlPromiseByAppIdRef.current.get(appId);
-    if (inflight) {
-      return inflight;
-    }
-
-    const pending = (async () => {
-      try {
-        const response = await fetch(
-          `/api/v1/store/apps/${encodeURIComponent(appId)}/compose?source=installed`,
-          { cache: "no-store" },
-        );
-        if (!response.ok) {
-          inferredDashboardUrlByAppIdRef.current.set(appId, "");
-          return "";
-        }
-
-        const json = (await response.json()) as InstalledComposeResponse;
-        const primary = json.data?.primary;
-        if (!primary) {
-          inferredDashboardUrlByAppIdRef.current.set(appId, "");
-          return "";
-        }
-
-        const resolved = parseDashboardUrlFromComposePrimary(primary);
-        inferredDashboardUrlByAppIdRef.current.set(appId, resolved);
-        return resolved;
-      } catch {
-        inferredDashboardUrlByAppIdRef.current.set(appId, "");
-        return "";
-      } finally {
-        inferDashboardUrlPromiseByAppIdRef.current.delete(appId);
-      }
-    })();
-
-    inferDashboardUrlPromiseByAppIdRef.current.set(appId, pending);
-    return pending;
-  }
-
   async function resolveActionTarget(app: AppItem): Promise<AppActionTarget | null> {
-    const initial = resolveAppActionTarget(app);
-    if (initial.dashboardUrl.trim().length > 0) {
-      return initial;
+    const fallback = resolveAppActionTarget(app);
+    if (fallback.dashboardUrl.trim().length > 0) {
+      return fallback;
+    }
+    try {
+      const response = await fetch(
+        `/api/v1/apps/${encodeURIComponent(app.id)}/dashboard-url`,
+        { cache: "no-store" },
+      );
+      if (response.ok) {
+        const json = (await response.json()) as {
+          url?: string;
+          data?: { url?: string };
+        };
+        const rawUrl = json.url ?? json.data?.url ?? "";
+        if (rawUrl.trim().length > 0) {
+          return {
+            ...fallback,
+            dashboardUrl: toCurrentHostUrl(rawUrl),
+          };
+        }
+      }
+    } catch {
+      // fallback to compose endpoint
     }
 
-    const inferredDashboardUrl = await inferDashboardUrlFromInstalledCompose(app.id);
-    if (inferredDashboardUrl.trim().length === 0) {
+    try {
+      const response = await fetch(
+        `/api/v1/store/apps/${encodeURIComponent(app.id)}/compose?source=installed`,
+        { cache: "no-store" },
+      );
+      if (!response.ok) {
+        return null;
+      }
+
+      const json = (await response.json()) as InstalledComposeResponse;
+      const primary = json.data?.primary;
+      if (!primary) {
+        return null;
+      }
+
+      const dashboardUrl = parseDashboardUrlFromComposePrimary(primary);
+      if (!dashboardUrl) {
+        return null;
+      }
+
+      return {
+        ...fallback,
+        dashboardUrl,
+      };
+    } catch {
       return null;
     }
-
-    return {
-      ...initial,
-      dashboardUrl: inferredDashboardUrl,
-    };
   }
 
   async function openDashboardForApp(app: AppItem) {
@@ -514,7 +540,7 @@ export function AppGrid({
       | "remove",
   ) {
     if (!menuApp) return;
-    const baseTarget = resolveAppActionTarget(menuApp);
+    const fallbackTarget = resolveAppActionTarget(menuApp);
 
     logClientAction({
       layer: "hook",
@@ -522,7 +548,7 @@ export function AppGrid({
       status: "start",
       meta: {
         action,
-        appName: baseTarget.appName,
+        appName: fallbackTarget.appName,
       },
     });
 
@@ -531,19 +557,28 @@ export function AppGrid({
         await openDashboardForApp(menuApp);
       } else if (action === "start") {
         updateAppStatus(menuApp.id, "running");
+        await startApp(menuApp.id);
       } else if (action === "stop") {
         updateAppStatus(menuApp.id, "stopped");
-      } else if (action === "restart" || action === "update") {
+        await stopApp(menuApp.id);
+      } else if (action === "restart") {
         updateAppStatus(menuApp.id, "updating");
         setTimeout(() => {
           updateAppStatus(menuApp.id, "running");
         }, 1200);
+        await restartApp(menuApp.id);
+      } else if (action === "update") {
+        updateAppStatus(menuApp.id, "updating");
+        setTimeout(() => {
+          updateAppStatus(menuApp.id, "running");
+        }, 1200);
+        await checkAppUpdates(menuApp.id);
       } else if (action === "logs") {
-        onViewLogs?.(baseTarget);
+        onViewLogs?.(fallbackTarget);
       } else if (action === "terminal") {
-        onOpenTerminal?.(baseTarget);
+        onOpenTerminal?.(fallbackTarget);
       } else if (action === "settings") {
-        onOpenSettings?.(baseTarget);
+        onOpenSettings?.(fallbackTarget);
       } else if (action === "copy-url") {
         const resolvedTarget = await resolveActionTarget(menuApp);
         if (!resolvedTarget) {
@@ -567,7 +602,7 @@ export function AppGrid({
         status: "success",
         meta: {
           action,
-          appName: baseTarget.appName,
+          appName: fallbackTarget.appName,
         },
       });
     } catch (error) {
@@ -578,7 +613,7 @@ export function AppGrid({
         status: "error",
         meta: {
           action,
-          appName: baseTarget.appName,
+          appName: fallbackTarget.appName,
         },
         error,
       });

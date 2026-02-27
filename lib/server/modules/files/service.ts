@@ -18,7 +18,13 @@ import {
   resolvePathWithinFilesRoot,
   type ResolvedFilesPath,
 } from "@/lib/server/modules/files/path-resolver";
+import {
+  isPathStarredInDb,
+  listStarredPathsFromDb,
+  setPathStarredInDb,
+} from "@/lib/server/modules/files/stars-repository";
 import type {
+  FileInfoResponse,
   FileListEntry,
   FileListResponse,
   FilePasteOperation,
@@ -26,7 +32,9 @@ import type {
   FileReadMode,
   FileReadResponse,
   FileCreateResponse,
+  FileRenameResponse,
   FileServiceErrorCode,
+  FileToggleStarResponse,
   FileWriteResponse,
 } from "@/lib/shared/contracts/files";
 
@@ -90,6 +98,22 @@ type PasteEntryParams = {
   sourcePath: string;
   destinationPath?: string;
   operation: FilePasteOperation;
+  includeHidden?: boolean;
+};
+
+type RenameEntryParams = {
+  path: string;
+  newName: string;
+  includeHidden?: boolean;
+};
+
+type GetEntryInfoParams = {
+  path: string;
+  includeHidden?: boolean;
+};
+
+type ToggleStarEntryParams = {
+  path: string;
   includeHidden?: boolean;
 };
 
@@ -227,6 +251,16 @@ function toPublicPath(segments: string[]) {
   return segments.join("/");
 }
 
+function toPermissionsString(mode: number) {
+  return `0${(mode & 0o777).toString(8).padStart(3, "0")}`;
+}
+
+function toEntryType(info: Awaited<ReturnType<typeof lstat>>) {
+  if (info.isDirectory()) return "folder" as const;
+  if (info.isFile()) return "file" as const;
+  return null;
+}
+
 function sortDirectoryEntries(entries: FileListEntry[]) {
   return entries.sort((left, right) => {
     if (left.type !== right.type) {
@@ -361,6 +395,7 @@ export async function listDirectory(params: ListDirectoryParams = {}): Promise<F
       withFileTypes: true,
     });
     const output: FileListEntry[] = [];
+    const starredPathSet = new Set(await listStarredPathsFromDb());
     const listingTrash = isTrashPathSegments(resolved.segments);
 
     for (const entry of entries) {
@@ -385,6 +420,7 @@ export async function listDirectory(params: ListDirectoryParams = {}): Promise<F
         sizeBytes: type === "file" ? info.size : null,
         modifiedAt: info.mtime.toISOString(),
         mtimeMs: info.mtimeMs,
+        starred: starredPathSet.has(toPublicPath([...resolved.segments, entry.name])),
       });
     }
 
@@ -810,5 +846,164 @@ export async function pasteEntry(params: PasteEntryParams): Promise<FilePasteRes
       `Failed to ${params.operation === "copy" ? "copy" : "move"} item`,
       targetPath?.absolutePath ?? destinationDirectory?.absolutePath ?? sourcePath?.absolutePath,
     );
+  }
+}
+
+export async function renameEntry(params: RenameEntryParams): Promise<FileRenameResponse> {
+  const includeHidden = Boolean(params.includeHidden);
+  const newName = ensureSafeName(params.newName, includeHidden);
+  let sourcePath: ResolvedFilesPath | undefined;
+  let targetPath: ResolvedFilesPath | undefined;
+
+  try {
+    sourcePath = await resolveFilePath(params.path, includeHidden, {
+      allowEmpty: false,
+    });
+    const sourceInfo = await lstat(sourcePath.absolutePath);
+    if (sourceInfo.isSymbolicLink()) {
+      throw new FileServiceError("Symlinks are not allowed", {
+        code: "symlink_blocked",
+        statusCode: 403,
+      });
+    }
+
+    const parentRelativePath = sourcePath.segments.slice(0, -1).join("/");
+    const nextRelativePath = joinRelativePath(
+      parentRelativePath ? parentRelativePath.split("/") : [],
+      newName,
+    );
+    targetPath = await resolveFilePath(nextRelativePath, includeHidden, {
+      allowEmpty: false,
+      allowMissingLeaf: true,
+    });
+
+    if (targetPath.absolutePath === sourcePath.absolutePath) {
+      return {
+        root: sourcePath.rootPath,
+        oldPath: sourcePath.relativePath,
+        path: sourcePath.relativePath,
+        type: toEntryType(sourceInfo) ?? "file",
+      };
+    }
+
+    if (targetPath.exists || (await pathExists(targetPath.absolutePath))) {
+      throw new FileServiceError("Destination already exists", {
+        code: "destination_exists",
+        statusCode: 409,
+      });
+    }
+
+    await rename(sourcePath.absolutePath, targetPath.absolutePath);
+    const nextType = toEntryType(sourceInfo);
+    if (!nextType) {
+      throw new FileServiceError("Unsupported file type", {
+        code: "unsupported_file",
+        statusCode: 415,
+      });
+    }
+
+    const wasStarred = await isPathStarredInDb(sourcePath.relativePath);
+    if (wasStarred) {
+      await setPathStarredInDb(sourcePath.relativePath, false);
+      await setPathStarredInDb(targetPath.relativePath, true);
+    }
+
+    return {
+      root: targetPath.rootPath,
+      oldPath: sourcePath.relativePath,
+      path: targetPath.relativePath,
+      type: nextType,
+    };
+  } catch (error) {
+    throw mapFsError(
+      error,
+      "Failed to rename item",
+      targetPath?.absolutePath ?? sourcePath?.absolutePath,
+    );
+  }
+}
+
+export async function getEntryInfo(params: GetEntryInfoParams): Promise<FileInfoResponse> {
+  const includeHidden = Boolean(params.includeHidden);
+  let resolved: ResolvedFilesPath | undefined;
+
+  try {
+    resolved = await resolveFilePath(params.path, includeHidden, {
+      allowEmpty: false,
+    });
+    const linkInfo = await lstat(resolved.absolutePath);
+    if (linkInfo.isSymbolicLink()) {
+      throw new FileServiceError("Symlinks are not allowed", {
+        code: "symlink_blocked",
+        statusCode: 403,
+      });
+    }
+
+    const entryType = toEntryType(linkInfo);
+    if (!entryType) {
+      throw new FileServiceError("Unsupported file type", {
+        code: "unsupported_file",
+        statusCode: 415,
+      });
+    }
+
+    const entryName = path.basename(resolved.absolutePath);
+    const entryExt = entryType === "file" ? getExtension(entryName) : null;
+    const starred = await isPathStarredInDb(resolved.relativePath);
+
+    return {
+      root: resolved.rootPath,
+      path: resolved.relativePath,
+      absolutePath: resolved.absolutePath,
+      name: entryName,
+      type: entryType,
+      ext: entryExt,
+      sizeBytes: linkInfo.size,
+      modifiedAt: linkInfo.mtime.toISOString(),
+      createdAt: linkInfo.birthtime.toISOString(),
+      permissions: toPermissionsString(linkInfo.mode),
+      starred,
+    };
+  } catch (error) {
+    throw mapFsError(error, "Failed to get file info", resolved?.absolutePath);
+  }
+}
+
+export async function toggleStarEntry(
+  params: ToggleStarEntryParams,
+): Promise<FileToggleStarResponse> {
+  const includeHidden = Boolean(params.includeHidden);
+  let resolved: ResolvedFilesPath | undefined;
+
+  try {
+    resolved = await resolveFilePath(params.path, includeHidden, {
+      allowEmpty: false,
+    });
+    const linkInfo = await lstat(resolved.absolutePath);
+    if (linkInfo.isSymbolicLink()) {
+      throw new FileServiceError("Symlinks are not allowed", {
+        code: "symlink_blocked",
+        statusCode: 403,
+      });
+    }
+
+    const entryType = toEntryType(linkInfo);
+    if (!entryType) {
+      throw new FileServiceError("Unsupported file type", {
+        code: "unsupported_file",
+        statusCode: 415,
+      });
+    }
+
+    const currentlyStarred = await isPathStarredInDb(resolved.relativePath);
+    const nextStarred = !currentlyStarred;
+    await setPathStarredInDb(resolved.relativePath, nextStarred);
+
+    return {
+      path: resolved.relativePath,
+      starred: nextStarred,
+    };
+  } catch (error) {
+    throw mapFsError(error, "Failed to update star status", resolved?.absolutePath);
   }
 }

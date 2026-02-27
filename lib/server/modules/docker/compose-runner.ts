@@ -681,6 +681,39 @@ export async function runComposeDown(input: {
   });
 }
 
+export async function runComposeStart(input: {
+  composePath: string;
+  envPath: string;
+  stackName: string;
+}) {
+  await runComposeCommand({
+    ...input,
+    args: ["start"],
+  });
+}
+
+export async function runComposeStop(input: {
+  composePath: string;
+  envPath: string;
+  stackName: string;
+}) {
+  await runComposeCommand({
+    ...input,
+    args: ["stop"],
+  });
+}
+
+export async function runComposeRestart(input: {
+  composePath: string;
+  envPath: string;
+  stackName: string;
+}) {
+  await runComposeCommand({
+    ...input,
+    args: ["restart"],
+  });
+}
+
 export async function getComposeStatus(input: {
   composePath: string;
   envPath: string;

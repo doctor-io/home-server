@@ -5,6 +5,7 @@ import { readFile } from "node:fs/promises";
 import { LruCache } from "@/lib/server/cache/lru";
 import { logServerAction, withServerTiming } from "@/lib/server/logging/logger";
 import { listInstalledAppsFromDb } from "@/lib/server/modules/apps/repository";
+import { findInstalledStackByAppId } from "@/lib/server/modules/apps/stacks-repository";
 import {
   extractPrimaryServiceWithName,
   parseComposeFile,
@@ -45,6 +46,16 @@ function parsePortFromUrl(value: string): number | null {
   }
 }
 
+function extractUrlPath(value: string) {
+  try {
+    const parsed = new URL(value);
+    const fullPath = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    return fullPath === "/" ? "" : fullPath;
+  } catch {
+    return "";
+  }
+}
+
 function parseHostPortFromMapping(value: string): number | null {
   const trimmed = value.trim().replace(/^['"]|['"]$/g, "");
   if (!trimmed) return null;
@@ -63,33 +74,66 @@ function parseHostPortFromMapping(value: string): number | null {
   return port;
 }
 
-async function inferWebUiPortFromCompose(
+async function inferComposePrimaryInfo(
   appId: string,
   composePath: string,
-): Promise<number | null> {
+): Promise<{
+  webUiPort: number | null;
+  appUrlPath: string;
+  appUrlRaw: string | null;
+  containerName: string | null;
+}> {
   try {
     const composeContent = await readFile(composePath, "utf8");
     const parsed = parseComposeFile(composeContent);
-    if (!parsed) return null;
+    if (!parsed) {
+      return {
+        webUiPort: null,
+        appUrlPath: "",
+        appUrlRaw: null,
+        containerName: null,
+      };
+    }
 
     const primary = extractPrimaryServiceWithName(parsed, appId);
-    if (!primary) return null;
+    if (!primary) {
+      return {
+        webUiPort: null,
+        appUrlPath: "",
+        appUrlRaw: null,
+        containerName: null,
+      };
+    }
 
     const appUrl = primary.service.environment?.APP_URL;
     if (typeof appUrl === "string" && appUrl.trim().length > 0) {
       const fromAppUrl = parsePortFromUrl(appUrl.trim());
       if (fromAppUrl !== null) {
-        return fromAppUrl;
+        return {
+          webUiPort: fromAppUrl,
+          appUrlPath: extractUrlPath(appUrl.trim()),
+          appUrlRaw: appUrl.trim(),
+          containerName: primary.service.containerName ?? null,
+        };
       }
     }
 
     const firstPortMapping = primary.service.ports?.find(
       (entry) => typeof entry === "string" && entry.trim().length > 0,
     );
-    if (!firstPortMapping) return null;
-    return parseHostPortFromMapping(firstPortMapping);
+    return {
+      webUiPort: firstPortMapping ? parseHostPortFromMapping(firstPortMapping) : null,
+      appUrlPath: "",
+      appUrlRaw: typeof appUrl === "string" ? appUrl.trim() : null,
+      containerName: primary.service.containerName ?? null,
+    };
   } catch {
-    return null;
+    return {
+      webUiPort: null,
+      appUrlPath: "",
+      appUrlRaw: null,
+      containerName: null,
+    };
   }
 }
 
@@ -123,8 +167,8 @@ export async function listInstalledApps(options?: { bypassCache?: boolean }) {
         // Get real Docker status for each app
         const appsWithStatus = await Promise.all(
           apps.map(async (app) => {
-            const inferredWebUiPort =
-              app.webUiPort ?? (await inferWebUiPortFromCompose(app.id, app.composePath));
+            const composeInfo = await inferComposePrimaryInfo(app.id, app.composePath);
+            const inferredWebUiPort = app.webUiPort ?? composeInfo.webUiPort;
             const envPath = path.join(path.dirname(app.composePath), ".env");
             try {
               const runtime = await getComposeRuntimeInfo({
@@ -136,14 +180,14 @@ export async function listInstalledApps(options?: { bypassCache?: boolean }) {
                 ...app,
                 webUiPort: inferredWebUiPort,
                 status: runtime.status,
-                containerName: runtime.primaryContainerName,
+                containerName: runtime.primaryContainerName ?? composeInfo.containerName,
               };
             } catch {
               return {
                 ...app,
                 webUiPort: inferredWebUiPort,
                 status: "unknown" as const,
-                containerName: null,
+                containerName: composeInfo.containerName,
               };
             }
           }),
@@ -174,4 +218,60 @@ export async function listInstalledApps(options?: { bypassCache?: boolean }) {
       return apps;
     },
   );
+}
+
+export async function resolveDashboardUrlForApp(appId: string): Promise<{
+  url: string;
+  source: "installed_stack" | "compose_app_url" | "compose_port_mapping";
+  warnings: string[];
+}> {
+  const installed = await findInstalledStackByAppId(appId);
+  if (!installed || installed.status === "not_installed") {
+    throw new Error("App is not installed");
+  }
+
+  const warnings: string[] = [];
+  const composeInfo = await inferComposePrimaryInfo(appId, installed.composePath);
+  const envPath = path.join(path.dirname(installed.composePath), ".env");
+
+  let runtimePath = composeInfo.appUrlPath;
+  try {
+    const runtime = await getComposeRuntimeInfo({
+      composePath: installed.composePath,
+      envPath,
+      stackName: installed.stackName,
+    });
+    if (!runtime.primaryContainerName) {
+      warnings.push("runtime_container_missing");
+    }
+  } catch {
+    warnings.push("runtime_unavailable");
+  }
+
+  if (typeof installed.webUiPort === "number" && installed.webUiPort > 0) {
+    return {
+      url: `http://localhost:${installed.webUiPort}${runtimePath}`,
+      source: "installed_stack",
+      warnings,
+    };
+  }
+
+  if (composeInfo.appUrlRaw && composeInfo.appUrlRaw.length > 0) {
+    return {
+      url: composeInfo.appUrlRaw,
+      source: "compose_app_url",
+      warnings,
+    };
+  }
+
+  if (typeof composeInfo.webUiPort === "number" && composeInfo.webUiPort > 0) {
+    runtimePath = runtimePath || "";
+    return {
+      url: `http://localhost:${composeInfo.webUiPort}${runtimePath}`,
+      source: "compose_port_mapping",
+      warnings,
+    };
+  }
+
+  throw new Error("Dashboard URL could not be resolved");
 }

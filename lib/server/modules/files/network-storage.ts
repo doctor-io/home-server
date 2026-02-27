@@ -5,6 +5,7 @@ import { execFile } from "node:child_process";
 import { lstat, mkdir, readdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
+import { serverEnv } from "@/lib/server/env";
 import { logServerAction } from "@/lib/server/logging/logger";
 import {
   FilesPathError,
@@ -104,6 +105,23 @@ function mountPathForShare(host: string, share: string) {
   const hostSegment = sanitizeSegment(host, "host");
   const shareSegment = sanitizeSegment(share, "share");
   return path.posix.join("Network", hostSegment, shareSegment);
+}
+
+function resolveMountIdentity() {
+  const processWithIds = process as NodeJS.Process & {
+    geteuid?: () => number;
+    getegid?: () => number;
+  };
+
+  const uid = serverEnv.FILES_NETWORK_MOUNT_UID
+    ?? (typeof processWithIds.geteuid === "function" ? processWithIds.geteuid() : 0);
+  const gid = serverEnv.FILES_NETWORK_MOUNT_GID
+    ?? (typeof processWithIds.getegid === "function" ? processWithIds.getegid() : 0);
+
+  return {
+    uid,
+    gid,
+  };
 }
 
 function escapeMountOptionValue(value: string) {
@@ -239,11 +257,12 @@ async function mountShareRecord(record: NetworkShareRecord) {
   });
 
   const smbPath = `//${record.host}/${record.share}`;
+  const identity = resolveMountIdentity();
   const mountOptions = [
     `username=${escapeMountOptionValue(record.username)}`,
     `password=${escapeMountOptionValue(password)}`,
-    "uid=1000",
-    "gid=1000",
+    `uid=${identity.uid}`,
+    `gid=${identity.gid}`,
     "iocharset=utf8",
   ].join(",");
 

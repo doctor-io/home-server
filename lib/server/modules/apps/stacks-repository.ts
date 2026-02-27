@@ -38,7 +38,15 @@ function toOperationStatus(status: string): StoreOperationStatus {
 }
 
 function toOperationAction(action: string): StoreOperationAction {
-  if (action === "install" || action === "redeploy" || action === "uninstall") {
+  if (
+    action === "install" ||
+    action === "redeploy" ||
+    action === "uninstall" ||
+    action === "start" ||
+    action === "stop" ||
+    action === "restart" ||
+    action === "check-updates"
+  ) {
     return action;
   }
   return "redeploy";

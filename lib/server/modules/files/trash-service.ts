@@ -14,6 +14,7 @@ import type {
   TrashRestoreResponse,
 } from "@/lib/shared/contracts/files";
 import {
+  deleteAllTrashEntriesFromDb,
   deleteTrashEntryFromDb,
   getTrashEntryFromDb,
   upsertTrashEntryInDb,
@@ -258,7 +259,7 @@ async function pruneEmptyAncestors(basePath: string, absolutePath: string) {
 }
 
 export async function moveToTrash(pathInput: string) {
-  let source: ResolvedFilePath;
+  let source: ResolvedFilesPath;
 
   try {
     source = await resolvePath(pathInput);
@@ -423,5 +424,30 @@ export async function deleteFromTrash(pathInput: string) {
     };
   } catch (error) {
     throw mapFsError(error, "Failed to permanently delete item from Trash");
+  }
+}
+
+export async function emptyTrash() {
+  let trashRoot: ResolvedFilesPath;
+
+  try {
+    trashRoot = await assertTrashPath("Trash");
+    const entries = await readdir(trashRoot.absolutePath);
+
+    for (const name of entries) {
+      const absolutePath = path.join(trashRoot.absolutePath, name);
+      await rm(absolutePath, {
+        recursive: true,
+        force: true,
+      });
+    }
+
+    const removed = await deleteAllTrashEntriesFromDb();
+
+    return {
+      deletedCount: removed.length,
+    };
+  } catch (error) {
+    throw mapFsError(error, "Failed to empty Trash");
   }
 }

@@ -62,6 +62,40 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((value) => value === "true"),
+  TERMINAL_WS_REQUIRE_AUTH: z
+    .string()
+    .optional()
+    .transform((value) => value !== "false"),
+  TERMINAL_MAX_SESSIONS_PER_USER: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(10)
+    .default(2),
+  TERMINAL_IDLE_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .min(10_000)
+    .default(900_000),
+  TERMINAL_MAX_SESSION_MS: z.coerce
+    .number()
+    .int()
+    .min(60_000)
+    .default(3_600_000),
+  APP_GRID_REAL_ACTIONS: z
+    .string()
+    .optional()
+    .transform((value) => value !== "false"),
+  STORE_PRESERVE_INSTALLED_COMPOSE: z
+    .string()
+    .optional()
+    .transform((value) => value !== "false"),
+  FILES_ENHANCED_OPS: z
+    .string()
+    .optional()
+    .transform((value) => value !== "false"),
+  FILES_NETWORK_MOUNT_UID: z.coerce.number().int().min(0).optional(),
+  FILES_NETWORK_MOUNT_GID: z.coerce.number().int().min(0).optional(),
   DOCKER_SOCKET_PATH: z.string().default("/var/run/docker.sock"),
   DBUS_HELPER_SOCKET_PATH: z
     .string()

@@ -3,6 +3,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { withClientTiming } from "@/lib/client/logger";
 import type {
+  TrashEmptyResponse,
   TrashDeleteRequest,
   TrashMoveRequest,
   TrashMoveResponse,
@@ -24,6 +25,10 @@ type TrashDeleteApiResponse = {
     deleted: boolean;
     path: string;
   };
+};
+
+type TrashEmptyApiResponse = {
+  data: TrashEmptyResponse;
 };
 
 function mapError(responseStatus: number, errorBody: { error?: string; code?: string }) {
@@ -141,6 +146,34 @@ async function deleteFromTrash(payload: TrashDeleteRequest) {
   );
 }
 
+async function emptyTrashRequest() {
+  return withClientTiming(
+    {
+      layer: "hook",
+      action: "hooks.useTrashActions.empty",
+      meta: {
+        endpoint: "/api/v1/files/trash/empty",
+      },
+    },
+    async () => {
+      const response = await fetch("/api/v1/files/trash/empty", {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        const errorBody = (await response.json().catch(() => ({}))) as {
+          error?: string;
+          code?: string;
+        };
+        throw new Error(mapError(response.status, errorBody));
+      }
+
+      const json = (await response.json()) as TrashEmptyApiResponse;
+      return json.data;
+    },
+  );
+}
+
 export function useMoveToTrash() {
   const queryClient = useQueryClient();
 
@@ -202,6 +235,22 @@ export function useDeleteFromTrash() {
       });
       void queryClient.invalidateQueries({
         queryKey: queryKeys.fileContent(variables.path),
+      });
+    },
+  });
+}
+
+export function useEmptyTrash() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: emptyTrashRequest,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: filesListKeyPrefix("Trash"),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.trashEntries("Trash"),
       });
     },
   });

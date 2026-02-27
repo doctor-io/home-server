@@ -187,6 +187,7 @@ export async function startAppLifecycleAction(input: {
   webUiPort?: number;
   composeSource?: string;
   removeVolumes?: boolean;
+  resetToCatalog?: boolean;
 }) {
   return withServerTiming(
     {
@@ -206,6 +207,7 @@ export async function startAppLifecycleAction(input: {
         webUiPort: input.webUiPort,
         composeSource: input.composeSource,
         removeVolumes: input.removeVolumes,
+        resetToCatalog: input.resetToCatalog,
       }),
   );
 }

@@ -5,11 +5,15 @@ import { withClientTiming } from "@/lib/client/logger";
 import type {
   FileCreateRequest,
   FileCreateResponse,
+  FileInfoResponse,
   FileListResponse,
   FilePasteRequest,
   FilePasteResponse,
+  FileRenameRequest,
+  FileRenameResponse,
   FileRootResponse,
   FileReadResponse,
+  FileToggleStarResponse,
   FileWriteRequest,
   FileWriteResponse,
 } from "@/lib/shared/contracts/files";
@@ -40,6 +44,18 @@ type FileCreateApiResponse = {
 
 type FilePasteApiResponse = {
   data: FilePasteResponse;
+};
+
+type FileRenameApiResponse = {
+  data: FileRenameResponse;
+};
+
+type FileInfoApiResponse = {
+  data: FileInfoResponse;
+};
+
+type FileToggleStarApiResponse = {
+  data: FileToggleStarResponse;
 };
 
 function buildListEndpoint(filePath: string, includeHidden = false) {
@@ -78,6 +94,13 @@ export function buildAssetUrl(filePath: string) {
     path: filePath,
   });
   return `/api/v1/files/asset?${params.toString()}`;
+}
+
+export function buildDownloadUrl(filePath: string) {
+  const params = new URLSearchParams({
+    path: filePath,
+  });
+  return `/api/v1/files/download?${params.toString()}`;
 }
 
 async function fetchRoot() {
@@ -297,6 +320,123 @@ async function pasteFile(payload: FilePasteRequest) {
   );
 }
 
+async function renameFile(payload: FileRenameRequest) {
+  return withClientTiming(
+    {
+      layer: "hook",
+      action: "hooks.useFiles.rename",
+      meta: {
+        endpoint: "/api/v1/files/ops",
+        path: payload.path,
+      },
+    },
+    async () => {
+      const response = await fetch("/api/v1/files/ops", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "rename",
+          ...payload,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorBody = (await response.json().catch(() => ({}))) as {
+          error?: string;
+          code?: string;
+        };
+        throw new Error(
+          errorBody.error ??
+            `Failed to rename (${response.status})${errorBody.code ? ` [${errorBody.code}]` : ""}`,
+        );
+      }
+
+      const json = (await response.json()) as FileRenameApiResponse;
+      return json.data;
+    },
+  );
+}
+
+async function getFileInfo(pathValue: string) {
+  return withClientTiming(
+    {
+      layer: "hook",
+      action: "hooks.useFiles.getInfo",
+      meta: {
+        endpoint: "/api/v1/files/ops",
+        path: pathValue,
+      },
+    },
+    async () => {
+      const response = await fetch("/api/v1/files/ops", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "get_info",
+          path: pathValue,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorBody = (await response.json().catch(() => ({}))) as {
+          error?: string;
+          code?: string;
+        };
+        throw new Error(
+          errorBody.error ??
+            `Failed to read info (${response.status})${errorBody.code ? ` [${errorBody.code}]` : ""}`,
+        );
+      }
+
+      const json = (await response.json()) as FileInfoApiResponse;
+      return json.data;
+    },
+  );
+}
+
+async function toggleStar(pathValue: string) {
+  return withClientTiming(
+    {
+      layer: "hook",
+      action: "hooks.useFiles.toggleStar",
+      meta: {
+        endpoint: "/api/v1/files/ops",
+        path: pathValue,
+      },
+    },
+    async () => {
+      const response = await fetch("/api/v1/files/ops", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "toggle_star",
+          path: pathValue,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorBody = (await response.json().catch(() => ({}))) as {
+          error?: string;
+          code?: string;
+        };
+        throw new Error(
+          errorBody.error ??
+            `Failed to toggle star (${response.status})${errorBody.code ? ` [${errorBody.code}]` : ""}`,
+        );
+      }
+
+      const json = (await response.json()) as FileToggleStarApiResponse;
+      return json.data;
+    },
+  );
+}
+
 export function useFilesRoot() {
   return useQuery({
     queryKey: queryKeys.filesRoot,
@@ -427,6 +567,43 @@ export function usePasteFileEntry() {
           queryKey: queryKeys.fileContent(variables.sourcePath),
         });
       }
+    },
+  });
+}
+
+export function useRenameFileEntry() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: renameFile,
+    onSuccess: (data, variables) => {
+      invalidateFileListPath(queryClient, getParentPath(variables.path));
+      if (getParentPath(variables.path) !== getParentPath(data.path)) {
+        invalidateFileListPath(queryClient, getParentPath(data.path));
+      }
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.fileContent(variables.path),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.fileContent(data.path),
+      });
+    },
+  });
+}
+
+export function useFileEntryInfo() {
+  return useMutation({
+    mutationFn: getFileInfo,
+  });
+}
+
+export function useToggleFileStar() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: toggleStar,
+    onSuccess: (_data, pathValue) => {
+      invalidateFileListPath(queryClient, getParentPath(pathValue));
     },
   });
 }

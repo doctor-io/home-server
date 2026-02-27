@@ -321,6 +321,7 @@ export function useStoreActions() {
       env?: Record<string, string>;
       webUiPort?: number;
       composeSource?: string;
+      resetToCatalog?: boolean;
     }) => {
       const response = await startLifecycleRequest(
         `/api/v1/store/apps/${encodeURIComponent(input.appId)}/install`,
@@ -329,6 +330,7 @@ export function useStoreActions() {
           env: input.env,
           webUiPort: input.webUiPort,
           composeSource: input.composeSource,
+          resetToCatalog: input.resetToCatalog,
         },
         "hooks.useStoreActions.install",
       );
@@ -541,6 +543,62 @@ export function useStoreActions() {
     installApp: installMutation.mutateAsync,
     installCustomApp: installCustomMutation.mutateAsync,
     redeployApp: redeployMutation.mutateAsync,
+    startApp: async (appId: string) => {
+      const response = await startLifecycleRequest(
+        `/api/v1/apps/${encodeURIComponent(appId)}/start`,
+        {},
+        "hooks.useStoreActions.start",
+      );
+      const payload = {
+        appId,
+        operationId: response.operationId,
+        action: "start" as const,
+      };
+      await attachOperationTracking(payload);
+      return payload;
+    },
+    stopApp: async (appId: string) => {
+      const response = await startLifecycleRequest(
+        `/api/v1/apps/${encodeURIComponent(appId)}/stop`,
+        {},
+        "hooks.useStoreActions.stop",
+      );
+      const payload = {
+        appId,
+        operationId: response.operationId,
+        action: "stop" as const,
+      };
+      await attachOperationTracking(payload);
+      return payload;
+    },
+    restartApp: async (appId: string) => {
+      const response = await startLifecycleRequest(
+        `/api/v1/apps/${encodeURIComponent(appId)}/restart`,
+        {},
+        "hooks.useStoreActions.restart",
+      );
+      const payload = {
+        appId,
+        operationId: response.operationId,
+        action: "restart" as const,
+      };
+      await attachOperationTracking(payload);
+      return payload;
+    },
+    checkAppUpdates: async (appId: string) => {
+      const response = await startLifecycleRequest(
+        `/api/v1/apps/${encodeURIComponent(appId)}/check-updates`,
+        {},
+        "hooks.useStoreActions.checkUpdates",
+      );
+      const payload = {
+        appId,
+        operationId: response.operationId,
+        action: "check-updates" as const,
+      };
+      await attachOperationTracking(payload);
+      return payload;
+    },
     uninstallApp: uninstallMutation.mutateAsync,
     saveAppSettings: saveSettingsMutation.mutateAsync,
   };
