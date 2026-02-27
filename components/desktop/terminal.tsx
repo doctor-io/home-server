@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type FocusEvent } from "react";
 import { ChevronRight } from "lucide-react";
 import { useTerminalCommand } from "@/hooks/useTerminalCommand";
 import type { TerminalOutputLine } from "@/lib/shared/contracts/terminal";
@@ -47,6 +47,7 @@ export function Terminal({
 }: {
   commandRequest?: TerminalCommandRequest;
 }) {
+  const rootRef = useRef<HTMLDivElement>(null);
   const [lines, setLines] = useState<TermLine[]>([
     {
       type: "welcome",
@@ -63,6 +64,7 @@ Type 'help' for available commands.
   const [historyIndex, setHistoryIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const focusFrameRef = useRef<number | null>(null);
   const [tabCount, setTabCount] = useState(1);
   const [activeTab, setActiveTab] = useState(0);
   const lastCommandRequestIdRef = useRef<number | null>(null);
@@ -83,9 +85,35 @@ Type 'help' for available commands.
     }
   }, [isExecuting]);
 
+  useEffect(() => {
+    return () => {
+      if (focusFrameRef.current !== null) {
+        cancelAnimationFrame(focusFrameRef.current);
+      }
+    };
+  }, []);
+
+  const scheduleFocusInput = useCallback(() => {
+    if (focusFrameRef.current !== null) {
+      cancelAnimationFrame(focusFrameRef.current);
+    }
+    focusFrameRef.current = requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      focusFrameRef.current = null;
+    });
+  }, []);
+
   const focusInput = useCallback(() => {
     inputRef.current?.focus();
   }, []);
+
+  function handleInputBlur(event: FocusEvent<HTMLInputElement>) {
+    const nextTarget = event.relatedTarget as Node | null;
+    if (nextTarget && rootRef.current?.contains(nextTarget)) {
+      return;
+    }
+    scheduleFocusInput();
+  }
 
   const runCommand = useCallback(
     async (inputValue: string) => {
@@ -231,7 +259,7 @@ Type 'help' for available commands.
   }, [commandRequest, enqueueCommand]);
 
   return (
-    <div className="flex h-full flex-col bg-card/90 select-text">
+    <div ref={rootRef} className="flex h-full flex-col bg-card/90 select-text">
       <div className="flex shrink-0 items-center gap-0 border-b border-glass-border bg-popover/70">
         {Array.from({ length: tabCount }).map((_, index) => (
           <button
@@ -303,6 +331,7 @@ Type 'help' for available commands.
             spellCheck={false}
             autoComplete="off"
             autoCapitalize="off"
+            onBlur={handleInputBlur}
           />
         </form>
       </div>

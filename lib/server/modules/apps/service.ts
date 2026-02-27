@@ -222,6 +222,7 @@ export async function listInstalledApps(options?: { bypassCache?: boolean }) {
 
 export async function resolveDashboardUrlForApp(appId: string): Promise<{
   url: string;
+  containerName: string | null;
   source: "installed_stack" | "compose_app_url" | "compose_port_mapping";
   warnings: string[];
 }> {
@@ -235,22 +236,29 @@ export async function resolveDashboardUrlForApp(appId: string): Promise<{
   const envPath = path.join(path.dirname(installed.composePath), ".env");
 
   let runtimePath = composeInfo.appUrlPath;
+  let runtimeContainerName: string | null = null;
   try {
     const runtime = await getComposeRuntimeInfo({
       composePath: installed.composePath,
       envPath,
       stackName: installed.stackName,
     });
+    runtimeContainerName = runtime.primaryContainerName ?? null;
     if (!runtime.primaryContainerName) {
       warnings.push("runtime_container_missing");
     }
   } catch {
     warnings.push("runtime_unavailable");
   }
+  const resolvedContainerName = runtimeContainerName ?? composeInfo.containerName ?? null;
+  if (!resolvedContainerName) {
+    warnings.push("container_name_unresolved");
+  }
 
   if (typeof installed.webUiPort === "number" && installed.webUiPort > 0) {
     return {
       url: `http://localhost:${installed.webUiPort}${runtimePath}`,
+      containerName: resolvedContainerName,
       source: "installed_stack",
       warnings,
     };
@@ -259,6 +267,7 @@ export async function resolveDashboardUrlForApp(appId: string): Promise<{
   if (composeInfo.appUrlRaw && composeInfo.appUrlRaw.length > 0) {
     return {
       url: composeInfo.appUrlRaw,
+      containerName: resolvedContainerName,
       source: "compose_app_url",
       warnings,
     };
@@ -268,6 +277,7 @@ export async function resolveDashboardUrlForApp(appId: string): Promise<{
     runtimePath = runtimePath || "";
     return {
       url: `http://localhost:${composeInfo.webUiPort}${runtimePath}`,
+      containerName: resolvedContainerName,
       source: "compose_port_mapping",
       warnings,
     };

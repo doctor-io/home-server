@@ -450,4 +450,40 @@ describe("network storage service", () => {
     });
     expect(deleteNetworkShareFromDb).toHaveBeenCalledWith("share-remove");
   });
+
+  it("removes stale db record when mount path is no longer valid", async () => {
+    const encrypted = encryptSecret("secret");
+    vi.mocked(getNetworkShareFromDb).mockResolvedValueOnce({
+      id: "share-stale",
+      host: "nas.local",
+      share: "Media",
+      username: "user",
+      mountPath: "Shared/nas.local/Media",
+      passwordCiphertext: encrypted.ciphertext,
+      passwordIv: encrypted.iv,
+      passwordTag: encrypted.tag,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    vi.mocked(deleteNetworkShareFromDb).mockResolvedValueOnce({
+      id: "share-stale",
+      host: "nas.local",
+      share: "Media",
+      username: "user",
+      mountPath: "Shared/nas.local/Media",
+      passwordCiphertext: encrypted.ciphertext,
+      passwordIv: encrypted.iv,
+      passwordTag: encrypted.tag,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const result = await removeShare("share-stale");
+
+    expect(result).toEqual({
+      removed: true,
+      id: "share-stale",
+    });
+    expect(deleteNetworkShareFromDb).toHaveBeenCalledWith("share-stale");
+  });
 });

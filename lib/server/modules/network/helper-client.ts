@@ -2,7 +2,7 @@ import "server-only";
 
 import net from "node:net";
 import { serverEnv } from "@/lib/server/env";
-import { withServerTiming } from "@/lib/server/logging/logger";
+import { logServerAction } from "@/lib/server/logging/logger";
 import type {
   ConnectNetworkRequest,
   NetworkEvent,
@@ -43,6 +43,8 @@ type HelperEventSubscriptionOptions = {
 };
 
 const DEFAULT_TIMEOUT_MS = 8_000;
+const HELPER_UNAVAILABLE_BACKOFF_MS = 10_000;
+let helperUnavailableUntil = 0;
 
 function parseNetworkServiceErrorCode(value: unknown): NetworkServiceErrorCode {
   if (
@@ -126,123 +128,168 @@ async function callHelper<T>(
   const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const requestId = options?.requestId;
   const callId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  if (Date.now() < helperUnavailableUntil) {
+    throw new NetworkHelperError("DBus helper unavailable", {
+      code: "helper_unavailable",
+      statusCode: 503,
+    });
+  }
 
-  return withServerTiming(
-    {
-      // Keep DBus call telemetry available in debug logs only to avoid high-volume info noise.
-      level: "debug",
-      layer: "system",
-      action: "dbus.network.call",
-      requestId,
-      meta: {
+  const startedAt = performance.now();
+
+  try {
+    const result = await new Promise<T>((resolve, reject) => {
+      const socket = net.createConnection({
+        path: serverEnv.DBUS_HELPER_SOCKET_PATH,
+      });
+      let settled = false;
+      let buffer = "";
+
+      const request: HelperRequest = {
+        id: callId,
         method,
-      },
-    },
-    async () =>
-      new Promise<T>((resolve, reject) => {
-        const socket = net.createConnection({
-          path: serverEnv.DBUS_HELPER_SOCKET_PATH,
-        });
-        let settled = false;
-        let buffer = "";
+        params,
+        requestId,
+      };
 
-        const request: HelperRequest = {
-          id: callId,
-          method,
-          params,
-          requestId,
-        };
+      const timeout = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        socket.destroy();
+        reject(
+          new NetworkHelperError("DBus helper timeout", {
+            code: "timeout",
+            statusCode: 504,
+          }),
+        );
+      }, timeoutMs);
 
-        const timeout = setTimeout(() => {
-          if (settled) return;
-          settled = true;
-          socket.destroy();
-          reject(
-            new NetworkHelperError("DBus helper timeout", {
-              code: "timeout",
-              statusCode: 504,
-            }),
-          );
-        }, timeoutMs);
+      const finalize = (fn: () => void) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        socket.end();
+        fn();
+      };
 
-        const finalize = (fn: () => void) => {
-          if (settled) return;
-          settled = true;
-          clearTimeout(timeout);
-          socket.end();
-          fn();
-        };
+      socket.on("connect", () => {
+        socket.write(`${JSON.stringify(request)}\n`);
+      });
 
-        socket.on("connect", () => {
-          socket.write(`${JSON.stringify(request)}\n`);
-        });
+      socket.on("data", (chunk) => {
+        buffer += chunk.toString("utf8");
+        let newline = buffer.indexOf("\n");
 
-        socket.on("data", (chunk) => {
-          buffer += chunk.toString("utf8");
-          let newline = buffer.indexOf("\n");
+        while (newline >= 0) {
+          const line = buffer.slice(0, newline).trim();
+          buffer = buffer.slice(newline + 1);
+          newline = buffer.indexOf("\n");
 
-          while (newline >= 0) {
-            const line = buffer.slice(0, newline).trim();
-            buffer = buffer.slice(newline + 1);
-            newline = buffer.indexOf("\n");
+          if (!line) continue;
+          const message = parseJsonLine(line);
+          if (!message) continue;
+          if (message.type === "event") continue;
+          if (message.id !== callId) continue;
 
-            if (!line) continue;
-            const message = parseJsonLine(line);
-            if (!message) continue;
-            if (message.type === "event") continue;
-            if (message.id !== callId) continue;
-
-            if (!message.ok) {
-              const helperCode = parseNetworkServiceErrorCode(message.error?.code);
-              const statusCode =
-                helperCode === "auth_failed"
-                  ? 401
-                  : helperCode === "helper_unavailable"
+          if (!message.ok) {
+            const helperCode = parseNetworkServiceErrorCode(message.error?.code);
+            const statusCode =
+              helperCode === "auth_failed"
+                ? 401
+                : helperCode === "helper_unavailable"
+                  ? 503
+                  : helperCode === "network_manager_unavailable"
                     ? 503
-                    : helperCode === "network_manager_unavailable"
-                      ? 503
-                      : helperCode === "timeout"
-                        ? 504
-                        : helperCode === "invalid_request"
-                          ? 400
-                          : 500;
+                    : helperCode === "timeout"
+                      ? 504
+                      : helperCode === "invalid_request"
+                        ? 400
+                        : 500;
 
-              finalize(() =>
-                reject(
-                  new NetworkHelperError(
-                    message.error?.message ?? "DBus helper request failed",
-                    {
-                      code: helperCode,
-                      statusCode,
-                    },
-                  ),
+            finalize(() =>
+              reject(
+                new NetworkHelperError(
+                  message.error?.message ?? "DBus helper request failed",
+                  {
+                    code: helperCode,
+                    statusCode,
+                  },
                 ),
-              );
-              return;
-            }
-
-            finalize(() => resolve(message.result as T));
+              ),
+            );
             return;
           }
-        });
 
-        socket.on("error", (error) => {
-          finalize(() => reject(mapSocketError(error)));
-        });
+          finalize(() => resolve(message.result as T));
+          return;
+        }
+      });
 
-        socket.on("close", () => {
-          if (settled) return;
-          settled = true;
-          clearTimeout(timeout);
-          reject(
-            new NetworkHelperError("DBus helper closed before response", {
-              code: "helper_unavailable",
-              statusCode: 503,
-            }),
-          );
-        });
-      }),
-  );
+      socket.on("error", (error) => {
+        finalize(() => reject(mapSocketError(error)));
+      });
+
+      socket.on("close", () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        reject(
+          new NetworkHelperError("DBus helper closed before response", {
+            code: "helper_unavailable",
+            statusCode: 503,
+          }),
+        );
+      });
+    });
+
+    helperUnavailableUntil = 0;
+    return result;
+  } catch (error) {
+    const mapped =
+      error instanceof NetworkHelperError ? error : mapSocketError(error);
+
+    if (
+      mapped.code === "helper_unavailable" ||
+      mapped.code === "timeout" ||
+      mapped.code === "network_manager_unavailable"
+    ) {
+      helperUnavailableUntil = Math.max(
+        helperUnavailableUntil,
+        Date.now() + HELPER_UNAVAILABLE_BACKOFF_MS,
+      );
+      logServerAction({
+        level: "warn",
+        layer: "system",
+        action: "dbus.network.call",
+        status: "error",
+        requestId,
+        durationMs: Number((performance.now() - startedAt).toFixed(2)),
+        message: mapped.message,
+        meta: {
+          method,
+          timeoutMs,
+        },
+        error: mapped,
+      });
+    } else {
+      logServerAction({
+        level: "error",
+        layer: "system",
+        action: "dbus.network.call",
+        status: "error",
+        requestId,
+        durationMs: Number((performance.now() - startedAt).toFixed(2)),
+        message: mapped.message,
+        meta: {
+          method,
+          timeoutMs,
+        },
+        error: mapped,
+      });
+    }
+
+    throw mapped;
+  }
 }
 
 export function isNetworkHelperUnavailableError(error: unknown) {

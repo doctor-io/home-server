@@ -458,6 +458,100 @@ describe("local sharing service", () => {
     );
   });
 
+  it("removes db record when cleanup command fails but share is already inactive", async () => {
+    vi.mocked(getLocalShareFromDb).mockResolvedValueOnce({
+      id: "local-4",
+      shareName: "Media",
+      sourcePath: "Media",
+      sharedPath: "Shared/Media",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    vi.mocked(deleteLocalShareFromDb).mockResolvedValueOnce({
+      id: "local-4",
+      shareName: "Media",
+      sourcePath: "Media",
+      sharedPath: "Shared/Media",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    let mountpointCallCount = 0;
+    vi.mocked(execFile).mockImplementation((command: string, ...restArgs: unknown[]) => {
+      const { args, callback } = getExecInvocation(restArgs);
+
+      if (command === "net" && args[0] === "usershare" && args[1] === "info") {
+        const error = new Error("usershare does not exist") as Error & {
+          code?: number;
+          stderr?: string;
+        };
+        error.code = 1;
+        error.stderr = "usershare does not exist";
+        callback(error, "", "usershare does not exist");
+        return {} as never;
+      }
+
+      if (command === "mountpoint") {
+        mountpointCallCount += 1;
+        if (mountpointCallCount === 1) {
+          callback(null, "", "");
+          return {} as never;
+        }
+        const error = new Error("not mounted") as Error & {
+          code?: number;
+          stderr?: string;
+        };
+        error.code = 1;
+        error.stderr = "not mounted";
+        callback(error, "", "not mounted");
+        return {} as never;
+      }
+
+      if (command === "umount") {
+        const error = new Error("permission denied") as Error & {
+          code?: number;
+          stderr?: string;
+        };
+        error.code = 1;
+        error.stderr = "permission denied";
+        callback(error, "", "permission denied");
+        return {} as never;
+      }
+
+      callback(null, "", "");
+      return {} as never;
+    });
+
+    const result = await removeLocalFolderShare("local-4");
+
+    expect(result.removed).toBe(true);
+    expect(deleteLocalShareFromDb).toHaveBeenCalledWith("local-4");
+  });
+
+  it("removes stale db record when shared path is no longer valid", async () => {
+    vi.mocked(getLocalShareFromDb).mockResolvedValueOnce({
+      id: "local-stale",
+      shareName: "Media",
+      sourcePath: "Media",
+      sharedPath: "Network/Media",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    vi.mocked(deleteLocalShareFromDb).mockResolvedValueOnce({
+      id: "local-stale",
+      shareName: "Media",
+      sourcePath: "Media",
+      sharedPath: "Network/Media",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const result = await removeLocalFolderShare("local-stale");
+
+    expect(result.removed).toBe(true);
+    expect(deleteLocalShareFromDb).toHaveBeenCalledWith("local-stale");
+  });
+
   it("serializes concurrent add requests for the same source path", async () => {
     let sourceReserved = false;
 

@@ -222,6 +222,41 @@ async function isMounted(mountPath: string) {
   }
 }
 
+async function isShareActive(record: NetworkShareRecord) {
+  try {
+    return await isMounted(record.mountPath);
+  } catch (error) {
+    const mappedError =
+      error instanceof NetworkStorageError
+        ? error
+        : mapCommandError(error, "Failed to resolve network share state", "internal_error");
+
+    if (
+      mappedError.code === "not_found" ||
+      mappedError.code === "invalid_path" ||
+      mappedError.code === "path_outside_root"
+    ) {
+      return false;
+    }
+
+    logServerAction({
+      level: "warn",
+      layer: "service",
+      action: "files.network.shares.remove.state",
+      status: "error",
+      message:
+        "Unable to verify whether network share is still mounted; continuing cleanup",
+      meta: {
+        shareId: record.id,
+        mountPath: record.mountPath,
+      },
+      error,
+    });
+
+    return false;
+  }
+}
+
 function toPublicShare(record: NetworkShareRecord): NetworkShare {
   return {
     id: record.id,
@@ -276,8 +311,32 @@ async function mountShareRecord(record: NetworkShareRecord) {
   ]);
 }
 
-async function unmountShareRecord(record: NetworkShareRecord) {
-  const resolved = await resolveMountPath(record.mountPath);
+async function unmountShareRecord(
+  record: NetworkShareRecord,
+  options?: {
+    tolerateMissing?: boolean;
+  },
+) {
+  const tolerateMissing = options?.tolerateMissing ?? false;
+  let resolved: ResolvedMountPath;
+
+  try {
+    resolved = await resolveMountPath(record.mountPath);
+  } catch (error) {
+    const mappedError =
+      error instanceof NetworkStorageError
+        ? error
+        : mapCommandError(error, "Failed to unmount network share", "unmount_failed");
+    if (
+      tolerateMissing &&
+      (mappedError.code === "not_found" ||
+        mappedError.code === "invalid_path" ||
+        mappedError.code === "path_outside_root")
+    ) {
+      return;
+    }
+    throw mappedError;
+  }
   const mounted = await isMounted(record.mountPath);
 
   if (mounted) {
@@ -290,10 +349,20 @@ async function unmountShareRecord(record: NetworkShareRecord) {
     }
   }
 
-  await rm(resolved.absolutePath, {
-    recursive: true,
-    force: true,
-  });
+  try {
+    await rm(resolved.absolutePath, {
+      recursive: true,
+      force: true,
+    });
+  } catch (error) {
+    const nodeError = error as NodeJS.ErrnoException;
+    if (
+      !tolerateMissing ||
+      (nodeError?.code !== "ENOENT" && nodeError?.code !== "ENOTDIR")
+    ) {
+      throw error;
+    }
+  }
 
   const hostDirectory = path.dirname(resolved.absolutePath);
   try {
@@ -465,9 +534,39 @@ export async function removeShare(shareId: string) {
   }
 
   try {
-    await unmountShareRecord(share);
+    await unmountShareRecord(share, {
+      tolerateMissing: true,
+    });
   } catch (error) {
-    throw mapCommandError(error, "Failed to unmount network share", "unmount_failed");
+    const mappedError = mapCommandError(
+      error,
+      "Failed to unmount network share",
+      "unmount_failed",
+    );
+    const tolerateCleanupError =
+      mappedError.code === "not_found" ||
+      mappedError.code === "invalid_path" ||
+      mappedError.code === "path_outside_root";
+
+    if (!tolerateCleanupError) {
+      const stillMounted = await isShareActive(share);
+      if (stillMounted) {
+        throw mappedError;
+      }
+    }
+
+    logServerAction({
+      level: "warn",
+      layer: "service",
+      action: "files.network.shares.remove.cleanup",
+      status: "error",
+      message: "Network share cleanup was already complete; removing stale DB record",
+      meta: {
+        shareId: share.id,
+        mountPath: share.mountPath,
+      },
+      error,
+    });
   }
 
   await deleteNetworkShareFromDb(share.id);

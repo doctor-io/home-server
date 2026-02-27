@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { lstat, mkdir, readdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
+import { logServerAction } from "@/lib/server/logging/logger";
 import {
   deleteLocalShareFromDb,
   getLocalShareBySourcePathFromDb,
@@ -183,6 +184,18 @@ function isMountMissingError(error: unknown) {
 function isMountBusyError(error: unknown) {
   const text = errorText(error);
   return text.includes("target is busy") || text.includes("device or resource busy");
+}
+
+function isPathCleanupNotRequiredError(error: unknown) {
+  if (!(error instanceof FilesPathError)) {
+    return false;
+  }
+
+  return (
+    error.code === "not_found" ||
+    error.code === "invalid_path" ||
+    error.code === "path_outside_root"
+  );
 }
 
 type ConstraintConflict = "share_name" | "source_path" | "shared_path" | null;
@@ -422,8 +435,18 @@ async function releaseShareExport(
     tolerateMissing?: boolean;
   },
 ) {
-  const exportResolved = await resolveExportPath(record.sharedPath);
   const tolerateMissing = options?.tolerateMissing ?? false;
+  let exportResolved: Awaited<ReturnType<typeof resolveExportPath>>;
+
+  try {
+    exportResolved = await resolveExportPath(record.sharedPath);
+  } catch (error) {
+    if (tolerateMissing && isPathCleanupNotRequiredError(error)) {
+      return;
+    }
+    throw error;
+  }
+
   const usershareExists = tolerateMissing
     ? await isUsersharePresent(record.shareName)
     : true;
@@ -462,10 +485,20 @@ async function releaseShareExport(
     }
   }
 
-  await rm(exportResolved.absolutePath, {
-    recursive: false,
-    force: true,
-  });
+  try {
+    await rm(exportResolved.absolutePath, {
+      recursive: false,
+      force: true,
+    });
+  } catch (error) {
+    const nodeError = error as NodeJS.ErrnoException;
+    if (
+      !tolerateMissing ||
+      (nodeError?.code !== "ENOENT" && nodeError?.code !== "ENOTDIR")
+    ) {
+      throw error;
+    }
+  }
 
   const sharedRoot = path.dirname(exportResolved.absolutePath);
   try {
@@ -478,6 +511,51 @@ async function releaseShareExport(
     }
   } catch {
     // ignored
+  }
+}
+
+async function isShareExportActive(record: LocalShareRecord) {
+  try {
+    const exportResolved = await resolveExportPath(record.sharedPath);
+    const [isMounted, isExported] = await Promise.all([
+      isMountPoint(exportResolved.absolutePath),
+      isUsersharePresent(record.shareName),
+    ]);
+    return isMounted || isExported;
+  } catch (error) {
+    if (isPathCleanupNotRequiredError(error)) {
+      return false;
+    }
+    throw error;
+  }
+}
+
+async function getShareExportActivity(record: LocalShareRecord) {
+  try {
+    const active = await isShareExportActive(record);
+    return {
+      active,
+      unknown: false,
+    };
+  } catch (error) {
+    logServerAction({
+      level: "warn",
+      layer: "service",
+      action: "files.local-share.remove.state",
+      status: "error",
+      message:
+        "Unable to verify whether a shared folder export is still active; continuing cleanup",
+      meta: {
+        shareId: record.id,
+        sourcePath: record.sourcePath,
+        sharedPath: record.sharedPath,
+      },
+      error,
+    });
+    return {
+      active: false,
+      unknown: true,
+    };
   }
 }
 
@@ -676,7 +754,36 @@ export async function removeLocalFolderShare(shareId: string) {
         tolerateMissing: true,
       });
     } catch (error) {
-      throw mapFsError(error, "Failed to remove shared folder", "unmount_failed");
+      const mappedError = mapFsError(
+        error,
+        "Failed to remove shared folder",
+        "unmount_failed",
+      );
+      const tolerateCleanupError =
+        mappedError.code === "not_found" ||
+        mappedError.code === "invalid_path" ||
+        mappedError.code === "path_outside_root";
+      if (!tolerateCleanupError) {
+        const activity = await getShareExportActivity(record);
+        const stillActive = activity.active;
+        if (stillActive) {
+          throw mappedError;
+        }
+      }
+
+      logServerAction({
+        level: "warn",
+        layer: "service",
+        action: "files.local-share.remove.cleanup",
+        status: "error",
+        message: "Share cleanup was already complete; removing stale DB record",
+        meta: {
+          shareId: record.id,
+          sourcePath: record.sourcePath,
+          sharedPath: record.sharedPath,
+        },
+        error,
+      });
     }
 
     await deleteLocalShareFromDb(record.id);

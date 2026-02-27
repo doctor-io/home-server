@@ -1,7 +1,7 @@
 /* @vitest-environment jsdom */
 
 import { act, renderHook } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { queryKeys } from "@/lib/shared/query-keys";
 import { useNetworkEventsSse } from "@/hooks/useNetworkEventsSse";
 import { createTestQueryClient, createWrapper } from "@/test/query-client-wrapper";
@@ -41,6 +41,7 @@ class MockEventSource {
 
 describe("useNetworkEventsSse", () => {
   it("connects to network event stream and invalidates caches on events", () => {
+    vi.useFakeTimers();
     vi.stubGlobal("EventSource", MockEventSource as unknown as typeof EventSource);
 
     const client = createTestQueryClient();
@@ -64,6 +65,7 @@ describe("useNetworkEventsSse", () => {
       source.emit("network.device.state.changed", {
         type: "network.device.state.changed",
       });
+      vi.runAllTimers();
     });
 
     expect(invalidateSpy).toHaveBeenCalledWith({
@@ -75,5 +77,6 @@ describe("useNetworkEventsSse", () => {
 
     unmount();
     expect(source.close).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
   });
 });

@@ -47,10 +47,16 @@ function isHiddenName(name: string) {
   return name.startsWith(".");
 }
 
-async function resolvePath(inputPath: string) {
+async function resolvePath(
+  inputPath: string,
+  options: {
+    allowMissingLeaf?: boolean;
+  } = {},
+) {
   const resolved = await resolvePathWithinFilesRoot({
     inputPath,
     allowHiddenSegments: true,
+    allowMissingLeaf: options.allowMissingLeaf ?? false,
   });
   const segments = resolved.segments;
   if (segments.some((segment) => isHiddenName(segment))) {
@@ -338,7 +344,9 @@ export async function restoreFromTrash(
       });
     }
 
-    const restoreTarget = await resolvePath(entry.originalPath);
+    const restoreTarget = await resolvePath(entry.originalPath, {
+      allowMissingLeaf: true,
+    });
     await mkdir(path.dirname(restoreTarget.absolutePath), {
       recursive: true,
     });
@@ -371,12 +379,28 @@ export async function restoreFromTrash(
       }
     }
 
-    const sourceCheck = await resolvePath(trashPath.relativePath);
-    if (sourceCheck.absolutePath !== trashPath.absolutePath) {
-      throw new TrashServiceError("Source path changed during operation", {
-        code: "invalid_path",
-        statusCode: 409,
-      });
+    let sourceAbsolutePath = trashPath.absolutePath;
+    try {
+      const sourceCheck = await resolvePath(trashPath.relativePath);
+      if (sourceCheck.absolutePath !== trashPath.absolutePath) {
+        throw new TrashServiceError("Source path changed during operation", {
+          code: "invalid_path",
+          statusCode: 409,
+        });
+      }
+      sourceAbsolutePath = sourceCheck.absolutePath;
+    } catch (error) {
+      const mappedError = mapFsError(error, "Failed to restore item from Trash");
+      if (mappedError.code !== "not_found") {
+        throw mappedError;
+      }
+
+      // Treat resolver races as recoverable when the source still exists at the
+      // already-validated path from the initial Trash lookup.
+      const sourceStillExists = await pathExists(trashPath.absolutePath);
+      if (!sourceStillExists) {
+        throw mappedError;
+      }
     }
     const destinationRelativePath = toPosixRelative(
       trashPath.rootPath,
@@ -384,7 +408,7 @@ export async function restoreFromTrash(
     );
     await assertMutationTargetSafe(trashPath.rootPath, destinationRelativePath);
 
-    await movePath(trashPath.absolutePath, destinationAbsolutePath);
+    await movePath(sourceAbsolutePath, destinationAbsolutePath);
     await deleteTrashEntryFromDb(trashPath.relativePath);
     await pruneEmptyAncestors(path.join(trashPath.rootPath, "Trash"), trashPath.absolutePath);
 

@@ -1,6 +1,6 @@
 /* @vitest-environment jsdom */
 
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const useStoreActionsMock = vi.fn();
 const useInstalledAppsMock = vi.fn();
@@ -142,10 +142,13 @@ describe("AppGrid context menu", () => {
     expect(openSpy).not.toHaveBeenCalled();
   });
 
-  it("routes logs, terminal, and settings actions through callbacks", () => {
+  it("routes logs, terminal, and settings actions through callbacks", async () => {
     const onViewLogs = vi.fn();
     const onOpenTerminal = vi.fn();
     const onOpenSettings = vi.fn();
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(
+      new Error("network down"),
+    );
 
     render(
       <AppGrid
@@ -158,30 +161,37 @@ describe("AppGrid context menu", () => {
 
     openContextMenuFor("Plex");
     fireEvent.click(screen.getByRole("button", { name: "View Logs" }));
-    expect(onViewLogs).toHaveBeenCalledWith({
-      appId: "plex",
-      appName: "Plex",
-      dashboardUrl: "http://localhost:32400/web",
-      containerName: "plex",
+    await waitFor(() => {
+      expect(onViewLogs).toHaveBeenCalledWith({
+        appId: "plex",
+        appName: "Plex",
+        dashboardUrl: "http://localhost:32400/web",
+        containerName: "plex",
+      });
     });
 
     openContextMenuFor("Plex");
     fireEvent.click(screen.getByRole("button", { name: "Open in Terminal" }));
-    expect(onOpenTerminal).toHaveBeenCalledWith({
-      appId: "plex",
-      appName: "Plex",
-      dashboardUrl: "http://localhost:32400/web",
-      containerName: "plex",
+    await waitFor(() => {
+      expect(onOpenTerminal).toHaveBeenCalledWith({
+        appId: "plex",
+        appName: "Plex",
+        dashboardUrl: "http://localhost:32400/web",
+        containerName: "plex",
+      });
     });
 
     openContextMenuFor("Plex");
     fireEvent.click(screen.getByRole("button", { name: "App Settings" }));
-    expect(onOpenSettings).toHaveBeenCalledWith({
-      appId: "plex",
-      appName: "Plex",
-      dashboardUrl: "http://localhost:32400/web",
-      containerName: "plex",
+    await waitFor(() => {
+      expect(onOpenSettings).toHaveBeenCalledWith({
+        appId: "plex",
+        appName: "Plex",
+        dashboardUrl: "http://localhost:32400/web",
+        containerName: "plex",
+      });
     });
+    fetchSpy.mockRestore();
   });
 
   it("copies dashboard url with clipboard fallback", async () => {
@@ -235,30 +245,38 @@ describe("AppGrid context menu", () => {
     });
   });
 
-  it("disables restart and update while app is updating", () => {
-    vi.useFakeTimers();
+  it("keeps restart and update actions available after check-updates request", async () => {
+    const checkAppUpdates = vi.fn().mockResolvedValue({
+      appId: "plex",
+      operationId: "op-1",
+      action: "check-updates",
+    });
+    useStoreActionsMock.mockReturnValue({
+      operationsByApp: {},
+      uninstallApp: vi.fn().mockResolvedValue(undefined),
+      checkAppUpdates,
+      restartApp: vi.fn().mockResolvedValue({
+        appId: "plex",
+        operationId: "op-2",
+        action: "restart",
+      }),
+      startApp: vi.fn(),
+      stopApp: vi.fn(),
+    });
+
     render(<AppGrid animationsEnabled={false} />);
 
     openContextMenuFor("Plex");
     fireEvent.click(screen.getByRole("button", { name: "Check Updates" }));
+    await waitFor(() => {
+      expect(checkAppUpdates).toHaveBeenCalledWith("plex");
+    });
 
     openContextMenuFor("Plex");
     const restartButton = screen.getByRole("button", { name: "Restart Container" });
     const updatesButton = screen.getByRole("button", { name: "Check Updates" });
-    expect((restartButton as HTMLButtonElement).disabled).toBe(true);
-    expect((updatesButton as HTMLButtonElement).disabled).toBe(true);
-
-    act(() => {
-      vi.advanceTimersByTime(1200);
-    });
-    openContextMenuFor("Plex");
-    expect(
-      (screen.getByRole("button", { name: "Restart Container" }) as HTMLButtonElement).disabled,
-    ).toBe(false);
-    expect(
-      (screen.getByRole("button", { name: "Check Updates" }) as HTMLButtonElement).disabled,
-    ).toBe(false);
-    vi.useRealTimers();
+    expect((restartButton as HTMLButtonElement).disabled).toBe(false);
+    expect((updatesButton as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("does not open the home page when dashboard url cannot be resolved", async () => {
@@ -312,7 +330,7 @@ describe("AppGrid context menu", () => {
 
     await waitFor(() => {
       expect(fetchSpy).toHaveBeenCalledWith(
-        "/api/v1/store/apps/unknown-app/compose?source=installed",
+        "/api/v1/apps/unknown-app/dashboard-url",
         { cache: "no-store" },
       );
     });

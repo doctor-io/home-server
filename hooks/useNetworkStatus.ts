@@ -40,7 +40,10 @@ export function useNetworkStatus() {
   return useQuery({
     queryKey: queryKeys.networkStatus,
     queryFn: fetchNetworkStatus,
-    refetchInterval: 15_000,
-    staleTime: 5_000,
+    refetchInterval: (query) =>
+      query.state.status === "error" ? 60_000 : 30_000,
+    staleTime: 10_000,
+    retry: 1,
+    refetchOnWindowFocus: false,
   });
 }

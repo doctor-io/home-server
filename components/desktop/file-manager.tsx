@@ -973,7 +973,7 @@ export function FileManager() {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Toolbar */}
-        <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-glass-border bg-card/65">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 px-3 py-2 border-b border-glass-border bg-card/65">
           {/* Navigation */}
           <div className="flex items-center gap-1 shrink-0">
             <button
@@ -997,7 +997,7 @@ export function FileManager() {
             >
               <span className="inline-flex items-center gap-1">
                 <HardDrive className="size-3.5" />
-                <span className="hidden xl:inline">{rootLabel}</span>
+                <span className="hidden 2xl:inline">{rootLabel}</span>
               </span>
             </button>
             {currentPath.map((segment, i) => (
@@ -1023,7 +1023,7 @@ export function FileManager() {
               title="Create folder"
             >
               <Folder className="size-3.5" />
-              <span className="hidden lg:inline">New Folder</span>
+              <span className="hidden xl:inline">New Folder</span>
             </button>
             <button
               onClick={() => {
@@ -1034,11 +1034,11 @@ export function FileManager() {
               title="Create file"
             >
               <File className="size-3.5" />
-              <span className="hidden lg:inline">New File</span>
+              <span className="hidden xl:inline">New File</span>
             </button>
           </div>
 
-          <div className="relative min-w-[9rem] flex-1 sm:flex-none sm:w-36 md:w-44">
+          <div className="relative min-w-[8.5rem] flex-1 sm:flex-none sm:w-36 md:w-40">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 size-3 text-muted-foreground" />
             <input
               type="text"
@@ -1065,7 +1065,7 @@ export function FileManager() {
                 title="Permanently delete all items in Trash"
               >
                 <Trash2 className="size-3.5" />
-                <span className="hidden lg:inline">Empty Trash</span>
+                <span className="hidden xl:inline">Empty Trash</span>
               </button>
             ) : null}
             <button
@@ -1078,7 +1078,7 @@ export function FileManager() {
               ) : (
                 <Eye className="size-3.5" />
               )}
-              <span className="hidden lg:inline">
+              <span className="hidden xl:inline">
                 {includeHidden ? "Hide Hidden" : "Show Hidden"}
               </span>
             </button>
@@ -1096,7 +1096,7 @@ export function FileManager() {
               title={`Sort by: ${sortBy}`}
             >
               <SortAsc className="size-3" />
-              <span className="capitalize hidden lg:inline">{sortBy}</span>
+              <span className="capitalize hidden xl:inline">{sortBy}</span>
             </button>
           </div>
 

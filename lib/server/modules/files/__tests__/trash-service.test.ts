@@ -121,6 +121,7 @@ import {
   restoreFromTrash,
   type TrashServiceError,
 } from "@/lib/server/modules/files/trash-service";
+import { resolvePathWithinFilesRoot } from "@/lib/server/modules/files/path-resolver";
 import {
   deleteTrashEntryFromDb,
   getTrashEntryFromDb,
@@ -178,6 +179,66 @@ describe("trash service", () => {
       await readFile(path.join(mockDataRoot, "Documents", "notes (2).txt"), "utf8"),
     ).toBe("from-trash");
     expect(vi.mocked(deleteTrashEntryFromDb)).toHaveBeenCalledWith("Trash/notes.txt");
+  });
+
+  it("restores when original target no longer exists", async () => {
+    await writeFile(path.join(mockDataRoot, "Trash", "restorable.txt"), "from-trash", "utf8");
+
+    vi.mocked(getTrashEntryFromDb).mockResolvedValueOnce({
+      id: "trash-restore-1",
+      trashPath: "Trash/restorable.txt",
+      originalPath: "Documents/restorable.txt",
+      deletedAt: new Date(),
+    });
+
+    const restored = await restoreFromTrash("Trash/restorable.txt", "keep-both");
+
+    expect(restored.sourceTrashPath).toBe("Trash/restorable.txt");
+    expect(restored.restoredPath).toBe("Documents/restorable.txt");
+    expect(
+      await readFile(path.join(mockDataRoot, "Documents", "restorable.txt"), "utf8"),
+    ).toBe("from-trash");
+    expect(vi.mocked(deleteTrashEntryFromDb)).toHaveBeenCalledWith("Trash/restorable.txt");
+  });
+
+  it("restores when source recheck transiently reports not_found", async () => {
+    await writeFile(path.join(mockDataRoot, "Trash", "race.txt"), "from-trash", "utf8");
+
+    vi.mocked(getTrashEntryFromDb).mockResolvedValueOnce({
+      id: "trash-race-1",
+      trashPath: "Trash/race.txt",
+      originalPath: "Documents/race.txt",
+      deletedAt: new Date(),
+    });
+
+    const defaultResolver = vi.mocked(resolvePathWithinFilesRoot).getMockImplementation();
+    if (!defaultResolver) {
+      throw new Error("Expected mocked resolvePathWithinFilesRoot implementation");
+    }
+
+    let trashResolveCount = 0;
+    vi.mocked(resolvePathWithinFilesRoot).mockImplementation(async (input) => {
+      if (input.inputPath === "Trash/race.txt") {
+        trashResolveCount += 1;
+        if (trashResolveCount === 2) {
+          const transientNotFound = new Error("transient not found") as Error & {
+            code?: string;
+          };
+          transientNotFound.code = "ENOENT";
+          throw transientNotFound;
+        }
+      }
+      return defaultResolver(input);
+    });
+
+    const restored = await restoreFromTrash("Trash/race.txt", "keep-both");
+
+    expect(restored.sourceTrashPath).toBe("Trash/race.txt");
+    expect(restored.restoredPath).toBe("Documents/race.txt");
+    expect(
+      await readFile(path.join(mockDataRoot, "Documents", "race.txt"), "utf8"),
+    ).toBe("from-trash");
+    expect(vi.mocked(deleteTrashEntryFromDb)).toHaveBeenCalledWith("Trash/race.txt");
   });
 
   it("deletes items permanently from Trash", async () => {

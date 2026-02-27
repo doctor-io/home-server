@@ -405,6 +405,15 @@ export function AppGrid({
     }));
   }
 
+  function clearAppStatus(appId: string) {
+    setStatusByAppId((previous) => {
+      if (!(appId in previous)) return previous;
+      const next = { ...previous };
+      delete next[appId];
+      return next;
+    });
+  }
+
   function openContextMenu(e: React.MouseEvent, app: AppItem) {
     e.preventDefault();
     setActiveAppId(app.id);
@@ -413,9 +422,15 @@ export function AppGrid({
     setContextMenu({ x, y, appId: app.id });
   }
 
-  async function resolveActionTarget(app: AppItem): Promise<AppActionTarget | null> {
+  async function resolveActionTarget(
+    app: AppItem,
+    options?: {
+      forceLookup?: boolean;
+    },
+  ): Promise<AppActionTarget | null> {
     const fallback = resolveAppActionTarget(app);
-    if (fallback.dashboardUrl.trim().length > 0) {
+    const shouldForceLookup = options?.forceLookup ?? false;
+    if (!shouldForceLookup && fallback.dashboardUrl.trim().length > 0) {
       return fallback;
     }
     try {
@@ -426,13 +441,26 @@ export function AppGrid({
       if (response.ok) {
         const json = (await response.json()) as {
           url?: string;
+          containerName?: string | null;
           data?: { url?: string };
         };
         const rawUrl = json.url ?? json.data?.url ?? "";
+        const containerName = json.containerName?.trim();
+        const nextContainerName =
+          containerName && containerName.length > 0
+            ? containerName
+            : fallback.containerName;
         if (rawUrl.trim().length > 0) {
           return {
             ...fallback,
             dashboardUrl: toCurrentHostUrl(rawUrl),
+            containerName: nextContainerName,
+          };
+        }
+        if (nextContainerName.length > 0) {
+          return {
+            ...fallback,
+            containerName: nextContainerName,
           };
         }
       }
@@ -446,7 +474,7 @@ export function AppGrid({
         { cache: "no-store" },
       );
       if (!response.ok) {
-        return null;
+        return shouldForceLookup ? fallback : null;
       }
 
       const json = (await response.json()) as InstalledComposeResponse;
@@ -457,7 +485,7 @@ export function AppGrid({
 
       const dashboardUrl = parseDashboardUrlFromComposePrimary(primary);
       if (!dashboardUrl) {
-        return null;
+        return shouldForceLookup ? fallback : null;
       }
 
       return {
@@ -465,7 +493,7 @@ export function AppGrid({
         dashboardUrl,
       };
     } catch {
-      return null;
+      return shouldForceLookup ? fallback : null;
     }
   }
 
@@ -483,7 +511,7 @@ export function AppGrid({
 
     try {
       const resolvedTarget = await resolveActionTarget(app);
-      if (!resolvedTarget) {
+      if (!resolvedTarget || resolvedTarget.dashboardUrl.trim().length === 0) {
         logClientAction({
           level: "warn",
           layer: "hook",
@@ -563,22 +591,45 @@ export function AppGrid({
         await stopApp(menuApp.id);
       } else if (action === "restart") {
         updateAppStatus(menuApp.id, "updating");
-        setTimeout(() => {
-          updateAppStatus(menuApp.id, "running");
-        }, 1200);
-        await restartApp(menuApp.id);
+        try {
+          await restartApp(menuApp.id);
+        } finally {
+          clearAppStatus(menuApp.id);
+        }
       } else if (action === "update") {
         updateAppStatus(menuApp.id, "updating");
-        setTimeout(() => {
-          updateAppStatus(menuApp.id, "running");
-        }, 1200);
-        await checkAppUpdates(menuApp.id);
+        try {
+          await checkAppUpdates(menuApp.id);
+        } finally {
+          clearAppStatus(menuApp.id);
+        }
       } else if (action === "logs") {
-        onViewLogs?.(fallbackTarget);
+        const resolvedTarget = await resolveActionTarget(menuApp, {
+          forceLookup: true,
+        });
+        if (!resolvedTarget) {
+          closeContextMenu();
+          return;
+        }
+        onViewLogs?.(resolvedTarget);
       } else if (action === "terminal") {
-        onOpenTerminal?.(fallbackTarget);
+        const resolvedTarget = await resolveActionTarget(menuApp, {
+          forceLookup: true,
+        });
+        if (!resolvedTarget) {
+          closeContextMenu();
+          return;
+        }
+        onOpenTerminal?.(resolvedTarget);
       } else if (action === "settings") {
-        onOpenSettings?.(fallbackTarget);
+        const resolvedTarget = await resolveActionTarget(menuApp, {
+          forceLookup: true,
+        });
+        if (!resolvedTarget) {
+          closeContextMenu();
+          return;
+        }
+        onOpenSettings?.(resolvedTarget);
       } else if (action === "copy-url") {
         const resolvedTarget = await resolveActionTarget(menuApp);
         if (!resolvedTarget) {

@@ -31,6 +31,8 @@ export function useNetworkEventsSse(enabled = true) {
     });
 
     const source = new EventSource("/api/v1/network/events/stream");
+    let refreshTimeout: ReturnType<typeof setTimeout> | null = null;
+    let refreshQueued = false;
 
     source.onopen = () => {
       setStatus("connected");
@@ -53,12 +55,22 @@ export function useNetworkEventsSse(enabled = true) {
       ]);
     };
 
+    const scheduleRefresh = () => {
+      if (refreshQueued) return;
+      refreshQueued = true;
+      refreshTimeout = setTimeout(() => {
+        refreshQueued = false;
+        refreshTimeout = null;
+        refreshCachedQueries();
+      }, 600);
+    };
+
     const onConnectionChanged = () => {
-      refreshCachedQueries();
+      scheduleRefresh();
     };
 
     const onDeviceStateChanged = () => {
-      refreshCachedQueries();
+      scheduleRefresh();
     };
 
     const onError = () => {
@@ -78,6 +90,9 @@ export function useNetworkEventsSse(enabled = true) {
     source.addEventListener("error", onError);
 
     return () => {
+      if (refreshTimeout !== null) {
+        clearTimeout(refreshTimeout);
+      }
       source.removeEventListener("network.connection.changed", onConnectionChanged);
       source.removeEventListener("network.device.state.changed", onDeviceStateChanged);
       source.removeEventListener("error", onError);
