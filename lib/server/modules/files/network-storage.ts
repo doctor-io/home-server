@@ -142,6 +142,30 @@ function isCommandUnavailable(error: unknown) {
   );
 }
 
+function errorText(error: unknown) {
+  if (!error || typeof error !== "object") return "";
+  const err = error as {
+    message?: string;
+    stderr?: string | Buffer;
+  };
+  const stderr =
+    typeof err.stderr === "string"
+      ? err.stderr
+      : Buffer.isBuffer(err.stderr)
+        ? err.stderr.toString("utf8")
+        : "";
+  return `${err.message ?? ""}\n${stderr}`.toLowerCase();
+}
+
+function isUnmountMissingError(error: unknown) {
+  const text = errorText(error);
+  return (
+    text.includes("not mounted") ||
+    text.includes("is not mounted") ||
+    text.includes("not found")
+  );
+}
+
 async function runCommand(command: string, args: string[]) {
   const result = await execFileAsync(command, args, {
     timeout: 15_000,
@@ -238,11 +262,17 @@ async function unmountShareRecord(record: NetworkShareRecord) {
   const mounted = await isMounted(record.mountPath);
 
   if (mounted) {
-    await runCommand("umount", [resolved.absolutePath]);
+    try {
+      await runCommand("umount", [resolved.absolutePath]);
+    } catch (error) {
+      if (!isUnmountMissingError(error)) {
+        throw error;
+      }
+    }
   }
 
   await rm(resolved.absolutePath, {
-    recursive: false,
+    recursive: true,
     force: true,
   });
 

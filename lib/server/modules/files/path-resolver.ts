@@ -170,10 +170,8 @@ async function ensureNoSymlinkTraversal(
 export async function resolvePathWithinFilesRoot(
   input: ResolvePathInput = {},
 ): Promise<ResolvedFilesPath> {
-  const rootPath = toAbsoluteFilesRoot();
-  await mkdir(rootPath, {
-    recursive: true,
-  });
+  const rootPath = await ensureFilesRootDirectories();
+  const canonicalRootPath = await realpath(rootPath).catch(() => rootPath);
 
   const relativePath = normalizeRelativeInput(
     input.inputPath ?? "",
@@ -215,7 +213,7 @@ export async function resolvePathWithinFilesRoot(
   let absolutePath = absoluteCandidate;
   if (exists) {
     const canonical = await realpath(absoluteCandidate);
-    if (!isWithinRoot(rootPath, canonical)) {
+    if (!isWithinRoot(canonicalRootPath, canonical)) {
       throw new FilesPathError("Path escapes root", {
         code: "path_outside_root",
         statusCode: 400,

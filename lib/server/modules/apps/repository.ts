@@ -19,6 +19,7 @@ export async function listInstalledAppsFromDb(): Promise<InstalledApp[]> {
       templateName: appStacks.templateName,
       stackName: appStacks.stackName,
       composePath: appStacks.composePath,
+      webUiPort: appStacks.webUiPort,
       displayName: appStacks.displayName,
       updatedAt: appStacks.updatedAt,
     })
@@ -29,10 +30,11 @@ export async function listInstalledAppsFromDb(): Promise<InstalledApp[]> {
 
   return rows.map((row) => ({
     id: row.appId,
-    name: row.displayName || row.templateName || row.appId,
-    stackName: row.stackName,
-    composePath: row.composePath,
-    status: "unknown" as const,
-    updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
-  }));
+      name: row.displayName || row.templateName || row.appId,
+      stackName: row.stackName,
+      composePath: row.composePath,
+      webUiPort: row.webUiPort,
+      status: "unknown" as const,
+      updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
+    }));
 }

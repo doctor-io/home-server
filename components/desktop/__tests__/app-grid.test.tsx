@@ -39,6 +39,7 @@ describe("AppGrid context menu", () => {
           id: "plex",
           name: "Plex",
           status: "running",
+          webUiPort: 32400,
           updatedAt: "2026-02-24T00:00:00.000Z",
         },
       ],
@@ -78,6 +79,35 @@ describe("AppGrid context menu", () => {
 
     expect(openSpy).toHaveBeenCalledWith(
       "http://localhost:32400/web",
+      "_blank",
+      "noopener,noreferrer",
+    );
+  });
+
+  it("prefers installed runtime port over catalog port for dashboard url", () => {
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+
+    useInstalledAppsMock.mockReturnValue({
+      data: [
+        {
+          id: "plex",
+          name: "Plex",
+          status: "running",
+          webUiPort: 32410,
+          updatedAt: "2026-02-24T00:00:00.000Z",
+        },
+      ],
+      isLoading: false,
+      isError: false,
+    });
+
+    render(<AppGrid animationsEnabled={false} />);
+
+    openContextMenuFor("Plex");
+    fireEvent.click(screen.getByRole("button", { name: "Open Dashboard" }));
+
+    expect(openSpy).toHaveBeenCalledWith(
+      "http://localhost:32410/web",
       "_blank",
       "noopener,noreferrer",
     );

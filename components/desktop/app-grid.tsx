@@ -296,7 +296,7 @@ export function AppGrid({
           bgColor: visual.bgColor,
           status: statusByAppId[appId] ?? derivedStatus,
           category: catalog?.categories[0] ?? visual.category,
-          webUiPort: catalog?.webUiPort ?? fallbackPort,
+          webUiPort: installed?.webUiPort ?? catalog?.webUiPort ?? fallbackPort,
           containerName: installed?.containerName ?? mapped?.containerName ?? appId,
         } satisfies AppItem;
       })

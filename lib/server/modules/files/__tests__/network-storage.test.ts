@@ -96,6 +96,7 @@ import {
   discoverShares,
   getShareInfo,
   mountShare,
+  removeShare,
   type NetworkStorageError,
 } from "@/lib/server/modules/files/network-storage";
 import {
@@ -396,5 +397,57 @@ describe("network storage service", () => {
       id: "share-1",
       isMounted: false,
     });
+  });
+
+  it("removes share when umount reports already unmounted", async () => {
+    const encrypted = encryptSecret("secret");
+    vi.mocked(getNetworkShareFromDb).mockResolvedValueOnce({
+      id: "share-remove",
+      host: "nas.local",
+      share: "Media",
+      username: "user",
+      mountPath: "Network/nas.local/Media",
+      passwordCiphertext: encrypted.ciphertext,
+      passwordIv: encrypted.iv,
+      passwordTag: encrypted.tag,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    vi.mocked(deleteNetworkShareFromDb).mockResolvedValueOnce({
+      id: "share-remove",
+      host: "nas.local",
+      share: "Media",
+      username: "user",
+      mountPath: "Network/nas.local/Media",
+      passwordCiphertext: encrypted.ciphertext,
+      passwordIv: encrypted.iv,
+      passwordTag: encrypted.tag,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    vi.mocked(execFile).mockImplementation((command: string, ...restArgs: unknown[]) => {
+      const callback = getExecFileCallback(restArgs);
+      if (command === "mountpoint") {
+        callback(null, "", "");
+        return {} as never;
+      }
+      if (command === "umount") {
+        const error = new Error("not mounted") as Error & { code?: number; stderr?: string };
+        error.code = 1;
+        error.stderr = "not mounted";
+        callback(error, "", "not mounted");
+        return {} as never;
+      }
+      callback(null, "", "");
+      return {} as never;
+    });
+
+    const result = await removeShare("share-remove");
+    expect(result).toEqual({
+      removed: true,
+      id: "share-remove",
+    });
+    expect(deleteNetworkShareFromDb).toHaveBeenCalledWith("share-remove");
   });
 });

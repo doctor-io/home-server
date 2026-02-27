@@ -520,6 +520,7 @@ export function useStoreActions() {
     },
     onSuccess: ({ appId, operationId }) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.storeCatalog });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.installedApps });
       void queryClient.invalidateQueries({ queryKey: queryKeys.storeApp(appId) });
       void queryClient.invalidateQueries({
         queryKey: queryKeys.appCompose(appId, "installed"),
