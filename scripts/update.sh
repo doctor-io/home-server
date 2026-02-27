@@ -148,9 +148,7 @@ install_dependencies_if_needed() {
 	fi
 }
 
-run_db_and_build() {
-	print_status "Initializing database schema..."
-	(cd "${INSTALL_DIR}" && set -a && source "${ENV_FILE}" && set +a && npm run db:init --silent) 1>/dev/null
+build_app() {
 	print_status "Building Next.js application..."
 	cd "${INSTALL_DIR}" && npm run build --silent 1>/dev/null
 }
@@ -340,7 +338,7 @@ main() {
 	fi
 
 	install_dependencies_if_needed
-	run_db_and_build
+	build_app
 	start_service
 	configure_reverse_proxy
 	restart_dbus_helper_service

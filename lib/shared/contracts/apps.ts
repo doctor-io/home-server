@@ -3,6 +3,7 @@ export type InstalledApp = {
   name: string;
   stackName: string;
   composePath: string;
+  containerName?: string | null;
   status: "running" | "stopped" | "unknown";
   updatedAt: string;
 };

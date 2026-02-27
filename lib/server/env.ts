@@ -57,6 +57,11 @@ const envSchema = z.object({
     .default(6 * 60 * 60_000), // 6 hours
   STORE_STACKS_ROOT: z.string().optional(),
   STORE_APP_DATA_ROOT: z.string().optional(),
+  FILES_ROOT: z.string().optional(),
+  FILES_ALLOW_HIDDEN: z
+    .string()
+    .optional()
+    .transform((value) => value === "true"),
   DOCKER_SOCKET_PATH: z.string().default("/var/run/docker.sock"),
   DBUS_HELPER_SOCKET_PATH: z
     .string()
@@ -76,9 +81,13 @@ const defaultStacksRoot =
   parsedEnv.data.NODE_ENV === "production" ? "/DATA/Apps" : "DATA/Apps";
 const defaultAppDataRoot =
   parsedEnv.data.NODE_ENV === "production" ? "/DATA/Apps" : "DATA/Apps";
+const defaultFilesRoot =
+  parsedEnv.data.NODE_ENV === "production" ? "/DATA" : "DATA";
 
 export const serverEnv = {
   ...parsedEnv.data,
   STORE_STACKS_ROOT: parsedEnv.data.STORE_STACKS_ROOT ?? defaultStacksRoot,
   STORE_APP_DATA_ROOT: parsedEnv.data.STORE_APP_DATA_ROOT ?? defaultAppDataRoot,
+  FILES_ROOT: parsedEnv.data.FILES_ROOT ?? defaultFilesRoot,
+  FILES_ALLOW_HIDDEN: parsedEnv.data.FILES_ALLOW_HIDDEN ?? false,
 };

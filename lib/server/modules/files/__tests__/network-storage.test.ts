@@ -5,12 +5,76 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let mockDataRoot = "";
 
-vi.mock("@/lib/server/storage/data-root", () => ({
-  ensureDataRootDirectories: vi.fn(async () => ({
-    dataRoot: mockDataRoot,
-    subdirectories: ["Network", "Trash"],
-  })),
-}));
+vi.mock("@/lib/server/modules/files/path-resolver", () => {
+  class FilesPathError extends Error {
+    code: string;
+    statusCode: number;
+
+    constructor(
+      message: string,
+      options?: {
+        code?: string;
+        statusCode?: number;
+      },
+    ) {
+      super(message);
+      this.code = options?.code ?? "internal_error";
+      this.statusCode = options?.statusCode ?? 500;
+    }
+  }
+
+  function ensureWithinRoot(rootPath: string, absolutePath: string) {
+    const relative = path.relative(rootPath, absolutePath);
+    const within =
+      relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+    if (!within) {
+      throw new FilesPathError("Path escapes root", {
+        code: "path_outside_root",
+        statusCode: 400,
+      });
+    }
+  }
+
+  return {
+    FilesPathError,
+    resolvePathWithinFilesRoot: vi.fn(async (input: {
+      inputPath?: string;
+      requiredPrefix?: string;
+      allowMissingLeaf?: boolean;
+    }) => {
+      const cleaned = (input.inputPath ?? "").trim().replaceAll("\\", "/");
+      const normalized = cleaned ? path.posix.normalize(cleaned) : "";
+      if (!normalized || normalized === "." || normalized === ".." || normalized.startsWith("../")) {
+        throw new FilesPathError("Invalid path", {
+          code: "invalid_path",
+          statusCode: 400,
+        });
+      }
+
+      if (
+        input.requiredPrefix &&
+        normalized !== input.requiredPrefix &&
+        !normalized.startsWith(`${input.requiredPrefix}/`)
+      ) {
+        throw new FilesPathError("Invalid path", {
+          code: "invalid_path",
+          statusCode: 400,
+        });
+      }
+
+      const absolutePath = path.resolve(mockDataRoot, normalized);
+      ensureWithinRoot(mockDataRoot, absolutePath);
+
+      return {
+        rootPath: mockDataRoot,
+        relativePath: normalized,
+        absolutePath,
+        segments: normalized.split("/"),
+        exists: true,
+      };
+    }),
+  };
+});
 
 vi.mock("@/lib/server/modules/files/network-shares-repository", () => ({
   listNetworkSharesFromDb: vi.fn(),

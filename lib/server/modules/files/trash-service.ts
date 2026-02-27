@@ -3,7 +3,11 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { cp, lstat, mkdir, readdir, rename, rm } from "node:fs/promises";
 import path from "node:path";
-import { ensureDataRootDirectories } from "@/lib/server/storage/data-root";
+import {
+  FilesPathError,
+  resolvePathWithinFilesRoot,
+  type ResolvedFilesPath,
+} from "@/lib/server/modules/files/path-resolver";
 import type {
   FileServiceErrorCode,
   TrashRestoreRequest,
@@ -38,100 +42,16 @@ export class TrashServiceError extends Error {
 
 type CollisionMode = NonNullable<TrashRestoreRequest["collision"]>;
 
-type ResolvedFilePath = {
-  rootPath: string;
-  relativePath: string;
-  absolutePath: string;
-  segments: string[];
-};
-
 function isHiddenName(name: string) {
   return name.startsWith(".");
 }
 
-function normalizeRelativePath(input: string | undefined, allowEmpty = false) {
-  if (!input) {
-    if (allowEmpty) return "";
-    throw new TrashServiceError("Invalid path", {
-      code: "invalid_path",
-      statusCode: 400,
-    });
-  }
-
-  const cleaned = input.trim().replaceAll("\\", "/");
-  if (cleaned.length === 0) {
-    if (allowEmpty) return "";
-    throw new TrashServiceError("Invalid path", {
-      code: "invalid_path",
-      statusCode: 400,
-    });
-  }
-  if (cleaned.includes("\0") || cleaned.startsWith("/")) {
-    throw new TrashServiceError("Invalid path", {
-      code: "invalid_path",
-      statusCode: 400,
-    });
-  }
-
-  const normalized = path.posix.normalize(cleaned);
-  if (normalized === ".") {
-    if (allowEmpty) return "";
-    throw new TrashServiceError("Invalid path", {
-      code: "invalid_path",
-      statusCode: 400,
-    });
-  }
-  if (normalized === ".." || normalized.startsWith("../")) {
-    throw new TrashServiceError("Path escapes root", {
-      code: "path_outside_root",
-      statusCode: 400,
-    });
-  }
-
-  return normalized;
-}
-
-function ensureWithinRoot(rootPath: string, absolutePath: string) {
-  const relative = path.relative(rootPath, absolutePath);
-  const within =
-    relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
-  if (!within) {
-    throw new TrashServiceError("Path escapes root", {
-      code: "path_outside_root",
-      statusCode: 400,
-    });
-  }
-}
-
-async function assertNoSymlinks(rootPath: string, segments: string[]) {
-  let current = rootPath;
-
-  for (const segment of segments) {
-    current = path.join(current, segment);
-    try {
-      const info = await lstat(current);
-      if (info.isSymbolicLink()) {
-        throw new TrashServiceError("Symlinks are not allowed", {
-          code: "symlink_blocked",
-          statusCode: 403,
-        });
-      }
-    } catch (error) {
-      const nodeError = error as NodeJS.ErrnoException;
-      if (nodeError?.code === "ENOENT") {
-        break;
-      }
-      throw error;
-    }
-  }
-}
-
 async function resolvePath(inputPath: string) {
-  const ensured = await ensureDataRootDirectories();
-  const rootPath = ensured.dataRoot;
-
-  const relativePath = normalizeRelativePath(inputPath);
-  const segments = relativePath.split("/").filter(Boolean);
+  const resolved = await resolvePathWithinFilesRoot({
+    inputPath,
+    allowHiddenSegments: true,
+  });
+  const segments = resolved.segments;
   if (segments.some((segment) => isHiddenName(segment))) {
     throw new TrashServiceError("Hidden files are not allowed", {
       code: "hidden_blocked",
@@ -139,16 +59,13 @@ async function resolvePath(inputPath: string) {
     });
   }
 
-  const absolutePath = path.resolve(rootPath, relativePath);
-  ensureWithinRoot(rootPath, absolutePath);
-  await assertNoSymlinks(rootPath, segments);
-
   return {
-    rootPath,
-    relativePath,
-    absolutePath,
+    rootPath: resolved.rootPath,
+    relativePath: resolved.relativePath,
+    absolutePath: resolved.absolutePath,
     segments,
-  } satisfies ResolvedFilePath;
+    exists: resolved.exists,
+  } satisfies ResolvedFilesPath;
 }
 
 function toPosixRelative(rootPath: string, absolutePath: string) {
@@ -230,8 +147,25 @@ async function movePath(sourceAbsolutePath: string, destinationAbsolutePath: str
   });
 }
 
+async function assertMutationTargetSafe(rootPath: string, relativePath: string) {
+  await resolvePathWithinFilesRoot({
+    inputPath: relativePath,
+    allowHiddenSegments: true,
+    allowMissingLeaf: true,
+  });
+  const absolutePath = path.join(rootPath, relativePath.replaceAll("/", path.sep));
+  return absolutePath;
+}
+
 function mapFsError(error: unknown, fallbackMessage: string) {
   if (error instanceof TrashServiceError) return error;
+  if (error instanceof FilesPathError) {
+    return new TrashServiceError(error.message, {
+      code: error.code,
+      statusCode: error.statusCode,
+      cause: error,
+    });
+  }
 
   const nodeError = error as NodeJS.ErrnoException;
   if (nodeError?.code === "ENOENT") {
@@ -261,6 +195,18 @@ function mapFsError(error: unknown, fallbackMessage: string) {
       statusCode: 400,
       cause: error,
     });
+  }
+  if (nodeError?.code === "EACCES" || nodeError?.code === "EPERM") {
+    const deniedPath =
+      typeof nodeError.path === "string" ? nodeError.path : undefined;
+    return new TrashServiceError(
+      `Permission denied${deniedPath ? `: ${deniedPath}` : ""}`,
+      {
+        code: "permission_denied",
+        statusCode: 403,
+        cause: error,
+      },
+    );
   }
 
   return new TrashServiceError(fallbackMessage, {
@@ -338,6 +284,15 @@ export async function moveToTrash(pathInput: string) {
     const trashTarget = await uniquePathFromTarget(
       path.join(trashRoot.absolutePath, path.basename(source.absolutePath)),
     );
+    const sourceCheck = await resolvePath(source.relativePath);
+    if (sourceCheck.absolutePath !== source.absolutePath) {
+      throw new TrashServiceError("Source path changed during operation", {
+        code: "invalid_path",
+        statusCode: 409,
+      });
+    }
+    const trashRelativeTarget = toPosixRelative(source.rootPath, trashTarget);
+    await assertMutationTargetSafe(source.rootPath, trashRelativeTarget);
 
     await movePath(source.absolutePath, trashTarget);
 
@@ -362,7 +317,7 @@ export async function restoreFromTrash(
   pathInput: string,
   collisionMode: CollisionMode = "keep-both",
 ): Promise<TrashRestoreResponse> {
-  let trashPath: ResolvedFilePath;
+  let trashPath: ResolvedFilesPath;
 
   try {
     trashPath = await assertTrashPath(pathInput);
@@ -397,6 +352,14 @@ export async function restoreFromTrash(
         });
       }
       if (collisionMode === "replace") {
+        const destinationRelativePath = toPosixRelative(
+          trashPath.rootPath,
+          destinationAbsolutePath,
+        );
+        await assertMutationTargetSafe(
+          trashPath.rootPath,
+          destinationRelativePath,
+        );
         await rm(destinationAbsolutePath, {
           recursive: true,
           force: true,
@@ -406,6 +369,19 @@ export async function restoreFromTrash(
         destinationAbsolutePath = await uniquePathFromTarget(destinationAbsolutePath);
       }
     }
+
+    const sourceCheck = await resolvePath(trashPath.relativePath);
+    if (sourceCheck.absolutePath !== trashPath.absolutePath) {
+      throw new TrashServiceError("Source path changed during operation", {
+        code: "invalid_path",
+        statusCode: 409,
+      });
+    }
+    const destinationRelativePath = toPosixRelative(
+      trashPath.rootPath,
+      destinationAbsolutePath,
+    );
+    await assertMutationTargetSafe(trashPath.rootPath, destinationRelativePath);
 
     await movePath(trashPath.absolutePath, destinationAbsolutePath);
     await deleteTrashEntryFromDb(trashPath.relativePath);
@@ -421,7 +397,7 @@ export async function restoreFromTrash(
 }
 
 export async function deleteFromTrash(pathInput: string) {
-  let trashPath: ResolvedFilePath;
+  let trashPath: ResolvedFilesPath;
 
   try {
     trashPath = await assertTrashPath(pathInput);
@@ -433,6 +409,7 @@ export async function deleteFromTrash(pathInput: string) {
       });
     }
 
+    await assertMutationTargetSafe(trashPath.rootPath, trashPath.relativePath);
     await rm(trashPath.absolutePath, {
       recursive: true,
       force: false,

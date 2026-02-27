@@ -12,6 +12,12 @@ const handle = app.getRequestHandler();
 
 async function main() {
   await app.prepare();
+  void import("./lib/server/modules/files/path-resolver")
+    .then((module) => module.ensureFilesRootDirectories())
+    .catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn("⚠ Files root initialization warning:", message);
+    });
 
   const shutdownHooks: Array<() => Promise<unknown> | unknown> = [];
   const server = createServer(async (req, res) => {

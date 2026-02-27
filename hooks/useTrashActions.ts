@@ -41,6 +41,10 @@ function getParentPath(filePath: string) {
   return normalized.slice(0, separatorIndex);
 }
 
+function filesListKeyPrefix(filePath: string) {
+  return ["files", "list", filePath] as const;
+}
+
 async function moveToTrash(payload: TrashMoveRequest) {
   return withClientTiming(
     {
@@ -144,10 +148,10 @@ export function useMoveToTrash() {
     mutationFn: moveToTrash,
     onSuccess: (data, variables) => {
       void queryClient.invalidateQueries({
-        queryKey: queryKeys.filesList(getParentPath(variables.path)),
+        queryKey: filesListKeyPrefix(getParentPath(variables.path)),
       });
       void queryClient.invalidateQueries({
-        queryKey: queryKeys.filesList("Trash"),
+        queryKey: filesListKeyPrefix("Trash"),
       });
       void queryClient.invalidateQueries({
         queryKey: queryKeys.fileContent(variables.path),
@@ -156,7 +160,7 @@ export function useMoveToTrash() {
         queryKey: queryKeys.trashEntries("Trash"),
       });
       void queryClient.invalidateQueries({
-        queryKey: queryKeys.filesList(getParentPath(data.trashPath)),
+        queryKey: filesListKeyPrefix(getParentPath(data.trashPath)),
       });
     },
   });
@@ -169,13 +173,13 @@ export function useRestoreFromTrash() {
     mutationFn: restoreFromTrash,
     onSuccess: (data, variables) => {
       void queryClient.invalidateQueries({
-        queryKey: queryKeys.filesList("Trash"),
+        queryKey: filesListKeyPrefix("Trash"),
       });
       void queryClient.invalidateQueries({
         queryKey: queryKeys.trashEntries("Trash"),
       });
       void queryClient.invalidateQueries({
-        queryKey: queryKeys.filesList(getParentPath(data.restoredPath)),
+        queryKey: filesListKeyPrefix(getParentPath(data.restoredPath)),
       });
       void queryClient.invalidateQueries({
         queryKey: queryKeys.fileContent(variables.path),
@@ -191,7 +195,7 @@ export function useDeleteFromTrash() {
     mutationFn: deleteFromTrash,
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({
-        queryKey: queryKeys.filesList(getParentPath(variables.path)),
+        queryKey: filesListKeyPrefix(getParentPath(variables.path)),
       });
       void queryClient.invalidateQueries({
         queryKey: queryKeys.trashEntries("Trash"),

@@ -204,6 +204,12 @@ export function useStoreActions() {
           queryClient.invalidateQueries({ queryKey: queryKeys.installedApps }),
           queryClient.invalidateQueries({ queryKey: queryKeys.storeApp(terminalAppId) }),
           queryClient.invalidateQueries({
+            queryKey: queryKeys.appCompose(terminalAppId, "installed"),
+          }),
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.appCompose(terminalAppId, "catalog"),
+          }),
+          queryClient.invalidateQueries({
             queryKey: queryKeys.storeOperation(terminalOperationId),
           }),
         ]);
@@ -515,6 +521,9 @@ export function useStoreActions() {
     onSuccess: ({ appId, operationId }) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.storeCatalog });
       void queryClient.invalidateQueries({ queryKey: queryKeys.storeApp(appId) });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.appCompose(appId, "installed"),
+      });
 
       if (operationId) {
         void attachOperationTracking({

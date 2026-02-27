@@ -1,6 +1,7 @@
 import { createReadStream } from "node:fs";
 import { Readable } from "node:stream";
 import { type NextRequest, NextResponse } from "next/server";
+import { serverEnv } from "@/lib/server/env";
 import {
   createRequestId,
   logServerAction,
@@ -38,6 +39,7 @@ export async function GET(request: NextRequest) {
 
         const details = await readFileForViewer({
           path: filePath,
+          includeHidden: serverEnv.FILES_ALLOW_HIDDEN,
         });
         if (!(details.mode === "image" || details.mode === "pdf")) {
           return NextResponse.json(
@@ -53,6 +55,7 @@ export async function GET(request: NextRequest) {
 
         const resolved = await resolveReadableFileAbsolutePath({
           path: filePath,
+          includeHidden: serverEnv.FILES_ALLOW_HIDDEN,
         });
         const stream = createReadStream(resolved.absolutePath);
 

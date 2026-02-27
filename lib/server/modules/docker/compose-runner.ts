@@ -105,8 +105,10 @@ export function applyWebUiPortOverride(composeContent: string, webUiPort: number
     return `${match[1]}${webUiPort}${match[3]}`;
   });
 
+  // Some stacks (for example `network_mode: host`) intentionally do not publish ports.
+  // In that case keep compose as-is and persist the port in installed stack metadata.
   if (!replaced) {
-    throw new Error("Unable to override web UI port: no numeric published port mapping found");
+    return composeContent;
   }
 
   return updated.join("\n");
@@ -684,6 +686,53 @@ export async function getComposeStatus(input: {
   envPath: string;
   stackName: string;
 }): Promise<"running" | "stopped" | "unknown"> {
+  const info = await getComposeRuntimeInfo(input);
+  return info.status;
+}
+
+type ComposePsEntry = {
+  State?: string;
+  Name?: string;
+};
+
+function parseComposePsOutput(stdout: string) {
+  const trimmed = stdout.trim();
+  if (!trimmed) return [] as ComposePsEntry[];
+
+  if (trimmed.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((entry): entry is ComposePsEntry => {
+          return Boolean(entry && typeof entry === "object");
+        });
+      }
+    } catch {
+      // fallback to line-delimited parser
+    }
+  }
+
+  return trimmed
+    .split("\n")
+    .map((line) => {
+      try {
+        return JSON.parse(line) as ComposePsEntry;
+      } catch {
+        return null;
+      }
+    })
+    .filter((entry): entry is ComposePsEntry => entry !== null);
+}
+
+export async function getComposeRuntimeInfo(input: {
+  composePath: string;
+  envPath: string;
+  stackName: string;
+}): Promise<{
+  status: "running" | "stopped" | "unknown";
+  containerNames: string[];
+  primaryContainerName: string | null;
+}> {
   try {
     const stdout = await runComposeCommand({
       ...input,
@@ -691,30 +740,47 @@ export async function getComposeStatus(input: {
     });
 
     if (!stdout.trim()) {
-      return "stopped";
+      return {
+        status: "stopped",
+        containerNames: [],
+        primaryContainerName: null,
+      };
     }
 
-    const lines = stdout.trim().split("\n");
-    const containers = lines.map((line) => {
-      try {
-        return JSON.parse(line) as { State?: string };
-      } catch {
-        return null;
-      }
-    }).filter((c): c is { State?: string } => c !== null);
+    const containers = parseComposePsOutput(stdout);
 
     if (containers.length === 0) {
-      return "stopped";
+      return {
+        status: "stopped",
+        containerNames: [],
+        primaryContainerName: null,
+      };
     }
 
     const allRunning = containers.every((c) => c.State === "running");
     const anyRunning = containers.some((c) => c.State === "running");
+    const containerNames = containers
+      .map((c) => c.Name?.trim() ?? "")
+      .filter((name) => name.length > 0);
+    const primaryRunning = containers.find((c) => c.State === "running" && c.Name);
+    const primaryContainerName =
+      primaryRunning?.Name?.trim() ??
+      containerNames[0] ??
+      null;
 
-    if (allRunning) return "running";
-    if (anyRunning) return "running"; // Partially running still counts as running
-    return "stopped";
+    const status = allRunning || anyRunning ? "running" : "stopped";
+
+    return {
+      status,
+      containerNames,
+      primaryContainerName,
+    };
   } catch {
-    return "unknown";
+    return {
+      status: "unknown",
+      containerNames: [],
+      primaryContainerName: null,
+    };
   }
 }
 

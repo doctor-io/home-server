@@ -130,6 +130,24 @@ export const filesNetworkShares = pgTable(
   ],
 );
 
+export const filesLocalShares = pgTable(
+  "files_local_shares",
+  {
+    id: text("id").primaryKey(),
+    shareName: text("share_name").notNull(),
+    sourcePath: text("source_path").notNull(),
+    sharedPath: text("shared_path").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("files_local_shares_share_name_idx").on(table.shareName),
+    uniqueIndex("files_local_shares_source_path_idx").on(table.sourcePath),
+    uniqueIndex("files_local_shares_shared_path_idx").on(table.sharedPath),
+    index("files_local_shares_created_at_idx").on(table.createdAt),
+  ],
+);
+
 export const filesTrashEntries = pgTable(
   "files_trash_entries",
   {

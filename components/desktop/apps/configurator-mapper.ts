@@ -609,13 +609,16 @@ export function classicStateToCompose(
     hostname: state.hostname,
   };
 
-  const normalizedPorts = state.ports
-    .filter((row) => row.host.trim() && row.container.trim())
-    .map((row) =>
-      row.protocol === "UDP"
-        ? `${row.host}:${row.container}/udp`
-        : `${row.host}:${row.container}`,
-    );
+  const normalizedPorts =
+    state.network.trim().toLowerCase() === "host"
+      ? []
+      : state.ports
+          .filter((row) => row.host.trim() && row.container.trim())
+          .map((row) =>
+            row.protocol === "UDP"
+              ? `${row.host}:${row.container}/udp`
+              : `${row.host}:${row.container}`,
+          );
   if (normalizedPorts.length > 0) {
     nextService.ports = normalizedPorts;
   } else {

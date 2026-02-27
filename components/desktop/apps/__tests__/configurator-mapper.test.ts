@@ -58,6 +58,24 @@ describe("configurator-mapper", () => {
     expect(compose).toContain("TZ: UTC");
   });
 
+  it("removes ports when network mode is host", () => {
+    const seed = createDefaultClassicState({
+      title: "Host App",
+      iconUrl: "",
+      fallbackPort: 8123,
+    });
+
+    const compose = classicStateToCompose({
+      ...seed,
+      network: "host",
+      ports: [{ id: "p-1", host: "8123", container: "8123", protocol: "TCP" as const }],
+    });
+
+    expect(compose).toContain("network_mode: host");
+    expect(compose).not.toContain("ports:");
+    expect(compose).not.toContain("8123:8123");
+  });
+
   it("returns parse error for invalid yaml", () => {
     const parsed = safeComposeToClassicState({
       composeDraft: "services:\n  app: [",

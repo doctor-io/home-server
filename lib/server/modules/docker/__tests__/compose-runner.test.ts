@@ -31,6 +31,18 @@ services:
     expect(updated).toContain(`- "3100:3000"`);
   });
 
+  it("keeps compose unchanged when no published port mapping exists", () => {
+    const compose = `
+services:
+  app:
+    image: test:latest
+    network_mode: host
+`;
+
+    const updated = applyWebUiPortOverride(compose, 3100);
+    expect(updated).toBe(compose);
+  });
+
   it("sanitizes stack names", () => {
     expect(sanitizeStackName("AdGuard Home!")).toBe("adguard-home");
   });

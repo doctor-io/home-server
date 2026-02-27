@@ -32,7 +32,7 @@ import {
   TerminalSquare,
   Trash2,
 } from "lucide-react";
-import { useMemo, useState, type SyntheticEvent } from "react";
+import { useMemo, useState } from "react";
 import { UninstallAppDialog } from "@/components/desktop/uninstall-app-dialog";
 import { useInstalledApps } from "@/hooks/useInstalledApps";
 import { useStoreActions } from "@/hooks/useStoreActions";
@@ -49,9 +49,11 @@ type AppItem = {
   status: "running" | "stopped" | "updating";
   category: string;
   webUiPort: number | null;
+  containerName: string | null;
 };
 
 export type AppActionTarget = {
+  appId: string;
   appName: string;
   dashboardUrl: string;
   containerName: string;
@@ -196,18 +198,20 @@ function resolveAppActionTarget(app: AppItem): AppActionTarget {
     const path = mapped ? extractUrlPath(mapped.dashboardUrl) : "";
 
     return {
+      appId: app.id,
       appName: app.name,
       dashboardUrl: `${protocol}//${hostname}:${app.webUiPort}${path}`,
-      containerName: mapped?.containerName ?? app.id,
+      containerName: app.containerName ?? mapped?.containerName ?? app.id,
     };
   }
 
   if (mapped) {
     const dashboardUrl = toCurrentHostUrl(mapped.dashboardUrl);
     return {
+      appId: app.id,
       appName: app.name,
       dashboardUrl,
-      containerName: mapped.containerName,
+      containerName: app.containerName ?? mapped.containerName,
     };
   }
 
@@ -215,9 +219,10 @@ function resolveAppActionTarget(app: AppItem): AppActionTarget {
   const hostname = typeof window !== "undefined" ? window.location.hostname : "localhost";
 
   return {
+    appId: app.id,
     appName: app.name,
     dashboardUrl: `${protocol}//${hostname}`,
-    containerName: app.id,
+    containerName: app.containerName ?? app.id,
   };
 }
 
@@ -292,6 +297,7 @@ export function AppGrid({
           status: statusByAppId[appId] ?? derivedStatus,
           category: catalog?.categories[0] ?? visual.category,
           webUiPort: catalog?.webUiPort ?? fallbackPort,
+          containerName: installed?.containerName ?? mapped?.containerName ?? appId,
         } satisfies AppItem;
       })
       .sort((left, right) => left.name.localeCompare(right.name));

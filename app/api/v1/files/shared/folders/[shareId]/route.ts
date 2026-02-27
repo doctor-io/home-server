@@ -1,44 +1,42 @@
-import { type NextRequest, NextResponse } from "next/server";
-import { serverEnv } from "@/lib/server/env";
+import { NextResponse } from "next/server";
 import {
   createRequestId,
   logServerAction,
   withServerTiming,
 } from "@/lib/server/logging/logger";
 import {
-  FileServiceError,
-  listDirectory,
-} from "@/lib/server/modules/files/service";
+  LocalSharingError,
+  removeLocalFolderShare,
+} from "@/lib/server/modules/files/local-sharing";
 
 export const runtime = "nodejs";
 
-export async function GET(request: NextRequest) {
+type Context = {
+  params: Promise<{
+    shareId: string;
+  }>;
+};
+
+export async function DELETE(_request: Request, context: Context) {
   const requestId = createRequestId();
+  const { shareId } = await context.params;
 
   try {
     return await withServerTiming(
       {
         layer: "api",
-        action: "files.list.get",
+        action: "files.shared.folders.delete",
         requestId,
+        meta: {
+          shareId,
+        },
       },
       async () => {
-        const searchParams = request.nextUrl.searchParams;
-        const filePath = searchParams.get("path") ?? undefined;
-        const includeHidden =
-          serverEnv.FILES_ALLOW_HIDDEN &&
-          searchParams.get("includeHidden") === "true";
-        const data = await listDirectory({
-          path: filePath,
-          includeHidden,
-        });
+        const data = await removeLocalFolderShare(shareId);
 
         return NextResponse.json(
           {
             data,
-            meta: {
-              count: data.entries.length,
-            },
           },
           {
             headers: {
@@ -49,7 +47,7 @@ export async function GET(request: NextRequest) {
       },
     );
   } catch (error) {
-    if (error instanceof FileServiceError) {
+    if (error instanceof LocalSharingError) {
       return NextResponse.json(
         {
           error: error.message,
@@ -64,16 +62,19 @@ export async function GET(request: NextRequest) {
     logServerAction({
       level: "error",
       layer: "api",
-      action: "files.list.get.response",
+      action: "files.shared.folders.delete.response",
       status: "error",
       requestId,
-      message: "Unable to list files",
+      message: "Unable to unshare folder",
       error,
+      meta: {
+        shareId,
+      },
     });
 
     return NextResponse.json(
       {
-        error: "Unable to list files",
+        error: "Unable to unshare folder",
         code: "internal_error",
       },
       {

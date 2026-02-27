@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { withClientTiming } from "@/lib/client/logger";
 import type {
   FileListResponse,
+  FileRootResponse,
   FileReadResponse,
   FileWriteRequest,
   FileWriteResponse,
@@ -21,14 +22,21 @@ type ReadFileApiResponse = {
   data: FileReadResponse;
 };
 
+type RootFileApiResponse = {
+  data: FileRootResponse;
+};
+
 type WriteFileApiResponse = {
   data: FileWriteResponse;
 };
 
-function buildListEndpoint(filePath: string) {
+function buildListEndpoint(filePath: string, includeHidden = false) {
   const params = new URLSearchParams();
   if (filePath.length > 0) {
     params.set("path", filePath);
+  }
+  if (includeHidden) {
+    params.set("includeHidden", "true");
   }
   const query = params.toString();
   return query.length > 0 ? `/api/v1/files?${query}` : "/api/v1/files";
@@ -60,19 +68,17 @@ export function buildAssetUrl(filePath: string) {
   return `/api/v1/files/asset?${params.toString()}`;
 }
 
-async function fetchDirectory(filePath: string) {
-  const endpoint = buildListEndpoint(filePath);
-
+async function fetchRoot() {
   return withClientTiming(
     {
       layer: "hook",
-      action: "hooks.useFiles.fetchDirectory",
+      action: "hooks.useFiles.fetchRoot",
       meta: {
-        endpoint,
+        endpoint: "/api/v1/files/root",
       },
     },
     async () => {
-      const response = await fetch(endpoint, {
+      const response = await fetch("/api/v1/files/root", {
         cache: "no-store",
       });
       if (!response.ok) {
@@ -82,11 +88,11 @@ async function fetchDirectory(filePath: string) {
         };
         throw new Error(
           errorBody.error ??
-            `Failed to list files (${response.status})${errorBody.code ? ` [${errorBody.code}]` : ""}`,
+            `Failed to fetch files root (${response.status})${errorBody.code ? ` [${errorBody.code}]` : ""}`,
         );
       }
 
-      const json = (await response.json()) as ListFilesApiResponse;
+      const json = (await response.json()) as RootFileApiResponse;
       return json.data;
     },
   );
@@ -160,12 +166,52 @@ async function saveFileContent(payload: FileWriteRequest) {
   );
 }
 
-export function useFilesDirectory(pathSegments: string[]) {
+export function useFilesRoot() {
+  return useQuery({
+    queryKey: queryKeys.filesRoot,
+    queryFn: fetchRoot,
+    staleTime: 5_000,
+  });
+}
+
+async function fetchDirectoryWithHidden(filePath: string, includeHidden: boolean) {
+  const endpoint = buildListEndpoint(filePath, includeHidden);
+
+  return withClientTiming(
+    {
+      layer: "hook",
+      action: "hooks.useFiles.fetchDirectory",
+      meta: {
+        endpoint,
+      },
+    },
+    async () => {
+      const response = await fetch(endpoint, {
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        const errorBody = (await response.json().catch(() => ({}))) as {
+          error?: string;
+          code?: string;
+        };
+        throw new Error(
+          errorBody.error ??
+            `Failed to list files (${response.status})${errorBody.code ? ` [${errorBody.code}]` : ""}`,
+        );
+      }
+
+      const json = (await response.json()) as ListFilesApiResponse;
+      return json.data;
+    },
+  );
+}
+
+export function useFilesDirectory(pathSegments: string[], includeHidden = false) {
   const filePath = toFilePath(pathSegments);
 
   return useQuery({
-    queryKey: queryKeys.filesList(filePath),
-    queryFn: () => fetchDirectory(filePath),
+    queryKey: queryKeys.filesList(filePath, includeHidden),
+    queryFn: () => fetchDirectoryWithHidden(filePath, includeHidden),
     staleTime: 3_000,
   });
 }
@@ -189,7 +235,7 @@ export function useSaveFileContent() {
         queryKey: queryKeys.fileContent(variables.path),
       });
       void queryClient.invalidateQueries({
-        queryKey: queryKeys.filesList(getParentPath(variables.path)),
+        queryKey: ["files", "list", getParentPath(variables.path)],
       });
       queryClient.setQueryData(queryKeys.fileContent(variables.path), (prev: ReadFileApiResponse | FileReadResponse | undefined) => {
         const previous =

@@ -7,6 +7,10 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { logServerAction } from "@/lib/server/logging/logger";
 import {
+  FilesPathError,
+  resolvePathWithinFilesRoot,
+} from "@/lib/server/modules/files/path-resolver";
+import {
   deleteNetworkShareFromDb,
   getNetworkShareByMountPathFromDb,
   getNetworkShareFromDb,
@@ -16,7 +20,6 @@ import {
   type NetworkShareRecord,
 } from "@/lib/server/modules/files/network-shares-repository";
 import { decryptSecret, encryptSecret } from "@/lib/server/modules/files/secrets";
-import { ensureDataRootDirectories } from "@/lib/server/storage/data-root";
 import type {
   CreateNetworkShareRequest,
   DiscoverServersResponse,
@@ -71,69 +74,30 @@ function sanitizeSegment(input: string, fallback: string) {
   return sanitized.length > 0 ? sanitized : fallback;
 }
 
-function normalizeRelativePath(input: string) {
-  const cleaned = input.trim().replaceAll("\\", "/");
-  if (cleaned.length === 0) {
-    throw new NetworkStorageError("Invalid mount path", {
-      code: "invalid_path",
-      statusCode: 400,
-    });
-  }
-  if (cleaned.includes("\0") || cleaned.startsWith("/")) {
-    throw new NetworkStorageError("Invalid mount path", {
-      code: "invalid_path",
-      statusCode: 400,
-    });
-  }
-
-  const normalized = path.posix.normalize(cleaned);
-  if (
-    normalized === "." ||
-    normalized === ".." ||
-    normalized.startsWith("../")
-  ) {
-    throw new NetworkStorageError("Invalid mount path", {
-      code: "invalid_path",
-      statusCode: 400,
-    });
-  }
-
-  return normalized;
-}
-
-function ensureWithinRoot(rootPath: string, absolutePath: string) {
-  const relative = path.relative(rootPath, absolutePath);
-  const within =
-    relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
-
-  if (!within) {
-    throw new NetworkStorageError("Path escapes root", {
-      code: "path_outside_root",
-      statusCode: 400,
-    });
-  }
-}
-
 async function resolveMountPath(mountPath: string): Promise<ResolvedMountPath> {
-  const ensured = await ensureDataRootDirectories();
-  const rootPath = ensured.dataRoot;
-
-  const relativePath = normalizeRelativePath(mountPath);
-  if (relativePath !== "Network" && !relativePath.startsWith("Network/")) {
-    throw new NetworkStorageError("Mount path must be under Network", {
-      code: "invalid_path",
-      statusCode: 400,
+  try {
+    const resolved = await resolvePathWithinFilesRoot({
+      inputPath: mountPath,
+      requiredPrefix: "Network",
+      allowHiddenSegments: false,
+      allowMissingLeaf: true,
     });
+
+    return {
+      rootPath: resolved.rootPath,
+      relativePath: resolved.relativePath,
+      absolutePath: resolved.absolutePath,
+    };
+  } catch (error) {
+    if (error instanceof FilesPathError) {
+      throw new NetworkStorageError(error.message, {
+        code: error.code,
+        statusCode: error.statusCode,
+        cause: error,
+      });
+    }
+    throw error;
   }
-
-  const absolutePath = path.resolve(rootPath, relativePath);
-  ensureWithinRoot(rootPath, absolutePath);
-
-  return {
-    rootPath,
-    relativePath,
-    absolutePath,
-  };
 }
 
 function mountPathForShare(host: string, share: string) {

@@ -4,7 +4,7 @@ import path from "node:path";
 import { LruCache } from "@/lib/server/cache/lru";
 import { logServerAction, withServerTiming } from "@/lib/server/logging/logger";
 import { listInstalledAppsFromDb } from "@/lib/server/modules/apps/repository";
-import { getComposeStatus } from "@/lib/server/modules/docker/compose-runner";
+import { getComposeRuntimeInfo } from "@/lib/server/modules/docker/compose-runner";
 import type { InstalledApp } from "@/lib/shared/contracts/apps";
 
 const appsCache = new LruCache<InstalledApp[]>(4, 5_000);
@@ -58,14 +58,22 @@ export async function listInstalledApps(options?: { bypassCache?: boolean }) {
           apps.map(async (app) => {
             const envPath = path.join(path.dirname(app.composePath), ".env");
             try {
-              const status = await getComposeStatus({
+              const runtime = await getComposeRuntimeInfo({
                 composePath: app.composePath,
                 envPath,
                 stackName: app.stackName,
               });
-              return { ...app, status };
+              return {
+                ...app,
+                status: runtime.status,
+                containerName: runtime.primaryContainerName,
+              };
             } catch {
-              return { ...app, status: "unknown" as const };
+              return {
+                ...app,
+                status: "unknown" as const,
+                containerName: null,
+              };
             }
           }),
         );

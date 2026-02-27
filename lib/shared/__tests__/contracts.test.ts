@@ -9,6 +9,7 @@ import type {
   StoreOperationEvent,
 } from "@/lib/shared/contracts/apps";
 import type {
+  CreateLocalFolderShareRequest,
   CreateNetworkShareRequest,
   DiscoverServersResponse,
   DiscoverSharesRequest,
@@ -24,6 +25,7 @@ import type {
   TrashRestoreResponse,
   FileWriteRequest,
   FileWriteResponse,
+  LocalFolderShareStatus,
 } from "@/lib/shared/contracts/files";
 import type { SystemMetricsSnapshot } from "@/lib/shared/contracts/system";
 import type { WeatherSnapshot } from "@/lib/shared/contracts/weather";
@@ -203,6 +205,20 @@ describe("shared contracts", () => {
       password: string;
     }>();
 
+    expectTypeOf<CreateLocalFolderShareRequest>().toMatchTypeOf<{
+      path: string;
+      name?: string;
+    }>();
+
+    expectTypeOf<LocalFolderShareStatus>().toMatchTypeOf<{
+      id: string;
+      shareName: string;
+      sourcePath: string;
+      sharedPath: string;
+      isMounted: boolean;
+      isExported: boolean;
+    }>();
+
     expectTypeOf<DiscoverServersResponse>().toMatchTypeOf<{
       servers: string[];
     }>();
@@ -244,6 +260,7 @@ describe("shared contracts", () => {
       | "not_a_directory"
       | "hidden_blocked"
       | "symlink_blocked"
+      | "permission_denied"
       | "unsupported_file"
       | "payload_too_large"
       | "write_conflict"

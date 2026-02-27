@@ -16,6 +16,7 @@ describe("AppSettingsPanel wrapper", () => {
     render(
       <AppSettingsPanel
         target={{
+          appId: "plex",
           appName: "Plex",
           containerName: "plex",
           dashboardUrl: "http://localhost:32400",

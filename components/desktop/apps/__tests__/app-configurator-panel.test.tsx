@@ -86,6 +86,7 @@ describe("AppConfiguratorPanel", () => {
     setupActions();
 
     const installedTarget = {
+      appId: "home-assistant",
       appName: "Home Assistant",
       dashboardUrl: "http://homeio.local:8123",
       containerName: "home-assistant",

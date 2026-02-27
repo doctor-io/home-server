@@ -5,21 +5,25 @@ vi.mock("@/lib/server/modules/apps/repository", () => ({
 }));
 
 vi.mock("@/lib/server/modules/docker/compose-runner", () => ({
-  getComposeStatus: vi.fn(),
+  getComposeRuntimeInfo: vi.fn(),
 }));
 
 import { listInstalledAppsFromDb } from "@/lib/server/modules/apps/repository";
 import { listInstalledApps } from "@/lib/server/modules/apps/service";
-import { getComposeStatus } from "@/lib/server/modules/docker/compose-runner";
+import { getComposeRuntimeInfo } from "@/lib/server/modules/docker/compose-runner";
 
 describe("apps service", () => {
   const repositoryMock = vi.mocked(listInstalledAppsFromDb);
-  const statusMock = vi.mocked(getComposeStatus);
+  const runtimeInfoMock = vi.mocked(getComposeRuntimeInfo);
 
   beforeEach(() => {
     repositoryMock.mockReset();
-    statusMock.mockReset();
-    statusMock.mockResolvedValue("running");
+    runtimeInfoMock.mockReset();
+    runtimeInfoMock.mockResolvedValue({
+      status: "running",
+      containerNames: ["nextcloud-app-1"],
+      primaryContainerName: "nextcloud-app-1",
+    });
   });
 
   it("caches installed apps", async () => {
@@ -37,6 +41,7 @@ describe("apps service", () => {
     const first = await listInstalledApps();
     const second = await listInstalledApps();
 
+    expect(first[0]?.containerName).toBe("nextcloud-app-1");
     expect(first).toEqual(second);
     expect(repositoryMock).toHaveBeenCalledTimes(1);
   });

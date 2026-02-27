@@ -7,7 +7,6 @@ import {
   useMoveToTrash,
   useRestoreFromTrash,
 } from "@/hooks/useTrashActions";
-import { queryKeys } from "@/lib/shared/query-keys";
 import { createTestQueryClient, createWrapper } from "@/test/query-client-wrapper";
 
 describe("useTrashActions", () => {
@@ -38,13 +37,13 @@ describe("useTrashActions", () => {
     });
 
     expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: queryKeys.filesList("Documents"),
+      queryKey: ["files", "list", "Documents"],
     });
     expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: queryKeys.filesList("Trash"),
+      queryKey: ["files", "list", "Trash"],
     });
     expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: queryKeys.trashEntries("Trash"),
+      queryKey: ["files", "trash", "entries", "Trash"],
     });
   });
 
@@ -76,7 +75,7 @@ describe("useTrashActions", () => {
     });
 
     expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: queryKeys.filesList("Documents"),
+      queryKey: ["files", "list", "Documents"],
     });
   });
 
@@ -107,7 +106,7 @@ describe("useTrashActions", () => {
     });
 
     expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: queryKeys.filesList("Trash"),
+      queryKey: ["files", "list", "Trash"],
     });
   });
 });

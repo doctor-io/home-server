@@ -98,6 +98,7 @@ describe("AppGrid context menu", () => {
     fireEvent.click(screen.getByRole("button", { name: "Open Dashboard" }));
 
     expect(onOpenDashboard).toHaveBeenCalledWith({
+      appId: "plex",
       appName: "Plex",
       dashboardUrl: "http://localhost:32400/web",
       containerName: "plex",
@@ -122,6 +123,7 @@ describe("AppGrid context menu", () => {
     openContextMenuFor("Plex");
     fireEvent.click(screen.getByRole("button", { name: "View Logs" }));
     expect(onViewLogs).toHaveBeenCalledWith({
+      appId: "plex",
       appName: "Plex",
       dashboardUrl: "http://localhost:32400/web",
       containerName: "plex",
@@ -130,6 +132,7 @@ describe("AppGrid context menu", () => {
     openContextMenuFor("Plex");
     fireEvent.click(screen.getByRole("button", { name: "Open in Terminal" }));
     expect(onOpenTerminal).toHaveBeenCalledWith({
+      appId: "plex",
       appName: "Plex",
       dashboardUrl: "http://localhost:32400/web",
       containerName: "plex",
@@ -138,6 +141,7 @@ describe("AppGrid context menu", () => {
     openContextMenuFor("Plex");
     fireEvent.click(screen.getByRole("button", { name: "App Settings" }));
     expect(onOpenSettings).toHaveBeenCalledWith({
+      appId: "plex",
       appName: "Plex",
       dashboardUrl: "http://localhost:32400/web",
       containerName: "plex",

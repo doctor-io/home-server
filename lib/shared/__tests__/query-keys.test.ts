@@ -14,15 +14,29 @@ describe("query keys", () => {
       "app",
       "adguard-home",
     ]);
+    expect(queryKeys.appCompose("adguard-home")).toEqual([
+      "store",
+      "app-compose",
+      "adguard-home",
+      "catalog",
+    ]);
+    expect(queryKeys.appCompose("adguard-home", "installed")).toEqual([
+      "store",
+      "app-compose",
+      "adguard-home",
+      "installed",
+    ]);
     expect(queryKeys.storeOperation("op-1")).toEqual([
       "store",
       "operation",
       "op-1",
     ]);
+    expect(queryKeys.filesRoot).toEqual(["files", "root"]);
     expect(queryKeys.filesList("Documents")).toEqual([
       "files",
       "list",
       "Documents",
+      false,
     ]);
     expect(queryKeys.fileContent("Documents/notes.txt")).toEqual([
       "files",
@@ -30,6 +44,7 @@ describe("query keys", () => {
       "Documents/notes.txt",
     ]);
     expect(queryKeys.networkShares).toEqual(["files", "network", "shares"]);
+    expect(queryKeys.localFolderShares).toEqual(["files", "shared", "folders"]);
     expect(queryKeys.trashEntries("Trash")).toEqual([
       "files",
       "trash",

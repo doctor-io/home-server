@@ -3,9 +3,10 @@ import "server-only";
 import { readFile, readdir, lstat, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
-  ensureDataRootDirectories,
-  resolveDataRootDirectory,
-} from "@/lib/server/storage/data-root";
+  FilesPathError,
+  resolvePathWithinFilesRoot,
+  type ResolvedFilesPath,
+} from "@/lib/server/modules/files/path-resolver";
 import type {
   FileListEntry,
   FileListResponse,
@@ -47,7 +48,6 @@ const IMAGE_MIME_BY_EXTENSION: Record<string, string> = {
 };
 
 export const MAX_TEXT_READ_BYTES = 2 * 1024 * 1024;
-const ROOT_LABEL = "/";
 
 type ListDirectoryParams = {
   path?: string;
@@ -56,19 +56,14 @@ type ListDirectoryParams = {
 
 type ReadFileForViewerParams = {
   path: string;
+  includeHidden?: boolean;
 };
 
 type WriteTextFileParams = {
   path: string;
   content: string;
   expectedMtimeMs?: number;
-};
-
-type ResolvedFilePath = {
-  rootPath: string;
-  relativePath: string;
-  absolutePath: string;
-  segments: string[];
+  includeHidden?: boolean;
 };
 
 export class FileServiceError extends Error {
@@ -101,87 +96,23 @@ function isHiddenName(name: string) {
   return name.startsWith(".");
 }
 
-function getPosixRelativePath(input: string | undefined) {
-  if (!input) return "";
-
-  const cleaned = input.trim().replaceAll("\\", "/");
-  if (cleaned.length === 0) return "";
-  if (cleaned.includes("\0")) {
-    throw new FileServiceError("Invalid path", {
-      code: "invalid_path",
-      statusCode: 400,
-    });
-  }
-  if (cleaned.startsWith("/")) {
-    throw new FileServiceError("Path must be relative", {
-      code: "invalid_path",
-      statusCode: 400,
-    });
-  }
-
-  const normalized = path.posix.normalize(cleaned);
-  if (normalized === "." || normalized === "") {
-    return "";
-  }
-  if (normalized === ".." || normalized.startsWith("../")) {
-    throw new FileServiceError("Path escapes root", {
-      code: "path_outside_root",
-      statusCode: 400,
-    });
-  }
-
-  return normalized;
-}
-
-function assertNoHiddenSegments(segments: string[]) {
-  if (segments.some((segment) => isHiddenName(segment))) {
-    throw new FileServiceError("Hidden files are not allowed", {
-      code: "hidden_blocked",
-      statusCode: 403,
-    });
-  }
-}
-
 function isTrashPathSegments(segments: string[]) {
   return segments[0] === "Trash";
 }
 
-function ensureWithinRoot(rootPath: string, absolutePath: string) {
-  const relative = path.relative(rootPath, absolutePath);
-  const within = relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
-  if (!within) {
-    throw new FileServiceError("Path escapes root", {
-      code: "path_outside_root",
-      statusCode: 400,
+function mapFsError(
+  error: unknown,
+  fallbackMessage: string,
+  absolutePath?: string,
+) {
+  if (error instanceof FileServiceError) return error;
+  if (error instanceof FilesPathError) {
+    return new FileServiceError(error.message, {
+      code: error.code,
+      statusCode: error.statusCode,
+      cause: error,
     });
   }
-}
-
-async function assertNoSymlinks(rootPath: string, segments: string[]) {
-  let current = rootPath;
-
-  for (const segment of segments) {
-    current = path.join(current, segment);
-    try {
-      const info = await lstat(current);
-      if (info.isSymbolicLink()) {
-        throw new FileServiceError("Symlinks are not allowed", {
-          code: "symlink_blocked",
-          statusCode: 403,
-        });
-      }
-    } catch (error) {
-      const nodeError = error as NodeJS.ErrnoException;
-      if (nodeError?.code === "ENOENT") {
-        break;
-      }
-      throw error;
-    }
-  }
-}
-
-function mapFsError(error: unknown, fallbackMessage: string) {
-  if (error instanceof FileServiceError) return error;
 
   const nodeError = error as NodeJS.ErrnoException;
   if (nodeError?.code === "ENOENT") {
@@ -206,8 +137,18 @@ function mapFsError(error: unknown, fallbackMessage: string) {
     });
   }
   if (nodeError?.code === "EACCES" || nodeError?.code === "EPERM") {
-    return new FileServiceError("Access denied", {
-      code: "invalid_path",
+    return new FileServiceError(
+      `Permission denied${absolutePath ? `: ${absolutePath}` : ""}`,
+      {
+        code: "permission_denied",
+        statusCode: 403,
+        cause: error,
+      },
+    );
+  }
+  if (nodeError?.code === "ELOOP") {
+    return new FileServiceError("Symlinks are not allowed", {
+      code: "symlink_blocked",
       statusCode: 403,
       cause: error,
     });
@@ -255,31 +196,28 @@ function sortDirectoryEntries(entries: FileListEntry[]) {
 }
 
 async function resolveFilePath(inputPath: string | undefined, includeHidden: boolean) {
-  resolveDataRootDirectory();
-  const ensured = await ensureDataRootDirectories();
-  const rootPath = ensured.dataRoot;
-
-  const relativePath = getPosixRelativePath(inputPath);
-  const segments = relativePath.length > 0 ? relativePath.split("/") : [];
-  if (!includeHidden && !isTrashPathSegments(segments)) {
-    assertNoHiddenSegments(segments);
+  const preResolved = await resolvePathWithinFilesRoot({
+    inputPath,
+    allowEmpty: true,
+    allowHiddenSegments: true,
+  });
+  if (!includeHidden && !isTrashPathSegments(preResolved.segments)) {
+    const hiddenSegment = preResolved.segments.find((segment) =>
+      isHiddenName(segment),
+    );
+    if (hiddenSegment) {
+      throw new FileServiceError("Hidden files are not allowed", {
+        code: "hidden_blocked",
+        statusCode: 403,
+      });
+    }
   }
-
-  const absolutePath = path.resolve(rootPath, relativePath);
-  ensureWithinRoot(rootPath, absolutePath);
-  await assertNoSymlinks(rootPath, segments);
-
-  return {
-    rootPath,
-    relativePath,
-    absolutePath,
-    segments,
-  } satisfies ResolvedFilePath;
+  return preResolved;
 }
 
 export async function listDirectory(params: ListDirectoryParams = {}): Promise<FileListResponse> {
   const includeHidden = Boolean(params.includeHidden);
-  let resolved: ResolvedFilePath;
+  let resolved: ResolvedFilesPath;
 
   try {
     resolved = await resolveFilePath(params.path, includeHidden);
@@ -297,7 +235,11 @@ export async function listDirectory(params: ListDirectoryParams = {}): Promise<F
       });
     }
   } catch (error) {
-    throw mapFsError(error, "Failed to list directory");
+    throw mapFsError(
+      error,
+      "Failed to list directory",
+      resolved?.absolutePath,
+    );
   }
 
   try {
@@ -333,21 +275,25 @@ export async function listDirectory(params: ListDirectoryParams = {}): Promise<F
     }
 
     return {
-      root: ROOT_LABEL,
+      root: resolved.rootPath,
       cwd: resolved.relativePath,
       entries: sortDirectoryEntries(output),
     };
   } catch (error) {
-    throw mapFsError(error, "Failed to list directory");
+    throw mapFsError(
+      error,
+      "Failed to list directory",
+      resolved.absolutePath,
+    );
   }
 }
 
 export async function readFileForViewer(params: ReadFileForViewerParams): Promise<FileReadResponse> {
-  let resolved: ResolvedFilePath;
+  let resolved: ResolvedFilesPath;
   let info: Awaited<ReturnType<typeof stat>>;
 
   try {
-    resolved = await resolveFilePath(params.path, false);
+    resolved = await resolveFilePath(params.path, Boolean(params.includeHidden));
     const linkInfo = await lstat(resolved.absolutePath);
     if (linkInfo.isSymbolicLink()) {
       throw new FileServiceError("Symlinks are not allowed", {
@@ -363,7 +309,11 @@ export async function readFileForViewer(params: ReadFileForViewerParams): Promis
     }
     info = await stat(resolved.absolutePath);
   } catch (error) {
-    throw mapFsError(error, "Failed to open file");
+    throw mapFsError(
+      error,
+      "Failed to open file",
+      resolved?.absolutePath,
+    );
   }
 
   const name = path.basename(resolved.absolutePath);
@@ -374,7 +324,7 @@ export async function readFileForViewer(params: ReadFileForViewerParams): Promis
   if (mode === "text") {
     if (info.size > MAX_TEXT_READ_BYTES) {
       return {
-        root: ROOT_LABEL,
+        root: resolved.rootPath,
         path: resolved.relativePath,
         name,
         ext,
@@ -390,7 +340,7 @@ export async function readFileForViewer(params: ReadFileForViewerParams): Promis
     try {
       const content = await readFile(resolved.absolutePath, "utf8");
       return {
-        root: ROOT_LABEL,
+        root: resolved.rootPath,
         path: resolved.relativePath,
         name,
         ext,
@@ -402,12 +352,16 @@ export async function readFileForViewer(params: ReadFileForViewerParams): Promis
         content,
       };
     } catch (error) {
-      throw mapFsError(error, "Failed to read file");
+      throw mapFsError(
+        error,
+        "Failed to read file",
+        resolved.absolutePath,
+      );
     }
   }
 
   return {
-    root: ROOT_LABEL,
+    root: resolved.rootPath,
     path: resolved.relativePath,
     name,
     ext,
@@ -429,11 +383,11 @@ export async function writeTextFile(params: WriteTextFileParams): Promise<FileWr
     });
   }
 
-  let resolved: ResolvedFilePath;
+  let resolved: ResolvedFilesPath;
   let currentInfo: Awaited<ReturnType<typeof stat>>;
 
   try {
-    resolved = await resolveFilePath(params.path, false);
+    resolved = await resolveFilePath(params.path, Boolean(params.includeHidden));
     const linkInfo = await lstat(resolved.absolutePath);
     if (linkInfo.isSymbolicLink()) {
       throw new FileServiceError("Symlinks are not allowed", {
@@ -449,7 +403,11 @@ export async function writeTextFile(params: WriteTextFileParams): Promise<FileWr
     }
     currentInfo = await stat(resolved.absolutePath);
   } catch (error) {
-    throw mapFsError(error, "Failed to save file");
+    throw mapFsError(
+      error,
+      "Failed to save file",
+      resolved?.absolutePath,
+    );
   }
 
   const ext = getExtension(path.basename(resolved.absolutePath));
@@ -472,25 +430,43 @@ export async function writeTextFile(params: WriteTextFileParams): Promise<FileWr
   }
 
   try {
+    const target = await resolvePathWithinFilesRoot({
+      inputPath: params.path,
+      allowHiddenSegments: Boolean(params.includeHidden),
+    });
+    if (target.absolutePath !== resolved.absolutePath) {
+      throw new FileServiceError("File changed while resolving target path", {
+        code: "write_conflict",
+        statusCode: 409,
+      });
+    }
+
     await writeFile(resolved.absolutePath, params.content, "utf8");
     const savedInfo = await stat(resolved.absolutePath);
     return {
-      root: ROOT_LABEL,
+      root: resolved.rootPath,
       path: resolved.relativePath,
       sizeBytes: savedInfo.size,
       modifiedAt: savedInfo.mtime.toISOString(),
       mtimeMs: savedInfo.mtimeMs,
     };
   } catch (error) {
-    throw mapFsError(error, "Failed to save file");
+    throw mapFsError(
+      error,
+      "Failed to save file",
+      resolved.absolutePath,
+    );
   }
 }
 
-export async function resolveReadableFileAbsolutePath(input: { path: string }) {
-  let resolved: ResolvedFilePath;
+export async function resolveReadableFileAbsolutePath(input: {
+  path: string;
+  includeHidden?: boolean;
+}) {
+  let resolved: ResolvedFilesPath;
 
   try {
-    resolved = await resolveFilePath(input.path, false);
+    resolved = await resolveFilePath(input.path, Boolean(input.includeHidden));
     const linkInfo = await lstat(resolved.absolutePath);
     if (linkInfo.isSymbolicLink()) {
       throw new FileServiceError("Symlinks are not allowed", {
@@ -505,11 +481,15 @@ export async function resolveReadableFileAbsolutePath(input: { path: string }) {
       });
     }
   } catch (error) {
-    throw mapFsError(error, "Failed to resolve file");
+    throw mapFsError(
+      error,
+      "Failed to resolve file",
+      resolved?.absolutePath,
+    );
   }
 
   return {
-    root: ROOT_LABEL,
+    root: resolved.rootPath,
     path: resolved.relativePath,
     absolutePath: resolved.absolutePath,
   };

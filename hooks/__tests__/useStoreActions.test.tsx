@@ -110,6 +110,12 @@ describe("useStoreActions", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.installedApps });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.storeApp("plex") });
     expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: queryKeys.appCompose("plex", "installed"),
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: queryKeys.appCompose("plex", "catalog"),
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: queryKeys.storeOperation("op-install-1"),
     });
   });
@@ -340,6 +346,12 @@ describe("useStoreActions", () => {
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.storeCatalog });
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.installedApps });
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.storeApp("2fauth") });
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: queryKeys.appCompose("2fauth", "installed"),
+      });
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: queryKeys.appCompose("2fauth", "catalog"),
+      });
       expect(invalidateSpy).toHaveBeenCalledWith({
         queryKey: queryKeys.storeOperation("op-install-poll"),
       });

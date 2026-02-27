@@ -57,6 +57,7 @@ describe("GET /api/v1/files/content", () => {
     expect(json.data.mode).toBe("text");
     expect(vi.mocked(readFileForViewer)).toHaveBeenCalledWith({
       path: "Documents/notes.txt",
+      includeHidden: false,
     });
   });
 

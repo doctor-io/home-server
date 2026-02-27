@@ -9,6 +9,12 @@ import {
   useSaveFileContent,
 } from "@/hooks/useFiles";
 import {
+  useCreateLocalFolderShare,
+  useDeleteLocalFolderShare,
+  useLocalFolderShares,
+} from "@/hooks/useLocalFolderShares";
+import { useNetworkShares } from "@/hooks/useNetworkShares";
+import {
   useDeleteFromTrash,
   useMoveToTrash,
   useRestoreFromTrash,
@@ -70,6 +76,16 @@ const PATH_ALIAS_MAP: Record<string, string> = {
 
 function normalizePathForBackend(pathSegments: string[]) {
   return pathSegments.map((segment) => PATH_ALIAS_MAP[segment] ?? segment);
+}
+
+const DISPLAY_PATH_ALIAS_MAP: Record<string, string> = {
+  Download: "Downloads",
+};
+
+function normalizePathForDisplay(pathSegments: string[]) {
+  return pathSegments.map(
+    (segment) => DISPLAY_PATH_ALIAS_MAP[segment] ?? segment,
+  );
 }
 
 function toUiFileEntry(entry: FileListEntry): FileEntry {
@@ -363,6 +379,10 @@ export function FileManager() {
   const [showNetworkDialog, setShowNetworkDialog] = useState(false);
 
   const directoryQuery = useFilesDirectory(currentPath);
+  const networkSharesQuery = useNetworkShares();
+  const localSharesQuery = useLocalFolderShares();
+  const createLocalShareMutation = useCreateLocalFolderShare();
+  const deleteLocalShareMutation = useDeleteLocalFolderShare();
   const saveFileContentMutation = useSaveFileContent();
   const moveToTrashMutation = useMoveToTrash();
   const restoreFromTrashMutation = useRestoreFromTrash();
@@ -424,6 +444,56 @@ export function FileManager() {
     !saveFileContentMutation.isPending,
   );
   const isTrashView = currentPath[0] === "Trash";
+  const isSharedView = currentPath[0] === "Shared";
+  const currentPathForDisplay = useMemo(
+    () => normalizePathForDisplay(currentPath),
+    [currentPath],
+  );
+  const localSharesByPath = useMemo(
+    () => {
+      const map = new Map<
+        string,
+        {
+          id: string;
+          shareName: string;
+          sourcePath: string;
+          sharedPath: string;
+          isMounted: boolean;
+          isExported: boolean;
+        }
+      >();
+      for (const share of localSharesQuery.data ?? []) {
+        map.set(share.sourcePath, share);
+        map.set(share.sharedPath, share);
+      }
+      return map;
+    },
+    [localSharesQuery.data],
+  );
+  const locationItems = useMemo(() => {
+    const shares = networkSharesQuery.data ?? [];
+    const hosts = new Map<string, string[]>();
+
+    for (const share of shares) {
+      const segments = share.mountPath.split("/").filter(Boolean);
+      const hostSegment = segments[1];
+      const rootSegment = segments[0];
+      if (!hostSegment || !rootSegment) {
+        continue;
+      }
+      if (hostSegment) {
+        hosts.set(hostSegment, [rootSegment, hostSegment]);
+      }
+    }
+
+    return Array.from(hosts.entries())
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([host, hostPath]) => ({
+        name: host,
+        icon: <HardDrive className="size-4 text-cyan-400" />,
+        path: hostPath,
+      }));
+  }, [networkSharesQuery.data]);
 
   useEffect(() => {
     if (!openFileKey || !openFileViewer || openFileViewer.mode !== "text")
@@ -562,9 +632,37 @@ export function FileManager() {
     }
   }
 
+  async function handleShareFolder(entry: FileEntry) {
+    try {
+      const result = await createLocalShareMutation.mutateAsync({
+        path: entry.path,
+      });
+      setStatusNotice(`Shared over network: /${result.sharedPath}`);
+    } catch (error) {
+      setStatusNotice(
+        error instanceof Error ? error.message : "Failed to share folder",
+      );
+    }
+  }
+
+  async function handleUnshareFolder(shareId: string) {
+    try {
+      await deleteLocalShareMutation.mutateAsync(shareId);
+      setStatusNotice("Shared folder removed");
+    } catch (error) {
+      setStatusNotice(
+        error instanceof Error ? error.message : "Failed to remove shared folder",
+      );
+    }
+  }
+
   // Count items
   const folderCount = sortedEntries.filter((e) => e.type === "folder").length;
   const fileCount = sortedEntries.filter((e) => e.type === "file").length;
+  const contextShare =
+    showContextMenu?.entry.type === "folder"
+      ? localSharesByPath.get(showContextMenu.entry.path)
+      : undefined;
 
   return (
     <div
@@ -594,7 +692,10 @@ export function FileManager() {
                   ) : null}
                 </div>
                 <div className="flex flex-col gap-0.5 mt-1.5">
-                  {section.items.map((item) => {
+                  {(section.title === "Locations"
+                    ? locationItems
+                    : section.items
+                  ).map((item) => {
                     const isActive =
                       JSON.stringify(normalizePathForBackend(item.path)) ===
                       JSON.stringify(currentPath);
@@ -602,7 +703,10 @@ export function FileManager() {
                       <button
                         key={item.name}
                         onClick={() => {
-                          if (item.action === "open-network-dialog") {
+                          if (
+                            "action" in item &&
+                            item.action === "open-network-dialog"
+                          ) {
                             setShowNetworkDialog(true);
                             return;
                           }
@@ -628,8 +732,12 @@ export function FileManager() {
           <div className="mt-auto p-3 border-t border-glass-border">
             <div className="mb-3 flex flex-col gap-0.5">
               <button
-                onClick={() => navigateToPath(["Network"])}
-                className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/40 transition-colors cursor-pointer"
+                onClick={() => navigateToPath(["Shared"])}
+                className={`flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
+                  isSharedView
+                    ? "bg-primary/15 text-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/40"
+                }`}
               >
                 <Users className="size-3.5 text-sky-400" />
                 <span>Shared</span>
@@ -693,7 +801,7 @@ export function FileManager() {
                   onClick={() => navigateToPath(currentPath.slice(0, i + 1))}
                   className="text-xs text-muted-foreground hover:text-foreground transition-colors px-1.5 py-1 rounded-md hover:bg-secondary/40 truncate max-w-32 cursor-pointer"
                 >
-                  {segment}
+                  {currentPathForDisplay[i] ?? segment}
                 </button>
               </div>
             ))}
@@ -966,7 +1074,7 @@ export function FileManager() {
                 {statusNotice}
               </span>
             ) : null}
-            <span className="font-mono">/{currentPath.join("/")}</span>
+            <span className="font-mono">/{currentPathForDisplay.join("/")}</span>
           </div>
         </div>
       </div>
@@ -1013,6 +1121,34 @@ export function FileManager() {
             label="Toggle Star"
             onClick={() => setShowContextMenu(null)}
           />
+          {showContextMenu.entry.type === "folder" && !isTrashView ? (
+            <>
+              <ContextMenuItem
+                icon={<Users className="size-3.5 text-sky-400" />}
+                label={contextShare ? "Stop Sharing" : "Share Folder"}
+                onClick={() => {
+                  const entry = showContextMenu.entry;
+                  const activeShare = contextShare;
+                  setShowContextMenu(null);
+                  if (activeShare) {
+                    void handleUnshareFolder(activeShare.id);
+                    return;
+                  }
+                  if (
+                    entry.path === "Shared" ||
+                    entry.path.startsWith("Shared/") ||
+                    entry.path === "Network" ||
+                    entry.path.startsWith("Network/")
+                  ) {
+                    setStatusNotice("Cannot share this folder path");
+                    return;
+                  }
+                  void handleShareFolder(entry);
+                }}
+              />
+              <div className="h-px bg-border mx-2 my-1" />
+            </>
+          ) : null}
           {isTrashView ? (
             <>
               <ContextMenuItem

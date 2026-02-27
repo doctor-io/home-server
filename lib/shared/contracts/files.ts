@@ -6,6 +6,7 @@ export type FileServiceErrorCode =
   | "not_a_directory"
   | "hidden_blocked"
   | "symlink_blocked"
+  | "permission_denied"
   | "unsupported_file"
   | "payload_too_large"
   | "write_conflict"
@@ -86,6 +87,20 @@ export type CreateNetworkShareRequest = {
   share: string;
   username: string;
   password: string;
+};
+
+export type LocalFolderShareStatus = {
+  id: string;
+  shareName: string;
+  sourcePath: string;
+  sharedPath: string;
+  isMounted: boolean;
+  isExported: boolean;
+};
+
+export type CreateLocalFolderShareRequest = {
+  path: string;
+  name?: string;
 };
 
 export type DiscoverServersResponse = {

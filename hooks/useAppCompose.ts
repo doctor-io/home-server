@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/shared/query-keys";
 
 export type AppComposeData = {
   image?: string;
@@ -30,7 +31,7 @@ export function useAppCompose(
   source: "catalog" | "installed" = "catalog",
 ) {
   return useQuery({
-    queryKey: ["app-compose", appId, source],
+    queryKey: queryKeys.appCompose(appId ?? "", source),
     queryFn: async () => {
       if (!appId) throw new Error("App ID is required");
 

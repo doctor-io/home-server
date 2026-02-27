@@ -94,7 +94,9 @@ export function AppConfiguratorPanel({
   customDefaults,
   onClose,
 }: AppConfiguratorPanelProps) {
-  const derivedTargetAppId = target ? toAppId(target.appName) : undefined;
+  const derivedTargetAppId = target
+    ? target.appId || toAppId(target.appName)
+    : undefined;
   const queryAppId =
     context === "custom_install"
       ? null

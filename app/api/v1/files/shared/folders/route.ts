@@ -1,55 +1,42 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { z } from "zod";
-import { serverEnv } from "@/lib/server/env";
 import {
   createRequestId,
   logServerAction,
   withServerTiming,
 } from "@/lib/server/logging/logger";
 import {
-  FileServiceError,
-  readFileForViewer,
-  writeTextFile,
-} from "@/lib/server/modules/files/service";
+  addLocalFolderShare,
+  listLocalFolderShares,
+  LocalSharingError,
+} from "@/lib/server/modules/files/local-sharing";
 
 export const runtime = "nodejs";
 
-const writeSchema = z.object({
+const createLocalShareSchema = z.object({
   path: z.string().trim().min(1),
-  content: z.string(),
-  expectedMtimeMs: z.number().finite().optional(),
+  name: z.string().trim().min(1).optional(),
 });
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   const requestId = createRequestId();
 
   try {
     return await withServerTiming(
       {
         layer: "api",
-        action: "files.content.get",
+        action: "files.shared.folders.get",
         requestId,
       },
       async () => {
-        const filePath = request.nextUrl.searchParams.get("path");
-        if (!filePath) {
-          return NextResponse.json(
-            {
-              error: "Missing file path",
-              code: "invalid_path",
-            },
-            { status: 400 },
-          );
-        }
-
-        const data = await readFileForViewer({
-          path: filePath,
-          includeHidden: serverEnv.FILES_ALLOW_HIDDEN,
-        });
+        const data = await listLocalFolderShares();
 
         return NextResponse.json(
           {
             data,
+            meta: {
+              count: data.length,
+            },
           },
           {
             headers: {
@@ -60,7 +47,7 @@ export async function GET(request: NextRequest) {
       },
     );
   } catch (error) {
-    if (error instanceof FileServiceError) {
+    if (error instanceof LocalSharingError) {
       return NextResponse.json(
         {
           error: error.message,
@@ -75,16 +62,16 @@ export async function GET(request: NextRequest) {
     logServerAction({
       level: "error",
       layer: "api",
-      action: "files.content.get.response",
+      action: "files.shared.folders.get.response",
       status: "error",
       requestId,
-      message: "Unable to read file",
+      message: "Unable to load shared folders",
       error,
     });
 
     return NextResponse.json(
       {
-        error: "Unable to read file",
+        error: "Unable to load shared folders",
         code: "internal_error",
       },
       {
@@ -94,33 +81,33 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function PUT(request: Request) {
+export async function POST(request: Request) {
   const requestId = createRequestId();
 
   try {
     return await withServerTiming(
       {
         layer: "api",
-        action: "files.content.put",
+        action: "files.shared.folders.post",
         requestId,
       },
       async () => {
         const payload = await request.json();
-        const parsed = writeSchema.safeParse(payload);
+        const parsed = createLocalShareSchema.safeParse(payload);
         if (!parsed.success) {
           return NextResponse.json(
             {
-              error: "Invalid write payload",
+              error: "Invalid shared folder payload",
               code: "invalid_path",
             },
-            { status: 400 },
+            {
+              status: 400,
+            },
           );
         }
 
-        const data = await writeTextFile({
-          ...parsed.data,
-          includeHidden: serverEnv.FILES_ALLOW_HIDDEN,
-        });
+        const data = await addLocalFolderShare(parsed.data);
+
         return NextResponse.json(
           {
             data,
@@ -134,7 +121,7 @@ export async function PUT(request: Request) {
       },
     );
   } catch (error) {
-    if (error instanceof FileServiceError) {
+    if (error instanceof LocalSharingError) {
       return NextResponse.json(
         {
           error: error.message,
@@ -149,16 +136,16 @@ export async function PUT(request: Request) {
     logServerAction({
       level: "error",
       layer: "api",
-      action: "files.content.put.response",
+      action: "files.shared.folders.post.response",
       status: "error",
       requestId,
-      message: "Unable to save file",
+      message: "Unable to share folder",
       error,
     });
 
     return NextResponse.json(
       {
-        error: "Unable to save file",
+        error: "Unable to share folder",
         code: "internal_error",
       },
       {
