@@ -77,6 +77,12 @@ Type 'help' for available commands.
     });
   }, [lines]);
 
+  useEffect(() => {
+    if (!isExecuting) {
+      inputRef.current?.focus();
+    }
+  }, [isExecuting]);
+
   const focusInput = useCallback(() => {
     inputRef.current?.focus();
   }, []);
@@ -292,8 +298,7 @@ Type 'help' for available commands.
             value={currentInput}
             onChange={(event) => setCurrentInput(event.target.value)}
             onKeyDown={handleKeyDown}
-            disabled={isExecuting}
-            className="flex-1 bg-transparent text-foreground outline-none font-mono text-sm caret-primary disabled:opacity-60"
+            className="flex-1 bg-transparent text-foreground outline-none font-mono text-sm caret-primary"
             autoFocus
             spellCheck={false}
             autoComplete="off"

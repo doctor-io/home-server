@@ -129,6 +129,8 @@ async function callHelper<T>(
 
   return withServerTiming(
     {
+      // Keep DBus call telemetry available in debug logs only to avoid high-volume info noise.
+      level: "debug",
       layer: "system",
       action: "dbus.network.call",
       requestId,
