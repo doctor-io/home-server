@@ -3,6 +3,25 @@
 import { useCallback, useEffect, useState } from "react";
 
 const USER_LOCATION_STORAGE_KEY = "weather.user-location.v1";
+const USER_LOCATION_REVERSE_CACHE_STORAGE_KEY = "weather.user-location.reverse.v1";
+const NOMINATIM_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const NOMINATIM_RATE_LIMIT_COOLDOWN_MS = 5 * 60 * 1000;
+const NOMINATIM_COORD_PRECISION = 3;
+
+type ResolvedPlace = {
+  city?: string;
+  country?: string;
+};
+
+type ReverseCacheEntry = ResolvedPlace & {
+  key: string;
+  resolvedAt: number;
+};
+
+let reverseCacheEntry: ReverseCacheEntry | null = null;
+let reverseCacheLoaded = false;
+let nominatimRateLimitedUntilMs = 0;
+const reverseLookupInFlight = new Map<string, Promise<ResolvedPlace>>();
 
 export type UserLocation = {
   latitude: number;
@@ -28,6 +47,76 @@ type NominatimReverseResponse = {
     country_code?: string;
   };
 };
+
+function toReverseLookupKey(location: {
+  latitude: number;
+  longitude: number;
+}) {
+  return `${location.latitude.toFixed(NOMINATIM_COORD_PRECISION)},${location.longitude.toFixed(
+    NOMINATIM_COORD_PRECISION,
+  )}`;
+}
+
+function loadReverseCacheFromStorage() {
+  if (reverseCacheLoaded || typeof localStorage === "undefined") return;
+  reverseCacheLoaded = true;
+
+  try {
+    const raw = localStorage.getItem(USER_LOCATION_REVERSE_CACHE_STORAGE_KEY);
+    if (!raw) return;
+
+    const parsed = JSON.parse(raw) as {
+      key?: unknown;
+      city?: unknown;
+      country?: unknown;
+      resolvedAt?: unknown;
+    };
+    if (typeof parsed.key !== "string") return;
+    if (typeof parsed.resolvedAt !== "number" || !Number.isFinite(parsed.resolvedAt)) {
+      return;
+    }
+
+    reverseCacheEntry = {
+      key: parsed.key,
+      city: typeof parsed.city === "string" ? parsed.city : undefined,
+      country: typeof parsed.country === "string" ? parsed.country : undefined,
+      resolvedAt: parsed.resolvedAt,
+    };
+  } catch {
+    reverseCacheEntry = null;
+  }
+}
+
+function getCachedReverseLookup(key: string) {
+  if (!reverseCacheEntry) return null;
+  if (reverseCacheEntry.key !== key) return null;
+  if (Date.now() - reverseCacheEntry.resolvedAt > NOMINATIM_CACHE_TTL_MS) {
+    reverseCacheEntry = null;
+    return null;
+  }
+
+  return {
+    city: reverseCacheEntry.city,
+    country: reverseCacheEntry.country,
+  } satisfies ResolvedPlace;
+}
+
+function persistReverseLookup(key: string, place: ResolvedPlace) {
+  reverseCacheEntry = {
+    key,
+    city: place.city,
+    country: place.country,
+    resolvedAt: Date.now(),
+  };
+  try {
+    localStorage.setItem(
+      USER_LOCATION_REVERSE_CACHE_STORAGE_KEY,
+      JSON.stringify(reverseCacheEntry),
+    );
+  } catch {
+    // Best effort only.
+  }
+}
 
 function toLocationError(error: GeolocationPositionError) {
   switch (error.code) {
@@ -86,24 +175,60 @@ async function resolveCityAndCountry(location: {
   latitude: number;
   longitude: number;
 }) {
-  try {
-    const response = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?lat=${location.latitude}&lon=${location.longitude}&format=json`,
-      { headers: { "User-Agent": "Homeio Dashboard" } },
-    );
-    if (!response.ok) return { city: undefined, country: undefined };
-    const json = (await response.json()) as NominatimReverseResponse;
-    const city =
-      json.address?.city ?? json.address?.town ?? json.address?.village;
-    const country = json.address?.country_code?.toUpperCase();
+  loadReverseCacheFromStorage();
+  const key = toReverseLookupKey(location);
+  const cached = getCachedReverseLookup(key);
+  if (cached) return cached;
 
-    return {
-      city,
-      country,
-    };
-  } catch {
+  if (Date.now() < nominatimRateLimitedUntilMs) {
     return { city: undefined, country: undefined };
   }
+
+  const existingRequest = reverseLookupInFlight.get(key);
+  if (existingRequest) {
+    return existingRequest;
+  }
+
+  const request = (async () => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${location.latitude}&lon=${location.longitude}&format=json`,
+        { headers: { "User-Agent": "Homeio Dashboard" } },
+      );
+      if (response.status === 429) {
+        nominatimRateLimitedUntilMs = Date.now() + NOMINATIM_RATE_LIMIT_COOLDOWN_MS;
+        return { city: undefined, country: undefined };
+      }
+      if (!response.ok) {
+        return { city: undefined, country: undefined };
+      }
+
+      const json = (await response.json()) as NominatimReverseResponse;
+      const city =
+        json.address?.city ?? json.address?.town ?? json.address?.village;
+      const country = json.address?.country_code?.toUpperCase();
+      const resolved = {
+        city,
+        country,
+      } satisfies ResolvedPlace;
+      persistReverseLookup(key, resolved);
+      return resolved;
+    } catch {
+      return { city: undefined, country: undefined };
+    } finally {
+      reverseLookupInFlight.delete(key);
+    }
+  })();
+
+  reverseLookupInFlight.set(key, request);
+  return request;
+}
+
+export function resetUserLocationReverseGeocodeStateForTests() {
+  reverseCacheEntry = null;
+  reverseCacheLoaded = false;
+  nominatimRateLimitedUntilMs = 0;
+  reverseLookupInFlight.clear();
 }
 
 export function useUserLocation(): UseUserLocationReturn {

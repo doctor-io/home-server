@@ -1,11 +1,11 @@
 {
   "name": "my-project",
-  "version": "0.1.31",
+  "version": "0.1.32",
   "private": true,
   "scripts": {
-    "dev": "node server.mjs",
+    "dev": "node --import tsx server.ts",
     "build": "next build",
-    "start": "node server.mjs",
+    "start": "NODE_ENV=production node --import tsx server.ts",
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",

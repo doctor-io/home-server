@@ -138,4 +138,19 @@ describe("files service", () => {
       code: "write_conflict",
     });
   });
+
+  it("shows hidden entries when listing Trash", async () => {
+    await mkdir(path.join(mockDataRoot, "Trash"), { recursive: true });
+    await writeFile(path.join(mockDataRoot, "Trash", ".env"), "x=1", "utf8");
+    await writeFile(path.join(mockDataRoot, "Trash", "notes.txt"), "hello", "utf8");
+
+    const result = await listDirectory({
+      path: "Trash",
+    });
+
+    expect(result.entries.map((entry) => entry.name)).toEqual([
+      ".env",
+      "notes.txt",
+    ]);
+  });
 });

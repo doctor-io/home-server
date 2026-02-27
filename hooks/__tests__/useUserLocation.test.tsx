@@ -2,7 +2,10 @@
 
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useUserLocation } from "@/hooks/useUserLocation";
+import {
+  resetUserLocationReverseGeocodeStateForTests,
+  useUserLocation,
+} from "@/hooks/useUserLocation";
 
 const USER_LOCATION_STORAGE_KEY = "weather.user-location.v1";
 
@@ -43,6 +46,7 @@ describe("useUserLocation", () => {
   beforeEach(() => {
     localStorage.clear();
     vi.clearAllMocks();
+    resetUserLocationReverseGeocodeStateForTests();
   });
 
   afterEach(() => {
@@ -154,5 +158,47 @@ describe("useUserLocation", () => {
 
     expect(result.current.location).toBeNull();
     expect(result.current.error).toBe("Geolocation not supported");
+  });
+
+  it("backs off reverse geocoding after a 429 rate-limit response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 429,
+      }),
+    );
+
+    mockGeolocation((success) => {
+      success({
+        coords: {
+          latitude: 35.2,
+          longitude: 9.4,
+        },
+      } as GeolocationPosition);
+    });
+
+    const { result } = renderHook(() => useUserLocation());
+
+    await waitFor(() => {
+      expect(result.current.location).toEqual({
+        latitude: 35.2,
+        longitude: 9.4,
+        city: undefined,
+        country: undefined,
+      });
+    });
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      result.current.requestLocation();
+    });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 });

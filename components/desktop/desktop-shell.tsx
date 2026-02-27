@@ -1,7 +1,7 @@
 "use client";
 
 import { useDesktopAppearance } from "@/hooks/useDesktopAppearance";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { CurrentUserError, useCurrentUser } from "@/hooks/useCurrentUser";
 import {
   readLockState,
   writeLockState,
@@ -53,7 +53,12 @@ const SETTINGS_SEARCH_SECTIONS = [
 
 export function DesktopShell() {
   const router = useRouter();
-  const { data: currentUser, isLoading: isLoadingUser, isError: isCurrentUserError } =
+  const {
+    data: currentUser,
+    error: currentUserError,
+    isLoading: isLoadingUser,
+    isError: isCurrentUserError,
+  } =
     useCurrentUser();
   const [openWindows, setOpenWindows] = useState<string[]>([]);
   const [closingWindows, setClosingWindows] = useState<string[]>([]);
@@ -107,9 +112,17 @@ export function DesktopShell() {
 
   useEffect(() => {
     if (isCurrentUserError) {
+      if (
+        currentUserError instanceof CurrentUserError &&
+        currentUserError.redirectTo
+      ) {
+        router.replace(currentUserError.redirectTo);
+        return;
+      }
+
       router.replace("/login");
     }
-  }, [isCurrentUserError, router]);
+  }, [currentUserError, isCurrentUserError, router]);
 
   const filteredSettingsSections = useMemo(() => {
     const query = settingsSearchQuery.trim().toLowerCase();

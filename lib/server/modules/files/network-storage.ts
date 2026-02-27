@@ -160,6 +160,24 @@ function mapCommandError(
   });
 }
 
+function isCommandUnavailable(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+
+  const err = error as {
+    code?: string;
+    message?: string;
+    stderr?: string;
+  };
+
+  if (err.code === "ENOENT") return true;
+
+  const combined = `${err.message ?? ""}\n${err.stderr ?? ""}`.toLowerCase();
+  return (
+    combined.includes("not found") ||
+    combined.includes("no such file or directory")
+  );
+}
+
 async function runCommand(command: string, args: string[]) {
   const result = await execFileAsync(command, args, {
     timeout: 15_000,
@@ -478,6 +496,18 @@ export async function discoverServers(): Promise<DiscoverServersResponse> {
       ),
     };
   } catch (error) {
+    if (isCommandUnavailable(error)) {
+      logServerAction({
+        level: "warn",
+        layer: "service",
+        action: "files.network.discover.servers.unavailable",
+        status: "error",
+        message: "SMB server discovery command is unavailable",
+        error,
+      });
+      return { servers: [] };
+    }
+
     throw mapCommandError(error, "Failed to discover SMB servers", "internal_error");
   }
 }
@@ -529,6 +559,19 @@ export async function discoverShares(input: {
       ),
     };
   } catch (error) {
+    if (isCommandUnavailable(error)) {
+      logServerAction({
+        level: "warn",
+        layer: "service",
+        action: "files.network.discover.shares.unavailable",
+        status: "error",
+        message: "SMB share discovery command is unavailable",
+        meta: { host },
+        error,
+      });
+      return { shares: [] };
+    }
+
     throw mapCommandError(
       error,
       "Failed to discover SMB shares for host",

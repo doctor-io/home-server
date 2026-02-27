@@ -1,8 +1,8 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import { withClientTiming } from "@/lib/client/logger";
 import { queryKeys } from "@/lib/shared/query-keys";
+import { useQuery } from "@tanstack/react-query";
 
 type CurrentUser = {
   id: string;
@@ -12,6 +12,18 @@ type CurrentUser = {
 type CurrentUserResponse = {
   data: CurrentUser;
 };
+
+export class CurrentUserError extends Error {
+  readonly status: number;
+  readonly redirectTo?: string;
+
+  constructor(message: string, status: number, redirectTo?: string) {
+    super(message);
+    this.name = "CurrentUserError";
+    this.status = status;
+    this.redirectTo = redirectTo;
+  }
+}
 
 async function fetchCurrentUser() {
   return withClientTiming(
@@ -28,7 +40,12 @@ async function fetchCurrentUser() {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch current user (${response.status})`);
+        const redirectTo = response.headers.get("x-auth-entry") ?? undefined;
+        throw new CurrentUserError(
+          `Failed to fetch current user (${response.status})`,
+          response.status,
+          redirectTo,
+        );
       }
 
       const json = (await response.json()) as CurrentUserResponse;

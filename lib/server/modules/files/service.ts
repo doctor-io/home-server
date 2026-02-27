@@ -142,6 +142,10 @@ function assertNoHiddenSegments(segments: string[]) {
   }
 }
 
+function isTrashPathSegments(segments: string[]) {
+  return segments[0] === "Trash";
+}
+
 function ensureWithinRoot(rootPath: string, absolutePath: string) {
   const relative = path.relative(rootPath, absolutePath);
   const within = relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
@@ -257,7 +261,7 @@ async function resolveFilePath(inputPath: string | undefined, includeHidden: boo
 
   const relativePath = getPosixRelativePath(inputPath);
   const segments = relativePath.length > 0 ? relativePath.split("/") : [];
-  if (!includeHidden) {
+  if (!includeHidden && !isTrashPathSegments(segments)) {
     assertNoHiddenSegments(segments);
   }
 
@@ -301,9 +305,10 @@ export async function listDirectory(params: ListDirectoryParams = {}): Promise<F
       withFileTypes: true,
     });
     const output: FileListEntry[] = [];
+    const listingTrash = isTrashPathSegments(resolved.segments);
 
     for (const entry of entries) {
-      if (!includeHidden && isHiddenName(entry.name)) {
+      if (!includeHidden && !listingTrash && isHiddenName(entry.name)) {
         continue;
       }
 

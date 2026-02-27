@@ -1,5 +1,20 @@
 "use client";
 
+import { NetworkStorageDialog } from "@/components/desktop/network-storage-dialog";
+import {
+  buildAssetUrl,
+  toFilePath,
+  useFileContent,
+  useFilesDirectory,
+  useSaveFileContent,
+} from "@/hooks/useFiles";
+import {
+  useDeleteFromTrash,
+  useMoveToTrash,
+  useRestoreFromTrash,
+} from "@/hooks/useTrashActions";
+import { formatBytesCompact } from "@/lib/client/format";
+import type { FileListEntry } from "@/lib/shared/contracts/files";
 import {
   ArrowUp,
   ChevronRight,
@@ -20,6 +35,7 @@ import {
   Info,
   LayoutGrid,
   List,
+  Plus,
   Save,
   Scissors,
   Search,
@@ -27,14 +43,9 @@ import {
   Star,
   Trash2,
   Users,
-  X
+  X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useFilesDirectory, useFileContent, useSaveFileContent, toFilePath, buildAssetUrl } from "@/hooks/useFiles";
-import { useDeleteFromTrash, useMoveToTrash, useRestoreFromTrash } from "@/hooks/useTrashActions";
-import { NetworkStorageDialog } from "@/components/desktop/network-storage-dialog";
-import { formatBytesCompact } from "@/lib/client/format";
-import type { FileListEntry } from "@/lib/shared/contracts/files";
 
 // --- Types ---
 
@@ -69,7 +80,10 @@ function toUiFileEntry(entry: FileListEntry): FileEntry {
     path: entry.path,
     type: entry.type,
     ext: entry.ext ?? undefined,
-    size: entry.sizeBytes === null ? undefined : formatBytesCompact(entry.sizeBytes),
+    size:
+      entry.sizeBytes === null
+        ? undefined
+        : formatBytesCompact(entry.sizeBytes),
     sizeBytes: entry.sizeBytes,
     modified: Number.isNaN(modifiedDate.getTime())
       ? "--"
@@ -209,11 +223,7 @@ type MonacoNamespace = {
 };
 type MonacoRequire = {
   config: (config: { paths: { vs: string } }) => void;
-  (
-    deps: string[],
-    onLoad: () => void,
-    onError: (error: unknown) => void,
-  ): void;
+  (deps: string[], onLoad: () => void, onError: (error: unknown) => void): void;
 };
 
 let monacoLoaderPromise: Promise<MonacoNamespace> | null = null;
@@ -275,7 +285,12 @@ function loadMonacoFromCdn(): Promise<MonacoNamespace> {
 
 type SidebarSection = {
   title: string;
-  items: { name: string; icon: React.ReactNode; path: string[] }[];
+  items: {
+    name: string;
+    icon: React.ReactNode;
+    path: string[];
+    action?: "open-network-dialog";
+  }[];
 };
 
 const sidebarSections: SidebarSection[] = [
@@ -302,16 +317,22 @@ const sidebarSections: SidebarSection[] = [
         icon: <FileVideo className="size-4 text-amber-400" />,
         path: ["Media"],
       },
+      {
+        name: "Apps",
+        icon: <FileCog className="size-4 text-violet-400" />,
+        path: ["Apps"],
+      },
     ],
   },
   {
     title: "Locations",
     items: [
-      {
-        name: "Server (4 TB)",
-        icon: <HardDrive className="size-4 text-muted-foreground" />,
-        path: [],
-      },
+      // {
+      //   name: "Network Storage",
+      //   icon: <HardDrive className="size-4 text-muted-foreground" />,
+      //   path: ["Network"],
+      //   action: "open-network-dialog",
+      // },
     ],
   },
 ];
@@ -388,7 +409,7 @@ export function FileManager() {
   const openFileViewer = fileContentQuery.data ?? null;
   const openFileContent =
     openFileKey && openFileViewer?.mode === "text"
-      ? fileDrafts[openFileKey] ?? (openFileViewer.content ?? "")
+      ? (fileDrafts[openFileKey] ?? openFileViewer.content ?? "")
       : "";
   const openFileBadgeLabel = openFileViewer
     ? openFileViewer.mode === "text"
@@ -398,14 +419,15 @@ export function FileManager() {
   const openFileAssetUrl = openFileKey ? buildAssetUrl(openFileKey) : "";
   const canSaveOpenFile = Boolean(
     openFileKey &&
-      openFileViewer?.mode === "text" &&
-      !fileContentQuery.isLoading &&
-      !saveFileContentMutation.isPending,
+    openFileViewer?.mode === "text" &&
+    !fileContentQuery.isLoading &&
+    !saveFileContentMutation.isPending,
   );
   const isTrashView = currentPath[0] === "Trash";
 
   useEffect(() => {
-    if (!openFileKey || !openFileViewer || openFileViewer.mode !== "text") return;
+    if (!openFileKey || !openFileViewer || openFileViewer.mode !== "text")
+      return;
 
     setFileDrafts((prev) => {
       if (prev[openFileKey] !== undefined) return prev;
@@ -517,7 +539,9 @@ export function FileManager() {
       setStatusNotice(`Restored: ${result.restoredPath}`);
     } catch (error) {
       setStatusNotice(
-        error instanceof Error ? error.message : "Failed to restore item from Trash",
+        error instanceof Error
+          ? error.message
+          : "Failed to restore item from Trash",
       );
     }
   }
@@ -531,7 +555,9 @@ export function FileManager() {
       setStatusNotice(`Deleted permanently: ${entry.name}`);
     } catch (error) {
       setStatusNotice(
-        error instanceof Error ? error.message : "Failed to permanently delete item",
+        error instanceof Error
+          ? error.message
+          : "Failed to permanently delete item",
       );
     }
   }
@@ -552,9 +578,21 @@ export function FileManager() {
           <div className="flex flex-col gap-4 p-3 pt-4">
             {sidebarSections.map((section) => (
               <div key={section.title}>
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest px-2">
-                  {section.title}
-                </span>
+                <div className="flex items-center justify-between px-2">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
+                    {section.title}
+                  </span>
+                  {section.title === "Locations" ? (
+                    <button
+                      onClick={() => setShowNetworkDialog(true)}
+                      className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-secondary/40 hover:text-foreground"
+                      title="Add network storage"
+                      aria-label="Add network storage"
+                    >
+                      <Plus className="size-3.5" />
+                    </button>
+                  ) : null}
+                </div>
                 <div className="flex flex-col gap-0.5 mt-1.5">
                   {section.items.map((item) => {
                     const isActive =
@@ -563,7 +601,13 @@ export function FileManager() {
                     return (
                       <button
                         key={item.name}
-                        onClick={() => navigateToPath(item.path)}
+                        onClick={() => {
+                          if (item.action === "open-network-dialog") {
+                            setShowNetworkDialog(true);
+                            return;
+                          }
+                          navigateToPath(item.path);
+                        }}
                         className={`flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
                           isActive
                             ? "bg-primary/15 text-foreground"
@@ -578,14 +622,13 @@ export function FileManager() {
                 </div>
               </div>
             ))}
-
           </div>
 
           {/* Bottom shortcuts + storage */}
           <div className="mt-auto p-3 border-t border-glass-border">
             <div className="mb-3 flex flex-col gap-0.5">
               <button
-                onClick={() => setShowNetworkDialog(true)}
+                onClick={() => navigateToPath(["Network"])}
                 className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/40 transition-colors cursor-pointer"
               >
                 <Users className="size-3.5 text-sky-400" />
@@ -891,18 +934,18 @@ export function FileManager() {
                   <div className="flex items-center gap-2.5 flex-1 min-w-0">
                     {getFileIcon(entry)}
                     <span className="text-xs text-foreground truncate">
-                    {entry.name}
-                  </span>
-                  {entry.starred && (
-                    <Star className="size-3 text-amber-400 fill-amber-400 shrink-0" />
-                  )}
-                </div>
-                <span className="w-20 text-right text-xs text-muted-foreground shrink-0 hidden sm:block">
+                      {entry.name}
+                    </span>
+                    {entry.starred && (
+                      <Star className="size-3 text-amber-400 fill-amber-400 shrink-0" />
+                    )}
+                  </div>
+                  <span className="w-20 text-right text-xs text-muted-foreground shrink-0 hidden sm:block">
                     {entry.type === "folder" ? "—" : (entry.size ?? "0 B")}
-                </span>
-                <span className="w-32 text-right text-xs text-muted-foreground shrink-0 hidden md:block">
-                  {entry.modified}
-                </span>
+                  </span>
+                  <span className="w-32 text-right text-xs text-muted-foreground shrink-0 hidden md:block">
+                    {entry.modified}
+                  </span>
                 </button>
               ))}
             </div>
@@ -919,7 +962,9 @@ export function FileManager() {
           </span>
           <div className="flex items-center gap-3">
             {statusNotice ? (
-              <span className="max-w-72 truncate text-status-amber">{statusNotice}</span>
+              <span className="max-w-72 truncate text-status-amber">
+                {statusNotice}
+              </span>
             ) : null}
             <span className="font-mono">/{currentPath.join("/")}</span>
           </div>

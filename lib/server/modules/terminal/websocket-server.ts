@@ -174,12 +174,10 @@ export function initializeWebSocketServer(server: Server): void {
   server.on("upgrade", (request: IncomingMessage, socket: Duplex, head: Buffer) => {
     const { pathname } = parse(request.url || "");
 
-    if (pathname === "/api/terminal") {
-      wss.handleUpgrade(request, socket, head, (ws: WebSocket) => {
-        wss.emit("connection", ws, request);
-      });
-    } else {
-      socket.destroy();
-    }
+    if (pathname !== "/api/terminal") return;
+
+    wss.handleUpgrade(request, socket, head, (ws: WebSocket) => {
+      wss.emit("connection", ws, request);
+    });
   });
 }

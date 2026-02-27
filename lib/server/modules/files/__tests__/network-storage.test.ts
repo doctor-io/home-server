@@ -113,6 +113,28 @@ describe("network storage service", () => {
     expect(result.servers).toEqual(["nas.local"]);
   });
 
+  it("returns empty servers when avahi-browse is unavailable", async () => {
+    vi.mocked(execFile).mockImplementation(
+      (command: string, ...restArgs: unknown[]) => {
+        const callback = getExecFileCallback(restArgs);
+        if (command === "avahi-browse") {
+          const error = new Error("spawn avahi-browse ENOENT") as Error & {
+            code?: string;
+          };
+          error.code = "ENOENT";
+          callback(error, "", "");
+          return {} as never;
+        }
+
+        callback(new Error(`Unexpected command ${command}`), "", "");
+        return {} as never;
+      },
+    );
+
+    const result = await discoverServers();
+    expect(result.servers).toEqual([]);
+  });
+
   it("parses discovered SMB shares", async () => {
     vi.mocked(execFile).mockImplementation(
       (command: string, ...restArgs: unknown[]) => {
@@ -138,6 +160,33 @@ describe("network storage service", () => {
     });
 
     expect(result.shares).toEqual(["Backups", "Media"]);
+  });
+
+  it("returns empty shares when smbclient is unavailable", async () => {
+    vi.mocked(execFile).mockImplementation(
+      (command: string, ...restArgs: unknown[]) => {
+        const callback = getExecFileCallback(restArgs);
+        if (command === "smbclient") {
+          const error = new Error("spawn smbclient ENOENT") as Error & {
+            code?: string;
+          };
+          error.code = "ENOENT";
+          callback(error, "", "");
+          return {} as never;
+        }
+
+        callback(new Error(`Unexpected command ${command}`), "", "");
+        return {} as never;
+      },
+    );
+
+    const result = await discoverShares({
+      host: "nas.local",
+      username: "user",
+      password: "secret",
+    });
+
+    expect(result.shares).toEqual([]);
   });
 
   it("mounts an existing share", async () => {

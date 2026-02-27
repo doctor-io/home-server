@@ -38,7 +38,14 @@ import {
   Wifi,
   Zap
 } from "lucide-react";
-import { useEffect, useState, type ChangeEvent } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ChangeEvent,
+} from "react";
+import { useSettingsBackend } from "@/hooks/useSettingsBackend";
 
 // =====================
 // Types
@@ -50,6 +57,41 @@ type SettingsSection = {
   icon: React.ComponentType<{ className?: string }>;
   badge?: string;
 };
+
+type ControlAvailability = {
+  disabled?: boolean;
+  disabledReason?: string;
+};
+
+const ControlAvailabilityContext = createContext<ControlAvailability>({
+  disabled: false,
+});
+
+function useControlAvailability(
+  overrideDisabled?: boolean,
+  overrideReason?: string,
+) {
+  const context = useContext(ControlAvailabilityContext);
+  const disabled =
+    overrideDisabled !== undefined ? overrideDisabled : Boolean(context.disabled);
+
+  const disabledReason =
+    overrideReason !== undefined
+      ? overrideReason
+      : disabled
+        ? context.disabledReason
+        : undefined;
+
+  return {
+    disabled,
+    disabledReason,
+  };
+}
+
+function ControlDisabledHint({ text }: { text?: string }) {
+  if (!text) return null;
+  return <span className="text-xs text-status-amber">{text}</span>;
+}
 
 // =====================
 // Sections Config
@@ -64,7 +106,7 @@ const sections: SettingsSection[] = [
   { id: "security", label: "Security", icon: Shield },
   { id: "notifications", label: "Notifications", icon: Bell },
   { id: "backup", label: "Backup & Restore", icon: Database },
-  { id: "updates", label: "Updates", icon: RefreshCw, badge: "2" },
+  { id: "updates", label: "Updates", icon: RefreshCw },
   { id: "appearance", label: "Appearance", icon: Palette },
   { id: "power", label: "Power", icon: Power },
 ];
@@ -78,12 +120,18 @@ function Toggle({
   onToggle,
   label,
   description,
+  disabled,
+  disabledReason,
 }: {
   enabled: boolean;
   onToggle: () => void;
   label: string;
   description?: string;
+  disabled?: boolean;
+  disabledReason?: string;
 }) {
+  const availability = useControlAvailability(disabled, disabledReason);
+
   return (
     <div className="flex items-center justify-between py-3">
       <div className="flex flex-col gap-0.5">
@@ -91,11 +139,17 @@ function Toggle({
         {description && (
           <span className="text-xs text-muted-foreground">{description}</span>
         )}
+        <ControlDisabledHint text={availability.disabledReason} />
       </div>
       <button
-        onClick={onToggle}
-        className="cursor-pointer shrink-0"
+        onClick={availability.disabled ? undefined : onToggle}
+        className={`shrink-0 ${
+          availability.disabled
+            ? "cursor-not-allowed opacity-50"
+            : "cursor-pointer"
+        }`}
         aria-label={`Toggle ${label}`}
+        disabled={availability.disabled}
       >
         {enabled ? (
           <ToggleRight className="size-7 text-primary" />
@@ -119,6 +173,8 @@ function SettingsInput({
   readOnly,
   copyable,
   description,
+  disabled,
+  disabledReason,
 }: {
   label: string;
   value: string;
@@ -127,10 +183,17 @@ function SettingsInput({
   readOnly?: boolean;
   copyable?: boolean;
   description?: string;
+  disabled?: boolean;
+  disabledReason?: string;
 }) {
   const [showPassword, setShowPassword] = useState(false);
   const [copied, setCopied] = useState(false);
   const isPassword = type === "password";
+  const availability = useControlAvailability(disabled, disabledReason);
+  const inputValueProps =
+    readOnly || availability.disabled
+      ? { value }
+      : { defaultValue: value };
 
   return (
     <div className="flex flex-col gap-1.5 py-2">
@@ -140,19 +203,26 @@ function SettingsInput({
       {description && (
         <span className="text-xs text-muted-foreground/70">{description}</span>
       )}
+      <ControlDisabledHint text={availability.disabledReason} />
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
           <input
             type={isPassword && !showPassword ? "password" : "text"}
-            defaultValue={value}
+            {...inputValueProps}
             placeholder={placeholder}
-            readOnly={readOnly}
-            className="h-8 w-full rounded-lg bg-secondary/40 border border-glass-border px-3 text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary/40 transition-all read-only:opacity-60"
+            readOnly={readOnly || availability.disabled}
+            disabled={availability.disabled}
+            className="h-8 w-full rounded-lg bg-secondary/40 border border-glass-border px-3 text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary/40 transition-all read-only:opacity-60 disabled:cursor-not-allowed disabled:opacity-50"
           />
           {isPassword && (
             <button
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+              className={`absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground ${
+                availability.disabled
+                  ? "cursor-not-allowed opacity-50"
+                  : "cursor-pointer hover:text-foreground"
+              }`}
+              disabled={availability.disabled}
             >
               {showPassword ? (
                 <EyeOff className="size-3.5" />
@@ -169,7 +239,12 @@ function SettingsInput({
               setCopied(true);
               setTimeout(() => setCopied(false), 2000);
             }}
-            className="p-1.5 rounded-lg hover:bg-secondary/50 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            className={`p-1.5 rounded-lg text-muted-foreground transition-colors ${
+              availability.disabled
+                ? "cursor-not-allowed opacity-50"
+                : "cursor-pointer hover:bg-secondary/50 hover:text-foreground"
+            }`}
+            disabled={availability.disabled}
           >
             {copied ? (
               <Check className="size-3.5 text-status-green" />
@@ -193,13 +268,19 @@ function SettingsSelect({
   options,
   description,
   onChange,
+  disabled,
+  disabledReason,
 }: {
   label: string;
   value: string;
   options: string[];
   description?: string;
   onChange?: (value: string) => void;
+  disabled?: boolean;
+  disabledReason?: string;
 }) {
+  const availability = useControlAvailability(disabled, disabledReason);
+
   return (
     <div className="flex flex-col gap-1.5 py-2">
       <label className="text-xs font-medium text-muted-foreground">
@@ -208,6 +289,7 @@ function SettingsSelect({
       {description && (
         <span className="text-xs text-muted-foreground/70">{description}</span>
       )}
+      <ControlDisabledHint text={availability.disabledReason} />
       <select
         {...(onChange
           ? {
@@ -215,8 +297,13 @@ function SettingsSelect({
               onChange: (e: ChangeEvent<HTMLSelectElement>) =>
                 onChange(e.target.value),
             }
-          : { defaultValue: value })}
-        className="h-8 rounded-lg bg-secondary/40 border border-glass-border px-3 text-xs text-foreground focus:outline-none focus:border-primary/40 transition-all cursor-pointer appearance-none"
+          : { value })}
+        disabled={availability.disabled}
+        onChange={(event) => {
+          if (!onChange) return;
+          onChange(event.target.value);
+        }}
+        className="h-8 rounded-lg bg-secondary/40 border border-glass-border px-3 text-xs text-foreground focus:outline-none focus:border-primary/40 transition-all cursor-pointer appearance-none disabled:cursor-not-allowed disabled:opacity-50"
       >
         {options.map((opt) => (
           <option key={opt} value={opt}>
@@ -371,6 +458,8 @@ function ContainerRow({
   ports,
   cpu,
   memory,
+  actionsDisabled,
+  disabledReason,
 }: {
   name: string;
   image: string;
@@ -378,37 +467,50 @@ function ContainerRow({
   ports: string;
   cpu: string;
   memory: string;
+  actionsDisabled?: boolean;
+  disabledReason?: string;
 }) {
   return (
-    <div className="flex items-center gap-3 py-2.5 group">
-      <div
-        className={`size-2 rounded-full shrink-0 ${
-          status === "running"
-            ? "bg-status-green"
-            : status === "restarting"
-              ? "bg-status-amber animate-pulse"
-              : "bg-muted-foreground/40"
-        }`}
-      />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-foreground font-medium">{name}</span>
-          <span className="text-xs text-muted-foreground font-mono">
-            {image}
+    <div className="py-2.5">
+      <div className="flex items-center gap-3 group">
+        <div
+          className={`size-2 rounded-full shrink-0 ${
+            status === "running"
+              ? "bg-status-green"
+              : status === "restarting"
+                ? "bg-status-amber animate-pulse"
+                : "bg-muted-foreground/40"
+          }`}
+        />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-foreground font-medium">{name}</span>
+            <span className="text-xs text-muted-foreground font-mono">
+              {image}
+            </span>
+          </div>
+          <span className="text-xs text-muted-foreground">
+            {ports} | CPU: {cpu} | RAM: {memory}
           </span>
         </div>
-        <span className="text-xs text-muted-foreground">
-          {ports} | CPU: {cpu} | RAM: {memory}
-        </span>
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+          <button
+            className="px-2 py-1 text-xs rounded-md bg-secondary/50 text-muted-foreground transition-colors disabled:cursor-not-allowed disabled:opacity-50 enabled:hover:bg-secondary enabled:hover:text-foreground cursor-pointer"
+            disabled={actionsDisabled}
+          >
+            {status === "running" ? "Stop" : "Start"}
+          </button>
+          <button
+            className="px-2 py-1 text-xs rounded-md bg-secondary/50 text-muted-foreground transition-colors disabled:cursor-not-allowed disabled:opacity-50 enabled:hover:bg-secondary enabled:hover:text-foreground cursor-pointer"
+            disabled={actionsDisabled}
+          >
+            Restart
+          </button>
+        </div>
       </div>
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-        <button className="px-2 py-1 text-xs rounded-md bg-secondary/50 hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
-          {status === "running" ? "Stop" : "Start"}
-        </button>
-        <button className="px-2 py-1 text-xs rounded-md bg-secondary/50 hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
-          Restart
-        </button>
-      </div>
+      {actionsDisabled && (
+        <span className="text-xs text-status-amber">{disabledReason}</span>
+      )}
     </div>
   );
 }
@@ -422,30 +524,42 @@ function UpdateRow({
   current,
   available,
   type,
+  actionDisabled,
+  disabledReason,
 }: {
   name: string;
   current: string;
   available: string;
   type: "system" | "app";
+  actionDisabled?: boolean;
+  disabledReason?: string;
 }) {
   return (
-    <div className="flex items-center gap-3 py-2.5 group">
-      <div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-        {type === "system" ? (
-          <Cpu className="size-4 text-primary" />
-        ) : (
-          <Container className="size-4 text-primary" />
-        )}
-      </div>
-      <div className="flex-1 min-w-0">
-        <span className="text-sm text-foreground">{name}</span>
-        <div className="text-xs text-muted-foreground">
-          {current} <ChevronRight className="size-3 inline" /> {available}
+    <div className="py-2.5">
+      <div className="flex items-center gap-3 group">
+        <div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+          {type === "system" ? (
+            <Cpu className="size-4 text-primary" />
+          ) : (
+            <Container className="size-4 text-primary" />
+          )}
         </div>
+        <div className="flex-1 min-w-0">
+          <span className="text-sm text-foreground">{name}</span>
+          <div className="text-xs text-muted-foreground">
+            {current} <ChevronRight className="size-3 inline" /> {available}
+          </div>
+        </div>
+        <button
+          className="px-3 py-1.5 text-xs font-medium rounded-lg bg-primary/15 text-primary transition-colors disabled:cursor-not-allowed disabled:opacity-50 enabled:hover:bg-primary/25 cursor-pointer"
+          disabled={actionDisabled}
+        >
+          Update
+        </button>
       </div>
-      <button className="px-3 py-1.5 text-xs font-medium rounded-lg bg-primary/15 text-primary hover:bg-primary/25 transition-colors cursor-pointer">
-        Update
-      </button>
+      {actionDisabled && (
+        <span className="text-xs text-status-amber">{disabledReason}</span>
+      )}
     </div>
   );
 }
@@ -493,44 +607,52 @@ function BackupRow({
 // Section Content
 // =====================
 
-function GeneralSection() {
-  const [autoStart, setAutoStart] = useState(true);
-  const [telemetry, setTelemetry] = useState(false);
-  const [remoteAccess, setRemoteAccess] = useState(true);
-
+function GeneralSection({
+  data,
+  capabilities,
+}: {
+  data: ReturnType<typeof useSettingsBackend>["general"];
+  capabilities: ReturnType<typeof useSettingsBackend>["capabilities"]["general"];
+}) {
   return (
     <div className="flex flex-col gap-1">
+      {data.warning && (
+        <InfoBanner
+          text={data.warning}
+          variant={data.unavailable ? "warning" : "info"}
+        />
+      )}
       <SectionDivider title="System Info" />
       <div className="grid grid-cols-2 gap-x-6 gap-y-1 py-2">
         <div className="flex flex-col gap-0.5 py-1.5">
           <span className="text-xs text-muted-foreground">Hostname</span>
           <span className="text-sm text-foreground font-medium">
-            serverlab-node01
+            {data.hostname}
           </span>
         </div>
         <div className="flex flex-col gap-0.5 py-1.5">
           <span className="text-xs text-muted-foreground">OS</span>
-          <span className="text-sm text-foreground">Ubuntu 24.04 LTS</span>
+          <span className="text-sm text-foreground">{data.platform}</span>
         </div>
         <div className="flex flex-col gap-0.5 py-1.5">
           <span className="text-xs text-muted-foreground">Kernel</span>
           <span className="text-sm text-foreground font-mono text-xs">
-            6.8.0-48-generic
+            {data.kernel}
           </span>
         </div>
         <div className="flex flex-col gap-0.5 py-1.5">
           <span className="text-xs text-muted-foreground">Architecture</span>
-          <span className="text-sm text-foreground">x86_64 (AMD64)</span>
+          <span className="text-sm text-foreground">{data.architecture}</span>
         </div>
         <div className="flex flex-col gap-0.5 py-1.5">
           <span className="text-xs text-muted-foreground">Uptime</span>
-          <span className="text-sm text-foreground">14 days, 6 hours</span>
+          <span className="text-sm text-foreground">{data.uptime}</span>
         </div>
         <div className="flex flex-col gap-0.5 py-1.5">
           <span className="text-xs text-muted-foreground">
             ServerLab Version
           </span>
-          <span className="text-sm text-foreground">v2.4.1</span>
+          <span className="text-sm text-foreground">{data.appVersion}</span>
         </div>
       </div>
 
@@ -542,16 +664,14 @@ function GeneralSection() {
             <span className="text-xs text-muted-foreground block">
               Processor
             </span>
-            <span className="text-xs text-foreground">
-              AMD Ryzen 7 5700G (16 threads)
-            </span>
+            <span className="text-xs text-foreground">{data.cpuSummary}</span>
           </div>
         </div>
         <div className="flex items-center gap-2 py-1.5">
           <MemoryStick className="size-4 text-primary" />
           <div>
             <span className="text-xs text-muted-foreground block">Memory</span>
-            <span className="text-xs text-foreground">64 GB DDR4-3200</span>
+            <span className="text-xs text-foreground">{data.memorySummary}</span>
           </div>
         </div>
         <div className="flex items-center gap-2 py-1.5">
@@ -560,22 +680,29 @@ function GeneralSection() {
             <span className="text-xs text-muted-foreground block">
               CPU Temperature
             </span>
-            <span className="text-xs text-foreground">52 C</span>
+            <span className="text-xs text-foreground">
+              {data.temperatureSummary}
+            </span>
           </div>
         </div>
         <div className="flex items-center gap-2 py-1.5">
           <MonitorSpeaker className="size-4 text-primary" />
           <div>
-            <span className="text-xs text-muted-foreground block">GPU</span>
+            <span className="text-xs text-muted-foreground block">User</span>
             <span className="text-xs text-foreground">
-              Radeon Vega 8 (integrated)
+              {data.username} ({data.processUptime})
             </span>
           </div>
         </div>
       </div>
 
       <SectionDivider title="Preferences" />
-      <SettingsInput label="Hostname" value="serverlab-node01" />
+      <SettingsInput
+        label="Hostname"
+        value={data.hostname}
+        disabled={capabilities.hostname.disabled}
+        disabledReason={capabilities.hostname.disabledReason}
+      />
       <SettingsSelect
         label="Timezone"
         value="UTC"
@@ -588,6 +715,8 @@ function GeneralSection() {
           "Asia/Tokyo",
           "Asia/Shanghai",
         ]}
+        disabled={capabilities.timezone.disabled}
+        disabledReason={capabilities.timezone.disabledReason}
       />
       <SettingsSelect
         label="Language"
@@ -600,50 +729,72 @@ function GeneralSection() {
           "Espanol",
           "Portugues",
         ]}
+        disabled={capabilities.language.disabled}
+        disabledReason={capabilities.language.disabledReason}
       />
       <Toggle
         label="Auto-start services on boot"
         description="Automatically start all enabled services when the server boots"
-        enabled={autoStart}
-        onToggle={() => setAutoStart(!autoStart)}
+        enabled={false}
+        onToggle={() => {}}
+        disabled={capabilities.autoStart.disabled}
+        disabledReason={capabilities.autoStart.disabledReason}
       />
       <Toggle
         label="Remote access"
         description="Allow remote connections via SSH and web UI"
-        enabled={remoteAccess}
-        onToggle={() => setRemoteAccess(!remoteAccess)}
+        enabled={false}
+        onToggle={() => {}}
+        disabled={capabilities.remoteAccess.disabled}
+        disabledReason={capabilities.remoteAccess.disabledReason}
       />
       <Toggle
         label="Anonymous telemetry"
         description="Send anonymized usage data to help improve ServerLab"
-        enabled={telemetry}
-        onToggle={() => setTelemetry(!telemetry)}
+        enabled={false}
+        onToggle={() => {}}
+        disabled={capabilities.telemetry.disabled}
+        disabledReason={capabilities.telemetry.disabledReason}
       />
     </div>
   );
 }
 
-function NetworkSection() {
-  const [dhcp, setDhcp] = useState(false);
-  const [ipv6, setIpv6] = useState(true);
-  const [wol, setWol] = useState(true);
-
+function NetworkSection({
+  data,
+  capabilities,
+}: {
+  data: ReturnType<typeof useSettingsBackend>["network"];
+  capabilities: ReturnType<typeof useSettingsBackend>["capabilities"]["network"];
+}) {
   return (
     <div className="flex flex-col gap-1">
+      {data.warning && (
+        <InfoBanner
+          text={data.warning}
+          variant={data.unavailable ? "warning" : "info"}
+        />
+      )}
       <SectionDivider title="Interfaces" />
       <div className="rounded-xl border border-glass-border bg-secondary/20 overflow-hidden">
         <div className="flex items-center justify-between p-3 border-b border-glass-border">
           <div className="flex items-center gap-3">
-            <div className="size-2 rounded-full bg-status-green" />
+            <div
+              className={`size-2 rounded-full ${
+                data.connected ? "bg-status-green" : "bg-muted-foreground/50"
+              }`}
+            />
             <div>
-              <span className="text-sm text-foreground font-medium">eth0</span>
+              <span className="text-sm text-foreground font-medium">
+                {data.iface}
+              </span>
               <span className="text-xs text-muted-foreground ml-2">
-                Primary
+                {data.connected ? "Connected" : "Disconnected"}
               </span>
             </div>
           </div>
           <span className="text-xs text-muted-foreground font-mono">
-            2.5 Gbps
+            Signal {data.signalPercent}
           </span>
         </div>
         <div className="grid grid-cols-3 gap-4 p-3">
@@ -652,58 +803,91 @@ function NetworkSection() {
               IPv4 Address
             </span>
             <span className="text-xs text-foreground font-mono">
-              192.168.1.100
+              {data.ipv4}
             </span>
           </div>
           <div>
             <span className="text-xs text-muted-foreground block">
-              Subnet Mask
+              SSID
             </span>
             <span className="text-xs text-foreground font-mono">
-              255.255.255.0
+              {data.ssid}
             </span>
           </div>
           <div>
             <span className="text-xs text-muted-foreground block">
-              MAC Address
+              Wi-Fi Networks
             </span>
             <span className="text-xs text-foreground font-mono">
-              A8:4B:6D:F2:1E:C3
+              {data.wifiCount}
             </span>
           </div>
         </div>
+        {data.topSsids.length > 0 && (
+          <div className="px-3 pb-3 text-xs text-muted-foreground">
+            Nearby: {data.topSsids.join(", ")}
+          </div>
+        )}
       </div>
 
       <SectionDivider title="Configuration" />
-      <SettingsInput label="Gateway" value="192.168.1.1" />
-      <SettingsInput label="DNS Primary" value="1.1.1.1" />
-      <SettingsInput label="DNS Secondary" value="8.8.8.8" />
-      <SettingsInput label="Domain" value="serverlab.local" />
+      <SettingsInput
+        label="Gateway"
+        value="--"
+        disabled={capabilities.gateway.disabled}
+        disabledReason={capabilities.gateway.disabledReason}
+      />
+      <SettingsInput
+        label="DNS Primary"
+        value="--"
+        disabled={capabilities.dnsPrimary.disabled}
+        disabledReason={capabilities.dnsPrimary.disabledReason}
+      />
+      <SettingsInput
+        label="DNS Secondary"
+        value="--"
+        disabled={capabilities.dnsSecondary.disabled}
+        disabledReason={capabilities.dnsSecondary.disabledReason}
+      />
+      <SettingsInput
+        label="Domain"
+        value="--"
+        disabled={capabilities.domain.disabled}
+        disabledReason={capabilities.domain.disabledReason}
+      />
       <Toggle
         label="DHCP"
         description="Automatically obtain IP address from network"
-        enabled={dhcp}
-        onToggle={() => setDhcp(!dhcp)}
+        enabled={false}
+        onToggle={() => {}}
+        disabled={capabilities.dhcp.disabled}
+        disabledReason={capabilities.dhcp.disabledReason}
       />
       <Toggle
         label="IPv6"
         description="Enable IPv6 networking support"
-        enabled={ipv6}
-        onToggle={() => setIpv6(!ipv6)}
+        enabled={false}
+        onToggle={() => {}}
+        disabled={capabilities.ipv6.disabled}
+        disabledReason={capabilities.ipv6.disabledReason}
       />
 
       <SectionDivider title="Advanced" />
       <Toggle
         label="Wake-on-LAN"
         description="Allow remote wake up via network packet"
-        enabled={wol}
-        onToggle={() => setWol(!wol)}
+        enabled={false}
+        onToggle={() => {}}
+        disabled={capabilities.wol.disabled}
+        disabledReason={capabilities.wol.disabledReason}
       />
       <SettingsSelect
         label="MTU"
         value="1500"
         options={["1500", "9000", "Custom"]}
         description="Maximum Transmission Unit size"
+        disabled={capabilities.mtu.disabled}
+        disabledReason={capabilities.mtu.disabledReason}
       />
 
       <SectionDivider title="Port Forwarding" />
@@ -727,9 +911,14 @@ function NetworkSection() {
           </div>
         ))}
       </div>
-      <button className="mt-2 self-start px-3 py-1.5 text-xs font-medium rounded-lg bg-secondary/50 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer">
+      <button
+        className="mt-2 self-start px-3 py-1.5 text-xs font-medium rounded-lg bg-secondary/50 text-muted-foreground transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 enabled:hover:text-foreground enabled:hover:bg-secondary"
+        disabled={capabilities.addRule.disabled}
+        title={capabilities.addRule.disabledReason}
+      >
         + Add Rule
       </button>
+      <ControlDisabledHint text={capabilities.addRule.disabledReason} />
     </div>
   );
 }
@@ -856,28 +1045,37 @@ function StorageSection() {
   );
 }
 
-function DockerSection() {
-  const [autoRestart, setAutoRestart] = useState(true);
-  const [logRotation, setLogRotation] = useState(true);
-
+function DockerSection({
+  data,
+  capabilities,
+}: {
+  data: ReturnType<typeof useSettingsBackend>["docker"];
+  capabilities: ReturnType<typeof useSettingsBackend>["capabilities"]["docker"];
+}) {
   return (
     <div className="flex flex-col gap-1">
+      {data.warning && (
+        <InfoBanner
+          text={data.warning}
+          variant={data.unavailable ? "warning" : "info"}
+        />
+      )}
       <SectionDivider title="Engine Status" />
       <div className="grid grid-cols-3 gap-4 py-2">
         <div className="rounded-xl border border-glass-border bg-secondary/20 p-3 text-center">
-          <span className="text-xl font-bold text-foreground">24</span>
+          <span className="text-xl font-bold text-foreground">{data.total}</span>
           <span className="text-xs text-muted-foreground block mt-0.5">
             Containers
           </span>
         </div>
         <div className="rounded-xl border border-glass-border bg-secondary/20 p-3 text-center">
-          <span className="text-xl font-bold text-status-green">18</span>
+          <span className="text-xl font-bold text-status-green">{data.running}</span>
           <span className="text-xs text-muted-foreground block mt-0.5">
             Running
           </span>
         </div>
         <div className="rounded-xl border border-glass-border bg-secondary/20 p-3 text-center">
-          <span className="text-xl font-bold text-foreground">42</span>
+          <span className="text-xl font-bold text-foreground">{data.images}</span>
           <span className="text-xs text-muted-foreground block mt-0.5">
             Images
           </span>
@@ -887,100 +1085,90 @@ function DockerSection() {
       <div className="grid grid-cols-2 gap-x-6 gap-y-1 py-2">
         <div className="flex flex-col gap-0.5 py-1">
           <span className="text-xs text-muted-foreground">Docker Version</span>
-          <span className="text-xs text-foreground font-mono">26.1.4</span>
+          <span className="text-xs text-foreground font-mono">
+            {data.engineVersion}
+          </span>
         </div>
         <div className="flex flex-col gap-0.5 py-1">
           <span className="text-xs text-muted-foreground">Compose Version</span>
-          <span className="text-xs text-foreground font-mono">v2.27.0</span>
+          <span className="text-xs text-foreground font-mono">
+            {data.composeVersion}
+          </span>
         </div>
         <div className="flex flex-col gap-0.5 py-1">
           <span className="text-xs text-muted-foreground">Storage Driver</span>
-          <span className="text-xs text-foreground">overlay2</span>
+          <span className="text-xs text-foreground">{data.storageDriver}</span>
         </div>
         <div className="flex flex-col gap-0.5 py-1">
           <span className="text-xs text-muted-foreground">Cgroup Driver</span>
-          <span className="text-xs text-foreground">systemd</span>
+          <span className="text-xs text-foreground">{data.cgroupDriver}</span>
         </div>
       </div>
 
       <SectionDivider title="Containers" />
-      <ContainerRow
-        name="plex"
-        image="plexinc/pms-docker:latest"
-        status="running"
-        ports="32400:32400"
-        cpu="3.2%"
-        memory="1.8 GB"
-      />
-      <ContainerRow
-        name="nextcloud"
-        image="nextcloud:28"
-        status="running"
-        ports="8080:80"
-        cpu="1.1%"
-        memory="420 MB"
-      />
-      <ContainerRow
-        name="pihole"
-        image="pihole/pihole:latest"
-        status="running"
-        ports="53:53, 80:80"
-        cpu="0.4%"
-        memory="128 MB"
-      />
-      <ContainerRow
-        name="grafana"
-        image="grafana/grafana:11"
-        status="running"
-        ports="3000:3000"
-        cpu="0.8%"
-        memory="256 MB"
-      />
-      <ContainerRow
-        name="home-assistant"
-        image="homeassistant/home-assistant:stable"
-        status="running"
-        ports="8123:8123"
-        cpu="2.4%"
-        memory="890 MB"
-      />
-      <ContainerRow
-        name="vaultwarden"
-        image="vaultwarden/server:latest"
-        status="stopped"
-        ports="8081:80"
-        cpu="0%"
-        memory="0 MB"
-      />
+      {data.containers.length === 0 ? (
+        <div className="py-2 text-xs text-muted-foreground">
+          No containers reported.
+        </div>
+      ) : (
+        data.containers.map((container) => (
+          <ContainerRow
+            key={container.id}
+            name={container.name}
+            image={container.image}
+            status={container.status}
+            ports={container.ports}
+            cpu={container.cpu}
+            memory={container.memory}
+            actionsDisabled={capabilities.lifecycle.disabled}
+            disabledReason={capabilities.lifecycle.disabledReason}
+          />
+        ))
+      )}
 
       <SectionDivider title="Settings" />
-      <SettingsInput label="Data Root" value="/var/lib/docker" readOnly />
+      <SettingsInput label="Data Root" value="--" readOnly />
       <Toggle
         label="Auto-restart policy"
         description="Automatically restart crashed containers"
-        enabled={autoRestart}
-        onToggle={() => setAutoRestart(!autoRestart)}
+        enabled={false}
+        onToggle={() => {}}
+        disabled={capabilities.autoRestart.disabled}
+        disabledReason={capabilities.autoRestart.disabledReason}
       />
       <Toggle
         label="Log rotation"
         description="Rotate container logs to prevent disk overuse"
-        enabled={logRotation}
-        onToggle={() => setLogRotation(!logRotation)}
+        enabled={false}
+        onToggle={() => {}}
+        disabled={capabilities.logRotation.disabled}
+        disabledReason={capabilities.logRotation.disabledReason}
       />
       <SettingsSelect
         label="Default Network"
         value="bridge"
         options={["bridge", "host", "macvlan", "none"]}
+        disabled={capabilities.defaultNetwork.disabled}
+        disabledReason={capabilities.defaultNetwork.disabledReason}
       />
 
       <div className="flex items-center gap-2 mt-3">
-        <button className="px-3 py-1.5 text-xs font-medium rounded-lg bg-secondary/50 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer">
+        <button
+          className="px-3 py-1.5 text-xs font-medium rounded-lg bg-secondary/50 text-muted-foreground transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 enabled:hover:text-foreground enabled:hover:bg-secondary"
+          disabled={capabilities.pruneImages.disabled}
+          title={capabilities.pruneImages.disabledReason}
+        >
           Prune Unused Images
         </button>
-        <button className="px-3 py-1.5 text-xs font-medium rounded-lg bg-secondary/50 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer">
+        <button
+          className="px-3 py-1.5 text-xs font-medium rounded-lg bg-secondary/50 text-muted-foreground transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 enabled:hover:text-foreground enabled:hover:bg-secondary"
+          disabled={capabilities.pruneVolumes.disabled}
+          title={capabilities.pruneVolumes.disabledReason}
+        >
           Prune Volumes
         </button>
       </div>
+      <ControlDisabledHint text={capabilities.pruneImages.disabledReason} />
     </div>
   );
 }
@@ -1456,34 +1644,65 @@ function BackupSection() {
   );
 }
 
-function UpdatesSection() {
+function UpdatesSection({
+  data,
+  capabilities,
+  onCheckForUpdates,
+}: {
+  data: ReturnType<typeof useSettingsBackend>["updates"];
+  capabilities: ReturnType<typeof useSettingsBackend>["capabilities"]["updates"];
+  onCheckForUpdates: () => Promise<unknown>;
+}) {
   const [autoCheck, setAutoCheck] = useState(true);
 
   return (
     <div className="flex flex-col gap-1">
+      {data.warning && (
+        <InfoBanner
+          text={data.warning}
+          variant={data.unavailable ? "warning" : "info"}
+        />
+      )}
+      {data.checkError && <InfoBanner text={data.checkError} variant="warning" />}
       <SectionDivider title="Available Updates" />
-      <UpdateRow
-        name="ServerLab OS"
-        current="v2.4.1"
-        available="v2.5.0"
-        type="system"
-      />
-      <UpdateRow
-        name="Plex Media Server"
-        current="1.40.2"
-        available="1.41.0"
-        type="app"
-      />
+      {data.entries.length === 0 ? (
+        <div className="py-2 text-xs text-muted-foreground">
+          No updates currently available.
+        </div>
+      ) : (
+        data.entries.map((entry) => (
+          <UpdateRow
+            key={entry.id}
+            name={entry.name}
+            current={entry.current}
+            available={entry.available}
+            type={entry.type}
+            actionDisabled={capabilities.updateRow.disabled}
+            disabledReason={capabilities.updateRow.disabledReason}
+          />
+        ))
+      )}
 
       <div className="flex items-center gap-2 mt-2">
-        <button className="px-3 py-1.5 text-xs font-medium rounded-lg bg-primary/15 text-primary hover:bg-primary/25 transition-colors cursor-pointer">
+        <button
+          className="px-3 py-1.5 text-xs font-medium rounded-lg bg-primary/15 text-primary transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 enabled:hover:bg-primary/25"
+          disabled={capabilities.updateAll.disabled}
+          title={capabilities.updateAll.disabledReason}
+        >
           Update All
         </button>
-        <button className="px-3 py-1.5 text-xs font-medium rounded-lg bg-secondary/50 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer flex items-center gap-1.5">
+        <button
+          className="px-3 py-1.5 text-xs font-medium rounded-lg bg-secondary/50 text-muted-foreground transition-colors cursor-pointer flex items-center gap-1.5 disabled:cursor-not-allowed disabled:opacity-50 enabled:hover:text-foreground enabled:hover:bg-secondary"
+          disabled={capabilities.checkForUpdates.disabled || data.isChecking}
+          onClick={() => {
+            void onCheckForUpdates();
+          }}
+        >
           <RefreshCw className="size-3" />
-          Check for Updates
+          {data.isChecking ? "Checking..." : "Check for Updates"}
         </button>
       </div>
+      <ControlDisabledHint text={capabilities.updateAll.disabledReason} />
 
       <SectionDivider title="Update Preferences" />
       <Toggle
@@ -1491,18 +1710,24 @@ function UpdatesSection() {
         description="Check for new updates daily"
         enabled={autoCheck}
         onToggle={() => setAutoCheck(!autoCheck)}
+        disabled={capabilities.autoCheck.disabled}
+        disabledReason={capabilities.autoCheck.disabledReason}
       />
       <SettingsSelect
         label="Update channel"
         value="Stable"
         options={["Stable", "Beta", "Nightly"]}
         description="Choose which release channel to follow"
+        disabled={capabilities.channel.disabled}
+        disabledReason={capabilities.channel.disabledReason}
       />
       <SettingsSelect
         label="Auto-update policy"
         value="Security Only"
         options={["Disabled", "Security Only", "All Updates"]}
         description="Which updates to install automatically"
+        disabled={capabilities.autoUpdatePolicy.disabled}
+        disabledReason={capabilities.autoUpdatePolicy.disabledReason}
       />
 
       <SectionDivider title="Update History" />
@@ -1867,32 +2092,105 @@ function renderSection({
   wallpaperOptions,
   accentOptions,
   onAppearanceChange,
+  settingsBackend,
 }: {
   id: string;
   appearance: AppearanceSettings;
   wallpaperOptions: WallpaperOption[];
   accentOptions: AccentColorOption[];
   onAppearanceChange: (patch: Partial<AppearanceSettings>) => void;
+  settingsBackend: ReturnType<typeof useSettingsBackend>;
 }) {
+  const unsupportedControlContext = {
+    disabled: true,
+    disabledReason: settingsBackend.capabilities.unsupportedSectionReason,
+  } as const;
+
   switch (id) {
     case "general":
-      return <GeneralSection />;
+      return (
+        <GeneralSection
+          data={settingsBackend.general}
+          capabilities={settingsBackend.capabilities.general}
+        />
+      );
     case "network":
-      return <NetworkSection />;
+      return (
+        <NetworkSection
+          data={settingsBackend.network}
+          capabilities={settingsBackend.capabilities.network}
+        />
+      );
     case "storage":
-      return <StorageSection />;
+      return (
+        <ControlAvailabilityContext.Provider value={unsupportedControlContext}>
+          <div className="flex flex-col gap-2">
+            <InfoBanner text={settingsBackend.capabilities.unsupportedSectionReason} />
+            <fieldset disabled className="opacity-70">
+              <StorageSection />
+            </fieldset>
+          </div>
+        </ControlAvailabilityContext.Provider>
+      );
     case "docker":
-      return <DockerSection />;
+      return (
+        <DockerSection
+          data={settingsBackend.docker}
+          capabilities={settingsBackend.capabilities.docker}
+        />
+      );
     case "users":
-      return <UsersSection />;
+      return (
+        <ControlAvailabilityContext.Provider value={unsupportedControlContext}>
+          <div className="flex flex-col gap-2">
+            <InfoBanner text={settingsBackend.capabilities.unsupportedSectionReason} />
+            <fieldset disabled className="opacity-70">
+              <UsersSection />
+            </fieldset>
+          </div>
+        </ControlAvailabilityContext.Provider>
+      );
     case "security":
-      return <SecuritySection />;
+      return (
+        <ControlAvailabilityContext.Provider value={unsupportedControlContext}>
+          <div className="flex flex-col gap-2">
+            <InfoBanner text={settingsBackend.capabilities.unsupportedSectionReason} />
+            <fieldset disabled className="opacity-70">
+              <SecuritySection />
+            </fieldset>
+          </div>
+        </ControlAvailabilityContext.Provider>
+      );
     case "notifications":
-      return <NotificationsSection />;
+      return (
+        <ControlAvailabilityContext.Provider value={unsupportedControlContext}>
+          <div className="flex flex-col gap-2">
+            <InfoBanner text={settingsBackend.capabilities.unsupportedSectionReason} />
+            <fieldset disabled className="opacity-70">
+              <NotificationsSection />
+            </fieldset>
+          </div>
+        </ControlAvailabilityContext.Provider>
+      );
     case "backup":
-      return <BackupSection />;
+      return (
+        <ControlAvailabilityContext.Provider value={unsupportedControlContext}>
+          <div className="flex flex-col gap-2">
+            <InfoBanner text={settingsBackend.capabilities.unsupportedSectionReason} />
+            <fieldset disabled className="opacity-70">
+              <BackupSection />
+            </fieldset>
+          </div>
+        </ControlAvailabilityContext.Provider>
+      );
     case "updates":
-      return <UpdatesSection />;
+      return (
+        <UpdatesSection
+          data={settingsBackend.updates}
+          capabilities={settingsBackend.capabilities.updates}
+          onCheckForUpdates={settingsBackend.actions.checkForUpdates}
+        />
+      );
     case "appearance":
       return (
         <AppearanceSection
@@ -1903,7 +2201,16 @@ function renderSection({
         />
       );
     case "power":
-      return <PowerSection />;
+      return (
+        <ControlAvailabilityContext.Provider value={unsupportedControlContext}>
+          <div className="flex flex-col gap-2">
+            <InfoBanner text={settingsBackend.capabilities.unsupportedSectionReason} />
+            <fieldset disabled className="opacity-70">
+              <PowerSection />
+            </fieldset>
+          </div>
+        </ControlAvailabilityContext.Provider>
+      );
     default:
       return null;
   }
@@ -1928,6 +2235,7 @@ export function SettingsPanel({
   onAppearanceChange,
   selectedSection,
 }: SettingsPanelProps) {
+  const settingsBackend = useSettingsBackend();
   const [activeSection, setActiveSection] = useState(
     selectedSection && sections.some((section) => section.id === selectedSection)
       ? selectedSection
@@ -1941,6 +2249,22 @@ export function SettingsPanel({
   }, [selectedSection]);
 
   const isLiveApplySection = activeSection === "appearance";
+  const sectionSaveEnabled =
+    settingsBackend.capabilities.saveBySection[
+      activeSection as keyof typeof settingsBackend.capabilities.saveBySection
+    ] ?? false;
+
+  const sectionsWithBadges = sections.map((section) =>
+    section.id === "updates"
+      ? {
+          ...section,
+          badge:
+            settingsBackend.updates.availableCount > 0
+              ? String(settingsBackend.updates.availableCount)
+              : undefined,
+        }
+      : section,
+  );
 
   return (
     <div className="flex h-full">
@@ -1951,7 +2275,7 @@ export function SettingsPanel({
             Settings
           </span>
           <div className="flex flex-col gap-0.5 mt-2">
-            {sections.map((section) => {
+            {sectionsWithBadges.map((section) => {
               const isActive = activeSection === section.id;
               return (
                 <button
@@ -1985,11 +2309,11 @@ export function SettingsPanel({
           <div className="flex items-center gap-2">
             <div className="size-2 rounded-full bg-status-green" />
             <span className="text-xs text-muted-foreground">
-              serverlab-node01
+              {settingsBackend.general.hostname}
             </span>
           </div>
           <span className="text-xs text-muted-foreground mt-1 block">
-            v2.4.1 | Ubuntu 24.04
+            {settingsBackend.general.appVersion} | {settingsBackend.general.platform}
           </span>
         </div>
       </aside>
@@ -2002,7 +2326,11 @@ export function SettingsPanel({
               {sections.find((s) => s.id === activeSection)?.label}
             </h2>
             {!isLiveApplySection && (
-              <button className="px-3 py-1.5 text-xs font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer">
+              <button
+                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-primary text-primary-foreground transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 enabled:hover:bg-primary/90"
+                disabled={!sectionSaveEnabled}
+                title={settingsBackend.capabilities.saveDisabledReason}
+              >
                 Save Changes
               </button>
             )}
@@ -2013,6 +2341,7 @@ export function SettingsPanel({
             wallpaperOptions,
             accentOptions,
             onAppearanceChange,
+            settingsBackend,
           })}
         </div>
       </main>

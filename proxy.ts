@@ -107,14 +107,17 @@ async function hasUsersInDb(request: NextRequest) {
       };
     };
 
-    const hasUsers = typeof json.data?.hasUsers === "boolean" ? json.data.hasUsers : true;
+    const hasUsers = typeof json.data?.hasUsers === "boolean" ? json.data.hasUsers : false;
     authStatusCache = {
       hasUsers,
       expiresAt: now + AUTH_STATUS_CACHE_MS,
     };
     return hasUsers;
   } catch {
-    return true;
+    if (authStatusCache) {
+      return authStatusCache.hasUsers;
+    }
+    return false;
   }
 }
 
@@ -153,6 +156,20 @@ export async function proxy(request: NextRequest) {
 
   if (!isAuthenticated) {
     if (pathname.startsWith("/api/")) {
+      if (pathname === "/api/auth/me") {
+        const hasUsers = await hasUsersInDb(request);
+        const authEntry = getAuthEntryPath(hasUsers);
+        const response = NextResponse.json(
+          {
+            error: "Unauthorized",
+            redirectTo: authEntry,
+          },
+          { status: 401 },
+        );
+        response.headers.set("x-auth-entry", authEntry);
+        return response;
+      }
+
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

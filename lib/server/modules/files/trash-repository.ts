@@ -1,6 +1,6 @@
 import "server-only";
 
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@/lib/server/db/drizzle";
 import { filesTrashEntries } from "@/lib/server/db/schema";
 
@@ -18,6 +18,36 @@ export type UpsertTrashEntryInput = {
   deletedAt?: Date;
 };
 
+let ensureTrashEntriesTablePromise: Promise<void> | null = null;
+
+async function ensureTrashEntriesTable() {
+  if (!ensureTrashEntriesTablePromise) {
+    ensureTrashEntriesTablePromise = (async () => {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS files_trash_entries (
+          id text PRIMARY KEY,
+          trash_path text NOT NULL,
+          original_path text NOT NULL,
+          deleted_at timestamptz NOT NULL DEFAULT NOW()
+        )
+      `);
+      await db.execute(sql`
+        CREATE UNIQUE INDEX IF NOT EXISTS files_trash_entries_trash_path_idx
+        ON files_trash_entries (trash_path)
+      `);
+      await db.execute(sql`
+        CREATE INDEX IF NOT EXISTS files_trash_entries_deleted_at_idx
+        ON files_trash_entries (deleted_at DESC)
+      `);
+    })().catch((error) => {
+      ensureTrashEntriesTablePromise = null;
+      throw error;
+    });
+  }
+
+  await ensureTrashEntriesTablePromise;
+}
+
 function toRecord(row: {
   id: string;
   trashPath: string;
@@ -33,6 +63,8 @@ function toRecord(row: {
 }
 
 export async function upsertTrashEntryInDb(input: UpsertTrashEntryInput) {
+  await ensureTrashEntriesTable();
+
   const deletedAt = input.deletedAt ?? new Date();
 
   const rows = await db
@@ -65,6 +97,8 @@ export async function upsertTrashEntryInDb(input: UpsertTrashEntryInput) {
 }
 
 export async function getTrashEntryFromDb(trashPath: string) {
+  await ensureTrashEntriesTable();
+
   const rows = await db
     .select({
       id: filesTrashEntries.id,
@@ -80,6 +114,8 @@ export async function getTrashEntryFromDb(trashPath: string) {
 }
 
 export async function deleteTrashEntryFromDb(trashPath: string) {
+  await ensureTrashEntriesTable();
+
   const rows = await db
     .delete(filesTrashEntries)
     .where(eq(filesTrashEntries.trashPath, trashPath))

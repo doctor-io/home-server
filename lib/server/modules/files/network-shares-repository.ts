@@ -1,6 +1,6 @@
 import "server-only";
 
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/server/db/drizzle";
 import { filesNetworkShares } from "@/lib/server/db/schema";
 
@@ -27,6 +27,42 @@ export type InsertNetworkShareInput = {
   passwordIv: string;
   passwordTag: string;
 };
+
+let ensureNetworkSharesTablePromise: Promise<void> | null = null;
+
+async function ensureNetworkSharesTable() {
+  if (!ensureNetworkSharesTablePromise) {
+    ensureNetworkSharesTablePromise = (async () => {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS files_network_shares (
+          id text PRIMARY KEY,
+          host text NOT NULL,
+          share text NOT NULL,
+          username text NOT NULL,
+          password_ciphertext text NOT NULL,
+          password_iv text NOT NULL,
+          password_tag text NOT NULL,
+          mount_path text NOT NULL,
+          created_at timestamptz NOT NULL DEFAULT NOW(),
+          updated_at timestamptz NOT NULL DEFAULT NOW()
+        )
+      `);
+      await db.execute(sql`
+        CREATE UNIQUE INDEX IF NOT EXISTS files_network_shares_mount_path_idx
+        ON files_network_shares (mount_path)
+      `);
+      await db.execute(sql`
+        CREATE INDEX IF NOT EXISTS files_network_shares_created_at_idx
+        ON files_network_shares (created_at)
+      `);
+    })().catch((error) => {
+      ensureNetworkSharesTablePromise = null;
+      throw error;
+    });
+  }
+
+  await ensureNetworkSharesTablePromise;
+}
 
 function toRecord(row: {
   id: string;
@@ -55,6 +91,8 @@ function toRecord(row: {
 }
 
 export async function listNetworkSharesFromDb() {
+  await ensureNetworkSharesTable();
+
   const rows = await db
     .select({
       id: filesNetworkShares.id,
@@ -75,6 +113,8 @@ export async function listNetworkSharesFromDb() {
 }
 
 export async function getNetworkShareFromDb(id: string) {
+  await ensureNetworkSharesTable();
+
   const rows = await db
     .select({
       id: filesNetworkShares.id,
@@ -96,6 +136,8 @@ export async function getNetworkShareFromDb(id: string) {
 }
 
 export async function getNetworkShareByMountPathFromDb(mountPath: string) {
+  await ensureNetworkSharesTable();
+
   const rows = await db
     .select({
       id: filesNetworkShares.id,
@@ -117,6 +159,8 @@ export async function getNetworkShareByMountPathFromDb(mountPath: string) {
 }
 
 export async function insertNetworkShareInDb(input: InsertNetworkShareInput) {
+  await ensureNetworkSharesTable();
+
   const rows = await db
     .insert(filesNetworkShares)
     .values({
@@ -150,6 +194,8 @@ export async function insertNetworkShareInDb(input: InsertNetworkShareInput) {
 }
 
 export async function touchNetworkShareInDb(id: string) {
+  await ensureNetworkSharesTable();
+
   const rows = await db
     .update(filesNetworkShares)
     .set({
@@ -173,6 +219,8 @@ export async function touchNetworkShareInDb(id: string) {
 }
 
 export async function deleteNetworkShareFromDb(id: string) {
+  await ensureNetworkSharesTable();
+
   const rows = await db
     .delete(filesNetworkShares)
     .where(eq(filesNetworkShares.id, id))

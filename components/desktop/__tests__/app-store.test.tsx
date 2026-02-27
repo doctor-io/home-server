@@ -9,6 +9,7 @@ const useStoreCatalogMock = vi.fn();
 const useStoreAppMock = vi.fn();
 const useStoreActionsMock = vi.fn();
 const useStoreOperationMock = vi.fn();
+const useAppComposeMock = vi.fn();
 
 vi.mock("@/hooks/useStoreCatalog", () => ({
   useStoreCatalog: (...args: unknown[]) => useStoreCatalogMock(...args),
@@ -24,6 +25,10 @@ vi.mock("@/hooks/useStoreActions", () => ({
 
 vi.mock("@/hooks/useStoreOperation", () => ({
   useStoreOperation: (...args: unknown[]) => useStoreOperationMock(...args),
+}));
+
+vi.mock("@/hooks/useAppCompose", () => ({
+  useAppCompose: (...args: unknown[]) => useAppComposeMock(...args),
 }));
 
 import { AppStore } from "@/components/desktop/app-store";
@@ -92,10 +97,12 @@ function setup({
   apps = [summaryApp],
   detail = null,
   operationsByApp = {},
+  onOpenCustomInstall = () => {},
 }: {
   apps?: StoreAppSummary[];
   detail?: StoreAppDetail | null;
   operationsByApp?: Record<string, AppOperationState>;
+  onOpenCustomInstall?: () => void;
 } = {}) {
   const installApp = vi.fn().mockResolvedValue(undefined);
   const installCustomApp = vi.fn().mockResolvedValue(undefined);
@@ -125,8 +132,14 @@ function setup({
     isError: false,
     error: null,
   });
+  useAppComposeMock.mockReturnValue({
+    data: null,
+    isLoading: false,
+    isError: false,
+    error: null,
+  });
 
-  render(<AppStore onOpenCustomInstall={() => {}} />);
+  render(<AppStore onOpenCustomInstall={onOpenCustomInstall} />);
 
   return {
     installApp,
@@ -142,6 +155,7 @@ describe("AppStore", () => {
     useStoreAppMock.mockReset();
     useStoreActionsMock.mockReset();
     useStoreOperationMock.mockReset();
+    useAppComposeMock.mockReset();
   });
 
   it("renders backend apps with logo and hides unsupported tabs/metrics", () => {
@@ -247,29 +261,16 @@ describe("AppStore", () => {
     expect(screen.getByText("Pulling image layers • 42%")).toBeTruthy();
   });
 
-  it("opens custom install dialog from menu and submits custom app payload", async () => {
-    const { installCustomApp } = setup();
+  it("opens custom install dialog from menu callback", async () => {
+    const onOpenCustomInstall = vi.fn();
+
+    setup({ onOpenCustomInstall });
 
     fireEvent.click(screen.getByRole("button", { name: /install menu/i }));
     fireEvent.click(screen.getByRole("menuitem", { name: /install custom app/i }));
 
-    fireEvent.change(screen.getByLabelText("App Name"), { target: { value: "My Custom App" } });
-    fireEvent.change(screen.getByLabelText("Icon URL"), { target: { value: "https://example.com/icon.png" } });
-    fireEvent.change(screen.getByLabelText("Web UI Port"), { target: { value: "8088" } });
-    fireEvent.change(screen.getByLabelText("Docker Compose"), {
-      target: { value: "services:\n  app:\n    image: nginx:latest" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: /install custom app/i }));
-
     await waitFor(() => {
-      expect(installCustomApp).toHaveBeenCalledWith({
-        name: "My Custom App",
-        iconUrl: "https://example.com/icon.png",
-        webUiPort: 8088,
-        repositoryUrl: undefined,
-        sourceType: "docker-compose",
-        source: "services:\n  app:\n    image: nginx:latest",
-      });
+      expect(onOpenCustomInstall).toHaveBeenCalledTimes(1);
     });
   });
 

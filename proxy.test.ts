@@ -92,4 +92,51 @@ describe("middleware auth guard", () => {
 
     expect(response.status).toBe(200);
   });
+
+  it("returns auth entry hint for unauthenticated /api/auth/me when users exist", async () => {
+    process.env.AUTH_SESSION_SECRET = secret;
+    vi.spyOn(global, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ data: { hasUsers: true } }), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }),
+    );
+
+    const request = new NextRequest("http://localhost/api/auth/me");
+    const response = await proxy(request);
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get("x-auth-entry")).toBe("/login");
+  });
+
+  it("returns auth entry hint for unauthenticated /api/auth/me when no users exist", async () => {
+    process.env.AUTH_SESSION_SECRET = secret;
+    vi.spyOn(global, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ data: { hasUsers: false } }), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }),
+    );
+
+    const request = new NextRequest("http://localhost/api/auth/me");
+    const response = await proxy(request);
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get("x-auth-entry")).toBe("/register");
+  });
+
+  it("falls back to register when auth status lookup fails", async () => {
+    process.env.AUTH_SESSION_SECRET = secret;
+    vi.spyOn(global, "fetch").mockRejectedValueOnce(new Error("network failure"));
+
+    const request = new NextRequest("http://localhost/");
+    const response = await proxy(request);
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toContain("/register");
+  });
 });

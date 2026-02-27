@@ -6,11 +6,6 @@ import {
   withServerTiming,
 } from "@/lib/server/logging/logger";
 import {
-  getNetworkStatusFromHelper,
-  isNetworkHelperUnavailableError,
-  NetworkHelperError,
-} from "@/lib/server/modules/network/helper-client";
-import {
   getLatestNetworkEvent,
   subscribeToNetworkEvents,
 } from "@/lib/server/modules/network/events";
@@ -21,45 +16,6 @@ export const runtime = "nodejs";
 
 export async function GET(request: Request) {
   const requestId = createRequestId();
-
-  try {
-    await getNetworkStatusFromHelper({
-      requestId,
-      timeoutMs: 2_000,
-    });
-  } catch (error) {
-    if (isNetworkHelperUnavailableError(error)) {
-      return NextResponse.json(
-        {
-          error: "DBus helper unavailable",
-          code: "helper_unavailable",
-        },
-        { status: 503 },
-      );
-    }
-
-    if (error instanceof NetworkHelperError) {
-      return NextResponse.json(
-        {
-          error: error.message,
-          code: error.code,
-        },
-        {
-          status: error.statusCode,
-        },
-      );
-    }
-
-    return NextResponse.json(
-      {
-        error: "Unable to open network event stream",
-        code: "internal_error",
-      },
-      {
-        status: 500,
-      },
-    );
-  }
 
   try {
     return await withServerTiming(
