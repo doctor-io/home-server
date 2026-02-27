@@ -1,5 +1,17 @@
 "use client";
 
+import { AppStoreInstallMenu } from "@/components/desktop/app-store-install-menu";
+import { AppConfiguratorPanel } from "@/components/desktop/apps/app-configurator-panel";
+import { UninstallAppDialog } from "@/components/desktop/uninstall-app-dialog";
+import type { AppOperationState } from "@/hooks/useStoreActions";
+import { useStoreActions } from "@/hooks/useStoreActions";
+import { useStoreApp } from "@/hooks/useStoreApp";
+import { useStoreCatalog } from "@/hooks/useStoreCatalog";
+import { useStoreOperation } from "@/hooks/useStoreOperation";
+import type {
+  StoreAppDetail,
+  StoreAppSummary,
+} from "@/lib/shared/contracts/apps";
 import {
   AlertCircle,
   ArrowUpCircle,
@@ -13,16 +25,6 @@ import {
   Wrench,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { AppSettingsPanel } from "@/components/desktop/apps/app-settings-panel";
-import { AppStoreInstallMenu } from "@/components/desktop/app-store-install-menu";
-import { UninstallAppDialog } from "@/components/desktop/uninstall-app-dialog";
-import { useStoreActions } from "@/hooks/useStoreActions";
-import { useStoreApp } from "@/hooks/useStoreApp";
-import { useStoreCatalog } from "@/hooks/useStoreCatalog";
-import { useStoreOperation } from "@/hooks/useStoreOperation";
-import type { AppActionTarget } from "@/components/desktop/app-grid";
-import type { AppOperationState } from "@/hooks/useStoreActions";
-import type { StoreAppDetail, StoreAppSummary } from "@/lib/shared/contracts/apps";
 
 function operationLabel(operation: AppOperationState | undefined) {
   if (!operation) return null;
@@ -39,7 +41,10 @@ function operationLabel(operation: AppOperationState | undefined) {
 }
 
 function isOperationBusy(operation: AppOperationState | undefined) {
-  return Boolean(operation && (operation.status === "queued" || operation.status === "running"));
+  return Boolean(
+    operation &&
+    (operation.status === "queued" || operation.status === "running"),
+  );
 }
 
 function StatusBadge({
@@ -68,7 +73,8 @@ function StatusBadge({
 
     return (
       <span className="flex items-center gap-1 text-xs font-medium text-primary animate-pulse">
-        <Loader2 className="size-3 animate-spin" /> {operationLabel(operation)}...
+        <Loader2 className="size-3 animate-spin" /> {operationLabel(operation)}
+        ...
       </span>
     );
   }
@@ -114,11 +120,23 @@ function StoreLogo({
   const [failed, setFailed] = useState(false);
 
   if (logoUrl && !failed) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={logoUrl} alt={alt} className={className} onError={() => setFailed(true)} />;
+     
+    return (
+      <img
+        src={logoUrl}
+        alt={alt}
+        className={className}
+        onError={() => setFailed(true)}
+      />
+    );
   }
 
-  return <Package className={`${className} text-muted-foreground`} aria-label={fallbackLabel} />;
+  return (
+    <Package
+      className={`${className} text-muted-foreground`}
+      aria-label={fallbackLabel}
+    />
+  );
 }
 
 type AppStoreDetailPanelProps = {
@@ -160,9 +178,13 @@ function AppStoreDetailPanel({
       </div>
 
       {!app || isLoading ? (
-        <div className="flex-1 p-6 text-sm text-muted-foreground">Loading app details...</div>
+        <div className="flex-1 p-6 text-sm text-muted-foreground">
+          Loading app details...
+        </div>
       ) : !detail ? (
-        <div className="flex-1 p-6 text-sm text-status-red">App details are unavailable.</div>
+        <div className="flex-1 p-6 text-sm text-status-red">
+          App details are unavailable.
+        </div>
       ) : (
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           <div className="flex items-start gap-5">
@@ -175,8 +197,12 @@ function AppStoreDetailPanel({
               />
             </div>
             <div className="flex-1 min-w-0">
-              <h2 className="text-lg font-semibold text-foreground">{detail.name}</h2>
-              <p className="text-xs text-muted-foreground mt-1">{detail.description}</p>
+              <h2 className="text-lg font-semibold text-foreground">
+                {detail.name}
+              </h2>
+              <p className="text-xs text-muted-foreground mt-1">
+                {detail.description}
+              </p>
               <div className="mt-3">
                 <StatusBadge app={detail} operation={operation} />
               </div>
@@ -188,11 +214,15 @@ function AppStoreDetailPanel({
                   <div className="h-1.5 rounded-full bg-muted overflow-hidden">
                     <div
                       className="h-full rounded-full bg-primary transition-all"
-                      style={{ width: `${Math.max(2, operation.progressPercent)}%` }}
+                      style={{
+                        width: `${Math.max(2, operation.progressPercent)}%`,
+                      }}
                     />
                   </div>
                   {operation.message ? (
-                    <p className="text-xs text-status-red">{operation.message}</p>
+                    <p className="text-xs text-status-red">
+                      {operation.message}
+                    </p>
                   ) : null}
                 </div>
               ) : null}
@@ -205,18 +235,29 @@ function AppStoreDetailPanel({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             <div className="p-3 rounded-xl bg-glass border border-glass-border">
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Platform</p>
-              <p className="mt-1 text-xs text-foreground font-medium">{detail.platform}</p>
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                Platform
+              </p>
+              <p className="mt-1 text-xs text-foreground font-medium">
+                {detail.platform}
+              </p>
             </div>
             {detail.webUiPort ? (
               <div className="p-3 rounded-xl bg-glass border border-glass-border">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Web UI Port</p>
-                <p className="mt-1 text-xs text-foreground font-mono font-medium">{detail.webUiPort}</p>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                  Web UI Port
+                </p>
+                <p className="mt-1 text-xs text-foreground font-mono font-medium">
+                  {detail.webUiPort}
+                </p>
               </div>
             ) : null}
             <div className="p-3 rounded-xl bg-glass border border-glass-border">
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Repository URL</p>
-              {detail.repositoryUrl.startsWith("http://") || detail.repositoryUrl.startsWith("https://") ? (
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                Repository URL
+              </p>
+              {detail.repositoryUrl.startsWith("http://") ||
+              detail.repositoryUrl.startsWith("https://") ? (
                 <a
                   href={detail.repositoryUrl}
                   target="_blank"
@@ -226,12 +267,16 @@ function AppStoreDetailPanel({
                   {detail.repositoryUrl}
                 </a>
               ) : (
-                <p className="mt-1 text-xs text-foreground break-all">{detail.repositoryUrl}</p>
+                <p className="mt-1 text-xs text-foreground break-all">
+                  {detail.repositoryUrl}
+                </p>
               )}
             </div>
           </div>
 
-          {actionError ? <p className="text-xs text-status-red">{actionError}</p> : null}
+          {actionError ? (
+            <p className="text-xs text-status-red">{actionError}</p>
+          ) : null}
 
           <div className="flex items-center gap-2">
             {detail.status === "not_installed" ? (
@@ -284,22 +329,24 @@ function AppStoreDetailPanel({
   );
 }
 
-export function AppStore({ onOpenCustomInstall }: { onOpenCustomInstall: () => void }) {
+export function AppStore({
+  onOpenCustomInstall,
+}: {
+  onOpenCustomInstall: () => void;
+}) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "installed">("all");
   const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [customInstallTemplate, setCustomInstallTemplate] = useState<StoreAppDetail | null>(null);
-  const [uninstallDialogApp, setUninstallDialogApp] = useState<StoreAppSummary | null>(null);
+  const [customInstallTemplate, setCustomInstallTemplate] =
+    useState<StoreAppDetail | null>(null);
+  const [uninstallDialogApp, setUninstallDialogApp] =
+    useState<StoreAppSummary | null>(null);
   const [uninstallError, setUninstallError] = useState<string | null>(null);
   const [uninstallPending, setUninstallPending] = useState(false);
 
-  const {
-    operationsByApp,
-    installApp,
-    redeployApp,
-    uninstallApp,
-  } = useStoreActions();
+  const { operationsByApp, installApp, redeployApp, uninstallApp } =
+    useStoreActions();
 
   const catalogQuery = useStoreCatalog({
     search: search.trim() || undefined,
@@ -334,7 +381,9 @@ export function AppStore({ onOpenCustomInstall }: { onOpenCustomInstall: () => v
         }
       : undefined);
 
-  const installedCount = apps.filter((app) => app.status !== "not_installed").length;
+  const installedCount = apps.filter(
+    (app) => app.status !== "not_installed",
+  ).length;
 
   async function startInstall(app: StoreAppSummary) {
     setActionError(null);
@@ -345,7 +394,9 @@ export function AppStore({ onOpenCustomInstall }: { onOpenCustomInstall: () => v
         webUiPort: app.webUiPort ?? undefined,
       });
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "Unable to start install.");
+      setActionError(
+        error instanceof Error ? error.message : "Unable to start install.",
+      );
     }
   }
 
@@ -357,7 +408,9 @@ export function AppStore({ onOpenCustomInstall }: { onOpenCustomInstall: () => v
         appId: app.id,
       });
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "Unable to start redeploy.");
+      setActionError(
+        error instanceof Error ? error.message : "Unable to start redeploy.",
+      );
     }
   }
 
@@ -367,7 +420,9 @@ export function AppStore({ onOpenCustomInstall }: { onOpenCustomInstall: () => v
     setUninstallDialogApp(app);
   }
 
-  async function submitDetailAction(action: "install" | "update" | "redeploy" | "uninstall") {
+  async function submitDetailAction(
+    action: "install" | "update" | "redeploy" | "uninstall",
+  ) {
     if (!selectedSummary || !selectedDetail) return;
     setActionError(null);
 
@@ -390,7 +445,9 @@ export function AppStore({ onOpenCustomInstall }: { onOpenCustomInstall: () => v
         appId: selectedSummary.id,
       });
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "Request failed.");
+      setActionError(
+        error instanceof Error ? error.message : "Request failed.",
+      );
     }
   }
 
@@ -407,7 +464,9 @@ export function AppStore({ onOpenCustomInstall }: { onOpenCustomInstall: () => v
       });
       setUninstallDialogApp(null);
     } catch (error) {
-      setUninstallError(error instanceof Error ? error.message : "Unable to start uninstall.");
+      setUninstallError(
+        error instanceof Error ? error.message : "Unable to start uninstall.",
+      );
     } finally {
       setUninstallPending(false);
     }
@@ -452,7 +511,7 @@ export function AppStore({ onOpenCustomInstall }: { onOpenCustomInstall: () => v
         />
         {customInstallTemplate ? (
           <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm">
-            <div className="relative h-[min(92vh,760px)] w-[min(96vw,980px)] overflow-hidden rounded-2xl border border-glass-border bg-card shadow-2xl">
+            <div className="relative h-[50vh] w-[min(96vw,980px)] overflow-hidden rounded-2xl border border-glass-border bg-card shadow-2xl">
               <button
                 type="button"
                 aria-label="Close install settings"
@@ -461,7 +520,8 @@ export function AppStore({ onOpenCustomInstall }: { onOpenCustomInstall: () => v
               >
                 Close
               </button>
-              <AppSettingsPanel
+              <AppConfiguratorPanel
+                context="catalog_install"
                 template={customInstallTemplate}
                 onClose={() => setCustomInstallTemplate(null)}
               />
@@ -526,9 +586,13 @@ export function AppStore({ onOpenCustomInstall }: { onOpenCustomInstall: () => v
           ) : null}
 
           {catalogQuery.isLoading ? (
-            <div className="text-sm text-muted-foreground">Loading app catalog...</div>
+            <div className="text-sm text-muted-foreground">
+              Loading app catalog...
+            </div>
           ) : catalogQuery.isError ? (
-            <div className="text-sm text-status-red">Unable to load app catalog.</div>
+            <div className="text-sm text-status-red">
+              Unable to load app catalog.
+            </div>
           ) : apps.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground">
               <Search className="size-8 opacity-30" />
@@ -565,7 +629,9 @@ export function AppStore({ onOpenCustomInstall }: { onOpenCustomInstall: () => v
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-foreground truncate">{app.name}</span>
+                        <span className="text-sm font-medium text-foreground truncate">
+                          {app.name}
+                        </span>
                         {app.webUiPort ? (
                           <span className="shrink-0 text-[10px] font-mono px-1.5 py-0.5 rounded bg-glass border border-glass-border text-muted-foreground">
                             :{app.webUiPort}
@@ -580,7 +646,9 @@ export function AppStore({ onOpenCustomInstall }: { onOpenCustomInstall: () => v
                           <div className="h-1.5 rounded-full bg-muted overflow-hidden">
                             <div
                               className="h-full rounded-full bg-primary transition-all"
-                              style={{ width: `${Math.max(2, operation.progressPercent)}%` }}
+                              style={{
+                                width: `${Math.max(2, operation.progressPercent)}%`,
+                              }}
                             />
                           </div>
                           <p className="text-[11px] text-muted-foreground mt-1">

@@ -42,6 +42,7 @@ describe("POST /api/v1/store/apps/:appId/install", () => {
         TZ: "UTC",
       },
       webUiPort: 3001,
+      composeSource: undefined,
     });
   });
 });

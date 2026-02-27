@@ -11,6 +11,11 @@ const appsCache = new LruCache<InstalledApp[]>(4, 5_000);
 const DB_UNAVAILABLE_BACKOFF_MS = 60_000;
 let dbUnavailableUntil = 0;
 
+export function invalidateInstalledAppsCache() {
+  appsCache.delete("installed-apps");
+  dbUnavailableUntil = 0;
+}
+
 function isDatabaseUnavailableError(error: unknown) {
   if (!(error instanceof Error)) return false;
 

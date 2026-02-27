@@ -14,24 +14,41 @@ export type AppComposeData = {
   command?: string | string[];
 };
 
+export type AppComposeResponse = {
+  compose: string;
+  primary: AppComposeData;
+  primaryServiceName: string;
+};
+
 /**
  * Fetch and parse the docker-compose.yml for an app from its GitHub repository.
  * Used to pre-fill the app settings dialog with default values.
  */
-export function useAppCompose(appId: string | undefined, enabled = true) {
+export function useAppCompose(
+  appId: string | undefined,
+  enabled = true,
+  source: "catalog" | "installed" = "catalog",
+) {
   return useQuery({
-    queryKey: ["app-compose", appId],
+    queryKey: ["app-compose", appId, source],
     queryFn: async () => {
       if (!appId) throw new Error("App ID is required");
 
-      const response = await fetch(`/api/v1/store/apps/${appId}/compose`);
+      const response = await fetch(
+        `/api/v1/store/apps/${appId}/compose?source=${encodeURIComponent(source)}`,
+      );
 
       if (!response.ok) {
-        throw new Error("Failed to fetch compose file");
+        const payload = await response.json().catch(() => null) as
+          | { error?: string; code?: string }
+          | null;
+        const message = payload?.error?.trim() || "Failed to fetch compose file";
+        const code = payload?.code?.trim();
+        throw new Error(code ? `${message} [${code}]` : message);
       }
 
       const json = await response.json();
-      return json.data as AppComposeData;
+      return json.data as AppComposeResponse;
     },
     enabled: enabled && !!appId,
     staleTime: 5 * 60 * 1000, // 5 minutes

@@ -14,6 +14,7 @@ const settingsSchema = z.object({
   iconUrl: z.string().trim().max(500).nullable().optional(),
   env: z.record(z.string(), z.string()).optional(),
   webUiPort: z.number().int().min(1024).max(65535).optional(),
+  composeSource: z.string().trim().min(1).max(500_000).optional(),
 });
 
 type Context = {

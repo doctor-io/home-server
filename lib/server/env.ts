@@ -55,8 +55,8 @@ const envSchema = z.object({
     .int()
     .min(5_000)
     .default(6 * 60 * 60_000), // 6 hours
-  STORE_STACKS_ROOT: z.string().default("/var/lib/home-server/stacks"),
-  STORE_APP_DATA_ROOT: z.string().default("/DATA/Apps"),
+  STORE_STACKS_ROOT: z.string().optional(),
+  STORE_APP_DATA_ROOT: z.string().optional(),
   DOCKER_SOCKET_PATH: z.string().default("/var/run/docker.sock"),
   DBUS_HELPER_SOCKET_PATH: z
     .string()
@@ -74,8 +74,11 @@ if (!parsedEnv.success) {
 
 const defaultStacksRoot =
   parsedEnv.data.NODE_ENV === "production" ? "/DATA/Apps" : "DATA/Apps";
+const defaultAppDataRoot =
+  parsedEnv.data.NODE_ENV === "production" ? "/DATA/Apps" : "DATA/Apps";
 
 export const serverEnv = {
   ...parsedEnv.data,
   STORE_STACKS_ROOT: parsedEnv.data.STORE_STACKS_ROOT ?? defaultStacksRoot,
+  STORE_APP_DATA_ROOT: parsedEnv.data.STORE_APP_DATA_ROOT ?? defaultAppDataRoot,
 };

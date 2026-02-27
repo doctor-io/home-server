@@ -237,10 +237,10 @@ describe("AppStore", () => {
     fireEvent.click(screen.getByRole("button", { name: /plex/i }));
     fireEvent.click(screen.getByRole("button", { name: /custom install/i }));
 
-    expect(screen.getByText("Plex Settings")).toBeTruthy();
+    expect(screen.getByText("Install Plex")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: /close.*install.*settings/i }));
-    expect(screen.queryByText("Plex Settings")).toBeNull();
+    expect(screen.queryByText("Install Plex")).toBeNull();
   });
 
   it("shows operation progress from backend state", () => {

@@ -10,11 +10,16 @@ import {
   runComposeUp,
   sanitizeStackName,
 } from "@/lib/server/modules/docker/compose-runner";
+import { invalidateInstalledAppsCache } from "@/lib/server/modules/apps/service";
 import { findStoreCatalogTemplateByAppId } from "@/lib/server/modules/store/catalog";
 import {
   findCustomStoreTemplateByAppId,
   isCustomStoreTemplate,
 } from "@/lib/server/modules/store/custom-apps";
+import {
+  extractPrimaryServiceWithName,
+  parseComposeFile,
+} from "@/lib/server/modules/docker/compose-parser";
 import { pullDockerImage } from "@/lib/server/modules/store/docker-client";
 import {
   createStoreOperation,
@@ -40,6 +45,7 @@ type OperationParams = {
   displayName?: string;
   env?: Record<string, string>;
   webUiPort?: number;
+  composeSource?: string;
   removeVolumes?: boolean;
 };
 
@@ -86,6 +92,21 @@ function mergeEnv(
   }
 
   return merged;
+}
+
+function parseFirstPublishedPort(ports: string[] | undefined): number | null {
+  if (!ports || ports.length === 0) return null;
+
+  for (const mapping of ports) {
+    const [mappingPart] = mapping.split("/");
+    const parts = mappingPart.split(":").filter(Boolean);
+    const published = parts.length >= 2 ? parts[parts.length - 2] : parts[0];
+    if (!published) continue;
+    const parsed = Number.parseInt(published, 10);
+    if (Number.isInteger(parsed)) return parsed;
+  }
+
+  return null;
 }
 
 function emitEvent(event: StoreOperationEvent) {
@@ -175,23 +196,56 @@ async function runInstallOrRedeployOperation(
     throw new Error(`Cannot redeploy "${params.appId}" because it is not installed`);
   }
 
-  const allowedEnvKeys = template.env.map((definition) => definition.name);
-  const templateDefaults = Object.fromEntries(
-    template.env
-      .filter((definition) => typeof definition.default === "string")
-      .map((definition) => [definition.name, definition.default as string]),
-  );
-
+  const hasComposeSource = typeof params.composeSource === "string" &&
+    params.composeSource.trim().length > 0;
   const requestedEnv = params.env ?? {};
-  const effectiveEnv = mergeEnv(
-    allowedEnvKeys,
-    templateDefaults,
-    existingStack?.env ?? {},
-    requestedEnv,
-  );
 
+  let composeSourcePrimary:
+    | ReturnType<typeof extractPrimaryServiceWithName>
+    | null = null;
+
+  if (hasComposeSource) {
+    const parsedCompose = parseComposeFile(params.composeSource as string);
+    if (!parsedCompose) {
+      throw new Error("Invalid compose source");
+    }
+
+    composeSourcePrimary = extractPrimaryServiceWithName(parsedCompose, params.appId);
+    if (!composeSourcePrimary) {
+      throw new Error("Invalid compose source");
+    }
+  }
+
+  let effectiveEnv: Record<string, string>;
+  if (hasComposeSource) {
+    const composeEnv = composeSourcePrimary?.service.environment ?? {};
+    effectiveEnv = {
+      ...(existingStack?.env ?? {}),
+      ...composeEnv,
+      ...requestedEnv,
+    };
+  } else {
+    const allowedEnvKeys = template.env.map((definition) => definition.name);
+    const templateDefaults = Object.fromEntries(
+      template.env
+        .filter((definition) => typeof definition.default === "string")
+        .map((definition) => [definition.name, definition.default as string]),
+    );
+    effectiveEnv = mergeEnv(
+      allowedEnvKeys,
+      templateDefaults,
+      existingStack?.env ?? {},
+      requestedEnv,
+    );
+  }
+
+  const composeSourcePort = hasComposeSource
+    ? parseFirstPublishedPort(composeSourcePrimary?.service.ports)
+    : null;
   const requestedPort =
-    typeof params.webUiPort === "number" ? params.webUiPort : existingStack?.webUiPort ?? null;
+    typeof params.webUiPort === "number"
+      ? params.webUiPort
+      : existingStack?.webUiPort ?? composeSourcePort ?? null;
 
   if (requestedPort !== null) {
     assertValidPort(requestedPort);
@@ -206,6 +260,10 @@ async function runInstallOrRedeployOperation(
 
   const stackName =
     existingStack?.stackName ?? sanitizeStackName(params.appId, params.displayName ?? template.name);
+  const isFreshInstall = params.action === "install" && !existingStack;
+  const storageMappingStrategy = isFreshInstall
+    ? "app_target_path"
+    : "legacy_named_source";
 
   await patchOperationAndEmit({
     operationId,
@@ -218,13 +276,23 @@ async function runInstallOrRedeployOperation(
     message: "Materializing compose files",
   });
 
-  const materialized = isCustomStoreTemplate(template)
+  const materialized = hasComposeSource
+    ? await materializeInlineStackFiles({
+        appId: params.appId,
+        stackName,
+        composeContent: params.composeSource as string,
+        env: effectiveEnv,
+        webUiPort: requestedPort,
+        storageMappingStrategy,
+      })
+    : isCustomStoreTemplate(template)
     ? await materializeInlineStackFiles({
         appId: params.appId,
         stackName,
         composeContent: template.composeContent,
         env: effectiveEnv,
         webUiPort: requestedPort,
+        storageMappingStrategy,
       })
     : await materializeStackFiles({
         appId: params.appId,
@@ -233,6 +301,7 @@ async function runInstallOrRedeployOperation(
         stackFile: template.stackFile,
         env: effectiveEnv,
         webUiPort: requestedPort,
+        storageMappingStrategy,
       });
 
   await patchOperationAndEmit({
@@ -435,6 +504,7 @@ async function executeStoreOperation(operationId: string, params: OperationParam
         remoteDigest: null,
       });
     }
+    invalidateInstalledAppsCache();
 
     await patchOperationAndEmit({
       operationId,

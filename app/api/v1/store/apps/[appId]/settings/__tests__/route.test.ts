@@ -38,6 +38,7 @@ describe("PATCH /api/v1/store/apps/:appId/settings", () => {
       appId: "home-assistant",
       displayName: "My Custom App",
       iconUrl: "https://example.com/icon.png",
+      composeSource: undefined,
     });
   });
 
@@ -77,6 +78,7 @@ describe("PATCH /api/v1/store/apps/:appId/settings", () => {
         TZ: "America/New_York",
       },
       webUiPort: 8124,
+      composeSource: undefined,
     });
   });
 
@@ -120,6 +122,7 @@ describe("PATCH /api/v1/store/apps/:appId/settings", () => {
         TZ: "Europe/London",
       },
       webUiPort: 9000,
+      composeSource: undefined,
     });
   });
 

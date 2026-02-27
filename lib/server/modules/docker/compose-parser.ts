@@ -21,6 +21,11 @@ export type ParsedComposeFile = {
   services: Record<string, ParsedComposeService>;
 };
 
+export type PrimaryComposeService = {
+  name: string;
+  service: ParsedComposeService;
+};
+
 /**
  * Fetch docker-compose.yml from a GitHub repository
  */
@@ -170,10 +175,10 @@ export function parseComposeFile(content: string): ParsedComposeFile | null {
  * Extract the primary service from a parsed compose file
  * (usually the first service, or the one matching the app name)
  */
-export function extractPrimaryService(
+export function extractPrimaryServiceWithName(
   parsed: ParsedComposeFile,
   appId?: string,
-): ParsedComposeService | null {
+): PrimaryComposeService | null {
   const serviceNames = Object.keys(parsed.services);
 
   if (serviceNames.length === 0) {
@@ -187,12 +192,26 @@ export function extractPrimaryService(
         name.toLowerCase().includes(appId.toLowerCase()),
     );
     if (matchingService) {
-      return parsed.services[matchingService];
+      return {
+        name: matchingService,
+        service: parsed.services[matchingService],
+      };
     }
   }
 
   // Return first service
-  return parsed.services[serviceNames[0]];
+  const fallbackName = serviceNames[0];
+  return {
+    name: fallbackName,
+    service: parsed.services[fallbackName],
+  };
+}
+
+export function extractPrimaryService(
+  parsed: ParsedComposeFile,
+  appId?: string,
+): ParsedComposeService | null {
+  return extractPrimaryServiceWithName(parsed, appId)?.service ?? null;
 }
 
 /**

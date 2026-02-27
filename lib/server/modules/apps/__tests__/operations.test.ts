@@ -4,6 +4,11 @@ vi.mock("@/lib/server/modules/store/catalog", () => ({
   findStoreCatalogTemplateByAppId: vi.fn(),
 }));
 
+vi.mock("@/lib/server/modules/docker/compose-parser", () => ({
+  parseComposeFile: vi.fn(),
+  extractPrimaryServiceWithName: vi.fn(),
+}));
+
 vi.mock("@/lib/server/modules/docker/compose-runner", () => ({
   cleanupComposeDataOnUninstall: vi.fn(),
   extractComposeImages: vi.fn(),
@@ -23,6 +28,10 @@ vi.mock("@/lib/server/modules/store/docker-client", () => ({
   pullDockerImage: vi.fn(),
 }));
 
+vi.mock("@/lib/server/modules/apps/service", () => ({
+  invalidateInstalledAppsCache: vi.fn(),
+}));
+
 vi.mock("@/lib/server/modules/apps/stacks-repository", () => ({
   createStoreOperation: vi.fn(),
   deleteInstalledStackByAppId: vi.fn(),
@@ -30,10 +39,15 @@ vi.mock("@/lib/server/modules/apps/stacks-repository", () => ({
   findStackByWebUiPort: vi.fn(),
   findStoreOperationById: vi.fn(),
   updateStoreOperation: vi.fn(),
+  updateStackUpdateStatus: vi.fn(),
   upsertInstalledStack: vi.fn(),
 }));
 
 import { findStoreCatalogTemplateByAppId } from "@/lib/server/modules/store/catalog";
+import {
+  extractPrimaryServiceWithName,
+  parseComposeFile,
+} from "@/lib/server/modules/docker/compose-parser";
 import {
   cleanupComposeDataOnUninstall,
   extractComposeImages,
@@ -44,12 +58,14 @@ import {
 } from "@/lib/server/modules/docker/compose-runner";
 import { findCustomStoreTemplateByAppId } from "@/lib/server/modules/store/custom-apps";
 import { pullDockerImage } from "@/lib/server/modules/store/docker-client";
+import { invalidateInstalledAppsCache } from "@/lib/server/modules/apps/service";
 import {
   createStoreOperation,
   deleteInstalledStackByAppId,
   findInstalledStackByAppId,
   findStackByWebUiPort,
   updateStoreOperation,
+  updateStackUpdateStatus,
   upsertInstalledStack,
 } from "@/lib/server/modules/apps/stacks-repository";
 import {
@@ -77,16 +93,20 @@ describe("store operations", () => {
     vi.mocked(findStoreCatalogTemplateByAppId).mockReset();
     vi.mocked(findCustomStoreTemplateByAppId).mockReset();
     vi.mocked(cleanupComposeDataOnUninstall).mockReset();
+    vi.mocked(parseComposeFile).mockReset();
+    vi.mocked(extractPrimaryServiceWithName).mockReset();
     vi.mocked(materializeInlineStackFiles).mockReset();
     vi.mocked(materializeStackFiles).mockReset();
     vi.mocked(extractComposeImages).mockReset();
     vi.mocked(pullDockerImage).mockReset();
     vi.mocked(runComposeUp).mockReset();
+    vi.mocked(invalidateInstalledAppsCache).mockReset();
     vi.mocked(createStoreOperation).mockReset();
     vi.mocked(deleteInstalledStackByAppId).mockReset();
     vi.mocked(findInstalledStackByAppId).mockReset();
     vi.mocked(findStackByWebUiPort).mockReset();
     vi.mocked(updateStoreOperation).mockReset();
+    vi.mocked(updateStackUpdateStatus).mockReset();
     vi.mocked(upsertInstalledStack).mockReset();
   });
 
@@ -100,6 +120,7 @@ describe("store operations", () => {
       note: "note",
       categories: ["Network"],
       logoUrl: null,
+      port: null,
       repositoryUrl: "https://github.com/bigbeartechworld/big-bear-portainer",
       stackFile: "Apps/adguard-home/docker-compose.yml",
       env: [{ name: "TZ", default: "UTC" }],
@@ -138,6 +159,7 @@ describe("store operations", () => {
 
     vi.mocked(createStoreOperation).mockResolvedValue(undefined);
     vi.mocked(updateStoreOperation).mockResolvedValue(undefined);
+    vi.mocked(updateStackUpdateStatus).mockResolvedValue(undefined);
     vi.mocked(runComposeUp).mockResolvedValue(undefined);
     vi.mocked(upsertInstalledStack).mockResolvedValue(undefined);
 
@@ -170,6 +192,13 @@ describe("store operations", () => {
         webUiPort: 3001,
       }),
     );
+    expect(materializeStackFiles).toHaveBeenCalledWith(
+      expect.objectContaining({
+        appId: "adguard-home",
+        storageMappingStrategy: "app_target_path",
+      }),
+    );
+    expect(invalidateInstalledAppsCache).toHaveBeenCalledTimes(1);
     expect(runComposeUp).toHaveBeenCalled();
 
     const latest = await waitForLatestEventType(operationId, "operation.completed");
@@ -186,6 +215,7 @@ describe("store operations", () => {
       note: "note",
       categories: ["Productivity"],
       logoUrl: null,
+      port: null,
       repositoryUrl: "https://github.com/bigbeartechworld/big-bear-portainer",
       stackFile: "Apps/Homepage/docker-compose.yml",
       env: [],
@@ -205,6 +235,7 @@ describe("store operations", () => {
     vi.mocked(pullDockerImage).mockRejectedValue(new Error("unauthorized"));
     vi.mocked(createStoreOperation).mockResolvedValue(undefined);
     vi.mocked(updateStoreOperation).mockResolvedValue(undefined);
+    vi.mocked(updateStackUpdateStatus).mockResolvedValue(undefined);
 
     let failed = false;
     const done = new Promise<void>((resolve) => {
@@ -274,8 +305,170 @@ describe("store operations", () => {
       composePath: "/tmp/store/stacks/2fauth/docker-compose.yml",
     });
     expect(deleteInstalledStackByAppId).toHaveBeenCalledWith("2fauth");
+    expect(invalidateInstalledAppsCache).toHaveBeenCalledTimes(1);
 
     const latest = await waitForLatestEventType(operationId, "operation.completed");
     expect(latest?.status).toBe("success");
+  });
+
+  it("uses legacy storage mapping on redeploy for existing apps", async () => {
+    vi.mocked(findStoreCatalogTemplateByAppId).mockResolvedValue({
+      appId: "home-assistant",
+      templateName: "home-assistant",
+      name: "Home Assistant",
+      description: "automation",
+      platform: "Docker",
+      note: "note",
+      categories: ["Automation"],
+      logoUrl: null,
+      port: null,
+      repositoryUrl: "https://github.com/bigbeartechworld/big-bear-portainer",
+      stackFile: "Apps/home-assistant/docker-compose.yml",
+      env: [],
+    });
+    vi.mocked(findCustomStoreTemplateByAppId).mockResolvedValue(null);
+    vi.mocked(findInstalledStackByAppId).mockResolvedValue({
+      appId: "home-assistant",
+      templateName: "home-assistant",
+      stackName: "home-assistant",
+      composePath: "/tmp/store/stacks/home-assistant/docker-compose.yml",
+      status: "installed",
+      webUiPort: null,
+      env: {},
+      installedAt: "2026-02-24T00:00:00.000Z",
+      updatedAt: "2026-02-24T00:00:00.000Z",
+    });
+    vi.mocked(findStackByWebUiPort).mockResolvedValue(null);
+    vi.mocked(materializeStackFiles).mockResolvedValue({
+      stackDir: "/tmp/store/stacks/home-assistant",
+      composePath: "/tmp/store/stacks/home-assistant/docker-compose.yml",
+      envPath: "/tmp/store/stacks/home-assistant/.env",
+      stackName: "home-assistant",
+      webUiPort: null,
+    });
+    vi.mocked(extractComposeImages).mockResolvedValue([]);
+    vi.mocked(createStoreOperation).mockResolvedValue(undefined);
+    vi.mocked(updateStoreOperation).mockResolvedValue(undefined);
+    vi.mocked(updateStackUpdateStatus).mockResolvedValue(undefined);
+    vi.mocked(runComposeUp).mockResolvedValue(undefined);
+    vi.mocked(upsertInstalledStack).mockResolvedValue(undefined);
+
+    let finished = false;
+    const done = new Promise<void>((resolve) => {
+      vi.mocked(updateStoreOperation).mockImplementation(async (_id, patch) => {
+        if (!finished && patch.status === "success") {
+          finished = true;
+          resolve();
+        }
+      });
+    });
+
+    await startStoreOperation({
+      appId: "home-assistant",
+      action: "redeploy",
+    });
+
+    await done;
+
+    expect(materializeStackFiles).toHaveBeenCalledWith(
+      expect.objectContaining({
+        appId: "home-assistant",
+        storageMappingStrategy: "legacy_named_source",
+      }),
+    );
+    expect(invalidateInstalledAppsCache).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses composeSource for install materialization and bypasses template env whitelist", async () => {
+    const composeSource = `services:\n  immich-server:\n    image: ghcr.io/immich-app/immich-server:v2.5.6\n    ports:\n      - \"2283:2283\"\n    environment:\n      DB_HOSTNAME: immich-postgres\n      CUSTOM_ENV: yes\n`;
+
+    vi.mocked(findStoreCatalogTemplateByAppId).mockResolvedValue({
+      appId: "immich",
+      templateName: "immich",
+      name: "Immich",
+      description: "photos",
+      platform: "Docker",
+      note: "note",
+      categories: ["Photos"],
+      logoUrl: null,
+      port: null,
+      repositoryUrl: "https://github.com/bigbeartechworld/big-bear-portainer",
+      stackFile: "Apps/immich/docker-compose.yml",
+      env: [{ name: "TZ", default: "UTC" }],
+    });
+    vi.mocked(findCustomStoreTemplateByAppId).mockResolvedValue(null);
+    vi.mocked(findInstalledStackByAppId).mockResolvedValue(null);
+    vi.mocked(findStackByWebUiPort).mockResolvedValue(null);
+    vi.mocked(parseComposeFile).mockReturnValue({
+      services: {
+        "immich-server": {
+          image: "ghcr.io/immich-app/immich-server:v2.5.6",
+          ports: ["2283:2283"],
+          environment: {
+            DB_HOSTNAME: "immich-postgres",
+            CUSTOM_ENV: "yes",
+          },
+        },
+      },
+    });
+    vi.mocked(extractPrimaryServiceWithName).mockReturnValue({
+      name: "immich-server",
+      service: {
+        image: "ghcr.io/immich-app/immich-server:v2.5.6",
+        ports: ["2283:2283"],
+        environment: {
+          DB_HOSTNAME: "immich-postgres",
+          CUSTOM_ENV: "yes",
+        },
+      },
+    });
+    vi.mocked(materializeInlineStackFiles).mockResolvedValue({
+      stackDir: "/tmp/store/stacks/immich",
+      composePath: "/tmp/store/stacks/immich/docker-compose.yml",
+      envPath: "/tmp/store/stacks/immich/.env",
+      stackName: "immich",
+      webUiPort: 2283,
+    });
+    vi.mocked(extractComposeImages).mockResolvedValue([]);
+    vi.mocked(createStoreOperation).mockResolvedValue(undefined);
+    vi.mocked(updateStoreOperation).mockResolvedValue(undefined);
+    vi.mocked(updateStackUpdateStatus).mockResolvedValue(undefined);
+    vi.mocked(runComposeUp).mockResolvedValue(undefined);
+    vi.mocked(upsertInstalledStack).mockResolvedValue(undefined);
+
+    let finished = false;
+    const done = new Promise<void>((resolve) => {
+      vi.mocked(updateStoreOperation).mockImplementation(async (_id, patch) => {
+        if (!finished && patch.status === "success") {
+          finished = true;
+          resolve();
+        }
+      });
+    });
+
+    await startStoreOperation({
+      appId: "immich",
+      action: "install",
+      composeSource,
+    });
+
+    await done;
+
+    expect(materializeInlineStackFiles).toHaveBeenCalledWith(
+      expect.objectContaining({
+        appId: "immich",
+        composeContent: composeSource,
+      }),
+    );
+    expect(materializeStackFiles).not.toHaveBeenCalled();
+    expect(upsertInstalledStack).toHaveBeenCalledWith(
+      expect.objectContaining({
+        appId: "immich",
+        env: expect.objectContaining({
+          DB_HOSTNAME: "immich-postgres",
+          CUSTOM_ENV: "yes",
+        }),
+      }),
+    );
   });
 });

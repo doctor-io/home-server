@@ -88,6 +88,9 @@ describe("store service", () => {
         status: "installed",
         webUiPort: 3001,
         env: {},
+        isUpToDate: true,
+        localDigest: "sha256:aaa",
+        remoteDigest: "sha256:aaa",
         installedAt: "2026-02-23T00:00:00.000Z",
         updatedAt: "2026-02-23T00:00:00.000Z",
       },
@@ -145,6 +148,9 @@ describe("store service", () => {
         status: "installed",
         webUiPort: 3001,
         env: {},
+        isUpToDate: false,
+        localDigest: "sha256:111",
+        remoteDigest: "sha256:222",
         installedAt: "2026-02-23T00:00:00.000Z",
         updatedAt: "2026-02-23T00:00:00.000Z",
       },
@@ -156,23 +162,13 @@ describe("store service", () => {
         status: "installed",
         webUiPort: 3000,
         env: {},
+        isUpToDate: true,
+        localDigest: "sha256:333",
+        remoteDigest: "sha256:333",
         installedAt: "2026-02-23T00:00:00.000Z",
         updatedAt: "2026-02-23T00:00:00.000Z",
       },
     ]);
-    vi.mocked(resolveStoreAppUpdateState)
-      .mockResolvedValueOnce({
-        updateAvailable: true,
-        localDigest: "sha256:111",
-        remoteDigest: "sha256:222",
-        image: "adguard:latest",
-      })
-      .mockResolvedValueOnce({
-        updateAvailable: false,
-        localDigest: "sha256:333",
-        remoteDigest: "sha256:333",
-        image: "homepage:latest",
-      });
 
     const result = await listStoreApps({
       updatesOnly: true,
@@ -233,6 +229,7 @@ describe("store service", () => {
       displayName: undefined,
       env: undefined,
       webUiPort: 3100,
+      composeSource: undefined,
       removeVolumes: undefined,
     });
   });

@@ -201,6 +201,7 @@ export function useStoreActions() {
       const invalidateTerminalState = (terminalAppId: string, terminalOperationId: string) => {
         void Promise.all([
           queryClient.invalidateQueries({ queryKey: queryKeys.storeCatalog }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.installedApps }),
           queryClient.invalidateQueries({ queryKey: queryKeys.storeApp(terminalAppId) }),
           queryClient.invalidateQueries({
             queryKey: queryKeys.storeOperation(terminalOperationId),
@@ -313,6 +314,7 @@ export function useStoreActions() {
       displayName?: string;
       env?: Record<string, string>;
       webUiPort?: number;
+      composeSource?: string;
     }) => {
       const response = await startLifecycleRequest(
         `/api/v1/store/apps/${encodeURIComponent(input.appId)}/install`,
@@ -320,6 +322,7 @@ export function useStoreActions() {
           displayName: input.displayName,
           env: input.env,
           webUiPort: input.webUiPort,
+          composeSource: input.composeSource,
         },
         "hooks.useStoreActions.install",
       );
@@ -344,12 +347,14 @@ export function useStoreActions() {
       appId: string;
       env?: Record<string, string>;
       webUiPort?: number;
+      composeSource?: string;
     }) => {
       const response = await startLifecycleRequest(
         `/api/v1/store/apps/${encodeURIComponent(input.appId)}/redeploy`,
         {
           env: input.env,
           webUiPort: input.webUiPort,
+          composeSource: input.composeSource,
         },
         "hooks.useStoreActions.redeploy",
       );
@@ -459,6 +464,7 @@ export function useStoreActions() {
       iconUrl?: string | null;
       env?: Record<string, string>;
       webUiPort?: number;
+      composeSource?: string;
     }) => {
       const response = await withClientTiming(
         {
@@ -481,6 +487,7 @@ export function useStoreActions() {
                 iconUrl: input.iconUrl,
                 env: input.env,
                 webUiPort: input.webUiPort,
+                composeSource: input.composeSource,
               }),
             },
           );

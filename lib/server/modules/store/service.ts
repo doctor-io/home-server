@@ -185,6 +185,7 @@ export async function startAppLifecycleAction(input: {
   displayName?: string;
   env?: Record<string, string>;
   webUiPort?: number;
+  composeSource?: string;
   removeVolumes?: boolean;
 }) {
   return withServerTiming(
@@ -203,6 +204,7 @@ export async function startAppLifecycleAction(input: {
         displayName: input.displayName,
         env: input.env,
         webUiPort: input.webUiPort,
+        composeSource: input.composeSource,
         removeVolumes: input.removeVolumes,
       }),
   );
@@ -214,6 +216,7 @@ export async function saveAppSettings(input: {
   iconUrl?: string | null;
   env?: Record<string, string>;
   webUiPort?: number;
+  composeSource?: string;
 }): Promise<{ operationId?: string }> {
   return withServerTiming(
     {
@@ -226,7 +229,7 @@ export async function saveAppSettings(input: {
       },
     },
     async () => {
-      const { appId, displayName, iconUrl, env, webUiPort } = input;
+      const { appId, displayName, iconUrl, env, webUiPort, composeSource } = input;
 
       // 1. Always save metadata immediately
       if (displayName !== undefined || iconUrl !== undefined) {
@@ -234,12 +237,13 @@ export async function saveAppSettings(input: {
       }
 
       // 2. Trigger redeploy if config changed
-      if (env !== undefined || webUiPort !== undefined) {
+      if (env !== undefined || webUiPort !== undefined || composeSource !== undefined) {
         const result = await startStoreOperation({
           appId,
           action: "redeploy",
           env,
           webUiPort,
+          composeSource,
         });
         return { operationId: result.operationId };
       }

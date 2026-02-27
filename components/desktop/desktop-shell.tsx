@@ -2,10 +2,7 @@
 
 import { useDesktopAppearance } from "@/hooks/useDesktopAppearance";
 import { CurrentUserError, useCurrentUser } from "@/hooks/useCurrentUser";
-import {
-  readLockState,
-  writeLockState,
-} from "@/lib/desktop/lock-state";
+import { readLockState, writeLockState } from "@/lib/desktop/lock-state";
 import {
   Activity,
   FolderOpen,
@@ -18,13 +15,8 @@ import {
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppGrid, type AppActionTarget } from "./app-grid";
-import { AppSettingsPanel } from "./apps/app-settings-panel";
+import { AppConfiguratorPanel } from "./apps/app-configurator-panel";
 import { AppStore } from "./app-store";
-import {
-  CustomInstallForm,
-  type CustomAppInstallDialogInput,
-} from "./custom-app-install-dialog";
-import { useStoreActions } from "@/hooks/useStoreActions";
 import { Dock } from "./dock";
 import { FileManager } from "./file-manager";
 import { LockScreen } from "./lock-screen";
@@ -74,8 +66,6 @@ export function DesktopShell() {
     command: string;
   } | null>(null);
   const [appSettingsTarget, setAppSettingsTarget] = useState<AppActionTarget | null>(null);
-  const [customInstallError, setCustomInstallError] = useState<string | null>(null);
-  const [customInstallPending, setCustomInstallPending] = useState(false);
   const terminalCommandIdRef = useRef(0);
   const [displayWallpaper, setDisplayWallpaper] = useState(
     "/images/1.jpg",
@@ -87,7 +77,6 @@ export function DesktopShell() {
   const wallpaperFrameRef = useRef<number | null>(null);
   const wallpaperTransitionIdRef = useRef(0);
   const settingsSearchInputRef = useRef<HTMLInputElement>(null);
-  const { installCustomApp } = useStoreActions();
   const {
     appearance,
     updateAppearance,
@@ -300,20 +289,6 @@ export function DesktopShell() {
     setIsSettingsSearchOpen(false);
     setSettingsSearchQuery("");
     openWindow("settings");
-  }
-
-  async function startCustomInstall(input: CustomAppInstallDialogInput) {
-    setCustomInstallError(null);
-    setCustomInstallPending(true);
-    try {
-      await installCustomApp(input);
-      closeWindow("custom-install");
-    } catch (error) {
-      setCustomInstallError(error instanceof Error ? error.message : "Unable to install custom app.");
-      throw error;
-    } finally {
-      setCustomInstallPending(false);
-    }
   }
 
   useEffect(() => {
@@ -581,10 +556,7 @@ export function DesktopShell() {
           <Window
             title="Install Custom App"
             icon={<Package className="size-4 text-primary" />}
-            onClose={() => {
-              closeWindow("custom-install");
-              setCustomInstallError(null);
-            }}
+            onClose={() => closeWindow("custom-install")}
             defaultWidth={720}
             defaultHeight={600}
             zIndex={getWindowZ("custom-install")}
@@ -592,11 +564,9 @@ export function DesktopShell() {
             isClosing={closingWindows.includes("custom-install")}
             animationsEnabled={appearance.animationsEnabled}
           >
-            <CustomInstallForm
-              isSubmitting={customInstallPending}
-              error={customInstallError}
-              onCancel={() => closeWindow("custom-install")}
-              onSubmit={(input) => startCustomInstall(input)}
+            <AppConfiguratorPanel
+              context="custom_install"
+              onClose={() => closeWindow("custom-install")}
             />
           </Window>
         )}
@@ -616,7 +586,10 @@ export function DesktopShell() {
             isClosing={closingWindows.includes("app-settings")}
             animationsEnabled={appearance.animationsEnabled}
           >
-            <AppSettingsPanel target={appSettingsTarget} />
+            <AppConfiguratorPanel
+              context="installed_edit"
+              target={appSettingsTarget}
+            />
           </Window>
         )}
 

@@ -4,9 +4,12 @@ import { execFile } from "node:child_process";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
-import { serverEnv } from "@/lib/server/env";
 import { withServerTiming } from "@/lib/server/logging/logger";
-import { resolveStoreStacksRoot } from "@/lib/server/storage/data-root";
+import {
+  ensureDataRootDirectories,
+  resolveStoreAppDataRoot,
+  resolveStoreStacksRoot,
+} from "@/lib/server/storage/data-root";
 
 const execFileAsync = promisify(execFile);
 
@@ -24,6 +27,10 @@ export type MaterializedStack = {
   stackName: string;
   webUiPort: number | null;
 };
+
+export type ComposeStorageMappingStrategy =
+  | "legacy_named_source"
+  | "app_target_path";
 
 type ParsedListItem = {
   prefix: string;
@@ -210,6 +217,47 @@ function isPathWithinRoot(candidate: string, root: string) {
   return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
+function normalizeContainerTargetPath(target: string) {
+  const normalizedTarget = path.posix.normalize(target);
+  const segments = normalizedTarget
+    .split("/")
+    .filter((segment) => segment.length > 0 && segment !== "." && segment !== "..");
+
+  if (segments.length === 0) {
+    return "data";
+  }
+
+  return path.join(...segments);
+}
+
+function resolveNamedVolumeBindSource(input: {
+  appDataRoot: string;
+  appId: string;
+  source: string;
+  target: string;
+  strategy: ComposeStorageMappingStrategy;
+}) {
+  if (input.strategy === "legacy_named_source") {
+    return path.join(input.appDataRoot, input.source);
+  }
+
+  if (input.appId.trim().length === 0) {
+    throw new Error("appId is required for app_target_path storage mapping");
+  }
+
+  const appScopedRoot = path.join(input.appDataRoot, input.appId);
+  const relativeTargetPath = normalizeContainerTargetPath(input.target);
+  const bindSource = path.join(appScopedRoot, relativeTargetPath);
+
+  if (!isPathWithinRoot(bindSource, appScopedRoot)) {
+    throw new Error(
+      `Generated bind mount path escapes app root for appId "${input.appId}"`,
+    );
+  }
+
+  return bindSource;
+}
+
 function findTopLevelSectionEnd(lines: string[], startIndex: number) {
   for (let index = startIndex; index < lines.length; index += 1) {
     const line = lines[index];
@@ -374,7 +422,14 @@ export function normalizeComposeStorageBindings(
   composeContent: string,
   stacksRoot: string,
   appDataRoot: string,
+  options?: {
+    appId?: string;
+    strategy?: ComposeStorageMappingStrategy;
+  },
 ) {
+  const strategy = options?.strategy ?? "legacy_named_source";
+  const appId = options?.appId ?? "";
+
   const lines = composeContent.split(/\r?\n/);
   const pathStack: Array<{ indent: number; key: string }> = [];
   const bindMountDirectories = new Set<string>();
@@ -422,7 +477,13 @@ export function normalizeComposeStorageBindings(
       continue;
     }
 
-    const bindSource = path.join(appDataRoot, volumeSpec.source);
+    const bindSource = resolveNamedVolumeBindSource({
+      appDataRoot,
+      appId,
+      source: volumeSpec.source,
+      target: volumeSpec.target,
+      strategy,
+    });
     const rewrittenSpec = volumeSpec.mode
       ? `${bindSource}:${volumeSpec.target}:${volumeSpec.mode}`
       : `${bindSource}:${volumeSpec.target}`;
@@ -450,6 +511,7 @@ export async function materializeStackFiles(input: {
   stackFile: string;
   env: Record<string, string>;
   webUiPort: number | null;
+  storageMappingStrategy?: ComposeStorageMappingStrategy;
 }) {
   const rawUrl = buildRawStackFileUrl(input.repositoryUrl, input.stackFile);
   const response = await fetch(rawUrl, {
@@ -465,9 +527,13 @@ export async function materializeStackFiles(input: {
     composeContent = applyWebUiPortOverride(composeContent, input.webUiPort);
   }
 
+  await ensureDataRootDirectories();
   const stacksRoot = resolveStoreStacksRoot();
-  const appDataRoot = serverEnv.STORE_APP_DATA_ROOT;
-  const normalized = normalizeComposeStorageBindings(composeContent, stacksRoot, appDataRoot);
+  const appDataRoot = resolveStoreAppDataRoot();
+  const normalized = normalizeComposeStorageBindings(composeContent, stacksRoot, appDataRoot, {
+    appId: input.appId,
+    strategy: input.storageMappingStrategy,
+  });
 
   const stackDir = path.join(stacksRoot, input.appId);
   const composePath = path.join(stackDir, "docker-compose.yml");
@@ -497,15 +563,20 @@ export async function materializeInlineStackFiles(input: {
   composeContent: string;
   env: Record<string, string>;
   webUiPort: number | null;
+  storageMappingStrategy?: ComposeStorageMappingStrategy;
 }) {
   let composeContent = input.composeContent;
   if (input.webUiPort !== null) {
     composeContent = applyWebUiPortOverride(composeContent, input.webUiPort);
   }
 
+  await ensureDataRootDirectories();
   const stacksRoot = resolveStoreStacksRoot();
-  const appDataRoot = serverEnv.STORE_APP_DATA_ROOT;
-  const normalized = normalizeComposeStorageBindings(composeContent, stacksRoot, appDataRoot);
+  const appDataRoot = resolveStoreAppDataRoot();
+  const normalized = normalizeComposeStorageBindings(composeContent, stacksRoot, appDataRoot, {
+    appId: input.appId,
+    strategy: input.storageMappingStrategy,
+  });
 
   const stackDir = path.join(stacksRoot, input.appId);
   const composePath = path.join(stackDir, "docker-compose.yml");

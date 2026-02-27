@@ -41,6 +41,7 @@ describe("POST /api/v1/store/apps/:appId/redeploy", () => {
         TZ: "Africa/Tunis",
       },
       webUiPort: 3100,
+      composeSource: undefined,
     });
   });
 });

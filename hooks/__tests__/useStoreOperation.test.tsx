@@ -123,6 +123,7 @@ describe("useStoreOperation", () => {
     });
 
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.storeCatalog });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.installedApps });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.storeApp("plex") });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.storeOperation("op-1") });
 

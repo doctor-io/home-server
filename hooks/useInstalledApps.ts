@@ -9,6 +9,9 @@ type InstalledAppsResponse = {
   data: InstalledApp[];
 };
 
+const STATUS_VERIFY_POLL_INTERVAL_MS = 2_000;
+const STATUS_VERIFY_WINDOW_MS = 30_000;
+
 async function fetchInstalledApps() {
   return withClientTiming(
     {
@@ -38,5 +41,27 @@ export function useInstalledApps() {
     queryKey: queryKeys.installedApps,
     queryFn: fetchInstalledApps,
     staleTime: 10_000,
+    refetchInterval: (query) => {
+      const apps = query.state.data;
+      if (!apps || apps.length === 0) {
+        return false;
+      }
+
+      const now = Date.now();
+      const shouldPollForVerification = apps.some((app) => {
+        if (app.status === "running") {
+          return false;
+        }
+
+        const updatedAtMs = Date.parse(app.updatedAt);
+        if (!Number.isFinite(updatedAtMs)) {
+          return false;
+        }
+
+        return now - updatedAtMs <= STATUS_VERIFY_WINDOW_MS;
+      });
+
+      return shouldPollForVerification ? STATUS_VERIFY_POLL_INTERVAL_MS : false;
+    },
   });
 }

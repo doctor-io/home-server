@@ -154,6 +154,7 @@ export function useStoreOperation(operationId: string | null) {
         if (isTerminalStatus(event.status)) {
           void Promise.all([
             queryClient.invalidateQueries({ queryKey: queryKeys.storeCatalog }),
+            queryClient.invalidateQueries({ queryKey: queryKeys.installedApps }),
             queryClient.invalidateQueries({ queryKey: queryKeys.storeApp(event.appId) }),
             queryClient.invalidateQueries({ queryKey: queryKeys.storeOperation(operationId) }),
           ]);

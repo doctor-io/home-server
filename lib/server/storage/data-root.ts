@@ -1,8 +1,8 @@
 import "server-only";
 
+import { serverEnv } from "@/lib/server/env";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
-import { serverEnv } from "@/lib/server/env";
 
 const DATA_SUBDIRECTORIES = [
   "Apps",
@@ -10,10 +10,20 @@ const DATA_SUBDIRECTORIES = [
   "Media",
   "Download",
   "Network",
-  "Trash",
+  ".Trash",
 ] as const;
 
 let resolvedDataRoot: string | null = null;
+
+function resolveConfiguredPath(inputPath: string) {
+  return path.isAbsolute(inputPath)
+    ? inputPath
+    : path.resolve(process.cwd(), inputPath);
+}
+
+function resolvePrimaryDataRoot() {
+  return path.dirname(resolveConfiguredPath(serverEnv.STORE_STACKS_ROOT));
+}
 
 export function resolveStoreStacksRoot() {
   // If we've already resolved a fallback, use it
@@ -21,9 +31,21 @@ export function resolveStoreStacksRoot() {
     return path.join(resolvedDataRoot, "Apps");
   }
 
-  return path.isAbsolute(serverEnv.STORE_STACKS_ROOT)
-    ? serverEnv.STORE_STACKS_ROOT
-    : path.resolve(process.cwd(), serverEnv.STORE_STACKS_ROOT);
+  return resolveConfiguredPath(serverEnv.STORE_STACKS_ROOT);
+}
+
+export function resolveStoreAppDataRoot() {
+  const configured = resolveConfiguredPath(serverEnv.STORE_APP_DATA_ROOT);
+  if (!resolvedDataRoot) {
+    return configured;
+  }
+
+  const primaryDataRoot = resolvePrimaryDataRoot();
+  if (resolvedDataRoot === primaryDataRoot) {
+    return configured;
+  }
+
+  return path.join(resolvedDataRoot, "Apps");
 }
 
 export function resolveDataRootDirectory() {
@@ -34,7 +56,7 @@ export function resolveDataRootDirectory() {
 }
 
 export async function ensureDataRootDirectories() {
-  const primaryDataRoot = path.dirname(resolveStoreStacksRoot());
+  const primaryDataRoot = resolvePrimaryDataRoot();
   const fallbackDataRoot = path.resolve(process.cwd(), "DATA");
 
   let dataRoot = primaryDataRoot;
@@ -47,7 +69,8 @@ export async function ensureDataRootDirectories() {
     );
     resolvedDataRoot = primaryDataRoot;
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : "unknown error";
+    const errorMessage =
+      error instanceof Error ? error.message : "unknown error";
     console.warn(
       `[Storage] Cannot create directories at ${primaryDataRoot} (${errorMessage}). Falling back to ${fallbackDataRoot}`,
     );
