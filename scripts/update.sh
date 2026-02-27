@@ -8,28 +8,8 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 APP_NAME="home-server"
-HOMEIO_USE_CURRENT_USER="${HOMEIO_USE_CURRENT_USER:-false}"
-
-# Determine which user to use
-if [[ "${HOMEIO_USE_CURRENT_USER}" == "true" ]]; then
-	# Use the actual user who ran sudo
-	ACTUAL_USER="${SUDO_USER:-${USER}}"
-	[[ -n "${ACTUAL_USER}" && "${ACTUAL_USER}" != "root" ]] || { echo "Could not determine regular user. Set HOMEIO_USER manually."; exit 1; }
-	APP_USER="${HOMEIO_USER:-${ACTUAL_USER}}"
-	APP_GROUP="${HOMEIO_GROUP:-${ACTUAL_USER}}"
-	# Use user's home directory for install
-	USER_HOME="$(eval echo ~${ACTUAL_USER})"
-	INSTALL_DIR="${HOMEIO_INSTALL_DIR:-${USER_HOME}/home-server}"
-else
-	# Use system user (original behavior)
-	APP_USER="${HOMEIO_USER:-homeio}"
-	APP_GROUP="${HOMEIO_GROUP:-${APP_USER}}"
-	INSTALL_DIR="${HOMEIO_INSTALL_DIR:-/opt/home-server}"
-fi
-
-ENV_DIR="${HOMEIO_ENV_DIR:-/etc/home-server}"
+INSTALL_DIR="${HOMEIO_INSTALL_DIR:-/opt/home-server}"
 ENV_FILE="${HOMEIO_ENV_FILE:-${INSTALL_DIR}/.env}"
-LEGACY_ENV_FILE="${ENV_DIR}/home-server.env"
 SERVICE_NAME="${HOMEIO_SERVICE_NAME:-home-server}"
 DBUS_SERVICE_NAME="${HOMEIO_DBUS_SERVICE_NAME:-home-server-dbus}"
 APP_PORT="${HOMEIO_APP_PORT:-${HOMEIO_PORT:-12026}}"
@@ -74,38 +54,10 @@ require_root() {
 	[[ "${EUID}" -eq 0 ]] || { print_error "Run this updater as root (for example: sudo bash update.sh)."; exit 1; }
 }
 
-run_as_app() {
-	local cmd="${1}"
-	runuser -u "${APP_USER}" -- bash -lc "${cmd}"
-}
-
 hash_file() {
 	local file="${1}"
 	[[ -f "${file}" ]] || return 0
 	sha256sum "${file}" | awk '{print $1}'
-}
-
-resolve_env_file() {
-	# If caller explicitly set HOMEIO_ENV_FILE, respect it strictly.
-	if [[ -n "${HOMEIO_ENV_FILE:-}" ]]; then
-		[[ -f "${ENV_FILE}" ]] || { print_error "Environment file not found: ${ENV_FILE}"; exit 1; }
-		return
-	fi
-
-	# Primary default path (matches install.sh).
-	if [[ -f "${ENV_FILE}" ]]; then
-		return
-	fi
-
-	# Backward-compatible legacy fallback.
-	if [[ -f "${LEGACY_ENV_FILE}" ]]; then
-		print_warn "Environment file not found at ${ENV_FILE}. Falling back to ${LEGACY_ENV_FILE}."
-		ENV_FILE="${LEGACY_ENV_FILE}"
-		return
-	fi
-
-	print_error "Environment file not found. Checked: ${ENV_FILE} and ${LEGACY_ENV_FILE}"
-	exit 1
 }
 
 check_prerequisites() {
@@ -116,14 +68,13 @@ check_prerequisites() {
 	command_exists npm || { print_error "npm is required."; exit 1; }
 
 	[[ -d "${INSTALL_DIR}" ]] || { print_error "Install directory not found: ${INSTALL_DIR}"; exit 1; }
-	resolve_env_file
-	id -u "${APP_USER}" >/dev/null 2>&1 || { print_error "App user not found: ${APP_USER}"; exit 1; }
+	[[ -f "${ENV_FILE}" ]] || { print_error "Environment file not found: ${ENV_FILE}"; exit 1; }
 }
 
 capture_current_state() {
 	PREVIOUS_LOCK_HASH="$(hash_file "${INSTALL_DIR}/package-lock.json" || true)"
 	if [[ -d "${INSTALL_DIR}/.git" ]]; then
-		PREVIOUS_GIT_REV="$(run_as_app "git -C '${INSTALL_DIR}' rev-parse HEAD" || true)"
+		PREVIOUS_GIT_REV="$(git -C "${INSTALL_DIR}" rev-parse HEAD || true)"
 	fi
 }
 
@@ -151,8 +102,8 @@ deploy_from_git() {
 	[[ -d "${INSTALL_DIR}/.git" ]] || { print_error "No git repository found at ${INSTALL_DIR}. Set HOMEIO_RELEASE_TARBALL_URL for tarball-based updates."; exit 1; }
 
 	print_status "Updating from git (${REPO_BRANCH})..."
-	run_as_app "git -C '${INSTALL_DIR}' fetch --depth=1 origin '${REPO_BRANCH}' --quiet"
-	run_as_app "git -C '${INSTALL_DIR}' checkout --force FETCH_HEAD --quiet"
+	git -C "${INSTALL_DIR}" fetch --depth=1 origin "${REPO_BRANCH}" --quiet
+	git -C "${INSTALL_DIR}" checkout --force FETCH_HEAD --quiet
 }
 
 deploy_from_tarball() {
@@ -182,7 +133,6 @@ deploy_from_tarball() {
 		--exclude "node_modules" \
 		--exclude ".next" \
 		"${source_dir}/" "${INSTALL_DIR}/"
-	chown -R "${APP_USER}:${APP_GROUP}" "${INSTALL_DIR}"
 
 	rm -rf "${tmp_dir}"
 }
@@ -192,7 +142,7 @@ install_dependencies_if_needed() {
 
 	if [[ "${PREVIOUS_LOCK_HASH}" != "${NEW_LOCK_HASH}" || ! -d "${INSTALL_DIR}/node_modules" ]]; then
 		print_status "Dependency changes detected. Installing npm dependencies..."
-		run_as_app "cd '${INSTALL_DIR}' && npm ci --silent --no-audit --no-fund" 1>/dev/null
+		cd "${INSTALL_DIR}" && npm ci --silent --no-audit --no-fund 1>/dev/null
 	else
 		print_status "No dependency changes detected. Skipping npm ci."
 	fi
@@ -200,9 +150,14 @@ install_dependencies_if_needed() {
 
 run_db_and_build() {
 	print_status "Initializing database schema..."
-	run_as_app "cd '${INSTALL_DIR}' && set -a && source '${ENV_FILE}' && set +a && npm run db:init --silent" 1>/dev/null
+	(cd "${INSTALL_DIR}" && set -a && source "${ENV_FILE}" && set +a && npm run db:init --silent) 1>/dev/null
 	print_status "Building Next.js application..."
-	run_as_app "cd '${INSTALL_DIR}' && npm run build --silent" 1>/dev/null
+	cd "${INSTALL_DIR}" && npm run build --silent 1>/dev/null
+}
+
+stop_service() {
+	print_status "Stopping ${SERVICE_NAME} service..."
+	systemctl stop "${SERVICE_UNIT}" >/dev/null 2>&1 || true
 }
 
 start_service() {
@@ -265,11 +220,6 @@ EOF
 	systemctl reload nginx
 }
 
-stop_service() {
-	print_status "Stopping ${SERVICE_NAME} service..."
-	systemctl stop "${SERVICE_UNIT}" >/dev/null 2>&1 || true
-}
-
 healthcheck() {
 	local attempts=0
 	while (( attempts < HOMEIO_HEALTHCHECK_RETRIES )); do
@@ -293,17 +243,16 @@ rollback_release() {
 	if [[ -n "${BACKUP_DIR}" && -d "${BACKUP_DIR}" ]]; then
 		print_status "Restoring backup from ${BACKUP_DIR}..."
 		rsync -a --delete "${BACKUP_DIR}/" "${INSTALL_DIR}/"
-		chown -R "${APP_USER}:${APP_GROUP}" "${INSTALL_DIR}"
 	elif [[ -n "${PREVIOUS_GIT_REV}" && -d "${INSTALL_DIR}/.git" ]]; then
 		print_status "Restoring previous git revision ${PREVIOUS_GIT_REV}..."
-		run_as_app "git -C '${INSTALL_DIR}' checkout --force '${PREVIOUS_GIT_REV}' --quiet"
+		git -C "${INSTALL_DIR}" checkout --force "${PREVIOUS_GIT_REV}" --quiet
 	else
 		print_error "No rollback source available."; exit 1;
 	fi
 
 	print_status "Rebuilding application after rollback..."
-	run_as_app "cd '${INSTALL_DIR}' && npm ci --silent" 1>/dev/null
-	run_as_app "cd '${INSTALL_DIR}' && npm run build --silent" 1>/dev/null
+	cd "${INSTALL_DIR}" && npm ci --silent 1>/dev/null
+	cd "${INSTALL_DIR}" && npm run build --silent 1>/dev/null
 	start_service
 
 	if healthcheck; then
