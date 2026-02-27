@@ -150,7 +150,7 @@ async function ensureNoSymlinkTraversal(
     } catch (error) {
       const nodeError = error as NodeJS.ErrnoException;
       if (nodeError?.code === "ENOENT") {
-        if (allowMissingLeaf && index === segments.length - 1) {
+        if (allowMissingLeaf) {
           exists = false;
           break;
         }

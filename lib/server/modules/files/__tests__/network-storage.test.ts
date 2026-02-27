@@ -94,15 +94,19 @@ import {
   addShare,
   discoverServers,
   discoverShares,
+  getShareInfo,
   mountShare,
   type NetworkStorageError,
 } from "@/lib/server/modules/files/network-storage";
 import {
+  deleteNetworkShareFromDb,
   getNetworkShareByMountPathFromDb,
   getNetworkShareFromDb,
   insertNetworkShareInDb,
+  listNetworkSharesFromDb,
   touchNetworkShareInDb,
 } from "@/lib/server/modules/files/network-shares-repository";
+import { resolvePathWithinFilesRoot } from "@/lib/server/modules/files/path-resolver";
 import { encryptSecret } from "@/lib/server/modules/files/secrets";
 
 type ExecFileCallback = (error: Error | null, stdout: string, stderr: string) => void;
@@ -304,5 +308,93 @@ describe("network storage service", () => {
 
     expect(mounted.isMounted).toBe(true);
     expect(vi.mocked(insertNetworkShareInDb)).not.toHaveBeenCalled();
+  });
+
+  it("rolls back db reservation when mount fails", async () => {
+    vi.mocked(getNetworkShareByMountPathFromDb).mockResolvedValueOnce(null);
+    vi.mocked(insertNetworkShareInDb).mockResolvedValueOnce({
+      id: "share-rollback",
+      host: "nas.local",
+      share: "Media",
+      username: "user",
+      mountPath: "Network/nas.local/Media",
+      passwordCiphertext: "x",
+      passwordIv: "x",
+      passwordTag: "x",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    vi.mocked(deleteNetworkShareFromDb).mockResolvedValueOnce({
+      id: "share-rollback",
+      host: "nas.local",
+      share: "Media",
+      username: "user",
+      mountPath: "Network/nas.local/Media",
+      passwordCiphertext: "x",
+      passwordIv: "x",
+      passwordTag: "x",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    vi.mocked(execFile).mockImplementation((command: string, ...restArgs: unknown[]) => {
+      const callback = getExecFileCallback(restArgs);
+      if (command === "mountpoint") {
+        const error = new Error("not mounted") as Error & { code?: number };
+        error.code = 1;
+        callback(error, "", "");
+        return {} as never;
+      }
+      if (command === "mount") {
+        const error = new Error("permission denied") as Error & { code?: number };
+        error.code = 1;
+        callback(error, "", "permission denied");
+        return {} as never;
+      }
+      callback(null, "", "");
+      return {} as never;
+    });
+
+    await expect(
+      addShare({
+        host: "nas.local",
+        share: "Media",
+        username: "user",
+        password: "secret",
+      }),
+    ).rejects.toMatchObject<Partial<NetworkStorageError>>({
+      code: "mount_failed",
+      statusCode: 500,
+    });
+
+    expect(deleteNetworkShareFromDb).toHaveBeenCalledWith("share-rollback");
+  });
+
+  it("returns shares even when mount status resolution fails", async () => {
+    vi.mocked(listNetworkSharesFromDb).mockResolvedValueOnce([
+      {
+        id: "share-1",
+        host: "nas.local",
+        share: "Media",
+        username: "user",
+        mountPath: "Network/nas.local/Media",
+        passwordCiphertext: "x",
+        passwordIv: "x",
+        passwordTag: "x",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
+
+    vi.mocked(resolvePathWithinFilesRoot).mockRejectedValueOnce(
+      new Error("resolver failed"),
+    );
+
+    const shares = await getShareInfo();
+    expect(shares).toHaveLength(1);
+    expect(shares[0]).toMatchObject({
+      id: "share-1",
+      isMounted: false,
+    });
   });
 });

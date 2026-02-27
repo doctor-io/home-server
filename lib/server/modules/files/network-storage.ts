@@ -320,7 +320,23 @@ export async function getShareInfo(): Promise<NetworkShareStatus[]> {
 
   const statuses = await Promise.all(
     shares.map(async (share) => {
-      const mounted = await isMounted(share.mountPath);
+      let mounted = false;
+      try {
+        mounted = await isMounted(share.mountPath);
+      } catch (error) {
+        logServerAction({
+          level: "warn",
+          layer: "service",
+          action: "files.network.shares.get.status",
+          status: "error",
+          message: "Failed to resolve network share mount status",
+          meta: {
+            shareId: share.id,
+            mountPath: share.mountPath,
+          },
+          error,
+        });
+      }
       return toShareStatus(share, mounted);
     }),
   );
@@ -371,7 +387,21 @@ export async function addShare(input: CreateNetworkShareRequest) {
       isMounted: true,
     } satisfies NetworkShareStatus;
   } catch (error) {
-    await deleteNetworkShareFromDb(created.id).catch(() => undefined);
+    try {
+      await deleteNetworkShareFromDb(created.id);
+    } catch (rollbackError) {
+      throw new NetworkStorageError(
+        "Failed to mount network share and rollback reservation",
+        {
+          code: "internal_error",
+          statusCode: 500,
+          cause: {
+            error,
+            rollbackError,
+          },
+        },
+      );
+    }
     throw mapCommandError(error, "Failed to mount network share", "mount_failed");
   }
 }
