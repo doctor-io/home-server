@@ -61,9 +61,28 @@ describe("useNetworkEventsSse", () => {
     act(() => {
       source.emit("network.connection.changed", {
         type: "network.connection.changed",
+        connected: true,
+        iface: "wlan0",
+        ssid: "HomeNet",
       });
       source.emit("network.device.state.changed", {
         type: "network.device.state.changed",
+        connected: true,
+        iface: "wlan0",
+        ssid: "HomeNet",
+      });
+      // Duplicate payloads should be deduplicated.
+      source.emit("network.connection.changed", {
+        type: "network.connection.changed",
+        connected: true,
+        iface: "wlan0",
+        ssid: "HomeNet",
+      });
+      source.emit("network.device.state.changed", {
+        type: "network.device.state.changed",
+        connected: true,
+        iface: "wlan0",
+        ssid: "HomeNet",
       });
       vi.runAllTimers();
     });
@@ -74,6 +93,14 @@ describe("useNetworkEventsSse", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: queryKeys.networkNetworks,
     });
+    const statusInvalidations = invalidateSpy.mock.calls.filter(
+      (call) => call[0]?.queryKey === queryKeys.networkStatus,
+    );
+    const networksInvalidations = invalidateSpy.mock.calls.filter(
+      (call) => call[0]?.queryKey === queryKeys.networkNetworks,
+    );
+    expect(statusInvalidations).toHaveLength(1);
+    expect(networksInvalidations).toHaveLength(1);
 
     unmount();
     expect(source.close).toHaveBeenCalledTimes(1);

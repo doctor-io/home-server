@@ -17,6 +17,18 @@ const metricsCache = new LruCache<SystemMetricsSnapshot>(
   8,
   serverEnv.METRICS_CACHE_TTL_MS,
 );
+const HELPER_STATUS_CACHE_TTL_MS = 10_000;
+const HELPER_STATUS_UNAVAILABLE_BACKOFF_MS = 15_000;
+const HELPER_STATUS_ERROR_LOG_COOLDOWN_MS = 30_000;
+
+let helperStatusCache:
+  | {
+      value: Awaited<ReturnType<typeof getNetworkStatusFromHelper>>;
+      expiresAt: number;
+    }
+  | null = null;
+let helperStatusUnavailableUntil = 0;
+let lastHelperStatusErrorLogAt = 0;
 
 function clampPercent(value: number) {
   if (!Number.isFinite(value)) return 0;
@@ -169,22 +181,9 @@ async function collectSnapshot(): Promise<SystemMetricsSnapshot> {
     .filter((coreTemp): coreTemp is number => coreTemp !== null);
   const maxTemperature = toNullableMetric(cpuTemperature?.max);
 
-  // Try to get WiFi status from NetworkManager D-Bus helper first (more reliable)
-  let helperStatus: Awaited<ReturnType<typeof getNetworkStatusFromHelper>> | null = null;
-  try {
-    helperStatus = await getNetworkStatusFromHelper();
-  } catch (error) {
-    if (!isNetworkHelperUnavailableError(error)) {
-      logServerAction({
-        level: "warn",
-        layer: "service",
-        action: "system.metrics.network.helper",
-        status: "error",
-        message: "Failed to get network status from D-Bus helper",
-        error,
-      });
-    }
-  }
+  // Try to get WiFi status from NetworkManager D-Bus helper first (more reliable),
+  // but cache it to avoid querying DBus for every metrics stream frame.
+  const helperStatus = await resolveHelperStatusForMetrics();
 
   const primaryWifiConnection =
     wifiConnections.find(
@@ -376,4 +375,55 @@ export async function getSystemMetricsSnapshot(options?: {
   });
 
   return snapshot;
+}
+
+function readHelperStatusCache() {
+  if (!helperStatusCache) return null;
+  if (helperStatusCache.expiresAt <= Date.now()) {
+    helperStatusCache = null;
+    return null;
+  }
+
+  return helperStatusCache.value;
+}
+
+async function resolveHelperStatusForMetrics() {
+  const cached = readHelperStatusCache();
+  if (cached) {
+    return cached;
+  }
+
+  if (Date.now() < helperStatusUnavailableUntil) {
+    return null;
+  }
+
+  try {
+    const status = await getNetworkStatusFromHelper();
+    helperStatusCache = {
+      value: status,
+      expiresAt: Date.now() + HELPER_STATUS_CACHE_TTL_MS,
+    };
+    helperStatusUnavailableUntil = 0;
+    return status;
+  } catch (error) {
+    if (isNetworkHelperUnavailableError(error)) {
+      helperStatusUnavailableUntil = Date.now() + HELPER_STATUS_UNAVAILABLE_BACKOFF_MS;
+      return null;
+    }
+
+    const now = Date.now();
+    if (now - lastHelperStatusErrorLogAt >= HELPER_STATUS_ERROR_LOG_COOLDOWN_MS) {
+      lastHelperStatusErrorLogAt = now;
+      logServerAction({
+        level: "warn",
+        layer: "service",
+        action: "system.metrics.network.helper",
+        status: "error",
+        message: "Failed to get network status from D-Bus helper",
+        error,
+      });
+    }
+
+    return null;
+  }
 }

@@ -453,12 +453,19 @@ async function releaseShareExport(
   const mountExists = tolerateMissing
     ? await isMountPoint(exportResolved.absolutePath)
     : true;
+  let usershareDeleteFailed = false;
 
   if (usershareExists) {
     try {
       await runCommand("net", ["usershare", "delete", record.shareName]);
     } catch (error) {
-      if (!(tolerateMissing && isUsershareMissingError(error))) {
+      if (tolerateMissing && isUsershareMissingError(error)) {
+        // Already deleted by an out-of-band cleanup.
+      } else if (tolerateMissing && !mountExists && isPermissionError(error)) {
+        // If the bind mount is already gone, treat usershare delete permission issues
+        // as a stale export entry and keep converging local state.
+        usershareDeleteFailed = true;
+      } else {
         throw error;
       }
     }
@@ -511,6 +518,15 @@ async function releaseShareExport(
     }
   } catch {
     // ignored
+  }
+
+  if (usershareDeleteFailed) {
+    const usershareStillPresent = await isUsersharePresent(record.shareName).catch(
+      () => false,
+    );
+    if (usershareStillPresent) {
+      return;
+    }
   }
 }
 

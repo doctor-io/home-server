@@ -36,6 +36,7 @@ type WifiNetworksResult = {
 };
 
 const NETWORK_FALLBACK_CACHE_TTL_MS = 30_000;
+const FALLBACK_LOG_COOLDOWN_MS = 60_000;
 
 let fallbackStatusCache:
   | {
@@ -50,6 +51,7 @@ let fallbackWifiNetworksCache:
       expiresAt: number;
     }
   | null = null;
+const fallbackLogAtByAction = new Map<string, number>();
 
 const connectNetworkSchema = z.object({
   ssid: z.string().trim().min(1).max(128),
@@ -137,6 +139,30 @@ function writeFallbackCaches(snapshot: Awaited<ReturnType<typeof getSystemMetric
   };
 }
 
+function logFallbackNotice(options: {
+  action: string;
+  requestId?: string;
+  message: string;
+  error?: unknown;
+}) {
+  const now = Date.now();
+  const lastLoggedAt = fallbackLogAtByAction.get(options.action) ?? 0;
+  if (now - lastLoggedAt < FALLBACK_LOG_COOLDOWN_MS) {
+    return;
+  }
+  fallbackLogAtByAction.set(options.action, now);
+
+  logServerAction({
+    level: "warn",
+    layer: "service",
+    action: options.action,
+    status: "info",
+    requestId: options.requestId,
+    message: options.message,
+    error: options.error,
+  });
+}
+
 function mapKnownServiceError(error: unknown) {
   if (error instanceof NetworkServiceError) return error;
 
@@ -206,11 +232,8 @@ export async function getNetworkStatus(context?: RequestContext): Promise<Networ
 
         const cached = readCachedFallbackStatus();
         if (cached) {
-          logServerAction({
-            level: "warn",
-            layer: "service",
+          logFallbackNotice({
             action: "network.status.get.fallback",
-            status: "info",
             requestId: context?.requestId,
             message: "DBus helper unavailable; using in-memory fallback cache",
           });
@@ -221,11 +244,8 @@ export async function getNetworkStatus(context?: RequestContext): Promise<Networ
           } satisfies NetworkStatusResult;
         }
 
-        logServerAction({
-          level: "warn",
-          layer: "service",
+        logFallbackNotice({
           action: "network.status.get.fallback",
-          status: "info",
           requestId: context?.requestId,
           message:
             "DBus helper unavailable; refreshing fallback cache from system metrics",
@@ -270,11 +290,8 @@ export async function getWifiNetworks(
 
         const cached = readCachedFallbackWifiNetworks();
         if (cached) {
-          logServerAction({
-            level: "warn",
-            layer: "service",
+          logFallbackNotice({
             action: "network.networks.get.fallback",
-            status: "info",
             requestId: context?.requestId,
             message: "DBus helper unavailable; using in-memory fallback cache",
           });
@@ -285,11 +302,8 @@ export async function getWifiNetworks(
           } satisfies WifiNetworksResult;
         }
 
-        logServerAction({
-          level: "warn",
-          layer: "service",
+        logFallbackNotice({
           action: "network.networks.get.fallback",
-          status: "info",
           requestId: context?.requestId,
           message:
             "DBus helper unavailable; refreshing fallback cache from system metrics",

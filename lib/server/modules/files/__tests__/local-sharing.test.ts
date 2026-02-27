@@ -390,6 +390,67 @@ describe("local sharing service", () => {
     );
   });
 
+  it("removes stale db record when usershare delete is permission-denied but mount is absent", async () => {
+    vi.mocked(getLocalShareFromDb).mockResolvedValueOnce({
+      id: "local-usershare-perm",
+      shareName: "Media",
+      sourcePath: "Media",
+      sharedPath: "Shared/Media",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    vi.mocked(deleteLocalShareFromDb).mockResolvedValueOnce({
+      id: "local-usershare-perm",
+      shareName: "Media",
+      sourcePath: "Media",
+      sharedPath: "Shared/Media",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    let usershareInfoCalls = 0;
+    vi.mocked(execFile).mockImplementation((command: string, ...restArgs: unknown[]) => {
+      const { args, callback } = getExecInvocation(restArgs);
+
+      if (command === "mountpoint") {
+        const error = new Error("not mounted") as Error & {
+          code?: number;
+          stderr?: string;
+        };
+        error.code = 1;
+        error.stderr = "not mounted";
+        callback(error, "", "not mounted");
+        return {} as never;
+      }
+
+      if (command === "net" && args[0] === "usershare" && args[1] === "info") {
+        usershareInfoCalls += 1;
+        callback(null, "share present", "");
+        return {} as never;
+      }
+
+      if (command === "net" && args[0] === "usershare" && args[1] === "delete") {
+        const error = new Error("permission denied") as Error & {
+          code?: number;
+          stderr?: string;
+        };
+        error.code = 1;
+        error.stderr = "permission denied";
+        callback(error, "", "permission denied");
+        return {} as never;
+      }
+
+      callback(null, "", "");
+      return {} as never;
+    });
+
+    const result = await removeLocalFolderShare("local-usershare-perm");
+
+    expect(result.removed).toBe(true);
+    expect(deleteLocalShareFromDb).toHaveBeenCalledWith("local-usershare-perm");
+    expect(usershareInfoCalls).toBeGreaterThanOrEqual(1);
+  });
+
   it("falls back to lazy umount when unmount target is busy", async () => {
     vi.mocked(getLocalShareFromDb).mockResolvedValueOnce({
       id: "local-3",

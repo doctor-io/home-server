@@ -1,22 +1,23 @@
 # Module Reliability Gate Results
 
 ## Module: Files Core + Trash + Shared Folder Convergence
-Timestamp: 2026-02-27T21:14:29Z
+Timestamp: 2026-02-27T21:55:40Z
 BASE_URL: http://192.168.1.15
 
 Passed:
 - 1. Login flow
-- 2.a Files core (create folder/file, rename, move to Trash)
+- 2. Files core flow (navigate `/DATA`, create folder/file, copy/cut/paste, rename, move to Trash, restore, empty Trash)
+- 3.a Files sharing flow (share folder and verify under `/Shared`)
 
 Failed:
-- 2.b Files core restore from Trash
-  - Endpoint: `POST /api/v1/files/trash/restore`
-  - Status: `404`
-  - Body: `{"error":"File or directory not found","code":"not_found"}`
-  - Screenshot: `/Users/ahmedtabib/Code/home-server/docs/qa/module1-restore-fail.png`
+- 3.b Files sharing flow (stop sharing)
+  - Endpoint: `DELETE /api/v1/files/shared/folders/b0f9317b-e03c-4e64-b2f8-8dc04784c887`
+  - Status: `500`
+  - Body: `{"error":"Failed to remove shared folder","code":"unmount_failed"}`
 
 Conclusion: FAIL (hard block active)
 
 Notes:
-- Reproduced by restoring folder `Trash/e2e-restore-folder`.
-- Additional direct API repro from browser context with payload `{ "path": "Trash/e2e-restore-folder", "collision": "keep-both" }` returns same `404 not_found`.
+- Current live shared-folder states report `isMounted=false` and `isExported=true`.
+- Added a service patch to converge stale local-share cleanup when bind mount is absent and usershare deletion fails, plus tests.
+- Patch requires redeploy/restart before rerunning this gate.

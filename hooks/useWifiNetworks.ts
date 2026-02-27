@@ -41,7 +41,17 @@ export function useWifiNetworks() {
   return useQuery({
     queryKey: queryKeys.networkNetworks,
     queryFn: fetchWifiNetworks,
-    refetchInterval: 30_000,
+    refetchInterval: (query) => {
+      if (query.state.status !== "error") {
+        return 120_000;
+      }
+
+      const failureCount = Math.max(1, query.state.fetchFailureCount);
+      const exponentialBackoffMs = 60_000 * 2 ** Math.min(failureCount - 1, 2);
+      return Math.min(exponentialBackoffMs, 300_000);
+    },
     staleTime: 10_000,
+    retry: 0,
+    refetchOnWindowFocus: false,
   });
 }
