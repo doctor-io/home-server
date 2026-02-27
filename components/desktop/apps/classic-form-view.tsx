@@ -27,16 +27,16 @@ export function ClassicFormView({ appIdLabel, state, onChange }: ClassicFormView
   };
 
   return (
-    <section className="flex-1 overflow-y-auto px-6 py-5">
+    <section className="flex-1 overflow-y-auto px-4 py-3">
       {appIdLabel ? (
-        <div className="mb-5 border-b border-glass-border pb-4">
-          <button className="cursor-default border-b-2 border-primary pb-2 text-lg font-semibold text-primary">
+        <div className="mb-3 border-b border-glass-border pb-3">
+          <button className="cursor-default border-b-2 border-primary pb-1 text-base font-semibold text-primary">
             {appIdLabel}
           </button>
         </div>
       ) : null}
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         <Field label="Docker Image *">
           <Input
             ariaLabel="Docker Image"
@@ -59,7 +59,7 @@ export function ClassicFormView({ appIdLabel, state, onChange }: ClassicFormView
 
         <Field label="Icon URL">
           <div className="flex items-center gap-2">
-            <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-glass-border bg-secondary/30">
+            <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-glass-border bg-secondary/30">
               {state.iconUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -81,7 +81,7 @@ export function ClassicFormView({ appIdLabel, state, onChange }: ClassicFormView
         </Field>
 
         <Field label="Web UI">
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-12">
+          <div className="grid grid-cols-1 gap-1.5 md:grid-cols-12">
             <div className="md:col-span-2">
               <Select
                 ariaLabel="Web UI protocol"
@@ -180,7 +180,7 @@ export function ClassicFormView({ appIdLabel, state, onChange }: ClassicFormView
           {state.ports.length === 0 ? (
             <HintText />
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {state.ports.map((row) => (
                 <PortEditor
                   key={row.id}
@@ -222,7 +222,7 @@ export function ClassicFormView({ appIdLabel, state, onChange }: ClassicFormView
           {state.volumes.length === 0 ? (
             <HintText />
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {state.volumes.map((row) => (
                 <VolumeEditor
                   key={row.id}
@@ -264,7 +264,7 @@ export function ClassicFormView({ appIdLabel, state, onChange }: ClassicFormView
           {state.envVars.length === 0 ? (
             <HintText />
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {state.envVars.map((row) => (
                 <EnvEditor
                   key={row.id}
@@ -317,13 +317,13 @@ export function ClassicFormView({ appIdLabel, state, onChange }: ClassicFormView
             role="switch"
             aria-checked={state.privileged}
             onClick={() => update({ privileged: !state.privileged })}
-            className={`relative h-7 w-12 rounded-full transition-colors ${
+            className={`relative h-6 w-10 rounded-full transition-colors ${
               state.privileged ? "bg-primary/70" : "bg-muted"
             }`}
           >
             <span
-              className={`absolute top-1 h-5 w-5 rounded-full bg-background shadow transition-transform ${
-                state.privileged ? "translate-x-6" : "translate-x-1"
+              className={`absolute top-1 h-4 w-4 rounded-full bg-background shadow transition-transform ${
+                state.privileged ? "translate-x-5" : "translate-x-1"
               }`}
             />
           </button>
@@ -373,14 +373,14 @@ function Field({
   onAdd?: () => void;
 }) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <label className="text-sm font-semibold text-foreground">{label}</label>
+        <label className="text-xs font-semibold text-foreground">{label}</label>
         {withAdd && (
           <button
             type="button"
             onClick={onAdd}
-            className="rounded-full border border-glass-border bg-secondary/40 px-3 py-1 text-xs font-medium text-foreground transition-colors hover:bg-secondary/60 cursor-pointer"
+            className="cursor-pointer rounded-full border border-glass-border bg-secondary/40 px-2.5 py-0.5 text-[11px] font-medium text-foreground transition-colors hover:bg-secondary/60"
           >
             + Add
           </button>
@@ -415,14 +415,14 @@ function Input({
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         readOnly={readOnly}
-        className={`h-10 w-full rounded-lg border bg-secondary/35 px-3 pr-10 text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none ${
+        className={`h-9 w-full rounded-lg border bg-secondary/35 px-2.5 pr-8 text-xs text-foreground placeholder:text-muted-foreground/70 focus:outline-none ${
           success
             ? "border-status-green/70 focus:border-status-green"
             : "border-glass-border focus:border-primary/50"
         } ${readOnly ? "opacity-80" : ""}`}
       />
       {success ? (
-        <Check className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-status-green" />
+        <Check className="pointer-events-none absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-status-green" />
       ) : null}
     </div>
   );
@@ -444,7 +444,7 @@ function Select({
       aria-label={ariaLabel}
       value={value}
       onChange={(event) => onChange(event.target.value)}
-      className="h-10 w-full rounded-lg border border-glass-border bg-secondary/35 px-3 text-sm text-foreground focus:border-primary/50 focus:outline-none"
+      className="h-9 w-full rounded-lg border border-glass-border bg-secondary/35 px-2.5 text-xs text-foreground focus:border-primary/50 focus:outline-none"
     >
       {options.map((option) => (
         <option key={option.value} value={option.value}>
@@ -457,8 +457,8 @@ function Select({
 
 function HintText() {
   return (
-    <p className="flex items-center gap-2 text-sm text-muted-foreground">
-      <Info className="size-4" />
+    <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      <Info className="size-3.5" />
       Click &quot;+&quot; to add one.
     </p>
   );
@@ -474,17 +474,17 @@ function PortEditor({
   onChange: (row: PortRow) => void;
 }) {
   return (
-    <div className="rounded-lg border border-glass-border bg-secondary/20 p-2">
-      <div className="mb-2 flex justify-end">
+    <div className="rounded-lg border border-glass-border bg-secondary/20 p-1.5">
+      <div className="mb-1 flex justify-end">
         <button
           type="button"
           onClick={onRemove}
-          className="cursor-pointer text-xs text-muted-foreground hover:text-status-red"
+          className="cursor-pointer text-[11px] text-muted-foreground hover:text-status-red"
         >
           Remove
         </button>
       </div>
-      <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-1.5 md:grid-cols-3">
         <Input
           value={row.host}
           onChange={(value) =>
@@ -525,17 +525,17 @@ function VolumeEditor({
   onChange: (row: VolumeRow) => void;
 }) {
   return (
-    <div className="rounded-lg border border-glass-border bg-secondary/20 p-2">
-      <div className="mb-2 flex justify-end">
+    <div className="rounded-lg border border-glass-border bg-secondary/20 p-1.5">
+      <div className="mb-1 flex justify-end">
         <button
           type="button"
           onClick={onRemove}
-          className="cursor-pointer text-xs text-muted-foreground hover:text-status-red"
+          className="cursor-pointer text-[11px] text-muted-foreground hover:text-status-red"
         >
           Remove
         </button>
       </div>
-      <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-1.5 md:grid-cols-2">
         <Input
           value={row.host}
           onChange={(value) => onChange({ ...row, host: value })}
@@ -561,17 +561,17 @@ function EnvEditor({
   onChange: (row: EnvRow) => void;
 }) {
   return (
-    <div className="rounded-lg border border-glass-border bg-secondary/20 p-2">
-      <div className="mb-2 flex justify-end">
+    <div className="rounded-lg border border-glass-border bg-secondary/20 p-1.5">
+      <div className="mb-1 flex justify-end">
         <button
           type="button"
           onClick={onRemove}
-          className="cursor-pointer text-xs text-muted-foreground hover:text-status-red"
+          className="cursor-pointer text-[11px] text-muted-foreground hover:text-status-red"
         >
           Remove
         </button>
       </div>
-      <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-1.5 md:grid-cols-2">
         <Input
           value={row.key}
           onChange={(value) => onChange({ ...row, key: value })}
@@ -601,19 +601,19 @@ function StringListEditor({
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       {values.map((value, index) => (
         <div
           key={`${index}-${value}`}
-          className="rounded-lg border border-glass-border bg-secondary/20 p-2"
+          className="rounded-lg border border-glass-border bg-secondary/20 p-1.5"
         >
-          <div className="mb-2 flex justify-end">
+          <div className="mb-1 flex justify-end">
             <button
               type="button"
               onClick={() =>
                 onChange(values.filter((_, currentIndex) => currentIndex !== index))
               }
-              className="cursor-pointer text-xs text-muted-foreground hover:text-status-red"
+              className="cursor-pointer text-[11px] text-muted-foreground hover:text-status-red"
             >
               Remove
             </button>

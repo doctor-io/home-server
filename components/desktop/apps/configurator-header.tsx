@@ -22,16 +22,16 @@ export function ConfiguratorHeader({
   onViewChange,
 }: ConfiguratorHeaderProps) {
   return (
-    <header className="flex items-center justify-between border-b border-glass-border px-6 py-4">
+    <header className="flex items-center justify-between border-b border-glass-border px-4 py-3">
       <div className="min-w-0">
-        <h3 className="truncate text-xl font-semibold text-foreground">{title}</h3>
-        <div className="mt-3 flex items-center gap-2">
+        <h3 className="truncate text-lg font-semibold text-foreground">{title}</h3>
+        <div className="mt-2 flex items-center gap-1.5">
           {views.map((view) => (
             <button
               key={view}
               type="button"
               onClick={() => onViewChange(view)}
-              className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
+              className={`cursor-pointer rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors ${
                 activeView === view
                   ? "border-primary/50 bg-primary/15 text-primary"
                   : "border-glass-border text-muted-foreground hover:bg-secondary/45 hover:text-foreground"
@@ -42,10 +42,10 @@ export function ConfiguratorHeader({
           ))}
         </div>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
         <button
           type="button"
-          className="rounded-lg border border-glass-border p-2 text-muted-foreground transition-colors hover:bg-secondary/45 hover:text-foreground"
+          className="rounded-lg border border-glass-border p-1.5 text-muted-foreground transition-colors hover:bg-secondary/45 hover:text-foreground"
           aria-label="Terminal and Logs"
           title="Terminal and Logs"
         >
@@ -53,7 +53,7 @@ export function ConfiguratorHeader({
         </button>
         <button
           type="button"
-          className="rounded-lg border border-glass-border p-2 text-muted-foreground transition-colors hover:bg-secondary/45 hover:text-foreground"
+          className="rounded-lg border border-glass-border p-1.5 text-muted-foreground transition-colors hover:bg-secondary/45 hover:text-foreground"
           aria-label="Export ComposeFile"
           title="Export ComposeFile"
         >

@@ -390,6 +390,74 @@ describe("local sharing service", () => {
     );
   });
 
+  it("falls back to lazy umount when unmount target is busy", async () => {
+    vi.mocked(getLocalShareFromDb).mockResolvedValueOnce({
+      id: "local-3",
+      shareName: "Media",
+      sourcePath: "Media",
+      sharedPath: "Shared/Media",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    vi.mocked(deleteLocalShareFromDb).mockResolvedValueOnce({
+      id: "local-3",
+      shareName: "Media",
+      sourcePath: "Media",
+      sharedPath: "Shared/Media",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    vi.mocked(execFile).mockImplementation((command: string, ...restArgs: unknown[]) => {
+      const { args, callback } = getExecInvocation(restArgs);
+
+      if (command === "net" && args[0] === "usershare" && args[1] === "info") {
+        callback(null, "share present", "");
+        return {} as never;
+      }
+
+      if (command === "mountpoint") {
+        callback(null, "", "");
+        return {} as never;
+      }
+
+      if (command === "net" && args[0] === "usershare" && args[1] === "delete") {
+        callback(null, "", "");
+        return {} as never;
+      }
+
+      if (command === "umount" && args[0] === "-l") {
+        callback(null, "", "");
+        return {} as never;
+      }
+
+      if (command === "umount") {
+        const error = new Error("target is busy") as Error & {
+          code?: number;
+          stderr?: string;
+        };
+        error.code = 32;
+        error.stderr = "target is busy";
+        callback(error, "", "target is busy");
+        return {} as never;
+      }
+
+      callback(null, "", "");
+      return {} as never;
+    });
+
+    const result = await removeLocalFolderShare("local-3");
+
+    expect(result.removed).toBe(true);
+    expect(deleteLocalShareFromDb).toHaveBeenCalledWith("local-3");
+    expect(execFile).toHaveBeenCalledWith(
+      "umount",
+      ["-l", expect.stringContaining("Shared/Media")],
+      expect.anything(),
+      expect.any(Function),
+    );
+  });
+
   it("serializes concurrent add requests for the same source path", async () => {
     let sourceReserved = false;
 

@@ -376,7 +376,7 @@ export function AppConfiguratorPanel({
       ) : (
         <>
           {context === "installed_edit" && composeQuery.isError ? (
-            <div className="mx-6 mt-4 rounded-lg border border-status-red/40 bg-status-red/10 px-3 py-2 text-xs text-status-red">
+            <div className="mx-4 mt-3 rounded-lg border border-status-red/40 bg-status-red/10 px-2.5 py-1.5 text-[11px] text-status-red">
               {String(composeQuery.error).includes("installed_compose_missing")
                 ? "Installed compose file is unavailable for this app."
                 : "Unable to load compose source for this app."}
@@ -384,7 +384,7 @@ export function AppConfiguratorPanel({
           ) : null}
 
           {context !== "custom_install" && !effectiveTemplate ? (
-            <div className="mx-6 mt-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+            <div className="mx-4 mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5 text-[11px] text-amber-200">
               App template metadata is unavailable. You can still edit and submit manually.
             </div>
           ) : null}
@@ -418,7 +418,7 @@ export function AppConfiguratorPanel({
         </>
       )}
 
-      <footer className="flex items-center justify-between border-t border-glass-border px-6 py-4">
+      <footer className="flex items-center justify-between border-t border-glass-border px-4 py-3">
         <div className="flex flex-col gap-1">
           <span className="text-xs text-muted-foreground">
             {didSave
@@ -435,7 +435,7 @@ export function AppConfiguratorPanel({
           type="button"
           onClick={() => void handleSubmit()}
           disabled={isSaving || !canSubmit}
-          className="flex items-center gap-2 rounded-full bg-primary px-6 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+          className="flex items-center gap-1.5 rounded-full bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isSaving ? <Loader2 className="size-4 animate-spin" /> : null}
           {buttonLabel}

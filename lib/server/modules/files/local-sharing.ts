@@ -174,8 +174,15 @@ function isMountMissingError(error: unknown) {
   return (
     text.includes("not mounted") ||
     text.includes("is not mounted") ||
-    text.includes("no mount point specified")
+    text.includes("no mount point specified") ||
+    text.includes("no such file") ||
+    text.includes("not found")
   );
+}
+
+function isMountBusyError(error: unknown) {
+  const text = errorText(error);
+  return text.includes("target is busy") || text.includes("device or resource busy");
 }
 
 type ConstraintConflict = "share_name" | "source_path" | "shared_path" | null;
@@ -438,7 +445,18 @@ async function releaseShareExport(
     try {
       await runCommand("umount", [exportResolved.absolutePath]);
     } catch (error) {
-      if (!(tolerateMissing && isMountMissingError(error))) {
+      if (tolerateMissing && isMountMissingError(error)) {
+        // Already unmounted or mount path no longer exists.
+      } else if (isMountBusyError(error)) {
+        try {
+          // Busy bind mounts can require lazy unmount to detach cleanly.
+          await runCommand("umount", ["-l", exportResolved.absolutePath]);
+        } catch (lazyError) {
+          if (!(tolerateMissing && isMountMissingError(lazyError))) {
+            throw lazyError;
+          }
+        }
+      } else {
         throw error;
       }
     }
