@@ -70,4 +70,23 @@ describe("DELETE /api/v1/files/shared/folders/:shareId", () => {
     expect(response.status).toBe(404);
     expect(json.code).toBe("share_not_found");
   });
+
+  it("maps permission errors", async () => {
+    vi.mocked(removeLocalFolderShare).mockRejectedValueOnce(
+      new LocalSharingError("denied", {
+        code: "permission_denied",
+        statusCode: 403,
+      }),
+    );
+
+    const response = await DELETE(new Request("http://localhost"), {
+      params: Promise.resolve({
+        shareId: "local-1",
+      }),
+    });
+    const json = (await response.json()) as { code: string };
+
+    expect(response.status).toBe(403);
+    expect(json.code).toBe("permission_denied");
+  });
 });

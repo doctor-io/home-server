@@ -102,4 +102,29 @@ describe("shared folders route", () => {
     expect(response.status).toBe(409);
     expect(json.code).toBe("share_exists");
   });
+
+  it("POST maps permission errors", async () => {
+    vi.mocked(addLocalFolderShare).mockRejectedValueOnce(
+      new LocalSharingError("denied", {
+        code: "permission_denied",
+        statusCode: 403,
+      }),
+    );
+
+    const response = await POST(
+      new Request("http://localhost/api/v1/files/shared/folders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          path: "Media",
+        }),
+      }),
+    );
+
+    const json = (await response.json()) as { code: string };
+    expect(response.status).toBe(403);
+    expect(json.code).toBe("permission_denied");
+  });
 });

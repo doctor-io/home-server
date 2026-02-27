@@ -305,7 +305,6 @@ type SidebarSection = {
     name: string;
     icon: React.ReactNode;
     path: string[];
-    action?: "open-network-dialog";
   }[];
 };
 
@@ -342,14 +341,7 @@ const sidebarSections: SidebarSection[] = [
   },
   {
     title: "Locations",
-    items: [
-      // {
-      //   name: "Network Storage",
-      //   icon: <HardDrive className="size-4 text-muted-foreground" />,
-      //   path: ["Network"],
-      //   action: "open-network-dialog",
-      // },
-    ],
+    items: [],
   },
 ];
 
@@ -703,13 +695,6 @@ export function FileManager() {
                       <button
                         key={item.name}
                         onClick={() => {
-                          if (
-                            "action" in item &&
-                            item.action === "open-network-dialog"
-                          ) {
-                            setShowNetworkDialog(true);
-                            return;
-                          }
                           navigateToPath(item.path);
                         }}
                         className={`flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-xs transition-colors cursor-pointer ${

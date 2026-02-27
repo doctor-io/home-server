@@ -7,7 +7,6 @@ import path from "node:path";
 import { promisify } from "node:util";
 import {
   deleteLocalShareFromDb,
-  getLocalShareByShareNameFromDb,
   getLocalShareBySourcePathFromDb,
   getLocalShareFromDb,
   insertLocalShareInDb,
@@ -25,6 +24,16 @@ import type {
 } from "@/lib/shared/contracts/files";
 
 const execFileAsync = promisify(execFile);
+const PG_UNIQUE_VIOLATION = "23505";
+const SHARE_NAME_UNIQUE_CONSTRAINT = "files_local_shares_share_name_idx";
+const SOURCE_PATH_UNIQUE_CONSTRAINT = "files_local_shares_source_path_idx";
+const SHARED_PATH_UNIQUE_CONSTRAINT = "files_local_shares_shared_path_idx";
+
+type OperationLock = {
+  waiters: Array<() => void>;
+};
+
+const operationLocks = new Map<string, OperationLock>();
 
 export class LocalSharingError extends Error {
   readonly code: FileServiceErrorCode;
@@ -67,20 +76,37 @@ function sanitizeShareName(input: string, fallback: string) {
   return fallbackSanitized.length > 0 ? fallbackSanitized : "shared-folder";
 }
 
+function withSuffix(baseName: string, attempt: number) {
+  if (attempt <= 0) {
+    return baseName;
+  }
+  return sanitizeShareName(`${baseName}-${attempt + 1}`, baseName);
+}
+
 async function runCommand(command: string, args: string[]) {
-  const result = await execFileAsync(command, args, {
-    timeout: 15_000,
-    maxBuffer: 1024 * 1024,
-  });
-  return typeof result === "string"
-    ? {
-        stdout: result,
-        stderr: "",
-      }
-    : {
-        stdout: result.stdout ?? "",
-        stderr: result.stderr ?? "",
-      };
+  try {
+    const result = await execFileAsync(command, args, {
+      timeout: 15_000,
+      maxBuffer: 1024 * 1024,
+    });
+    return typeof result === "string"
+      ? {
+          stdout: result,
+          stderr: "",
+        }
+      : {
+          stdout: result.stdout ?? "",
+          stderr: result.stderr ?? "",
+        };
+  } catch (error) {
+    const commandError = error as NodeJS.ErrnoException & {
+      command?: string;
+      args?: string[];
+    };
+    commandError.command = command;
+    commandError.args = args;
+    throw commandError;
+  }
 }
 
 async function isMountPoint(absolutePath: string) {
@@ -101,6 +127,133 @@ async function isUsersharePresent(shareName: string) {
   }
 }
 
+function errorText(error: unknown) {
+  const maybe = error as {
+    message?: string;
+    stderr?: string | Buffer;
+  };
+  const stderr =
+    typeof maybe.stderr === "string"
+      ? maybe.stderr
+      : Buffer.isBuffer(maybe.stderr)
+        ? maybe.stderr.toString("utf8")
+        : "";
+  return `${maybe.message ?? ""}\n${stderr}`.toLowerCase();
+}
+
+function isCommandUnavailableError(error: unknown) {
+  const maybe = error as NodeJS.ErrnoException;
+  return maybe?.code === "ENOENT" && maybe?.syscall === "spawn";
+}
+
+function isPermissionError(error: unknown) {
+  const maybe = error as NodeJS.ErrnoException;
+  if (maybe?.code === "EACCES" || maybe?.code === "EPERM") {
+    return true;
+  }
+  const text = errorText(error);
+  return (
+    text.includes("permission denied") ||
+    text.includes("access denied") ||
+    text.includes("operation not permitted")
+  );
+}
+
+function isUsershareMissingError(error: unknown) {
+  const text = errorText(error);
+  return (
+    text.includes("does not exist") ||
+    text.includes("not found") ||
+    text.includes("unknown service") ||
+    text.includes("no such file")
+  );
+}
+
+function isMountMissingError(error: unknown) {
+  const text = errorText(error);
+  return (
+    text.includes("not mounted") ||
+    text.includes("is not mounted") ||
+    text.includes("no mount point specified")
+  );
+}
+
+type ConstraintConflict = "share_name" | "source_path" | "shared_path" | null;
+
+function getUniqueConflict(error: unknown): ConstraintConflict {
+  const maybe = error as {
+    code?: unknown;
+    constraint?: unknown;
+    detail?: unknown;
+    message?: unknown;
+  };
+  if (maybe?.code !== PG_UNIQUE_VIOLATION) {
+    return null;
+  }
+
+  const constraint =
+    typeof maybe.constraint === "string" ? maybe.constraint : "";
+  const detail = typeof maybe.detail === "string" ? maybe.detail : "";
+  const message = typeof maybe.message === "string" ? maybe.message : "";
+  const combined = `${constraint}\n${detail}\n${message}`.toLowerCase();
+
+  if (
+    combined.includes(SOURCE_PATH_UNIQUE_CONSTRAINT) ||
+    combined.includes("source_path")
+  ) {
+    return "source_path";
+  }
+  if (
+    combined.includes(SHARE_NAME_UNIQUE_CONSTRAINT) ||
+    combined.includes("share_name")
+  ) {
+    return "share_name";
+  }
+  if (
+    combined.includes(SHARED_PATH_UNIQUE_CONSTRAINT) ||
+    combined.includes("shared_path")
+  ) {
+    return "shared_path";
+  }
+  return null;
+}
+
+async function acquireOperationLock(key: string) {
+  const existing = operationLocks.get(key);
+  if (!existing) {
+    operationLocks.set(key, {
+      waiters: [],
+    });
+    return;
+  }
+
+  await new Promise<void>((resolve) => {
+    existing.waiters.push(resolve);
+  });
+}
+
+function releaseOperationLock(key: string) {
+  const state = operationLocks.get(key);
+  if (!state) return;
+
+  const next = state.waiters.shift();
+  if (next) {
+    next();
+    return;
+  }
+
+  operationLocks.delete(key);
+}
+
+async function withOperationLock<T>(key: string, operation: () => Promise<T>) {
+  await acquireOperationLock(key);
+  try {
+    return await operation();
+  } finally {
+    releaseOperationLock(key);
+  }
+}
+
 function toShareStatus(
   record: LocalShareRecord,
   state: { isMounted: boolean; isExported: boolean },
@@ -115,7 +268,11 @@ function toShareStatus(
   };
 }
 
-function mapFsError(error: unknown, fallbackMessage: string) {
+function mapFsError(
+  error: unknown,
+  fallbackMessage: string,
+  failureCode: "mount_failed" | "unmount_failed",
+) {
   if (error instanceof LocalSharingError) return error;
   if (error instanceof FilesPathError) {
     return new LocalSharingError(error.message, {
@@ -125,7 +282,38 @@ function mapFsError(error: unknown, fallbackMessage: string) {
     });
   }
 
+  const uniqueConflict = getUniqueConflict(error);
+  if (uniqueConflict === "source_path") {
+    return new LocalSharingError("Folder is already shared", {
+      code: "share_exists",
+      statusCode: 409,
+      cause: error,
+    });
+  }
+
   const nodeError = error as NodeJS.ErrnoException;
+  if (isCommandUnavailableError(error)) {
+    return new LocalSharingError(
+      "Required sharing command is unavailable on this server",
+      {
+        code: failureCode,
+        statusCode: 500,
+        cause: error,
+      },
+    );
+  }
+  if (isPermissionError(error)) {
+    const deniedPath =
+      typeof nodeError.path === "string" ? nodeError.path : undefined;
+    return new LocalSharingError(
+      `Permission denied${deniedPath ? `: ${deniedPath}` : ""}`,
+      {
+        code: "permission_denied",
+        statusCode: 403,
+        cause: error,
+      },
+    );
+  }
   if (nodeError?.code === "ENOENT") {
     return new LocalSharingError("File or directory not found", {
       code: "not_found",
@@ -133,21 +321,9 @@ function mapFsError(error: unknown, fallbackMessage: string) {
       cause: error,
     });
   }
-  if (nodeError?.code === "EACCES" || nodeError?.code === "EPERM") {
-    const deniedPath =
-      typeof nodeError.path === "string" ? nodeError.path : undefined;
-    return new LocalSharingError(
-      `Permission denied${deniedPath ? `: ${deniedPath}` : ""}`,
-      {
-        code: "mount_failed",
-        statusCode: 403,
-        cause: error,
-      },
-    );
-  }
 
   return new LocalSharingError(fallbackMessage, {
-    code: "internal_error",
+    code: failureCode,
     statusCode: 500,
     cause: error,
   });
@@ -233,16 +409,28 @@ async function ensureUsershareExported(shareName: string, exportAbsolutePath: st
   }
 }
 
-async function releaseShareExport(record: LocalShareRecord) {
+async function releaseShareExport(
+  record: LocalShareRecord,
+  options?: {
+    tolerateMissing?: boolean;
+  },
+) {
   const exportResolved = await resolveExportPath(record.sharedPath);
-  const usersharePresent = await isUsersharePresent(record.shareName);
-  if (usersharePresent) {
+
+  try {
     await runCommand("net", ["usershare", "delete", record.shareName]);
+  } catch (error) {
+    if (!(options?.tolerateMissing && isUsershareMissingError(error))) {
+      throw error;
+    }
   }
 
-  const mounted = await isMountPoint(exportResolved.absolutePath);
-  if (mounted) {
+  try {
     await runCommand("umount", [exportResolved.absolutePath]);
+  } catch (error) {
+    if (!(options?.tolerateMissing && isMountMissingError(error))) {
+      throw error;
+    }
   }
 
   await rm(exportResolved.absolutePath, {
@@ -264,16 +452,36 @@ async function releaseShareExport(record: LocalShareRecord) {
   }
 }
 
-async function nextUniqueShareName(baseName: string) {
-  const rootName = sanitizeShareName(baseName, "shared-folder");
-  let candidate = rootName;
+async function reserveLocalShare(
+  sourceRelativePath: string,
+  preferredName: string,
+) {
+  const baseName = sanitizeShareName(preferredName, "shared-folder");
 
-  for (let index = 1; index <= 500; index += 1) {
-    const existing = await getLocalShareByShareNameFromDb(candidate);
-    if (!existing) {
-      return candidate;
+  for (let attempt = 0; attempt < 500; attempt += 1) {
+    const candidateName = withSuffix(baseName, attempt);
+    const candidatePath = path.posix.join("Shared", candidateName);
+    try {
+      return await insertLocalShareInDb({
+        id: randomUUID(),
+        shareName: candidateName,
+        sourcePath: sourceRelativePath,
+        sharedPath: candidatePath,
+      });
+    } catch (error) {
+      const conflict = getUniqueConflict(error);
+      if (conflict === "source_path") {
+        throw new LocalSharingError("Folder is already shared", {
+          code: "share_exists",
+          statusCode: 409,
+          cause: error,
+        });
+      }
+      if (conflict === "share_name" || conflict === "shared_path") {
+        continue;
+      }
+      throw error;
     }
-    candidate = sanitizeShareName(`${rootName}-${index + 1}`, rootName);
   }
 
   throw new LocalSharingError("Unable to allocate a unique share name", {
@@ -282,11 +490,30 @@ async function nextUniqueShareName(baseName: string) {
   });
 }
 
-async function resolveShareState(record: LocalShareRecord) {
+async function resolveShareState(
+  record: LocalShareRecord,
+  caches: {
+    mountStateByPath: Map<string, Promise<boolean>>;
+    usershareStateByName: Map<string, Promise<boolean>>;
+  },
+) {
   const exportResolved = await resolveExportPath(record.sharedPath);
+
+  let mountedPromise = caches.mountStateByPath.get(exportResolved.absolutePath);
+  if (!mountedPromise) {
+    mountedPromise = isMountPoint(exportResolved.absolutePath);
+    caches.mountStateByPath.set(exportResolved.absolutePath, mountedPromise);
+  }
+
+  let exportedPromise = caches.usershareStateByName.get(record.shareName);
+  if (!exportedPromise) {
+    exportedPromise = isUsersharePresent(record.shareName);
+    caches.usershareStateByName.set(record.shareName, exportedPromise);
+  }
+
   const [isMounted, isExported] = await Promise.all([
-    isMountPoint(exportResolved.absolutePath),
-    isUsersharePresent(record.shareName),
+    mountedPromise,
+    exportedPromise,
   ]);
   return {
     isMounted,
@@ -296,10 +523,14 @@ async function resolveShareState(record: LocalShareRecord) {
 
 export async function listLocalFolderShares(): Promise<LocalFolderShareStatus[]> {
   const records = await listLocalSharesFromDb();
+  const caches = {
+    mountStateByPath: new Map<string, Promise<boolean>>(),
+    usershareStateByName: new Map<string, Promise<boolean>>(),
+  };
 
   return Promise.all(
     records.map(async (record) => {
-      const state = await resolveShareState(record);
+      const state = await resolveShareState(record, caches);
       return toShareStatus(record, state);
     }),
   );
@@ -310,75 +541,120 @@ export async function addLocalFolderShare(
 ): Promise<LocalFolderShareStatus> {
   try {
     const source = await resolveSourcePath(input.path);
-    const existingBySource = await getLocalShareBySourcePathFromDb(
-      source.relativePath,
-    );
-    if (existingBySource) {
-      throw new LocalSharingError("Folder is already shared", {
-        code: "share_exists",
-        statusCode: 409,
-      });
-    }
 
-    await ensureSharedRoot();
-
-    const sourceBaseName = path.posix.basename(source.relativePath || "share");
-    const preferredName = sanitizeShareName(input.name ?? sourceBaseName, sourceBaseName);
-    const shareName = await nextUniqueShareName(preferredName);
-    const sharedPath = path.posix.join("Shared", shareName);
-    const exportTarget = await resolveExportPath(sharedPath);
-
-    await ensureShareMounted(source.absolutePath, exportTarget.absolutePath);
-    try {
-      await ensureUsershareExported(shareName, exportTarget.absolutePath);
-    } catch (error) {
-      const mounted = await isMountPoint(exportTarget.absolutePath);
-      if (mounted) {
-        await runCommand("umount", [exportTarget.absolutePath]).catch(() => undefined);
+    return await withOperationLock(`source:${source.relativePath}`, async () => {
+      const existingBySource = await getLocalShareBySourcePathFromDb(
+        source.relativePath,
+      );
+      if (existingBySource) {
+        throw new LocalSharingError("Folder is already shared", {
+          code: "share_exists",
+          statusCode: 409,
+        });
       }
-      await rm(exportTarget.absolutePath, {
-        recursive: false,
-        force: true,
-      }).catch(() => undefined);
 
-      throw error;
-    }
+      await ensureSharedRoot();
 
-    const record = await insertLocalShareInDb({
-      id: randomUUID(),
-      shareName,
-      sourcePath: source.relativePath,
-      sharedPath,
-    });
+      const sourceBaseName = path.posix.basename(source.relativePath || "share");
+      const preferredName = sanitizeShareName(
+        input.name ?? sourceBaseName,
+        sourceBaseName,
+      );
+      const reserved = await reserveLocalShare(source.relativePath, preferredName);
 
-    return toShareStatus(record, {
-      isMounted: true,
-      isExported: true,
+      try {
+        const exportTarget = await resolveExportPath(reserved.sharedPath);
+        await ensureShareMounted(source.absolutePath, exportTarget.absolutePath);
+        await ensureUsershareExported(
+          reserved.shareName,
+          exportTarget.absolutePath,
+        );
+
+        return toShareStatus(reserved, {
+          isMounted: true,
+          isExported: true,
+        });
+      } catch (error) {
+        let rollbackError: unknown | null = null;
+        let dbRollbackError: unknown | null = null;
+        try {
+          await releaseShareExport(reserved, {
+            tolerateMissing: true,
+          });
+        } catch (rollbackFailure) {
+          rollbackError = rollbackFailure;
+        }
+        try {
+          await deleteLocalShareFromDb(reserved.id);
+        } catch (deleteFailure) {
+          dbRollbackError = deleteFailure;
+        }
+
+        if (dbRollbackError) {
+          throw new LocalSharingError(
+            "Failed to share folder and rollback reserved state",
+            {
+              code: "internal_error",
+              statusCode: 500,
+              cause: {
+                error,
+                rollbackError,
+                dbRollbackError,
+              },
+            },
+          );
+        }
+
+        if (rollbackError) {
+          const mappedError = mapFsError(error, "Failed to share folder", "mount_failed");
+          if (mappedError.code !== "internal_error") {
+            throw mappedError;
+          }
+
+          throw new LocalSharingError(
+            "Failed to share folder and rollback partial state",
+            {
+              code: "internal_error",
+              statusCode: 500,
+              cause: {
+                error,
+                rollbackError,
+              },
+            },
+          );
+        }
+
+        throw error;
+      }
     });
   } catch (error) {
-    throw mapFsError(error, "Failed to share folder");
+    throw mapFsError(error, "Failed to share folder", "mount_failed");
   }
 }
 
 export async function removeLocalFolderShare(shareId: string) {
-  const record = await getLocalShareFromDb(shareId);
-  if (!record) {
-    throw new LocalSharingError("Shared folder not found", {
-      code: "share_not_found",
-      statusCode: 404,
-    });
-  }
+  return withOperationLock(`share:${shareId}`, async () => {
+    const record = await getLocalShareFromDb(shareId);
+    if (!record) {
+      throw new LocalSharingError("Shared folder not found", {
+        code: "share_not_found",
+        statusCode: 404,
+      });
+    }
 
-  try {
-    await releaseShareExport(record);
-  } catch (error) {
-    throw mapFsError(error, "Failed to remove shared folder");
-  }
+    try {
+      await releaseShareExport(record, {
+        tolerateMissing: true,
+      });
+    } catch (error) {
+      throw mapFsError(error, "Failed to remove shared folder", "unmount_failed");
+    }
 
-  await deleteLocalShareFromDb(record.id);
+    await deleteLocalShareFromDb(record.id);
 
-  return {
-    removed: true,
-    id: record.id,
-  };
+    return {
+      removed: true,
+      id: record.id,
+    };
+  });
 }

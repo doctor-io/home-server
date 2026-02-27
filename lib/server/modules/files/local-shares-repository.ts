@@ -134,25 +134,6 @@ export async function getLocalShareBySourcePathFromDb(sourcePath: string) {
   return rows[0] ? toRecord(rows[0]) : null;
 }
 
-export async function getLocalShareByShareNameFromDb(shareName: string) {
-  await ensureLocalSharesTable();
-
-  const rows = await db
-    .select({
-      id: filesLocalShares.id,
-      shareName: filesLocalShares.shareName,
-      sourcePath: filesLocalShares.sourcePath,
-      sharedPath: filesLocalShares.sharedPath,
-      createdAt: filesLocalShares.createdAt,
-      updatedAt: filesLocalShares.updatedAt,
-    })
-    .from(filesLocalShares)
-    .where(eq(filesLocalShares.shareName, shareName))
-    .limit(1);
-
-  return rows[0] ? toRecord(rows[0]) : null;
-}
-
 export async function insertLocalShareInDb(input: InsertLocalShareInput) {
   await ensureLocalSharesTable();
 

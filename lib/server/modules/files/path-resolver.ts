@@ -1,5 +1,6 @@
 import "server-only";
 
+import { constants as fsConstants } from "node:fs";
 import { access, lstat, mkdir, realpath } from "node:fs/promises";
 import path from "node:path";
 import { serverEnv } from "@/lib/server/env";
@@ -240,7 +241,7 @@ export async function getFilesRootInfo(): Promise<FilesRootInfo> {
 
   let writable = true;
   try {
-    await access(rootPath);
+    await access(rootPath, fsConstants.W_OK);
   } catch {
     writable = false;
   }
