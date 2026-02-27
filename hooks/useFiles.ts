@@ -3,7 +3,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { withClientTiming } from "@/lib/client/logger";
 import type {
+  FileCreateRequest,
+  FileCreateResponse,
   FileListResponse,
+  FilePasteRequest,
+  FilePasteResponse,
   FileRootResponse,
   FileReadResponse,
   FileWriteRequest,
@@ -28,6 +32,14 @@ type RootFileApiResponse = {
 
 type WriteFileApiResponse = {
   data: FileWriteResponse;
+};
+
+type FileCreateApiResponse = {
+  data: FileCreateResponse;
+};
+
+type FilePasteApiResponse = {
+  data: FilePasteResponse;
 };
 
 function buildListEndpoint(filePath: string, includeHidden = false) {
@@ -166,6 +178,125 @@ async function saveFileContent(payload: FileWriteRequest) {
   );
 }
 
+async function createFolder(payload: FileCreateRequest) {
+  return withClientTiming(
+    {
+      layer: "hook",
+      action: "hooks.useFiles.createFolder",
+      meta: {
+        endpoint: "/api/v1/files/ops",
+        parentPath: payload.parentPath,
+      },
+    },
+    async () => {
+      const response = await fetch("/api/v1/files/ops", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "create_folder",
+          ...payload,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorBody = (await response.json().catch(() => ({}))) as {
+          error?: string;
+          code?: string;
+        };
+        throw new Error(
+          errorBody.error ??
+            `Failed to create folder (${response.status})${errorBody.code ? ` [${errorBody.code}]` : ""}`,
+        );
+      }
+
+      const json = (await response.json()) as FileCreateApiResponse;
+      return json.data;
+    },
+  );
+}
+
+async function createFile(payload: FileCreateRequest) {
+  return withClientTiming(
+    {
+      layer: "hook",
+      action: "hooks.useFiles.createFile",
+      meta: {
+        endpoint: "/api/v1/files/ops",
+        parentPath: payload.parentPath,
+      },
+    },
+    async () => {
+      const response = await fetch("/api/v1/files/ops", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "create_file",
+          ...payload,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorBody = (await response.json().catch(() => ({}))) as {
+          error?: string;
+          code?: string;
+        };
+        throw new Error(
+          errorBody.error ??
+            `Failed to create file (${response.status})${errorBody.code ? ` [${errorBody.code}]` : ""}`,
+        );
+      }
+
+      const json = (await response.json()) as FileCreateApiResponse;
+      return json.data;
+    },
+  );
+}
+
+async function pasteFile(payload: FilePasteRequest) {
+  return withClientTiming(
+    {
+      layer: "hook",
+      action: "hooks.useFiles.paste",
+      meta: {
+        endpoint: "/api/v1/files/ops",
+        sourcePath: payload.sourcePath,
+        destinationPath: payload.destinationPath,
+        operation: payload.operation,
+      },
+    },
+    async () => {
+      const response = await fetch("/api/v1/files/ops", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "paste",
+          ...payload,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorBody = (await response.json().catch(() => ({}))) as {
+          error?: string;
+          code?: string;
+        };
+        throw new Error(
+          errorBody.error ??
+            `Failed to paste (${response.status})${errorBody.code ? ` [${errorBody.code}]` : ""}`,
+        );
+      }
+
+      const json = (await response.json()) as FilePasteApiResponse;
+      return json.data;
+    },
+  );
+}
+
 export function useFilesRoot() {
   return useQuery({
     queryKey: queryKeys.filesRoot,
@@ -251,6 +382,51 @@ export function useSaveFileContent() {
           sizeBytes: data.sizeBytes,
         } satisfies FileReadResponse;
       });
+    },
+  });
+}
+
+function invalidateFileListPath(queryClient: ReturnType<typeof useQueryClient>, filePath: string) {
+  void queryClient.invalidateQueries({
+    queryKey: ["files", "list", filePath],
+  });
+}
+
+export function useCreateFolder() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: createFolder,
+    onSuccess: (_, variables) => {
+      invalidateFileListPath(queryClient, variables.parentPath);
+    },
+  });
+}
+
+export function useCreateFile() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: createFile,
+    onSuccess: (_, variables) => {
+      invalidateFileListPath(queryClient, variables.parentPath);
+    },
+  });
+}
+
+export function usePasteFileEntry() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: pasteFile,
+    onSuccess: (_, variables) => {
+      invalidateFileListPath(queryClient, variables.destinationPath);
+      invalidateFileListPath(queryClient, getParentPath(variables.sourcePath));
+      if (variables.operation === "move") {
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.fileContent(variables.sourcePath),
+        });
+      }
     },
   });
 }

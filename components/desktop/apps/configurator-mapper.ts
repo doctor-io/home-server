@@ -69,6 +69,10 @@ type PrimaryServiceSelectionInput = {
   primaryServiceName?: string;
 };
 
+const INFRA_SERVICE_TOKEN_PATTERN =
+  /(?:^|[-_.])(db|database|postgres|postgresql|mariadb|mysql|redis|cache|broker|queue|rabbitmq|kafka|zookeeper|mongo|mongodb|elasticsearch|minio)(?:$|[-_.])/i;
+const APP_ALIAS_PATTERN = /^(app|main|server|web|frontend|backend)$/i;
+
 function nextId(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -251,6 +255,70 @@ function parseCommand(input: unknown): string[] {
   return [];
 }
 
+function hasPublishedPorts(input: Record<string, unknown>): boolean {
+  const ports = input.ports;
+  if (!Array.isArray(ports)) {
+    return false;
+  }
+
+  return ports.some((entry) => {
+    if (typeof entry === "string") {
+      return entry.trim().length > 0;
+    }
+    if (!entry || typeof entry !== "object") {
+      return false;
+    }
+
+    const candidate = entry as { target?: unknown; published?: unknown };
+    return Boolean(candidate.target ?? candidate.published);
+  });
+}
+
+function scorePrimaryServiceCandidate(input: {
+  name: string;
+  service: Record<string, unknown>;
+  appId?: string;
+}): number {
+  const name = input.name.toLowerCase();
+  const appId = input.appId?.toLowerCase().trim();
+  const image =
+    typeof input.service.image === "string" ? input.service.image.toLowerCase() : "";
+
+  let score = 0;
+  if (hasPublishedPorts(input.service)) {
+    score += 40;
+  }
+
+  if (name === "app") {
+    score += 60;
+  } else if (APP_ALIAS_PATTERN.test(name)) {
+    score += 30;
+  }
+  if (name.includes("server")) {
+    score += 20;
+  }
+
+  if (appId) {
+    if (name === appId) {
+      score += 100;
+    } else if (name.startsWith(`${appId}-`) || name.endsWith(`-${appId}`)) {
+      score += 45;
+    } else if (name.includes(appId)) {
+      score += 25;
+    }
+
+    if (image.includes(appId)) {
+      score += 20;
+    }
+  }
+
+  if (INFRA_SERVICE_TOKEN_PATTERN.test(name)) {
+    score -= 80;
+  }
+
+  return score;
+}
+
 function getPrimaryService(
   input: PrimaryServiceSelectionInput,
 ): { name: string; service: Record<string, unknown> } {
@@ -280,17 +348,21 @@ function getPrimaryService(
         service: services[exactMatch] ?? {},
       };
     }
-
-    const includesMatch = names.find((name) => name.toLowerCase().includes(normalizedAppId));
-    if (includesMatch) {
-      return {
-        name: includesMatch,
-        service: services[includesMatch] ?? {},
-      };
-    }
   }
 
-  const name = names[0];
+  const rankedServices = names
+    .map((name, index) => ({
+      name,
+      index,
+      score: scorePrimaryServiceCandidate({
+        name,
+        service: services[name] ?? {},
+        appId,
+      }),
+    }))
+    .sort((a, b) => b.score - a.score || a.index - b.index);
+
+  const name = rankedServices[0]?.name ?? names[0];
   return {
     name,
     service: services[name] ?? {},

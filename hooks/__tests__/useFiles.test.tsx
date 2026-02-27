@@ -5,8 +5,11 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildAssetUrl,
   toFilePath,
+  useCreateFile,
+  useCreateFolder,
   useFileContent,
   useFilesDirectory,
+  usePasteFileEntry,
   useSaveFileContent,
 } from "@/hooks/useFiles";
 import { queryKeys } from "@/lib/shared/query-keys";
@@ -128,7 +131,7 @@ describe("useFiles hooks", () => {
       queryKey: queryKeys.fileContent("Documents/notes.txt"),
     });
     expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: queryKeys.filesList("Documents"),
+      queryKey: ["files", "list", "Documents"],
     });
   });
 
@@ -138,5 +141,132 @@ describe("useFiles hooks", () => {
     expect(buildAssetUrl("Media/photo.png")).toBe(
       "/api/v1/files/asset?path=Media%2Fphoto.png",
     );
+  });
+
+  it("creates a folder via files ops endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        data: {
+          root: "/",
+          path: "Documents/New Folder",
+          type: "folder",
+        },
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = createTestQueryClient();
+    const invalidateSpy = vi.spyOn(client, "invalidateQueries");
+    const { result } = renderHook(() => useCreateFolder(), {
+      wrapper: createWrapper(client),
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        parentPath: "Documents",
+        name: "New Folder",
+      });
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/v1/files/ops", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        action: "create_folder",
+        parentPath: "Documents",
+        name: "New Folder",
+      }),
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ["files", "list", "Documents"],
+    });
+  });
+
+  it("creates a file via files ops endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        data: {
+          root: "/",
+          path: "Documents/notes.txt",
+          type: "file",
+        },
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = createTestQueryClient();
+    const { result } = renderHook(() => useCreateFile(), {
+      wrapper: createWrapper(client),
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        parentPath: "Documents",
+        name: "notes.txt",
+      });
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/v1/files/ops", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        action: "create_file",
+        parentPath: "Documents",
+        name: "notes.txt",
+      }),
+    });
+  });
+
+  it("pastes copied entries via files ops endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        data: {
+          root: "/",
+          path: "Documents/photo.jpg",
+          type: "file",
+        },
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = createTestQueryClient();
+    const invalidateSpy = vi.spyOn(client, "invalidateQueries");
+    const { result } = renderHook(() => usePasteFileEntry(), {
+      wrapper: createWrapper(client),
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        sourcePath: "Media/photo.jpg",
+        destinationPath: "Documents",
+        operation: "copy",
+      });
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/v1/files/ops", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        action: "paste",
+        sourcePath: "Media/photo.jpg",
+        destinationPath: "Documents",
+        operation: "copy",
+      }),
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ["files", "list", "Documents"],
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ["files", "list", "Media"],
+    });
   });
 });

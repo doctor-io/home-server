@@ -4,8 +4,11 @@ import { NetworkStorageDialog } from "@/components/desktop/network-storage-dialo
 import {
   buildAssetUrl,
   toFilePath,
+  useCreateFile,
+  useCreateFolder,
   useFileContent,
   useFilesDirectory,
+  usePasteFileEntry,
   useSaveFileContent,
 } from "@/hooks/useFiles";
 import {
@@ -14,6 +17,7 @@ import {
   useLocalFolderShares,
 } from "@/hooks/useLocalFolderShares";
 import { useNetworkShares } from "@/hooks/useNetworkShares";
+import { useSystemMetrics } from "@/hooks/useSystemMetrics";
 import {
   useDeleteFromTrash,
   useMoveToTrash,
@@ -216,6 +220,18 @@ function getMonacoTheme() {
 
 const MONACO_CDN_BASE =
   "https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min";
+const BYTES_PER_TB = 1024 ** 4;
+
+function formatTerabytesRounded1(bytes: number) {
+  const value = bytes / BYTES_PER_TB;
+  const rounded = value.toFixed(1);
+  return rounded.endsWith(".0") ? rounded.slice(0, -2) : rounded;
+}
+
+function clampPercent(value: number | null | undefined) {
+  if (typeof value !== "number" || Number.isNaN(value)) return 0;
+  return Math.max(0, Math.min(value, 100));
+}
 
 type MonacoSubscription = { dispose: () => void };
 type MonacoModel = { dispose: () => void };
@@ -350,6 +366,11 @@ const sidebarSections: SidebarSection[] = [
 type ViewMode = "grid" | "list";
 type SortBy = "name" | "modified" | "size";
 type OpenFileState = { path: string[]; entry: FileEntry };
+type ClipboardState = {
+  sourcePath: string;
+  operation: "copy" | "move";
+  name: string;
+};
 
 export function FileManager() {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -369,10 +390,18 @@ export function FileManager() {
   const [editorNotice, setEditorNotice] = useState<string | null>(null);
   const [statusNotice, setStatusNotice] = useState<string | null>(null);
   const [showNetworkDialog, setShowNetworkDialog] = useState(false);
+  const [clipboardState, setClipboardState] = useState<ClipboardState | null>(
+    null,
+  );
+  const [isEmptyingTrash, setIsEmptyingTrash] = useState(false);
 
   const directoryQuery = useFilesDirectory(currentPath);
+  const systemMetricsQuery = useSystemMetrics();
   const networkSharesQuery = useNetworkShares();
   const localSharesQuery = useLocalFolderShares();
+  const createFolderMutation = useCreateFolder();
+  const createFileMutation = useCreateFile();
+  const pasteFileEntryMutation = usePasteFileEntry();
   const createLocalShareMutation = useCreateLocalFolderShare();
   const deleteLocalShareMutation = useDeleteLocalFolderShare();
   const saveFileContentMutation = useSaveFileContent();
@@ -437,6 +466,12 @@ export function FileManager() {
   );
   const isTrashView = currentPath[0] === "Trash";
   const isSharedView = currentPath[0] === "Shared";
+  const storageMetrics = systemMetricsQuery.data?.storage;
+  const storageUsageText =
+    storageMetrics && storageMetrics.totalBytes > 0
+      ? `${formatTerabytesRounded1(storageMetrics.usedBytes)} TB / ${formatTerabytesRounded1(storageMetrics.totalBytes)} TB`
+      : "-- / --";
+  const storageUsagePercent = clampPercent(storageMetrics?.usedPercent);
   const currentPathForDisplay = useMemo(
     () => normalizePathForDisplay(currentPath),
     [currentPath],
@@ -534,6 +569,90 @@ export function FileManager() {
     setOpenFile(null);
   }
 
+  function requestEntryName(kind: "file" | "folder") {
+    if (typeof window === "undefined") {
+      return null;
+    }
+    const entered = window.prompt(
+      kind === "folder" ? "Folder name" : "File name",
+      "",
+    );
+    if (entered === null) {
+      return null;
+    }
+    const normalized = entered.trim();
+    if (normalized.length === 0) {
+      setStatusNotice(`Invalid ${kind} name`);
+      return null;
+    }
+    return normalized;
+  }
+
+  async function handleCreateEntry(kind: "file" | "folder") {
+    const name = requestEntryName(kind);
+    if (!name) {
+      return;
+    }
+    const parentPath = toFilePath(currentPath);
+
+    try {
+      const result =
+        kind === "folder"
+          ? await createFolderMutation.mutateAsync({
+              parentPath,
+              name,
+            })
+          : await createFileMutation.mutateAsync({
+              parentPath,
+              name,
+            });
+      setStatusNotice(
+        `${kind === "folder" ? "Folder" : "File"} created: ${result.path}`,
+      );
+    } catch (error) {
+      setStatusNotice(
+        error instanceof Error
+          ? error.message
+          : `Failed to create ${kind}`,
+      );
+    }
+  }
+
+  function setClipboardFromEntry(entry: FileEntry, operation: "copy" | "move") {
+    setClipboardState({
+      sourcePath: entry.path,
+      operation,
+      name: entry.name,
+    });
+    setStatusNotice(`${operation === "copy" ? "Copied" : "Cut"}: ${entry.name}`);
+  }
+
+  async function handlePasteToDestination(destinationPath: string) {
+    if (!clipboardState) {
+      setStatusNotice("Clipboard is empty");
+      return;
+    }
+
+    try {
+      const result = await pasteFileEntryMutation.mutateAsync({
+        sourcePath: clipboardState.sourcePath,
+        destinationPath,
+        operation: clipboardState.operation,
+      });
+      setStatusNotice(
+        `${clipboardState.operation === "copy" ? "Copied" : "Moved"} to ${result.path}`,
+      );
+      if (clipboardState.operation === "move") {
+        setClipboardState(null);
+        if (openFile && toFilePath(openFile.path) === clipboardState.sourcePath) {
+          setOpenFile(null);
+        }
+      }
+    } catch (error) {
+      setStatusNotice(error instanceof Error ? error.message : "Paste failed");
+    }
+  }
+
   function handleContextMenu(e: React.MouseEvent, entry: FileEntry) {
     e.preventDefault();
     const menuWidth = 220;
@@ -621,6 +740,38 @@ export function FileManager() {
           ? error.message
           : "Failed to permanently delete item",
       );
+    }
+  }
+
+  async function handleEmptyTrash() {
+    if (!isTrashView || currentEntries.length === 0 || isEmptyingTrash) {
+      return;
+    }
+    if (typeof window !== "undefined") {
+      const confirmed = window.confirm(
+        `Permanently delete ${currentEntries.length} item${currentEntries.length > 1 ? "s" : ""} from Trash?`,
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    setIsEmptyingTrash(true);
+    try {
+      for (const entry of currentEntries) {
+        await deleteFromTrashMutation.mutateAsync({
+          path: entry.path,
+        });
+      }
+      setStatusNotice(
+        `Trash emptied (${currentEntries.length} item${currentEntries.length > 1 ? "s" : ""})`,
+      );
+    } catch (error) {
+      setStatusNotice(
+        error instanceof Error ? error.message : "Failed to empty Trash",
+      );
+    } finally {
+      setIsEmptyingTrash(false);
     }
   }
 
@@ -742,11 +893,14 @@ export function FileManager() {
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-xs text-muted-foreground">Storage</span>
               <span className="text-xs text-muted-foreground">
-                1.8 TB / 4 TB
+                {storageUsageText}
               </span>
             </div>
             <div className="h-1.5 rounded-full bg-secondary/60 overflow-hidden">
-              <div className="h-full rounded-full bg-primary w-[45%]" />
+              <div
+                className="h-full rounded-full bg-primary"
+                style={{ width: `${storageUsagePercent}%` }}
+              />
             </div>
           </div>
         </aside>
@@ -793,6 +947,32 @@ export function FileManager() {
           </nav>
 
           {/* Search */}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => {
+                void handleCreateEntry("folder");
+              }}
+              disabled={createFolderMutation.isPending}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-secondary/50 text-xs text-muted-foreground transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+              title="Create folder"
+            >
+              <Folder className="size-3.5" />
+              <span className="hidden sm:inline">New Folder</span>
+            </button>
+            <button
+              onClick={() => {
+                void handleCreateEntry("file");
+              }}
+              disabled={createFileMutation.isPending}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-secondary/50 text-xs text-muted-foreground transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+              title="Create file"
+            >
+              <File className="size-3.5" />
+              <span className="hidden sm:inline">New File</span>
+            </button>
+          </div>
+
+          {/* Search */}
           <div className="relative">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 size-3 text-muted-foreground" />
             <input
@@ -806,6 +986,23 @@ export function FileManager() {
 
           {/* Sort */}
           <div className="flex items-center gap-1">
+            {isTrashView ? (
+              <button
+                onClick={() => {
+                  void handleEmptyTrash();
+                }}
+                disabled={
+                  isEmptyingTrash ||
+                  deleteFromTrashMutation.isPending ||
+                  currentEntries.length === 0
+                }
+                className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-status-red/10 text-xs text-status-red transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                title="Permanently delete all items in Trash"
+              >
+                <Trash2 className="size-3.5" />
+                <span className="hidden sm:inline">Empty Trash</span>
+              </button>
+            ) : null}
             <button
               onClick={() =>
                 setSortBy((s) =>
@@ -1059,6 +1256,12 @@ export function FileManager() {
                 {statusNotice}
               </span>
             ) : null}
+            {clipboardState ? (
+              <span className="max-w-56 truncate text-muted-foreground">
+                {clipboardState.operation === "copy" ? "Clipboard" : "Cut"}:{" "}
+                {clipboardState.name}
+              </span>
+            ) : null}
             <span className="font-mono">/{currentPathForDisplay.join("/")}</span>
           </div>
         </div>
@@ -1088,17 +1291,32 @@ export function FileManager() {
           <ContextMenuItem
             icon={<Copy className="size-3.5" />}
             label="Copy"
-            onClick={() => setShowContextMenu(null)}
+            onClick={() => {
+              const entry = showContextMenu.entry;
+              setShowContextMenu(null);
+              setClipboardFromEntry(entry, "copy");
+            }}
           />
           <ContextMenuItem
             icon={<Scissors className="size-3.5" />}
             label="Cut"
-            onClick={() => setShowContextMenu(null)}
+            onClick={() => {
+              const entry = showContextMenu.entry;
+              setShowContextMenu(null);
+              setClipboardFromEntry(entry, "move");
+            }}
           />
           <ContextMenuItem
             icon={<ClipboardPaste className="size-3.5" />}
             label="Paste"
-            onClick={() => setShowContextMenu(null)}
+            disabled={!clipboardState || isTrashView || pasteFileEntryMutation.isPending}
+            onClick={() => {
+              const entry = showContextMenu.entry;
+              setShowContextMenu(null);
+              const destinationPath =
+                entry.type === "folder" ? entry.path : toFilePath(currentPath);
+              void handlePasteToDestination(destinationPath);
+            }}
           />
           <div className="h-px bg-border mx-2 my-1" />
           <ContextMenuItem
@@ -1282,20 +1500,25 @@ function ContextMenuItem({
   icon,
   label,
   danger,
+  disabled,
   onClick,
 }: {
   icon: React.ReactNode;
   label: string;
   danger?: boolean;
+  disabled?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       onClick={onClick}
+      disabled={disabled}
       className={`flex items-center gap-2.5 w-full px-3 py-1.5 text-xs transition-colors cursor-pointer ${
-        danger
-          ? "text-status-red hover:bg-status-red/10"
-          : "text-foreground hover:bg-secondary/50"
+        disabled
+          ? "cursor-not-allowed text-muted-foreground/50"
+          : danger
+            ? "text-status-red hover:bg-status-red/10"
+            : "text-foreground hover:bg-secondary/50"
       }`}
     >
       {icon}

@@ -33,6 +33,32 @@ describe("configurator-mapper", () => {
     expect(state.containerCommands).toEqual(["--config", "/config/settings.yaml"]);
   });
 
+  it("prefers app service over db sidecar when appId matches sidecar name", () => {
+    const composeDraft = `services:
+  app:
+    image: photoprism/photoprism:240915
+    ports:
+      - "2342:2342"
+    network_mode: host
+  photoprism-db:
+    image: mariadb:10.8
+`;
+
+    const state = composeToClassicState({
+      composeDraft,
+      appId: "photoprism",
+      seed: {
+        title: "Photoprism",
+        iconUrl: "",
+      },
+    });
+
+    expect(state.dockerImage).toBe("photoprism/photoprism:240915");
+    expect(state.webUi.port).toBe("2342");
+    expect(state.network).toBe("host");
+    expect(state.ports[0]?.host).toBe("2342");
+  });
+
   it("maps classic state back to compose while keeping unknown top-level fields", () => {
     const seed = createDefaultClassicState({
       title: "Sample",

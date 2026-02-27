@@ -125,6 +125,30 @@ describe("AppConfiguratorPanel", () => {
     expect(screen.queryByRole("button", { name: "Docker Run" })).toBeNull();
   });
 
+  it("does not block installed settings on template metadata loading", () => {
+    setupActions();
+
+    useStoreAppMock.mockReturnValue({
+      data: null,
+      isLoading: true,
+    });
+
+    render(
+      <AppConfiguratorPanel
+        context="installed_edit"
+        target={{
+          appId: "dozzle",
+          appName: "Dozzle",
+          dashboardUrl: "http://192.168.1.15:8080",
+          containerName: "dozzle",
+        }}
+      />,
+    );
+
+    expect(screen.queryByText("Loading app configuration...")).toBeNull();
+    expect(screen.getByLabelText("Docker Image")).toBeTruthy();
+  });
+
   it("syncs classic edits into compose view", () => {
     setupActions();
 

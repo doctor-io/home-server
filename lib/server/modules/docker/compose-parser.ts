@@ -26,6 +26,58 @@ export type PrimaryComposeService = {
   service: ParsedComposeService;
 };
 
+const INFRA_SERVICE_TOKEN_PATTERN =
+  /(?:^|[-_.])(db|database|postgres|postgresql|mariadb|mysql|redis|cache|broker|queue|rabbitmq|kafka|zookeeper|mongo|mongodb|elasticsearch|minio)(?:$|[-_.])/i;
+const APP_ALIAS_PATTERN = /^(app|main|server|web|frontend|backend)$/i;
+
+function hasPublishedPorts(service: ParsedComposeService): boolean {
+  return Array.isArray(service.ports) && service.ports.length > 0;
+}
+
+function scorePrimaryServiceCandidate(input: {
+  name: string;
+  service: ParsedComposeService;
+  appId?: string;
+}): number {
+  const name = input.name.toLowerCase();
+  const appId = input.appId?.toLowerCase().trim();
+  const image = typeof input.service.image === "string" ? input.service.image.toLowerCase() : "";
+
+  let score = 0;
+  if (hasPublishedPorts(input.service)) {
+    score += 40;
+  }
+
+  if (name === "app") {
+    score += 60;
+  } else if (APP_ALIAS_PATTERN.test(name)) {
+    score += 30;
+  }
+  if (name.includes("server")) {
+    score += 20;
+  }
+
+  if (appId) {
+    if (name === appId) {
+      score += 100;
+    } else if (name.startsWith(`${appId}-`) || name.endsWith(`-${appId}`)) {
+      score += 45;
+    } else if (name.includes(appId)) {
+      score += 25;
+    }
+
+    if (image.includes(appId)) {
+      score += 20;
+    }
+  }
+
+  if (INFRA_SERVICE_TOKEN_PATTERN.test(name)) {
+    score -= 80;
+  }
+
+  return score;
+}
+
 /**
  * Fetch docker-compose.yml from a GitHub repository
  */
@@ -185,22 +237,31 @@ export function extractPrimaryServiceWithName(
     return null;
   }
 
-  // Try to find service matching app ID
+  // First prefer an exact service-name match.
   if (appId) {
-    const matchingService = serviceNames.find(
-      (name) => name.toLowerCase() === appId.toLowerCase() ||
-        name.toLowerCase().includes(appId.toLowerCase()),
-    );
-    if (matchingService) {
+    const normalizedAppId = appId.toLowerCase().trim();
+    const exactMatch = serviceNames.find((name) => name.toLowerCase() === normalizedAppId);
+    if (exactMatch) {
       return {
-        name: matchingService,
-        service: parsed.services[matchingService],
+        name: exactMatch,
+        service: parsed.services[exactMatch],
       };
     }
   }
 
-  // Return first service
-  const fallbackName = serviceNames[0];
+  const rankedServices = serviceNames
+    .map((name, index) => ({
+      name,
+      index,
+      score: scorePrimaryServiceCandidate({
+        name,
+        service: parsed.services[name],
+        appId,
+      }),
+    }))
+    .sort((a, b) => b.score - a.score || a.index - b.index);
+
+  const fallbackName = rankedServices[0]?.name ?? serviceNames[0];
   return {
     name: fallbackName,
     service: parsed.services[fallbackName],

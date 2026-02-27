@@ -1,6 +1,17 @@
 import "server-only";
 
-import { readFile, readdir, lstat, stat, writeFile } from "node:fs/promises";
+import {
+  cp,
+  copyFile,
+  lstat,
+  mkdir,
+  readFile,
+  readdir,
+  rename,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import path from "node:path";
 import {
   FilesPathError,
@@ -10,8 +21,11 @@ import {
 import type {
   FileListEntry,
   FileListResponse,
+  FilePasteOperation,
+  FilePasteResponse,
   FileReadMode,
   FileReadResponse,
+  FileCreateResponse,
   FileServiceErrorCode,
   FileWriteResponse,
 } from "@/lib/shared/contracts/files";
@@ -63,6 +77,19 @@ type WriteTextFileParams = {
   path: string;
   content: string;
   expectedMtimeMs?: number;
+  includeHidden?: boolean;
+};
+
+type CreateEntryParams = {
+  parentPath?: string;
+  name: string;
+  includeHidden?: boolean;
+};
+
+type PasteEntryParams = {
+  sourcePath: string;
+  destinationPath?: string;
+  operation: FilePasteOperation;
   includeHidden?: boolean;
 };
 
@@ -153,6 +180,20 @@ function mapFsError(
       cause: error,
     });
   }
+  if (nodeError?.code === "EEXIST") {
+    return new FileServiceError("Destination already exists", {
+      code: "destination_exists",
+      statusCode: 409,
+      cause: error,
+    });
+  }
+  if (nodeError?.code === "EXDEV") {
+    return new FileServiceError("Move across filesystem boundaries failed", {
+      code: "internal_error",
+      statusCode: 500,
+      cause: error,
+    });
+  }
 
   return new FileServiceError(fallbackMessage, {
     code: "internal_error",
@@ -195,11 +236,55 @@ function sortDirectoryEntries(entries: FileListEntry[]) {
   });
 }
 
-async function resolveFilePath(inputPath: string | undefined, includeHidden: boolean) {
+function ensureSafeName(rawName: string, includeHidden: boolean) {
+  const name = rawName.trim();
+  if (name.length === 0 || name === "." || name === "..") {
+    throw new FileServiceError("Invalid path", {
+      code: "invalid_path",
+      statusCode: 400,
+    });
+  }
+  if (name.includes("/") || name.includes("\\") || name.includes("\0")) {
+    throw new FileServiceError("Invalid path", {
+      code: "invalid_path",
+      statusCode: 400,
+    });
+  }
+  if (!includeHidden && isHiddenName(name)) {
+    throw new FileServiceError("Hidden files are not allowed", {
+      code: "hidden_blocked",
+      statusCode: 403,
+    });
+  }
+  return name;
+}
+
+async function pathExists(absolutePath: string) {
+  try {
+    await lstat(absolutePath);
+    return true;
+  } catch (error) {
+    const nodeError = error as NodeJS.ErrnoException;
+    if (nodeError?.code === "ENOENT") {
+      return false;
+    }
+    throw error;
+  }
+}
+
+async function resolveFilePath(
+  inputPath: string | undefined,
+  includeHidden: boolean,
+  options: {
+    allowEmpty?: boolean;
+    allowMissingLeaf?: boolean;
+  } = {},
+) {
   const preResolved = await resolvePathWithinFilesRoot({
     inputPath,
-    allowEmpty: true,
+    allowEmpty: options.allowEmpty ?? true,
     allowHiddenSegments: true,
+    allowMissingLeaf: options.allowMissingLeaf ?? false,
   });
   if (!includeHidden && !isTrashPathSegments(preResolved.segments)) {
     const hiddenSegment = preResolved.segments.find((segment) =>
@@ -215,9 +300,38 @@ async function resolveFilePath(inputPath: string | undefined, includeHidden: boo
   return preResolved;
 }
 
+async function assertDirectoryPath(
+  inputPath: string | undefined,
+  includeHidden: boolean,
+  options: { allowEmpty?: boolean } = {},
+) {
+  const resolved = await resolveFilePath(inputPath, includeHidden, {
+    allowEmpty: options.allowEmpty ?? true,
+  });
+  const info = await lstat(resolved.absolutePath);
+  if (info.isSymbolicLink()) {
+    throw new FileServiceError("Symlinks are not allowed", {
+      code: "symlink_blocked",
+      statusCode: 403,
+    });
+  }
+  if (!info.isDirectory()) {
+    throw new FileServiceError("Path is not a directory", {
+      code: "not_a_directory",
+      statusCode: 400,
+    });
+  }
+  return resolved;
+}
+
+function joinRelativePath(baseSegments: string[], leafName: string) {
+  if (baseSegments.length === 0) return leafName;
+  return `${baseSegments.join("/")}/${leafName}`;
+}
+
 export async function listDirectory(params: ListDirectoryParams = {}): Promise<FileListResponse> {
   const includeHidden = Boolean(params.includeHidden);
-  let resolved: ResolvedFilesPath;
+  let resolved: ResolvedFilesPath | undefined;
 
   try {
     resolved = await resolveFilePath(params.path, includeHidden);
@@ -289,11 +403,13 @@ export async function listDirectory(params: ListDirectoryParams = {}): Promise<F
 }
 
 export async function readFileForViewer(params: ReadFileForViewerParams): Promise<FileReadResponse> {
-  let resolved: ResolvedFilesPath;
+  let resolved: ResolvedFilesPath | undefined;
   let info: Awaited<ReturnType<typeof stat>>;
 
   try {
-    resolved = await resolveFilePath(params.path, Boolean(params.includeHidden));
+    resolved = await resolveFilePath(params.path, Boolean(params.includeHidden), {
+      allowEmpty: false,
+    });
     const linkInfo = await lstat(resolved.absolutePath);
     if (linkInfo.isSymbolicLink()) {
       throw new FileServiceError("Symlinks are not allowed", {
@@ -383,11 +499,13 @@ export async function writeTextFile(params: WriteTextFileParams): Promise<FileWr
     });
   }
 
-  let resolved: ResolvedFilesPath;
+  let resolved: ResolvedFilesPath | undefined;
   let currentInfo: Awaited<ReturnType<typeof stat>>;
 
   try {
-    resolved = await resolveFilePath(params.path, Boolean(params.includeHidden));
+    resolved = await resolveFilePath(params.path, Boolean(params.includeHidden), {
+      allowEmpty: false,
+    });
     const linkInfo = await lstat(resolved.absolutePath);
     if (linkInfo.isSymbolicLink()) {
       throw new FileServiceError("Symlinks are not allowed", {
@@ -463,10 +581,12 @@ export async function resolveReadableFileAbsolutePath(input: {
   path: string;
   includeHidden?: boolean;
 }) {
-  let resolved: ResolvedFilesPath;
+  let resolved: ResolvedFilesPath | undefined;
 
   try {
-    resolved = await resolveFilePath(input.path, Boolean(input.includeHidden));
+    resolved = await resolveFilePath(input.path, Boolean(input.includeHidden), {
+      allowEmpty: false,
+    });
     const linkInfo = await lstat(resolved.absolutePath);
     if (linkInfo.isSymbolicLink()) {
       throw new FileServiceError("Symlinks are not allowed", {
@@ -493,4 +613,202 @@ export async function resolveReadableFileAbsolutePath(input: {
     path: resolved.relativePath,
     absolutePath: resolved.absolutePath,
   };
+}
+
+export async function createDirectoryEntry(
+  params: CreateEntryParams,
+): Promise<FileCreateResponse> {
+  const includeHidden = Boolean(params.includeHidden);
+  const name = ensureSafeName(params.name, includeHidden);
+  let parentPath: ResolvedFilesPath | undefined;
+
+  try {
+    parentPath = await assertDirectoryPath(params.parentPath, includeHidden, {
+      allowEmpty: true,
+    });
+    const relativePath = joinRelativePath(parentPath.segments, name);
+    const targetPath = await resolveFilePath(relativePath, includeHidden, {
+      allowEmpty: false,
+      allowMissingLeaf: true,
+    });
+
+    if (targetPath.exists || (await pathExists(targetPath.absolutePath))) {
+      throw new FileServiceError("Destination already exists", {
+        code: "destination_exists",
+        statusCode: 409,
+      });
+    }
+
+    await mkdir(targetPath.absolutePath, {
+      recursive: false,
+    });
+
+    return {
+      root: targetPath.rootPath,
+      path: targetPath.relativePath,
+      type: "folder",
+    };
+  } catch (error) {
+    throw mapFsError(error, "Failed to create folder", parentPath?.absolutePath);
+  }
+}
+
+export async function createFileEntry(
+  params: CreateEntryParams,
+): Promise<FileCreateResponse> {
+  const includeHidden = Boolean(params.includeHidden);
+  const name = ensureSafeName(params.name, includeHidden);
+  let parentPath: ResolvedFilesPath | undefined;
+
+  try {
+    parentPath = await assertDirectoryPath(params.parentPath, includeHidden, {
+      allowEmpty: true,
+    });
+    const relativePath = joinRelativePath(parentPath.segments, name);
+    const targetPath = await resolveFilePath(relativePath, includeHidden, {
+      allowEmpty: false,
+      allowMissingLeaf: true,
+    });
+
+    if (targetPath.exists || (await pathExists(targetPath.absolutePath))) {
+      throw new FileServiceError("Destination already exists", {
+        code: "destination_exists",
+        statusCode: 409,
+      });
+    }
+
+    await writeFile(targetPath.absolutePath, "", {
+      encoding: "utf8",
+      flag: "wx",
+    });
+
+    return {
+      root: targetPath.rootPath,
+      path: targetPath.relativePath,
+      type: "file",
+    };
+  } catch (error) {
+    throw mapFsError(error, "Failed to create file", parentPath?.absolutePath);
+  }
+}
+
+async function movePath(
+  sourceAbsolutePath: string,
+  destinationAbsolutePath: string,
+  isDirectory: boolean,
+) {
+  try {
+    await rename(sourceAbsolutePath, destinationAbsolutePath);
+    return;
+  } catch (error) {
+    const nodeError = error as NodeJS.ErrnoException;
+    if (nodeError?.code !== "EXDEV") {
+      throw error;
+    }
+  }
+
+  if (isDirectory) {
+    await cp(sourceAbsolutePath, destinationAbsolutePath, {
+      recursive: true,
+      force: false,
+      errorOnExist: true,
+    });
+  } else {
+    await copyFile(sourceAbsolutePath, destinationAbsolutePath);
+  }
+  await rm(sourceAbsolutePath, {
+    recursive: true,
+    force: true,
+  });
+}
+
+export async function pasteEntry(params: PasteEntryParams): Promise<FilePasteResponse> {
+  const includeHidden = Boolean(params.includeHidden);
+  let sourcePath: ResolvedFilesPath | undefined;
+  let destinationDirectory: ResolvedFilesPath | undefined;
+  let targetPath: ResolvedFilesPath | undefined;
+
+  try {
+    sourcePath = await resolveFilePath(params.sourcePath, includeHidden, {
+      allowEmpty: false,
+    });
+    const sourceInfo = await lstat(sourcePath.absolutePath);
+    if (sourceInfo.isSymbolicLink()) {
+      throw new FileServiceError("Symlinks are not allowed", {
+        code: "symlink_blocked",
+        statusCode: 403,
+      });
+    }
+    if (!sourceInfo.isDirectory() && !sourceInfo.isFile()) {
+      throw new FileServiceError("Unsupported file type", {
+        code: "unsupported_file",
+        statusCode: 415,
+      });
+    }
+
+    destinationDirectory = await assertDirectoryPath(
+      params.destinationPath,
+      includeHidden,
+      { allowEmpty: true },
+    );
+    const targetRelativePath = joinRelativePath(
+      destinationDirectory.segments,
+      path.basename(sourcePath.relativePath),
+    );
+    targetPath = await resolveFilePath(targetRelativePath, includeHidden, {
+      allowEmpty: false,
+      allowMissingLeaf: true,
+    });
+
+    if (targetPath.absolutePath === sourcePath.absolutePath) {
+      throw new FileServiceError("Destination already exists", {
+        code: "destination_exists",
+        statusCode: 409,
+      });
+    }
+
+    if (targetPath.exists || (await pathExists(targetPath.absolutePath))) {
+      throw new FileServiceError("Destination already exists", {
+        code: "destination_exists",
+        statusCode: 409,
+      });
+    }
+
+    if (
+      params.operation === "move" &&
+      sourceInfo.isDirectory() &&
+      targetPath.relativePath.startsWith(`${sourcePath.relativePath}/`)
+    ) {
+      throw new FileServiceError("Cannot move folder into itself", {
+        code: "invalid_path",
+        statusCode: 400,
+      });
+    }
+
+    if (params.operation === "copy") {
+      await cp(sourcePath.absolutePath, targetPath.absolutePath, {
+        recursive: sourceInfo.isDirectory(),
+        force: false,
+        errorOnExist: true,
+      });
+    } else {
+      await movePath(
+        sourcePath.absolutePath,
+        targetPath.absolutePath,
+        sourceInfo.isDirectory(),
+      );
+    }
+
+    return {
+      root: targetPath.rootPath,
+      path: targetPath.relativePath,
+      type: sourceInfo.isDirectory() ? "folder" : "file",
+    };
+  } catch (error) {
+    throw mapFsError(
+      error,
+      `Failed to ${params.operation === "copy" ? "copy" : "move"} item`,
+      targetPath?.absolutePath ?? destinationDirectory?.absolutePath ?? sourcePath?.absolutePath,
+    );
+  }
 }

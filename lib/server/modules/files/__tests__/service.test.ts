@@ -146,8 +146,11 @@ vi.mock("@/lib/server/modules/files/path-resolver", () => {
 });
 
 import {
+  createDirectoryEntry,
+  createFileEntry,
   MAX_TEXT_READ_BYTES,
   listDirectory,
+  pasteEntry,
   readFileForViewer,
   writeTextFile,
 } from "@/lib/server/modules/files/service";
@@ -300,5 +303,76 @@ describe("files service", () => {
       ".env",
       "notes.txt",
     ]);
+  });
+
+  it("creates folder and file entries in the requested directory", async () => {
+    await mkdir(path.join(mockDataRoot, "Documents"), { recursive: true });
+
+    const createdFolder = await createDirectoryEntry({
+      parentPath: "Documents",
+      name: "Projects",
+    });
+    const createdFile = await createFileEntry({
+      parentPath: "Documents",
+      name: "todo.txt",
+    });
+
+    expect(createdFolder.path).toBe("Documents/Projects");
+    expect(createdFolder.type).toBe("folder");
+    expect(createdFile.path).toBe("Documents/todo.txt");
+    expect(createdFile.type).toBe("file");
+  });
+
+  it("copies entries into destination directory", async () => {
+    await mkdir(path.join(mockDataRoot, "Documents"), { recursive: true });
+    await mkdir(path.join(mockDataRoot, "Media"), { recursive: true });
+    await writeFile(path.join(mockDataRoot, "Media", "photo.jpg"), "binary", "utf8");
+
+    const copied = await pasteEntry({
+      sourcePath: "Media/photo.jpg",
+      destinationPath: "Documents",
+      operation: "copy",
+    });
+
+    expect(copied.path).toBe("Documents/photo.jpg");
+    expect(await readFile(path.join(mockDataRoot, "Media", "photo.jpg"), "utf8")).toBe("binary");
+    expect(await readFile(path.join(mockDataRoot, "Documents", "photo.jpg"), "utf8")).toBe("binary");
+  });
+
+  it("moves entries into destination directory", async () => {
+    await mkdir(path.join(mockDataRoot, "Documents"), { recursive: true });
+    await mkdir(path.join(mockDataRoot, "Media"), { recursive: true });
+    await writeFile(path.join(mockDataRoot, "Media", "move-me.txt"), "m", "utf8");
+
+    const moved = await pasteEntry({
+      sourcePath: "Media/move-me.txt",
+      destinationPath: "Documents",
+      operation: "move",
+    });
+
+    expect(moved.path).toBe("Documents/move-me.txt");
+    await expect(
+      readFile(path.join(mockDataRoot, "Media", "move-me.txt"), "utf8"),
+    ).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+    expect(await readFile(path.join(mockDataRoot, "Documents", "move-me.txt"), "utf8")).toBe("m");
+  });
+
+  it("rejects paste when destination exists", async () => {
+    await mkdir(path.join(mockDataRoot, "Documents"), { recursive: true });
+    await mkdir(path.join(mockDataRoot, "Media"), { recursive: true });
+    await writeFile(path.join(mockDataRoot, "Media", "photo.jpg"), "src", "utf8");
+    await writeFile(path.join(mockDataRoot, "Documents", "photo.jpg"), "dst", "utf8");
+
+    await expect(
+      pasteEntry({
+        sourcePath: "Media/photo.jpg",
+        destinationPath: "Documents",
+        operation: "copy",
+      }),
+    ).rejects.toMatchObject({
+      code: "destination_exists",
+    });
   });
 });

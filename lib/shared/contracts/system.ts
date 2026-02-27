@@ -31,6 +31,14 @@ export type BatteryMetrics = {
   designToMaxCapacityPercent: number | null;
 };
 
+export type StorageMetrics = {
+  mountPath: string;
+  totalBytes: number;
+  availableBytes: number;
+  usedBytes: number;
+  usedPercent: number;
+};
+
 export type WifiAccessPoint = {
   ssid: string;
   channel: number | null;
@@ -61,6 +69,7 @@ export type SystemMetricsSnapshot = {
   memory: MemoryUsage;
   temperature: TemperatureMetrics;
   battery: BatteryMetrics;
+  storage?: StorageMetrics;
   wifi: WifiMetrics;
   process: {
     pid: number;

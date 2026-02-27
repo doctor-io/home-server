@@ -69,7 +69,7 @@ describe("AppGrid context menu", () => {
     });
   });
 
-  it("opens dashboard with default url mapping", () => {
+  it("opens dashboard with default url mapping", async () => {
     const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
 
     render(<AppGrid animationsEnabled={false} />);
@@ -77,14 +77,16 @@ describe("AppGrid context menu", () => {
     openContextMenuFor("Plex");
     fireEvent.click(screen.getByRole("button", { name: "Open Dashboard" }));
 
-    expect(openSpy).toHaveBeenCalledWith(
-      "http://localhost:32400/web",
-      "_blank",
-      "noopener,noreferrer",
-    );
+    await waitFor(() => {
+      expect(openSpy).toHaveBeenCalledWith(
+        "http://localhost:32400/web",
+        "_blank",
+        "noopener,noreferrer",
+      );
+    });
   });
 
-  it("prefers installed runtime port over catalog port for dashboard url", () => {
+  it("prefers installed runtime port over catalog port for dashboard url", async () => {
     const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
 
     useInstalledAppsMock.mockReturnValue({
@@ -106,14 +108,16 @@ describe("AppGrid context menu", () => {
     openContextMenuFor("Plex");
     fireEvent.click(screen.getByRole("button", { name: "Open Dashboard" }));
 
-    expect(openSpy).toHaveBeenCalledWith(
-      "http://localhost:32410/web",
-      "_blank",
-      "noopener,noreferrer",
-    );
+    await waitFor(() => {
+      expect(openSpy).toHaveBeenCalledWith(
+        "http://localhost:32410/web",
+        "_blank",
+        "noopener,noreferrer",
+      );
+    });
   });
 
-  it("routes open dashboard through callback when provided", () => {
+  it("routes open dashboard through callback when provided", async () => {
     const onOpenDashboard = vi.fn();
     const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
 
@@ -127,11 +131,13 @@ describe("AppGrid context menu", () => {
     openContextMenuFor("Plex");
     fireEvent.click(screen.getByRole("button", { name: "Open Dashboard" }));
 
-    expect(onOpenDashboard).toHaveBeenCalledWith({
-      appId: "plex",
-      appName: "Plex",
-      dashboardUrl: "http://localhost:32400/web",
-      containerName: "plex",
+    await waitFor(() => {
+      expect(onOpenDashboard).toHaveBeenCalledWith({
+        appId: "plex",
+        appName: "Plex",
+        dashboardUrl: "http://localhost:32400/web",
+        containerName: "plex",
+      });
     });
     expect(openSpy).not.toHaveBeenCalled();
   });
@@ -253,6 +259,65 @@ describe("AppGrid context menu", () => {
       (screen.getByRole("button", { name: "Check Updates" }) as HTMLButtonElement).disabled,
     ).toBe(false);
     vi.useRealTimers();
+  });
+
+  it("does not open the home page when dashboard url cannot be resolved", async () => {
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ data: { primary: {} } }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    useInstalledAppsMock.mockReturnValue({
+      data: [
+        {
+          id: "unknown-app",
+          name: "Unknown App",
+          status: "running",
+          webUiPort: null,
+          updatedAt: "2026-02-24T00:00:00.000Z",
+        },
+      ],
+      isLoading: false,
+      isError: false,
+    });
+    useStoreCatalogMock.mockReturnValue({
+      data: [
+        {
+          id: "unknown-app",
+          name: "Unknown App",
+          description: "No known dashboard",
+          platform: "linux",
+          categories: ["Misc"],
+          logoUrl: null,
+          repositoryUrl: "https://example.com",
+          stackFile: "Apps/unknown-app/docker-compose.yml",
+          status: "installed",
+          webUiPort: null,
+          updateAvailable: false,
+          localDigest: null,
+          remoteDigest: null,
+        },
+      ],
+      isLoading: false,
+      isError: false,
+    });
+
+    render(<AppGrid animationsEnabled={false} />);
+
+    openContextMenuFor("Unknown App");
+    fireEvent.click(screen.getByRole("button", { name: "Open Dashboard" }));
+
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "/api/v1/store/apps/unknown-app/compose?source=installed",
+        { cache: "no-store" },
+      );
+    });
+    expect(openSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
   });
 
 });

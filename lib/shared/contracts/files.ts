@@ -43,6 +43,13 @@ export type FileListResponse = {
   entries: FileListEntry[];
 };
 
+export type FileRootResponse = {
+  rootPath: string;
+  effectiveUid: number | null;
+  effectiveGid: number | null;
+  writable: boolean;
+};
+
 export type FileReadResponse = {
   root: string;
   path: string;
@@ -68,6 +75,31 @@ export type FileWriteResponse = {
   sizeBytes: number;
   modifiedAt: string;
   mtimeMs: number;
+};
+
+export type FileCreateRequest = {
+  parentPath: string;
+  name: string;
+};
+
+export type FileCreateResponse = {
+  root: string;
+  path: string;
+  type: FileEntryType;
+};
+
+export type FilePasteOperation = "copy" | "move";
+
+export type FilePasteRequest = {
+  sourcePath: string;
+  destinationPath: string;
+  operation: FilePasteOperation;
+};
+
+export type FilePasteResponse = {
+  root: string;
+  path: string;
+  type: FileEntryType;
 };
 
 export type NetworkShare = {

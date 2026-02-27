@@ -300,6 +300,8 @@ export function AppConfiguratorPanel({
     dockerRunState.name.trim().length > 0 && dockerRunState.source.trim().length > 0;
   const canSubmit =
     activeView === "docker_run" ? dockerRunCanSubmit : composeCanSubmit;
+  const shouldBlockOnTemplateLoading =
+    context === "catalog_install" && !effectiveTemplate && detailQuery.isLoading;
 
   async function handleSubmit() {
     if (isSaving || !canSubmit) return;
@@ -367,7 +369,7 @@ export function AppConfiguratorPanel({
         onViewChange={setActiveView}
       />
 
-      {context !== "custom_install" && !effectiveTemplate && detailQuery.isLoading ? (
+      {shouldBlockOnTemplateLoading ? (
         <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
           Loading app configuration...
         </div>

@@ -6,6 +6,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mockUseFilesDirectory = vi.fn();
 const mockUseFileContent = vi.fn();
 const mockUseSaveFileContent = vi.fn();
+const mockUseCreateFolder = vi.fn();
+const mockUseCreateFile = vi.fn();
+const mockUsePasteFileEntry = vi.fn();
 const mockUseMoveToTrash = vi.fn();
 const mockUseRestoreFromTrash = vi.fn();
 const mockUseDeleteFromTrash = vi.fn();
@@ -13,6 +16,7 @@ const mockUseNetworkShares = vi.fn();
 const mockUseLocalFolderShares = vi.fn();
 const mockUseCreateLocalFolderShare = vi.fn();
 const mockUseDeleteLocalFolderShare = vi.fn();
+const mockUseSystemMetrics = vi.fn();
 
 vi.mock("@/hooks/useFiles", () => ({
   buildAssetUrl: (filePath: string) => `/api/v1/files/asset?path=${encodeURIComponent(filePath)}`,
@@ -20,6 +24,9 @@ vi.mock("@/hooks/useFiles", () => ({
   useFilesDirectory: (...args: unknown[]) => mockUseFilesDirectory(...args),
   useFileContent: (...args: unknown[]) => mockUseFileContent(...args),
   useSaveFileContent: (...args: unknown[]) => mockUseSaveFileContent(...args),
+  useCreateFolder: (...args: unknown[]) => mockUseCreateFolder(...args),
+  useCreateFile: (...args: unknown[]) => mockUseCreateFile(...args),
+  usePasteFileEntry: (...args: unknown[]) => mockUsePasteFileEntry(...args),
 }));
 
 vi.mock("@/hooks/useTrashActions", () => ({
@@ -30,6 +37,10 @@ vi.mock("@/hooks/useTrashActions", () => ({
 
 vi.mock("@/hooks/useNetworkShares", () => ({
   useNetworkShares: (...args: unknown[]) => mockUseNetworkShares(...args),
+}));
+
+vi.mock("@/hooks/useSystemMetrics", () => ({
+  useSystemMetrics: (...args: unknown[]) => mockUseSystemMetrics(...args),
 }));
 
 vi.mock("@/hooks/useLocalFolderShares", () => ({
@@ -70,6 +81,9 @@ describe("FileManager sharing and navigation", () => {
     mockUseFilesDirectory.mockReset();
     mockUseFileContent.mockReset();
     mockUseSaveFileContent.mockReset();
+    mockUseCreateFolder.mockReset();
+    mockUseCreateFile.mockReset();
+    mockUsePasteFileEntry.mockReset();
     mockUseMoveToTrash.mockReset();
     mockUseRestoreFromTrash.mockReset();
     mockUseDeleteFromTrash.mockReset();
@@ -77,6 +91,7 @@ describe("FileManager sharing and navigation", () => {
     mockUseLocalFolderShares.mockReset();
     mockUseCreateLocalFolderShare.mockReset();
     mockUseDeleteLocalFolderShare.mockReset();
+    mockUseSystemMetrics.mockReset();
 
     mockUseFilesDirectory.mockReturnValue(mockDirectory([]));
     mockUseFileContent.mockReturnValue({
@@ -87,6 +102,30 @@ describe("FileManager sharing and navigation", () => {
     });
     mockUseSaveFileContent.mockReturnValue({
       mutateAsync: vi.fn(),
+      isPending: false,
+    });
+    mockUseCreateFolder.mockReturnValue({
+      mutateAsync: vi.fn().mockResolvedValue({
+        root: "/DATA",
+        path: "Documents/New Folder",
+        type: "folder",
+      }),
+      isPending: false,
+    });
+    mockUseCreateFile.mockReturnValue({
+      mutateAsync: vi.fn().mockResolvedValue({
+        root: "/DATA",
+        path: "Documents/New File.txt",
+        type: "file",
+      }),
+      isPending: false,
+    });
+    mockUsePasteFileEntry.mockReturnValue({
+      mutateAsync: vi.fn().mockResolvedValue({
+        root: "/DATA",
+        path: "Documents/FolderToShare",
+        type: "folder",
+      }),
       isPending: false,
     });
     mockUseMoveToTrash.mockReturnValue({
@@ -103,6 +142,20 @@ describe("FileManager sharing and navigation", () => {
     });
     mockUseNetworkShares.mockReturnValue({
       data: [],
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+    mockUseSystemMetrics.mockReturnValue({
+      data: {
+        storage: {
+          mountPath: "/DATA",
+          totalBytes: 4 * 1024 ** 4,
+          availableBytes: 2.2 * 1024 ** 4,
+          usedBytes: 1.8 * 1024 ** 4,
+          usedPercent: 45,
+        },
+      },
       isLoading: false,
       isError: false,
       error: null,
@@ -167,6 +220,11 @@ describe("FileManager sharing and navigation", () => {
     ).toBeTruthy();
   });
 
+  it("renders real storage usage text in sidebar", () => {
+    render(<FileManager />);
+    expect(screen.getByText("1.8 TB / 4 TB")).toBeTruthy();
+  });
+
   it("shows Share Folder action when folder is not shared", () => {
     mockUseFilesDirectory.mockReturnValue(
       mockDirectory([
@@ -222,5 +280,129 @@ describe("FileManager sharing and navigation", () => {
     );
 
     expect(screen.getByRole("button", { name: "Stop Sharing" })).toBeTruthy();
+  });
+
+  it("creates folder and file from header actions", async () => {
+    const promptSpy = vi.spyOn(window, "prompt");
+    promptSpy
+      .mockReturnValueOnce("New Folder")
+      .mockReturnValueOnce("New File.txt");
+
+    render(<FileManager />);
+
+    fireEvent.click(screen.getByRole("button", { name: /new folder/i }));
+    fireEvent.click(screen.getByRole("button", { name: /new file/i }));
+
+    const createFolderCall =
+      mockUseCreateFolder.mock.results[0]?.value?.mutateAsync as
+        | ((payload: { parentPath: string; name: string }) => Promise<unknown>)
+        | undefined;
+    const createFileCall =
+      mockUseCreateFile.mock.results[0]?.value?.mutateAsync as
+        | ((payload: { parentPath: string; name: string }) => Promise<unknown>)
+        | undefined;
+
+    await waitFor(() => {
+      expect(createFolderCall).toBeDefined();
+      expect(createFileCall).toBeDefined();
+    });
+
+    expect(createFolderCall).toHaveBeenCalledWith({
+      parentPath: "",
+      name: "New Folder",
+    });
+    expect(createFileCall).toHaveBeenCalledWith({
+      parentPath: "",
+      name: "New File.txt",
+    });
+
+    promptSpy.mockRestore();
+  });
+
+  it("copies and pastes using context menu", async () => {
+    mockUseFilesDirectory.mockReturnValue(
+      mockDirectory([
+        {
+          name: "FolderToShare",
+          path: "FolderToShare",
+          type: "folder",
+        },
+      ]),
+    );
+
+    render(<FileManager />);
+
+    fireEvent.contextMenu(
+      screen.getByRole("button", { name: /FolderToShare/i }),
+      { clientX: 100, clientY: 100 },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+
+    fireEvent.contextMenu(
+      screen.getByRole("button", { name: /FolderToShare/i }),
+      { clientX: 110, clientY: 110 },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Paste" }));
+
+    const pasteCall = mockUsePasteFileEntry.mock.results[0]?.value?.mutateAsync as
+      | ((payload: {
+          sourcePath: string;
+          destinationPath: string;
+          operation: "copy" | "move";
+        }) => Promise<unknown>)
+      | undefined;
+
+    await waitFor(() => {
+      expect(pasteCall).toBeDefined();
+      expect(pasteCall).toHaveBeenCalledWith({
+        sourcePath: "FolderToShare",
+        destinationPath: "FolderToShare",
+        operation: "copy",
+      });
+    });
+  });
+
+  it("shows Empty Trash in header and deletes all trash entries", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const deleteMutateAsync = vi.fn().mockResolvedValue({
+      deleted: true,
+    });
+    mockUseDeleteFromTrash.mockReturnValue({
+      mutateAsync: deleteMutateAsync,
+      isPending: false,
+    });
+    mockUseFilesDirectory.mockImplementation((pathSegments: string[]) => {
+      if (pathSegments[0] === "Trash") {
+        return mockDirectory([
+          {
+            name: "a.txt",
+            path: "Trash/a.txt",
+            type: "file",
+          },
+          {
+            name: "b.txt",
+            path: "Trash/b.txt",
+            type: "file",
+          },
+        ]);
+      }
+      return mockDirectory([]);
+    });
+
+    render(<FileManager />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Trash" }));
+
+    const emptyTrashButton = await screen.findByRole("button", {
+      name: /empty trash/i,
+    });
+    fireEvent.click(emptyTrashButton);
+
+    await waitFor(() => {
+      expect(deleteMutateAsync).toHaveBeenCalledWith({ path: "Trash/a.txt" });
+      expect(deleteMutateAsync).toHaveBeenCalledWith({ path: "Trash/b.txt" });
+    });
+
+    confirmSpy.mockRestore();
   });
 });

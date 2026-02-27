@@ -5,6 +5,8 @@ import { serverEnv } from "@/lib/server/env";
 import { logServerAction } from "@/lib/server/logging/logger";
 import type { SystemMetricsSnapshot } from "@/lib/shared/contracts/system";
 import os from "node:os";
+import { statfs } from "node:fs/promises";
+import path from "node:path";
 import si from "systeminformation";
 import {
   getNetworkStatusFromHelper,
@@ -19,6 +21,49 @@ const metricsCache = new LruCache<SystemMetricsSnapshot>(
 function clampPercent(value: number) {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(Number(value.toFixed(2)), 100));
+}
+
+function toNumber(value: number | bigint) {
+  if (typeof value === "bigint") {
+    return Number(value);
+  }
+  return value;
+}
+
+async function collectStorageMetrics() {
+  try {
+    const configuredRoot = serverEnv.FILES_ROOT;
+    const targetPath = path.isAbsolute(configuredRoot)
+      ? configuredRoot
+      : path.resolve(process.cwd(), configuredRoot);
+    const filesystemStats = await statfs(targetPath);
+
+    const blockSize = toNumber(filesystemStats.bsize);
+    const totalBlocks = toNumber(filesystemStats.blocks);
+    const availableBlocks = toNumber(filesystemStats.bavail);
+    const totalBytes = Math.max(Math.round(blockSize * totalBlocks), 0);
+    const availableBytes = Math.max(Math.round(blockSize * availableBlocks), 0);
+    const usedBytes = Math.max(totalBytes - availableBytes, 0);
+    const usedPercent = totalBytes > 0 ? (usedBytes / totalBytes) * 100 : 0;
+
+    return {
+      mountPath: targetPath,
+      totalBytes,
+      availableBytes,
+      usedBytes,
+      usedPercent: clampPercent(usedPercent),
+    };
+  } catch (error) {
+    logServerAction({
+      level: "warn",
+      layer: "service",
+      action: "system.metrics.storage",
+      status: "error",
+      message: "Unable to collect storage metrics",
+      error,
+    });
+    return null;
+  }
 }
 
 function toNullableMetric(
@@ -94,6 +139,7 @@ async function collectSnapshot(): Promise<SystemMetricsSnapshot> {
     wifiNetworks,
     networkInterfaces,
     networkStats,
+    storageMetrics,
   ] = await Promise.all([
     withFallback("system.metrics.currentLoad", () => si.currentLoad(), null),
     withFallback(
@@ -114,6 +160,7 @@ async function collectSnapshot(): Promise<SystemMetricsSnapshot> {
       [],
     ),
     withFallback("system.metrics.networkStats", () => si.networkStats(), []),
+    collectStorageMetrics(),
   ]);
 
   const mainTemperature = toNullableMetric(cpuTemperature?.main);
@@ -244,6 +291,7 @@ async function collectSnapshot(): Promise<SystemMetricsSnapshot> {
         maxCapacityWh,
       ),
     },
+    storage: storageMetrics ?? undefined,
     wifi: {
       connected: helperStatus?.connected ?? isWifiConnected,
       iface:

@@ -32,7 +32,7 @@ import {
   TerminalSquare,
   Trash2,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { UninstallAppDialog } from "@/components/desktop/uninstall-app-dialog";
 import { useInstalledApps } from "@/hooks/useInstalledApps";
 import { useStoreActions } from "@/hooks/useStoreActions";
@@ -57,6 +57,15 @@ export type AppActionTarget = {
   appName: string;
   dashboardUrl: string;
   containerName: string;
+};
+
+type InstalledComposeResponse = {
+  data?: {
+    primary?: {
+      ports?: string[];
+      environment?: Record<string, string>;
+    };
+  };
 };
 
 const iconByKeyword: Array<{
@@ -189,6 +198,28 @@ function parsePortFromUrl(value: string): number | null {
   }
 }
 
+function parseDashboardUrlFromComposePrimary(primary: {
+  ports?: string[];
+  environment?: Record<string, string>;
+}): string {
+  const appUrl = primary.environment?.APP_URL;
+  if (typeof appUrl === "string" && appUrl.trim().length > 0) {
+    return toCurrentHostUrl(appUrl.trim());
+  }
+
+  const firstPort = primary.ports
+    ?.map((entry) => parsePortMapping(entry)?.host ?? "")
+    .find((hostPort) => hostPort.trim().length > 0);
+
+  if (!firstPort) {
+    return "";
+  }
+
+  const protocol = typeof window !== "undefined" ? window.location.protocol : "http:";
+  const hostname = typeof window !== "undefined" ? window.location.hostname : "localhost";
+  return `${protocol}//${hostname}:${firstPort}`;
+}
+
 function resolveAppActionTarget(app: AppItem): AppActionTarget {
   const mapped = appConnectionMap[app.id] ?? appConnectionMap[toSlug(app.name)];
 
@@ -215,13 +246,10 @@ function resolveAppActionTarget(app: AppItem): AppActionTarget {
     };
   }
 
-  const protocol = typeof window !== "undefined" ? window.location.protocol : "http:";
-  const hostname = typeof window !== "undefined" ? window.location.hostname : "localhost";
-
   return {
     appId: app.id,
     appName: app.name,
-    dashboardUrl: `${protocol}//${hostname}`,
+    dashboardUrl: "",
     containerName: app.containerName ?? app.id,
   };
 }
@@ -255,6 +283,8 @@ export function AppGrid({
   const [uninstallAppId, setUninstallAppId] = useState<string | null>(null);
   const [uninstallError, setUninstallError] = useState<string | null>(null);
   const [uninstallPending, setUninstallPending] = useState(false);
+  const inferredDashboardUrlByAppIdRef = useRef<Map<string, string>>(new Map());
+  const inferDashboardUrlPromiseByAppIdRef = useRef<Map<string, Promise<string>>>(new Map());
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -352,23 +382,99 @@ export function AppGrid({
     }));
   }
 
-  function openDashboardForApp(app: AppItem) {
-    const target = resolveAppActionTarget(app);
+  async function inferDashboardUrlFromInstalledCompose(appId: string) {
+    const cached = inferredDashboardUrlByAppIdRef.current.get(appId);
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    const inflight = inferDashboardUrlPromiseByAppIdRef.current.get(appId);
+    if (inflight) {
+      return inflight;
+    }
+
+    const pending = (async () => {
+      try {
+        const response = await fetch(
+          `/api/v1/store/apps/${encodeURIComponent(appId)}/compose?source=installed`,
+          { cache: "no-store" },
+        );
+        if (!response.ok) {
+          inferredDashboardUrlByAppIdRef.current.set(appId, "");
+          return "";
+        }
+
+        const json = (await response.json()) as InstalledComposeResponse;
+        const primary = json.data?.primary;
+        if (!primary) {
+          inferredDashboardUrlByAppIdRef.current.set(appId, "");
+          return "";
+        }
+
+        const resolved = parseDashboardUrlFromComposePrimary(primary);
+        inferredDashboardUrlByAppIdRef.current.set(appId, resolved);
+        return resolved;
+      } catch {
+        inferredDashboardUrlByAppIdRef.current.set(appId, "");
+        return "";
+      } finally {
+        inferDashboardUrlPromiseByAppIdRef.current.delete(appId);
+      }
+    })();
+
+    inferDashboardUrlPromiseByAppIdRef.current.set(appId, pending);
+    return pending;
+  }
+
+  async function resolveActionTarget(app: AppItem): Promise<AppActionTarget | null> {
+    const initial = resolveAppActionTarget(app);
+    if (initial.dashboardUrl.trim().length > 0) {
+      return initial;
+    }
+
+    const inferredDashboardUrl = await inferDashboardUrlFromInstalledCompose(app.id);
+    if (inferredDashboardUrl.trim().length === 0) {
+      return null;
+    }
+
+    return {
+      ...initial,
+      dashboardUrl: inferredDashboardUrl,
+    };
+  }
+
+  async function openDashboardForApp(app: AppItem) {
+    const fallbackTarget = resolveAppActionTarget(app);
 
     logClientAction({
       layer: "hook",
       action: "desktop.appGrid.open",
       status: "start",
       meta: {
-        appName: target.appName,
+        appName: fallbackTarget.appName,
       },
     });
 
     try {
+      const resolvedTarget = await resolveActionTarget(app);
+      if (!resolvedTarget) {
+        logClientAction({
+          level: "warn",
+          layer: "hook",
+          action: "desktop.appGrid.open",
+          status: "error",
+          meta: {
+            appName: fallbackTarget.appName,
+          },
+          message: "Dashboard URL unavailable for app",
+        });
+        return;
+      }
+
       if (onOpenDashboard) {
-        onOpenDashboard(target);
+        onOpenDashboard(resolvedTarget);
       } else {
-        window.open(target.dashboardUrl, "_blank", "noopener,noreferrer");
+        window.open(resolvedTarget.dashboardUrl, "_blank", "noopener,noreferrer");
       }
 
       logClientAction({
@@ -376,8 +482,8 @@ export function AppGrid({
         action: "desktop.appGrid.open",
         status: "success",
         meta: {
-          appName: target.appName,
-          dashboardUrl: target.dashboardUrl,
+          appName: resolvedTarget.appName,
+          dashboardUrl: resolvedTarget.dashboardUrl,
         },
       });
     } catch (error) {
@@ -387,7 +493,7 @@ export function AppGrid({
         action: "desktop.appGrid.open",
         status: "error",
         meta: {
-          appName: target.appName,
+          appName: fallbackTarget.appName,
         },
         error,
       });
@@ -408,7 +514,7 @@ export function AppGrid({
       | "remove",
   ) {
     if (!menuApp) return;
-    const target = resolveAppActionTarget(menuApp);
+    const baseTarget = resolveAppActionTarget(menuApp);
 
     logClientAction({
       layer: "hook",
@@ -416,13 +522,13 @@ export function AppGrid({
       status: "start",
       meta: {
         action,
-        appName: target.appName,
+        appName: baseTarget.appName,
       },
     });
 
     try {
       if (action === "open") {
-        openDashboardForApp(menuApp);
+        await openDashboardForApp(menuApp);
       } else if (action === "start") {
         updateAppStatus(menuApp.id, "running");
       } else if (action === "stop") {
@@ -433,16 +539,22 @@ export function AppGrid({
           updateAppStatus(menuApp.id, "running");
         }, 1200);
       } else if (action === "logs") {
-        onViewLogs?.(target);
+        onViewLogs?.(baseTarget);
       } else if (action === "terminal") {
-        onOpenTerminal?.(target);
+        onOpenTerminal?.(baseTarget);
       } else if (action === "settings") {
-        onOpenSettings?.(target);
+        onOpenSettings?.(baseTarget);
       } else if (action === "copy-url") {
+        const resolvedTarget = await resolveActionTarget(menuApp);
+        if (!resolvedTarget) {
+          closeContextMenu();
+          return;
+        }
+
         if (onCopyUrl) {
-          onCopyUrl(target);
+          onCopyUrl(resolvedTarget);
         } else if (navigator.clipboard?.writeText) {
-          await navigator.clipboard.writeText(target.dashboardUrl);
+          await navigator.clipboard.writeText(resolvedTarget.dashboardUrl);
         }
       } else if (action === "remove") {
         setUninstallError(null);
@@ -455,7 +567,7 @@ export function AppGrid({
         status: "success",
         meta: {
           action,
-          appName: target.appName,
+          appName: baseTarget.appName,
         },
       });
     } catch (error) {
@@ -466,7 +578,7 @@ export function AppGrid({
         status: "error",
         meta: {
           action,
-          appName: target.appName,
+          appName: baseTarget.appName,
         },
         error,
       });
@@ -528,7 +640,7 @@ export function AppGrid({
           {filtered.map((app) => (
             <button
               key={app.id}
-              onClick={() => openDashboardForApp(app)}
+              onClick={() => void openDashboardForApp(app)}
               onContextMenu={(e) => openContextMenu(e, app)}
               className={`group flex flex-col items-center gap-2 p-2 rounded-xl cursor-pointer ${
                 activeAppId === app.id

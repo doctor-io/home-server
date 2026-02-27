@@ -21,6 +21,8 @@ export type AppComposeResponse = {
   primaryServiceName: string;
 };
 
+const APP_COMPOSE_REQUEST_TIMEOUT_MS = 10_000;
+
 /**
  * Fetch and parse the docker-compose.yml for an app from its GitHub repository.
  * Used to pre-fill the app settings dialog with default values.
@@ -35,9 +37,27 @@ export function useAppCompose(
     queryFn: async () => {
       if (!appId) throw new Error("App ID is required");
 
-      const response = await fetch(
-        `/api/v1/store/apps/${appId}/compose?source=${encodeURIComponent(source)}`,
-      );
+      const controller = new AbortController();
+      const timeout = setTimeout(() => {
+        controller.abort();
+      }, APP_COMPOSE_REQUEST_TIMEOUT_MS);
+
+      let response: Response;
+      try {
+        response = await fetch(
+          `/api/v1/store/apps/${appId}/compose?source=${encodeURIComponent(source)}`,
+          {
+            signal: controller.signal,
+          },
+        );
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") {
+          throw new Error("Failed to fetch compose file (request timeout)");
+        }
+        throw error;
+      } finally {
+        clearTimeout(timeout);
+      }
 
       if (!response.ok) {
         const payload = await response.json().catch(() => null) as
