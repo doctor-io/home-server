@@ -84,6 +84,30 @@ hash_file() {
 	sha256sum "${file}" | awk '{print $1}'
 }
 
+resolve_env_file() {
+	# If caller explicitly set HOMEIO_ENV_FILE, respect it strictly.
+	if [[ -n "${HOMEIO_ENV_FILE:-}" ]]; then
+		[[ -f "${ENV_FILE}" ]] || { print_error "Environment file not found: ${ENV_FILE}"; exit 1; }
+		return
+	fi
+
+	# Default path first.
+	if [[ -f "${ENV_FILE}" ]]; then
+		return
+	fi
+
+	# Backward-compatible fallback with install.sh default.
+	local install_env_file="${INSTALL_DIR}/.env"
+	if [[ -f "${install_env_file}" ]]; then
+		print_warn "Environment file not found at ${ENV_FILE}. Falling back to ${install_env_file}."
+		ENV_FILE="${install_env_file}"
+		return
+	fi
+
+	print_error "Environment file not found. Checked: ${ENV_FILE} and ${install_env_file}"
+	exit 1
+}
+
 check_prerequisites() {
 	print_status "Checking prerequisites..."
 	command_exists systemctl || { print_error "systemd is required but systemctl is not available."; exit 1; }
@@ -92,7 +116,7 @@ check_prerequisites() {
 	command_exists npm || { print_error "npm is required."; exit 1; }
 
 	[[ -d "${INSTALL_DIR}" ]] || { print_error "Install directory not found: ${INSTALL_DIR}"; exit 1; }
-	[[ -f "${ENV_FILE}" ]] || { print_error "Environment file not found: ${ENV_FILE}"; exit 1; }
+	resolve_env_file
 	id -u "${APP_USER}" >/dev/null 2>&1 || { print_error "App user not found: ${APP_USER}"; exit 1; }
 }
 
