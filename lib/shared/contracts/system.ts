@@ -37,6 +37,37 @@ export type StorageMetrics = {
   availableBytes: number;
   usedBytes: number;
   usedPercent: number;
+  volumes?: StorageVolumeMetrics[];
+  raid?: RaidMetrics | null;
+  smart?: SmartHealthMetrics | null;
+};
+
+export type StorageVolumeMetrics = {
+  id: string;
+  label: string;
+  mountPath: string;
+  device: string;
+  filesystem: string | null;
+  mediaType: string | null;
+  totalBytes: number;
+  usedBytes: number;
+  usedPercent: number;
+};
+
+export type RaidMetrics = {
+  name: string;
+  type: string;
+  totalBytes: number | null;
+  redundancy: string | null;
+  status: "healthy" | "degraded" | "unknown";
+};
+
+export type SmartHealthMetrics = {
+  status: "healthy" | "degraded" | "unknown";
+  healthyDisks: number;
+  failingDisks: number;
+  checkedAt: string;
+  message: string;
 };
 
 export type WifiAccessPoint = {

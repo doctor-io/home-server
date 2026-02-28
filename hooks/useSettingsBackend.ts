@@ -254,6 +254,16 @@ export function useSettingsBackend() {
 
   const storage = useMemo(() => {
     const rootStorage = systemMetricsQuery.data?.storage;
+    const disks = (rootStorage?.volumes ?? []).map((volume) => ({
+      id: volume.id,
+      label: volume.label,
+      mountPath: volume.mountPath,
+      totalBytes: volume.totalBytes,
+      usedBytes: volume.usedBytes,
+      usedPercent: volume.usedPercent,
+      mediaType: volume.mediaType,
+      filesystem: volume.filesystem,
+    }));
     const localFolderShares = localFolderSharesQuery.data ?? [];
     const networkShares = networkSharesQuery.data ?? [];
     const shares = [
@@ -305,6 +315,9 @@ export function useSettingsBackend() {
       shares,
       localShareCount: localFolderShares.length,
       networkShareCount: networkShares.length,
+      disks,
+      raid: rootStorage?.raid ?? null,
+      smart: rootStorage?.smart ?? null,
       isLoading:
         systemMetricsQuery.isLoading ||
         localFolderSharesQuery.isLoading ||

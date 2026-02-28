@@ -3,7 +3,7 @@ import "server-only";
 import { LruCache } from "@/lib/server/cache/lru";
 import { serverEnv } from "@/lib/server/env";
 import { logServerAction } from "@/lib/server/logging/logger";
-import type { SystemMetricsSnapshot } from "@/lib/shared/contracts/system";
+import type { StorageMetrics, SystemMetricsSnapshot } from "@/lib/shared/contracts/system";
 import os from "node:os";
 import { statfs } from "node:fs/promises";
 import path from "node:path";
@@ -20,10 +20,19 @@ const metricsCache = new LruCache<SystemMetricsSnapshot>(
 const HELPER_STATUS_CACHE_TTL_MS = 10_000;
 const HELPER_STATUS_UNAVAILABLE_BACKOFF_MS = 15_000;
 const HELPER_STATUS_ERROR_LOG_COOLDOWN_MS = 30_000;
+const STORAGE_DETAILS_CACHE_TTL_MS = 60_000;
+
+type CachedStorageDetails = Pick<StorageMetrics, "volumes" | "raid" | "smart">;
 
 let helperStatusCache:
   | {
       value: Awaited<ReturnType<typeof getNetworkStatusFromHelper>>;
+      expiresAt: number;
+    }
+  | null = null;
+let storageDetailsCache:
+  | {
+      value: CachedStorageDetails;
       expiresAt: number;
     }
   | null = null;
@@ -42,6 +51,216 @@ function toNumber(value: number | bigint) {
   return value;
 }
 
+function toFiniteNumber(value: unknown) {
+  if (typeof value !== "number" || Number.isNaN(value) || !Number.isFinite(value)) {
+    return null;
+  }
+  return value;
+}
+
+function baseDeviceFromPartition(device: string) {
+  return device.replace(/p?\d+$/, "");
+}
+
+function deriveVolumeLabel(input: {
+  device: string;
+  mountPath: string;
+  mediaType: string | null;
+}) {
+  const mountName =
+    input.mountPath === "/"
+      ? "System"
+      : input.mountPath.startsWith("/DATA")
+        ? "Data"
+        : path.basename(input.mountPath) || "Volume";
+  const mediaSuffix = input.mediaType ? ` (${input.mediaType})` : "";
+  return `${input.device} - ${mountName}${mediaSuffix}`;
+}
+
+function inferRaidFromVolumes(
+  volumes: NonNullable<StorageMetrics["volumes"]>,
+): StorageMetrics["raid"] {
+  const zfsVolumes = volumes.filter((volume) =>
+    volume.filesystem?.toLowerCase().includes("zfs"),
+  );
+  if (zfsVolumes.length > 0) {
+    return {
+      name: "zpool",
+      type: "ZFS",
+      totalBytes: zfsVolumes.reduce((sum, volume) => sum + volume.totalBytes, 0),
+      redundancy: "Managed by ZFS",
+      status: "healthy",
+    };
+  }
+
+  const mdVolumes = volumes.filter((volume) => volume.device.startsWith("/dev/md"));
+  if (mdVolumes.length > 0) {
+    return {
+      name: path.basename(mdVolumes[0].device),
+      type: "Linux RAID",
+      totalBytes: mdVolumes.reduce((sum, volume) => sum + volume.totalBytes, 0),
+      redundancy: "Managed by mdadm",
+      status: "healthy",
+    };
+  }
+
+  return null;
+}
+
+function summarizeSmartHealth(
+  diskLayout: Awaited<ReturnType<typeof si.diskLayout>>,
+): StorageMetrics["smart"] {
+  if (diskLayout.length === 0) {
+    return null;
+  }
+
+  let healthyDisks = 0;
+  let failingDisks = 0;
+
+  for (const disk of diskLayout) {
+    const smartStatus =
+      typeof disk.smartStatus === "string"
+        ? disk.smartStatus.trim().toLowerCase()
+        : "";
+
+    if (
+      smartStatus.includes("fail") ||
+      smartStatus.includes("error") ||
+      smartStatus.includes("pred") ||
+      smartStatus.includes("bad")
+    ) {
+      failingDisks += 1;
+      continue;
+    }
+
+    if (
+      smartStatus.includes("ok") ||
+      smartStatus.includes("good") ||
+      smartStatus.includes("pass")
+    ) {
+      healthyDisks += 1;
+    }
+  }
+
+  const status =
+    failingDisks > 0 ? "degraded" : healthyDisks > 0 ? "healthy" : "unknown";
+
+  const message =
+    status === "degraded"
+      ? `${failingDisks} drive(s) reported potential SMART issues.`
+      : status === "healthy"
+        ? `All ${healthyDisks} SMART-capable drive(s) report healthy status.`
+        : "SMART status unavailable for detected drives.";
+
+  return {
+    status,
+    healthyDisks,
+    failingDisks,
+    checkedAt: new Date().toISOString(),
+    message,
+  };
+}
+
+function readStorageDetailsCache() {
+  if (!storageDetailsCache) return null;
+  if (storageDetailsCache.expiresAt <= Date.now()) {
+    storageDetailsCache = null;
+    return null;
+  }
+  return storageDetailsCache.value;
+}
+
+async function collectStorageDetailMetrics(): Promise<CachedStorageDetails> {
+  const cached = readStorageDetailsCache();
+  if (cached) {
+    return cached;
+  }
+
+  const [fsSizes, diskLayout] = await Promise.all([
+    withFallback("system.metrics.storage.fsSize", () => si.fsSize(), []),
+    withFallback("system.metrics.storage.diskLayout", () => si.diskLayout(), []),
+  ]);
+
+  const mediaTypeByDevice = new Map<string, string>();
+  for (const disk of diskLayout) {
+    if (typeof disk.device !== "string" || disk.device.trim().length === 0) continue;
+    const mediaType =
+      typeof disk.type === "string" && disk.type.trim().length > 0
+        ? disk.type.trim().toUpperCase()
+        : null;
+    if (!mediaType) continue;
+    mediaTypeByDevice.set(baseDeviceFromPartition(disk.device), mediaType);
+  }
+
+  const volumes = fsSizes
+    .map((fsSize) => {
+      const totalBytesRaw = toFiniteNumber(fsSize.size);
+      if (totalBytesRaw === null || totalBytesRaw <= 0) {
+        return null;
+      }
+
+      const totalBytes = Math.max(Math.round(totalBytesRaw), 0);
+      const usedBytesRaw = toFiniteNumber(fsSize.used);
+      const usedPercentRaw = toFiniteNumber(fsSize.use);
+      const inferredUsedBytes =
+        usedPercentRaw !== null
+          ? Math.round((totalBytes * clampPercent(usedPercentRaw)) / 100)
+          : 0;
+      const usedBytes =
+        usedBytesRaw !== null
+          ? Math.max(Math.round(usedBytesRaw), 0)
+          : Math.max(inferredUsedBytes, 0);
+      const usedPercent =
+        usedPercentRaw !== null
+          ? clampPercent(usedPercentRaw)
+          : totalBytes > 0
+            ? clampPercent((usedBytes / totalBytes) * 100)
+            : 0;
+
+      const mountPath =
+        typeof fsSize.mount === "string" && fsSize.mount.trim().length > 0
+          ? fsSize.mount
+          : "/";
+      const device =
+        typeof fsSize.fs === "string" && fsSize.fs.trim().length > 0
+          ? fsSize.fs
+          : mountPath;
+      const mediaType = mediaTypeByDevice.get(baseDeviceFromPartition(device)) ?? null;
+      const filesystem =
+        typeof fsSize.type === "string" && fsSize.type.trim().length > 0
+          ? fsSize.type.trim()
+          : null;
+
+      return {
+        id: `${device}:${mountPath}`,
+        label: deriveVolumeLabel({ device, mountPath, mediaType }),
+        mountPath,
+        device,
+        filesystem,
+        mediaType,
+        totalBytes,
+        usedBytes: Math.min(usedBytes, totalBytes),
+        usedPercent,
+      };
+    })
+    .filter((volume): volume is NonNullable<typeof volume> => volume !== null)
+    .sort((left, right) => right.usedBytes - left.usedBytes)
+    .slice(0, 8);
+
+  const details: CachedStorageDetails = {
+    volumes,
+    raid: inferRaidFromVolumes(volumes),
+    smart: summarizeSmartHealth(diskLayout),
+  };
+
+  storageDetailsCache = {
+    value: details,
+    expiresAt: Date.now() + STORAGE_DETAILS_CACHE_TTL_MS,
+  };
+
+  return details;
+}
+
 async function collectStorageMetrics() {
   try {
     const configuredRoot = serverEnv.FILES_ROOT;
@@ -57,6 +276,7 @@ async function collectStorageMetrics() {
     const availableBytes = Math.max(Math.round(blockSize * availableBlocks), 0);
     const usedBytes = Math.max(totalBytes - availableBytes, 0);
     const usedPercent = totalBytes > 0 ? (usedBytes / totalBytes) * 100 : 0;
+    const details = await collectStorageDetailMetrics();
 
     return {
       mountPath: targetPath,
@@ -64,6 +284,7 @@ async function collectStorageMetrics() {
       availableBytes,
       usedBytes,
       usedPercent: clampPercent(usedPercent),
+      ...details,
     };
   } catch (error) {
     logServerAction({

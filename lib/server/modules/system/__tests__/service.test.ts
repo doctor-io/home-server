@@ -75,6 +75,23 @@ vi.mock("systeminformation", () => ({
         ms: 1000,
       },
     ]),
+    fsSize: vi.fn(async () => [
+      {
+        fs: "/dev/sda1",
+        type: "ext4",
+        size: 500 * 1024 * 1024 * 1024,
+        used: 120 * 1024 * 1024 * 1024,
+        use: 24,
+        mount: "/",
+      },
+    ]),
+    diskLayout: vi.fn(async () => [
+      {
+        device: "/dev/sda",
+        type: "SSD",
+        smartStatus: "Ok",
+      },
+    ]),
   },
 }));
 
