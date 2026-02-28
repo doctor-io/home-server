@@ -1,5 +1,10 @@
 "use client";
 
+import { UninstallAppDialog } from "@/components/desktop/uninstall-app-dialog";
+import { useInstalledApps } from "@/hooks/useInstalledApps";
+import { useStoreActions } from "@/hooks/useStoreActions";
+import { useStoreCatalog } from "@/hooks/useStoreCatalog";
+import { logClientAction } from "@/lib/client/logger";
 import {
   BarChart3,
   BookOpen,
@@ -33,11 +38,6 @@ import {
   Trash2,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { UninstallAppDialog } from "@/components/desktop/uninstall-app-dialog";
-import { useInstalledApps } from "@/hooks/useInstalledApps";
-import { useStoreActions } from "@/hooks/useStoreActions";
-import { useStoreCatalog } from "@/hooks/useStoreCatalog";
-import { logClientAction } from "@/lib/client/logger";
 
 type AppItem = {
   id: string;
@@ -76,13 +76,29 @@ const iconByKeyword: Array<{
   { keywords: ["plex", "jellyfin"], icon: Film, category: "Media" },
   { keywords: ["nextcloud", "cloud"], icon: Cloud, category: "Productivity" },
   { keywords: ["pihole", "pi-hole"], icon: Shield, category: "Network" },
-  { keywords: ["home assistant", "home-asst"], icon: Home, category: "Automation" },
+  {
+    keywords: ["home assistant", "home-asst"],
+    icon: Home,
+    category: "Automation",
+  },
   { keywords: ["portainer", "docker"], icon: Container, category: "System" },
   { keywords: ["grafana"], icon: BarChart3, category: "System" },
   { keywords: ["proxy", "nginx"], icon: Globe, category: "Network" },
-  { keywords: ["vaultwarden", "auth", "2fauth"], icon: Lock, category: "Security" },
-  { keywords: ["qbittorrent", "torrent"], icon: Download, category: "Downloads" },
-  { keywords: ["postgres", "mysql", "database"], icon: Database, category: "System" },
+  {
+    keywords: ["vaultwarden", "auth", "2fauth"],
+    icon: Lock,
+    category: "Security",
+  },
+  {
+    keywords: ["qbittorrent", "torrent"],
+    icon: Download,
+    category: "Downloads",
+  },
+  {
+    keywords: ["postgres", "mysql", "database"],
+    icon: Database,
+    category: "System",
+  },
   { keywords: ["music", "audio"], icon: Music, category: "Media" },
   { keywords: ["gitea", "git"], icon: Code, category: "Development" },
   { keywords: ["immich", "photo"], icon: Camera, category: "Media" },
@@ -90,7 +106,11 @@ const iconByKeyword: Array<{
   { keywords: ["file"], icon: FolderOpen, category: "Productivity" },
   { keywords: ["uptime", "kuma"], icon: Server, category: "System" },
   { keywords: ["mail"], icon: Mail, category: "Communication" },
-  { keywords: ["matrix", "chat"], icon: MessageSquare, category: "Communication" },
+  {
+    keywords: ["matrix", "chat"],
+    icon: MessageSquare,
+    category: "Communication",
+  },
   { keywords: ["rss"], icon: Rss, category: "Productivity" },
   { keywords: ["minecraft", "game"], icon: Gamepad2, category: "Gaming" },
 ];
@@ -114,32 +134,92 @@ const appConnectionMap: Record<
   }
 > = {
   plex: { dashboardUrl: "http://localhost:32400/web", containerName: "plex" },
-  nextcloud: { dashboardUrl: "http://localhost:8080", containerName: "nextcloud" },
-  "pi-hole": { dashboardUrl: "http://localhost:8053/admin", containerName: "pihole" },
-  pihole: { dashboardUrl: "http://localhost:8053/admin", containerName: "pihole" },
-  "home-asst": { dashboardUrl: "http://localhost:8123", containerName: "home-assistant" },
-  "home-assistant": { dashboardUrl: "http://localhost:8123", containerName: "home-assistant" },
-  portainer: { dashboardUrl: "http://localhost:9443", containerName: "portainer" },
+  nextcloud: {
+    dashboardUrl: "http://localhost:8080",
+    containerName: "nextcloud",
+  },
+  "pi-hole": {
+    dashboardUrl: "http://localhost:8053/admin",
+    containerName: "pihole",
+  },
+  pihole: {
+    dashboardUrl: "http://localhost:8053/admin",
+    containerName: "pihole",
+  },
+  "home-asst": {
+    dashboardUrl: "http://localhost:8123",
+    containerName: "home-assistant",
+  },
+  "home-assistant": {
+    dashboardUrl: "http://localhost:8123",
+    containerName: "home-assistant",
+  },
+  portainer: {
+    dashboardUrl: "http://localhost:9443",
+    containerName: "portainer",
+  },
   grafana: { dashboardUrl: "http://localhost:3000", containerName: "grafana" },
-  "nginx-proxy": { dashboardUrl: "http://localhost:81", containerName: "nginx-proxy" },
-  vaultwarden: { dashboardUrl: "http://localhost:8222", containerName: "vaultwarden" },
-  qbittorrent: { dashboardUrl: "http://localhost:8081", containerName: "qbittorrent" },
-  postgresql: { dashboardUrl: "http://localhost:5432", containerName: "postgres" },
-  postgres: { dashboardUrl: "http://localhost:5432", containerName: "postgres" },
-  jellyfin: { dashboardUrl: "http://localhost:8096", containerName: "jellyfin" },
+  "nginx-proxy": {
+    dashboardUrl: "http://localhost:81",
+    containerName: "nginx-proxy",
+  },
+  vaultwarden: {
+    dashboardUrl: "http://localhost:8222",
+    containerName: "vaultwarden",
+  },
+  qbittorrent: {
+    dashboardUrl: "http://localhost:8081",
+    containerName: "qbittorrent",
+  },
+  postgresql: {
+    dashboardUrl: "http://localhost:5432",
+    containerName: "postgres",
+  },
+  postgres: {
+    dashboardUrl: "http://localhost:5432",
+    containerName: "postgres",
+  },
+  jellyfin: {
+    dashboardUrl: "http://localhost:8096",
+    containerName: "jellyfin",
+  },
   gitea: { dashboardUrl: "http://localhost:3001", containerName: "gitea" },
-  immich: { dashboardUrl: "http://localhost:2283", containerName: "immich-server" },
-  bookstack: { dashboardUrl: "http://localhost:6875", containerName: "bookstack" },
-  "file-browser": { dashboardUrl: "http://localhost:8082", containerName: "filebrowser" },
-  "uptime-kuma": { dashboardUrl: "http://localhost:3002", containerName: "uptime-kuma" },
+  immich: {
+    dashboardUrl: "http://localhost:2283",
+    containerName: "immich-server",
+  },
+  bookstack: {
+    dashboardUrl: "http://localhost:6875",
+    containerName: "bookstack",
+  },
+  "file-browser": {
+    dashboardUrl: "http://localhost:8082",
+    containerName: "filebrowser",
+  },
+  "uptime-kuma": {
+    dashboardUrl: "http://localhost:3002",
+    containerName: "uptime-kuma",
+  },
   mailcow: { dashboardUrl: "http://localhost:8090", containerName: "mailcow" },
-  matrix: { dashboardUrl: "http://localhost:8008", containerName: "matrix-synapse" },
-  freshrss: { dashboardUrl: "http://localhost:8083", containerName: "freshrss" },
-  minecraft: { dashboardUrl: "http://localhost:25565", containerName: "minecraft" },
+  matrix: {
+    dashboardUrl: "http://localhost:8008",
+    containerName: "matrix-synapse",
+  },
+  freshrss: {
+    dashboardUrl: "http://localhost:8083",
+    containerName: "freshrss",
+  },
+  minecraft: {
+    dashboardUrl: "http://localhost:25565",
+    containerName: "minecraft",
+  },
 };
 
 function toSlug(value: string) {
-  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-");
 }
 
 function hashText(value: string) {
@@ -154,8 +234,9 @@ function hashText(value: string) {
 function pickVisual(appName: string, appId: string) {
   const name = appName.toLowerCase();
   const matched =
-    iconByKeyword.find((entry) => entry.keywords.some((keyword) => name.includes(keyword))) ??
-    null;
+    iconByKeyword.find((entry) =>
+      entry.keywords.some((keyword) => name.includes(keyword)),
+    ) ?? null;
   const palette = visualPalette[hashText(appId) % visualPalette.length];
 
   return {
@@ -179,8 +260,14 @@ function extractUrlPath(value: string) {
 function toCurrentHostUrl(value: string) {
   try {
     const parsed = new URL(value);
-    const protocol = typeof window !== "undefined" ? window.location.protocol : parsed.protocol;
-    const hostname = typeof window !== "undefined" ? window.location.hostname : parsed.hostname;
+    const protocol =
+      typeof window !== "undefined"
+        ? window.location.protocol
+        : parsed.protocol;
+    const hostname =
+      typeof window !== "undefined"
+        ? window.location.hostname
+        : parsed.hostname;
     return `${protocol}//${hostname}${parsed.port ? `:${parsed.port}` : ""}${parsed.pathname}${parsed.search}${parsed.hash}`;
   } catch {
     return value;
@@ -206,9 +293,8 @@ function parseHostPortFromMapping(value: string): number | null {
   const segments = mappingPart.split(":").filter(Boolean);
   if (segments.length === 0) return null;
 
-  const hostSegment = segments.length >= 2
-    ? segments[segments.length - 2]
-    : segments[0];
+  const hostSegment =
+    segments.length >= 2 ? segments[segments.length - 2] : segments[0];
   const port = Number.parseInt(hostSegment ?? "", 10);
   return Number.isInteger(port) ? port : null;
 }
@@ -230,8 +316,10 @@ function parseDashboardUrlFromComposePrimary(primary: {
     return "";
   }
 
-  const protocol = typeof window !== "undefined" ? window.location.protocol : "http:";
-  const hostname = typeof window !== "undefined" ? window.location.hostname : "localhost";
+  const protocol =
+    typeof window !== "undefined" ? window.location.protocol : "http:";
+  const hostname =
+    typeof window !== "undefined" ? window.location.hostname : "localhost";
   return `${protocol}//${hostname}:${firstPort}`;
 }
 
@@ -241,8 +329,10 @@ function resolveAppActionTarget(app: AppItem): AppActionTarget {
   const fallbackContainerName = app.containerName?.trim() ?? "";
 
   if (app.webUiPort !== null) {
-    const protocol = typeof window !== "undefined" ? window.location.protocol : "http:";
-    const hostname = typeof window !== "undefined" ? window.location.hostname : "localhost";
+    const protocol =
+      typeof window !== "undefined" ? window.location.protocol : "http:";
+    const hostname =
+      typeof window !== "undefined" ? window.location.hostname : "localhost";
 
     return {
       appId: app.id,
@@ -301,7 +391,9 @@ export function AppGrid({
     restartApp,
     checkAppUpdates,
   } = useStoreActions();
-  const [statusByAppId, setStatusByAppId] = useState<Record<string, AppItem["status"]>>({});
+  const [statusByAppId, setStatusByAppId] = useState<
+    Record<string, AppItem["status"]>
+  >({});
   const [activeAppId, setActiveAppId] = useState<string | null>(null);
   const [uninstallAppId, setUninstallAppId] = useState<string | null>(null);
   const [uninstallError, setUninstallError] = useState<string | null>(null);
@@ -318,19 +410,27 @@ export function AppGrid({
     const installedCatalog = installedCatalogQuery.data ?? [];
     const installedById = new Map(installedApps.map((app) => [app.id, app]));
     const catalogById = new Map(installedCatalog.map((app) => [app.id, app]));
-    const ids = Array.from(new Set([...installedById.keys(), ...catalogById.keys()]));
+    const ids = Array.from(
+      new Set([...installedById.keys(), ...catalogById.keys()]),
+    );
 
     return ids
       .map((appId) => {
         const installed = installedById.get(appId);
         const catalog = catalogById.get(appId);
         const name = catalog?.name ?? installed?.name ?? appId;
-        const mapped = appConnectionMap[appId] ?? appConnectionMap[toSlug(name)];
-        const fallbackPort = mapped ? parsePortFromUrl(mapped.dashboardUrl) : null;
+        const mapped =
+          appConnectionMap[appId] ?? appConnectionMap[toSlug(name)];
+        const fallbackPort = mapped
+          ? parsePortFromUrl(mapped.dashboardUrl)
+          : null;
         const visual = pickVisual(name, appId);
 
         let derivedStatus: AppItem["status"] = "stopped";
-        if (catalog?.status === "installing" || catalog?.status === "updating") {
+        if (
+          catalog?.status === "installing" ||
+          catalog?.status === "updating"
+        ) {
           derivedStatus = "updating";
         } else if (installed?.status === "running") {
           derivedStatus = "running";
@@ -340,7 +440,8 @@ export function AppGrid({
         const operationState = operationsByApp[appId];
         if (
           operationState &&
-          (operationState.status === "queued" || operationState.status === "running")
+          (operationState.status === "queued" ||
+            operationState.status === "running")
         ) {
           derivedStatus = "updating";
         }
@@ -363,10 +464,17 @@ export function AppGrid({
         } satisfies AppItem;
       })
       .sort((left, right) => left.name.localeCompare(right.name));
-  }, [installedAppsQuery.data, installedCatalogQuery.data, operationsByApp, statusByAppId]);
+  }, [
+    installedAppsQuery.data,
+    installedCatalogQuery.data,
+    operationsByApp,
+    statusByAppId,
+  ]);
 
-  const isAppsLoading = installedAppsQuery.isLoading || installedCatalogQuery.isLoading;
-  const isAppsError = installedAppsQuery.isError && installedCatalogQuery.isError;
+  const isAppsLoading =
+    installedAppsQuery.isLoading || installedCatalogQuery.isLoading;
+  const isAppsError =
+    installedAppsQuery.isError && installedCatalogQuery.isError;
 
   const filtered = apps;
   const iconContainerClass =
@@ -391,7 +499,7 @@ export function AppGrid({
   const menuOperation = menuApp ? operationsByApp[menuApp.id] : undefined;
   const isMenuAppBusy = Boolean(
     menuOperation &&
-      (menuOperation.status === "queued" || menuOperation.status === "running"),
+    (menuOperation.status === "queued" || menuOperation.status === "running"),
   );
 
   function closeContextMenu() {
@@ -488,7 +596,11 @@ export function AppGrid({
     };
 
     if (requireDashboardUrl && target.dashboardUrl.trim().length === 0) {
-      return shouldForceLookup ? null : fallback.dashboardUrl.trim().length > 0 ? fallback : null;
+      return shouldForceLookup
+        ? null
+        : fallback.dashboardUrl.trim().length > 0
+          ? fallback
+          : null;
     }
 
     if (requireContainerName && target.containerName.trim().length === 0) {
@@ -531,7 +643,11 @@ export function AppGrid({
       if (onOpenDashboard) {
         onOpenDashboard(resolvedTarget);
       } else {
-        window.open(resolvedTarget.dashboardUrl, "_blank", "noopener,noreferrer");
+        window.open(
+          resolvedTarget.dashboardUrl,
+          "_blank",
+          "noopener,noreferrer",
+        );
       }
 
       logClientAction({
@@ -693,7 +809,9 @@ export function AppGrid({
       });
       setUninstallAppId(null);
     } catch (error) {
-      setUninstallError(error instanceof Error ? error.message : "Unable to start uninstall.");
+      setUninstallError(
+        error instanceof Error ? error.message : "Unable to start uninstall.",
+      );
     } finally {
       setUninstallPending(false);
     }
@@ -723,11 +841,17 @@ export function AppGrid({
 
       {/* App icon grid - like a real desktop */}
       {isAppsLoading && filtered.length === 0 ? (
-        <div className="mt-24 text-xs text-muted-foreground">Loading apps...</div>
+        <div className="mt-24 text-xs text-muted-foreground">
+          Loading apps...
+        </div>
       ) : isAppsError && filtered.length === 0 ? (
-        <div className="mt-24 text-xs text-status-red">Unable to load apps.</div>
+        <div className="mt-24 text-xs text-status-red">
+          Unable to load apps.
+        </div>
       ) : filtered.length === 0 ? (
-        <div className="mt-24 text-xs text-muted-foreground">No apps found.</div>
+        <div className="mt-24 text-xs text-muted-foreground">
+          No apps found.
+        </div>
       ) : (
         <div className="mt-24 grid justify-center gap-x-2 gap-y-5 grid-cols-[repeat(4,minmax(0,5.5rem))] sm:grid-cols-[repeat(5,minmax(0,5.5rem))] md:grid-cols-[repeat(6,minmax(0,5.5rem))] lg:grid-cols-[repeat(8,minmax(0,5.5rem))] xl:grid-cols-[repeat(10,minmax(0,5.5rem))]">
           {filtered.map((app) => (
@@ -768,7 +892,9 @@ export function AppGrid({
                         loading="lazy"
                         decoding="async"
                         onLoad={() => {
-                          setLoadedImages((prev) => new Set(prev).add(app.logoUrl!));
+                          setLoadedImages((prev) =>
+                            new Set(prev).add(app.logoUrl!),
+                          );
                         }}
                         onError={(e) => {
                           const img = e.currentTarget;
@@ -777,14 +903,19 @@ export function AppGrid({
                             img.style.display = "none";
                             container.classList.remove("bg-white/90");
                             container.classList.add(app.bgColor, app.color);
-                            const fallback = container.querySelector("[data-fallback-icon]");
+                            const fallback = container.querySelector(
+                              "[data-fallback-icon]",
+                            );
                             if (fallback instanceof HTMLElement) {
                               fallback.style.display = "block";
                             }
                           }
                         }}
                       />
-                      <app.icon className={`${iconGlyphClass} hidden`} data-fallback-icon />
+                      <app.icon
+                        className={`${iconGlyphClass} hidden`}
+                        data-fallback-icon
+                      />
                     </>
                   ) : (
                     <app.icon className={iconGlyphClass} />

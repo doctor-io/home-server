@@ -7,8 +7,8 @@ import {
   toFilePath,
   useCreateFile,
   useCreateFolder,
-  useFileEntryInfo,
   useFileContent,
+  useFileEntryInfo,
   useFilesDirectory,
   useFilesRoot,
   usePasteFileEntry,
@@ -24,8 +24,8 @@ import {
 import { useNetworkShares } from "@/hooks/useNetworkShares";
 import { useSystemMetrics } from "@/hooks/useSystemMetrics";
 import {
-  useEmptyTrash,
   useDeleteFromTrash,
+  useEmptyTrash,
   useMoveToTrash,
   useRestoreFromTrash,
 } from "@/hooks/useTrashActions";
@@ -380,6 +380,11 @@ type ClipboardState = {
   operation: "copy" | "move";
   name: string;
 };
+type CreateEntryDialogState = {
+  kind: "file" | "folder";
+  name: string;
+  error: string | null;
+};
 
 export function FileManager() {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -404,6 +409,8 @@ export function FileManager() {
   );
   const [isEmptyingTrash, setIsEmptyingTrash] = useState(false);
   const [includeHidden, setIncludeHidden] = useState(false);
+  const [createEntryDialog, setCreateEntryDialog] =
+    useState<CreateEntryDialogState | null>(null);
 
   const filesRootQuery = useFilesRoot();
   const directoryQuery = useFilesDirectory(currentPath, includeHidden);
@@ -493,27 +500,24 @@ export function FileManager() {
   );
   const filesRootPath = filesRootQuery.data?.rootPath ?? "";
   const rootLabel = filesRootPath.length > 0 ? filesRootPath : "/DATA";
-  const localSharesByPath = useMemo(
-    () => {
-      const map = new Map<
-        string,
-        {
-          id: string;
-          shareName: string;
-          sourcePath: string;
-          sharedPath: string;
-          isMounted: boolean;
-          isExported: boolean;
-        }
-      >();
-      for (const share of localSharesQuery.data ?? []) {
-        map.set(share.sourcePath, share);
-        map.set(share.sharedPath, share);
+  const localSharesByPath = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        id: string;
+        shareName: string;
+        sourcePath: string;
+        sharedPath: string;
+        isMounted: boolean;
+        isExported: boolean;
       }
-      return map;
-    },
-    [localSharesQuery.data],
-  );
+    >();
+    for (const share of localSharesQuery.data ?? []) {
+      map.set(share.sourcePath, share);
+      map.set(share.sharedPath, share);
+    }
+    return map;
+  }, [localSharesQuery.data]);
   const locationItems = useMemo(() => {
     const shares = networkSharesQuery.data ?? [];
     const hosts = new Map<string, string[]>();
@@ -586,52 +590,65 @@ export function FileManager() {
     setOpenFile(null);
   }
 
-  function requestEntryName(kind: "file" | "folder") {
-    if (typeof window === "undefined") {
-      return null;
-    }
-    const entered = window.prompt(
-      kind === "folder" ? "Folder name" : "File name",
-      "",
-    );
-    if (entered === null) {
-      return null;
-    }
-    const normalized = entered.trim();
-    if (normalized.length === 0) {
-      setStatusNotice(`Invalid ${kind} name`);
-      return null;
-    }
-    return normalized;
-  }
-
-  async function handleCreateEntry(kind: "file" | "folder") {
-    const name = requestEntryName(kind);
-    if (!name) {
-      return;
+  async function handleCreateEntry(kind: "file" | "folder", name: string) {
+    const normalizedName = name.trim();
+    if (normalizedName.length === 0) {
+      throw new Error(`Invalid ${kind} name`);
     }
     const parentPath = toFilePath(currentPath);
 
+    const result =
+      kind === "folder"
+        ? await createFolderMutation.mutateAsync({
+            parentPath,
+            name: normalizedName,
+          })
+        : await createFileMutation.mutateAsync({
+            parentPath,
+            name: normalizedName,
+          });
+
+    setStatusNotice(
+      `${kind === "folder" ? "Folder" : "File"} created: ${result.path}`,
+    );
+  }
+
+  function openCreateEntryDialog(kind: "file" | "folder") {
+    setCreateEntryDialog({
+      kind,
+      name: "",
+      error: null,
+    });
+  }
+
+  function closeCreateEntryDialog() {
+    if (createFolderMutation.isPending || createFileMutation.isPending) {
+      return;
+    }
+    setCreateEntryDialog(null);
+  }
+
+  async function submitCreateEntryDialog() {
+    if (!createEntryDialog) {
+      return;
+    }
+
+    const kind = createEntryDialog.kind;
     try {
-      const result =
-        kind === "folder"
-          ? await createFolderMutation.mutateAsync({
-              parentPath,
-              name,
-            })
-          : await createFileMutation.mutateAsync({
-              parentPath,
-              name,
-            });
-      setStatusNotice(
-        `${kind === "folder" ? "Folder" : "File"} created: ${result.path}`,
-      );
+      await handleCreateEntry(kind, createEntryDialog.name);
+      setCreateEntryDialog(null);
     } catch (error) {
-      setStatusNotice(
-        error instanceof Error
-          ? error.message
-          : `Failed to create ${kind}`,
+      const message =
+        error instanceof Error ? error.message : `Failed to create ${kind}`;
+      setCreateEntryDialog((previous) =>
+        previous
+          ? {
+              ...previous,
+              error: message,
+            }
+          : previous,
       );
+      setStatusNotice(message);
     }
   }
 
@@ -641,7 +658,9 @@ export function FileManager() {
       operation,
       name: entry.name,
     });
-    setStatusNotice(`${operation === "copy" ? "Copied" : "Cut"}: ${entry.name}`);
+    setStatusNotice(
+      `${operation === "copy" ? "Copied" : "Cut"}: ${entry.name}`,
+    );
   }
 
   async function handlePasteToDestination(destinationPath: string) {
@@ -661,7 +680,10 @@ export function FileManager() {
       );
       if (clipboardState.operation === "move") {
         setClipboardState(null);
-        if (openFile && toFilePath(openFile.path) === clipboardState.sourcePath) {
+        if (
+          openFile &&
+          toFilePath(openFile.path) === clipboardState.sourcePath
+        ) {
           setOpenFile(null);
         }
       }
@@ -804,9 +826,13 @@ export function FileManager() {
         newName: newName.trim(),
       });
       setSelectedFile(null);
-      setStatusNotice(`Renamed to ${result.path.split("/").pop() ?? newName.trim()}`);
+      setStatusNotice(
+        `Renamed to ${result.path.split("/").pop() ?? newName.trim()}`,
+      );
     } catch (error) {
-      setStatusNotice(error instanceof Error ? error.message : "Failed to rename item");
+      setStatusNotice(
+        error instanceof Error ? error.message : "Failed to rename item",
+      );
     }
   }
 
@@ -817,16 +843,22 @@ export function FileManager() {
         `${info.name} | ${info.type} | ${formatBytesCompact(info.sizeBytes)} | perms ${info.permissions}`,
       );
     } catch (error) {
-      setStatusNotice(error instanceof Error ? error.message : "Failed to get item info");
+      setStatusNotice(
+        error instanceof Error ? error.message : "Failed to get item info",
+      );
     }
   }
 
   async function handleToggleStar(entry: FileEntry) {
     try {
       const result = await toggleStarMutation.mutateAsync(entry.path);
-      setStatusNotice(result.starred ? `Starred ${entry.name}` : `Unstarred ${entry.name}`);
+      setStatusNotice(
+        result.starred ? `Starred ${entry.name}` : `Unstarred ${entry.name}`,
+      );
     } catch (error) {
-      setStatusNotice(error instanceof Error ? error.message : "Failed to toggle star");
+      setStatusNotice(
+        error instanceof Error ? error.message : "Failed to toggle star",
+      );
     }
   }
 
@@ -858,7 +890,9 @@ export function FileManager() {
       setStatusNotice("Shared folder removed");
     } catch (error) {
       setStatusNotice(
-        error instanceof Error ? error.message : "Failed to remove shared folder",
+        error instanceof Error
+          ? error.message
+          : "Failed to remove shared folder",
       );
     }
   }
@@ -973,7 +1007,7 @@ export function FileManager() {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Toolbar */}
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 px-3 py-2 border-b border-glass-border bg-card/65">
+        <div className="flex flex-nowrap items-center gap-2 overflow-x-auto px-3 py-2 border-b border-glass-border bg-card/65">
           {/* Navigation */}
           <div className="flex items-center gap-1 shrink-0">
             <button
@@ -988,7 +1022,7 @@ export function FileManager() {
 
           {/* Breadcrumb */}
           <nav
-            className="flex items-center gap-1 min-w-0 flex-1 basis-full md:basis-auto"
+            className="flex min-w-0 flex-1 items-center gap-1"
             aria-label="File path"
           >
             <button
@@ -1016,29 +1050,31 @@ export function FileManager() {
           <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={() => {
-                void handleCreateEntry("folder");
+                openCreateEntryDialog("folder");
               }}
               disabled={createFolderMutation.isPending}
-              className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-secondary/50 text-xs text-muted-foreground transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-              title="Create folder"
+              className="relative inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label="New folder"
+              title="New folder"
             >
               <Folder className="size-3.5" />
-              <span className="hidden xl:inline">New Folder</span>
+              <Plus className="absolute -right-0.5 -top-0.5 size-2.5" />
             </button>
             <button
               onClick={() => {
-                void handleCreateEntry("file");
+                openCreateEntryDialog("file");
               }}
               disabled={createFileMutation.isPending}
-              className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-secondary/50 text-xs text-muted-foreground transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-              title="Create file"
+              className="relative inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label="New file"
+              title="New file"
             >
               <File className="size-3.5" />
-              <span className="hidden xl:inline">New File</span>
+              <Plus className="absolute -right-0.5 -top-0.5 size-2.5" />
             </button>
           </div>
 
-          <div className="relative min-w-[8.5rem] flex-1 sm:flex-none sm:w-36 md:w-40">
+          <div className="relative w-40 shrink-0">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 size-3 text-muted-foreground" />
             <input
               type="text"
@@ -1078,9 +1114,6 @@ export function FileManager() {
               ) : (
                 <Eye className="size-3.5" />
               )}
-              <span className="hidden xl:inline">
-                {includeHidden ? "Hide Hidden" : "Show Hidden"}
-              </span>
             </button>
             <button
               onClick={() =>
@@ -1408,7 +1441,9 @@ export function FileManager() {
           <ContextMenuItem
             icon={<ClipboardPaste className="size-3.5" />}
             label="Paste"
-            disabled={!clipboardState || isTrashView || pasteFileEntryMutation.isPending}
+            disabled={
+              !clipboardState || isTrashView || pasteFileEntryMutation.isPending
+            }
             onClick={() => {
               const entry = showContextMenu.entry;
               setShowContextMenu(null);
@@ -1502,6 +1537,106 @@ export function FileManager() {
           )}
         </div>
       )}
+      {createEntryDialog ? (
+        <div
+          className="absolute inset-0 z-[205] flex items-center justify-center bg-background/35 px-4 backdrop-blur-[1px]"
+          onClick={() => {
+            closeCreateEntryDialog();
+          }}
+        >
+          <div
+            className="w-full max-w-xs rounded-xl border border-glass-border bg-popover/95 p-3 shadow-2xl shadow-black/45"
+            role="dialog"
+            aria-modal="true"
+            aria-label={
+              createEntryDialog.kind === "folder"
+                ? "Create new folder"
+                : "Create new file"
+            }
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-2 flex items-center gap-2 text-sm font-medium text-foreground">
+              {createEntryDialog.kind === "folder" ? (
+                <Folder className="size-4 text-sky-400" />
+              ) : (
+                <File className="size-4 text-emerald-400" />
+              )}
+              <span>
+                {createEntryDialog.kind === "folder"
+                  ? "Create New Folder"
+                  : "Create New File"}
+              </span>
+            </div>
+            <label className="mb-2 block text-xs text-muted-foreground">
+              {createEntryDialog.kind === "folder"
+                ? "Folder name"
+                : "File name"}
+              <input
+                autoFocus
+                type="text"
+                value={createEntryDialog.name}
+                onChange={(event) =>
+                  setCreateEntryDialog((previous) =>
+                    previous
+                      ? {
+                          ...previous,
+                          name: event.target.value,
+                          error: null,
+                        }
+                      : previous,
+                  )
+                }
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    void submitCreateEntryDialog();
+                  } else if (event.key === "Escape") {
+                    event.preventDefault();
+                    closeCreateEntryDialog();
+                  }
+                }}
+                className="mt-1 h-8 w-full rounded-lg border border-glass-border bg-secondary/30 px-2 text-xs text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary/40 focus:bg-secondary/50"
+                placeholder={
+                  createEntryDialog.kind === "folder"
+                    ? "my-folder"
+                    : "notes.txt"
+                }
+              />
+            </label>
+            {createEntryDialog.error ? (
+              <div className="mb-2 text-xs text-status-red">
+                {createEntryDialog.error}
+              </div>
+            ) : null}
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  closeCreateEntryDialog();
+                }}
+                disabled={
+                  createFolderMutation.isPending || createFileMutation.isPending
+                }
+                className="rounded-lg px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  void submitCreateEntryDialog();
+                }}
+                disabled={
+                  createEntryDialog.name.trim().length === 0 ||
+                  createFolderMutation.isPending ||
+                  createFileMutation.isPending
+                }
+                className="rounded-lg bg-primary/20 px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/30 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <NetworkStorageDialog
         isOpen={showNetworkDialog}
         onClose={() => setShowNetworkDialog(false)}

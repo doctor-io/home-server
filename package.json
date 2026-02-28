@@ -1,6 +1,6 @@
 {
   "name": "my-project",
-  "version": "0.1.49",
+  "version": "0.1.50",
   "private": true,
   "scripts": {
     "dev": "node --import tsx server.ts",
@@ -73,6 +73,7 @@
     "react-hook-form": "^7.54.1",
     "react-resizable-panels": "^2.1.7",
     "recharts": "2.15.0",
+    "server-only": "file:packages/server-only",
     "sonner": "^1.7.1",
     "systeminformation": "^5.31.1",
     "tailwind-merge": "^3.3.1",

@@ -329,15 +329,19 @@ describe("FileManager sharing and navigation", () => {
   });
 
   it("creates folder and file from header actions", async () => {
-    const promptSpy = vi.spyOn(window, "prompt");
-    promptSpy
-      .mockReturnValueOnce("New Folder")
-      .mockReturnValueOnce("New File.txt");
-
     render(<FileManager />);
 
     fireEvent.click(screen.getByRole("button", { name: /new folder/i }));
+    fireEvent.change(screen.getByLabelText("Folder name"), {
+      target: { value: "New Folder" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create" }));
+
     fireEvent.click(screen.getByRole("button", { name: /new file/i }));
+    fireEvent.change(screen.getByLabelText("File name"), {
+      target: { value: "New File.txt" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create" }));
 
     const createFolderCall =
       mockUseCreateFolder.mock.results[0]?.value?.mutateAsync as
@@ -361,8 +365,6 @@ describe("FileManager sharing and navigation", () => {
       parentPath: "",
       name: "New File.txt",
     });
-
-    promptSpy.mockRestore();
   });
 
   it("copies and pastes using context menu", async () => {

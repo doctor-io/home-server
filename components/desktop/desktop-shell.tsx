@@ -6,6 +6,7 @@ import { readLockState, writeLockState } from "@/lib/desktop/lock-state";
 import {
   Activity,
   FolderOpen,
+  Loader2,
   Package,
   Search,
   Settings,
@@ -360,8 +361,17 @@ export function DesktopShell() {
 
   if (isLoadingUser || !isLockStateHydrated) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-background text-sm text-muted-foreground">
-        Loading session...
+      <div className="relative h-screen w-screen overflow-hidden bg-background">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(56,189,248,0.15),transparent_45%),radial-gradient(circle_at_80%_70%,rgba(16,185,129,0.14),transparent_42%)]" />
+        <div className="absolute inset-0 bg-background/70 backdrop-blur-sm" />
+        <div className="relative z-10 flex h-full w-full items-center justify-center px-4">
+          <div className="flex min-w-56 items-center gap-3 rounded-2xl border border-glass-border bg-popover/70 px-4 py-3 shadow-2xl shadow-black/40">
+            <Loader2 className="size-4 animate-spin text-primary" />
+            <span className="text-sm text-muted-foreground">
+              Loading session...
+            </span>
+          </div>
+        </div>
       </div>
     );
   }

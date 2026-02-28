@@ -492,9 +492,17 @@ async function releaseShareExport(
     }
   }
 
+  // Safety guard: never remove the exported directory while it is still mounted.
+  const mountedAfterCleanup = await isMountPoint(exportResolved.absolutePath).catch(
+    () => false,
+  );
+  if (mountedAfterCleanup) {
+    throw new Error("Failed to unmount shared folder export");
+  }
+
   try {
     await rm(exportResolved.absolutePath, {
-      recursive: false,
+      recursive: true,
       force: true,
     });
   } catch (error) {

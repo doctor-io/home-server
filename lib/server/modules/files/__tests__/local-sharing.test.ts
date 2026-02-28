@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm } from "node:fs/promises";
+import { lstat, mkdtemp, mkdir, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -296,6 +296,17 @@ describe("local sharing service", () => {
     vi.mocked(execFile).mockImplementation((command: string, ...restArgs: unknown[]) => {
       const { args, callback } = getExecInvocation(restArgs);
 
+      if (command === "mountpoint") {
+        const error = new Error("not mounted") as Error & {
+          code?: number;
+          stderr?: string;
+        };
+        error.code = 1;
+        error.stderr = "not mounted";
+        callback(error, "", "not mounted");
+        return {} as never;
+      }
+
       if (command === "net" && args[0] === "usershare" && args[1] === "delete") {
         const error = new Error("usershare does not exist") as Error & {
           code?: number;
@@ -469,6 +480,7 @@ describe("local sharing service", () => {
       updatedAt: new Date(),
     });
 
+    let mountpointCallCount = 0;
     vi.mocked(execFile).mockImplementation((command: string, ...restArgs: unknown[]) => {
       const { args, callback } = getExecInvocation(restArgs);
 
@@ -478,7 +490,18 @@ describe("local sharing service", () => {
       }
 
       if (command === "mountpoint") {
-        callback(null, "", "");
+        mountpointCallCount += 1;
+        if (mountpointCallCount === 1) {
+          callback(null, "", "");
+          return {} as never;
+        }
+        const error = new Error("not mounted") as Error & {
+          code?: number;
+          stderr?: string;
+        };
+        error.code = 1;
+        error.stderr = "not mounted";
+        callback(error, "", "not mounted");
         return {} as never;
       }
 
@@ -611,6 +634,62 @@ describe("local sharing service", () => {
 
     expect(result.removed).toBe(true);
     expect(deleteLocalShareFromDb).toHaveBeenCalledWith("local-stale");
+  });
+
+  it("removes exported shared directory contents when unshare succeeds", async () => {
+    const exportedDir = path.join(mockDataRoot, "Shared", "Media");
+    await mkdir(exportedDir, { recursive: true });
+    await mkdir(path.join(exportedDir, "nested"), { recursive: true });
+
+    vi.mocked(getLocalShareFromDb).mockResolvedValueOnce({
+      id: "local-cleanup-dir",
+      shareName: "Media",
+      sourcePath: "Media",
+      sharedPath: "Shared/Media",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    vi.mocked(deleteLocalShareFromDb).mockResolvedValueOnce({
+      id: "local-cleanup-dir",
+      shareName: "Media",
+      sourcePath: "Media",
+      sharedPath: "Shared/Media",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    vi.mocked(execFile).mockImplementation((command: string, ...restArgs: unknown[]) => {
+      const { args, callback } = getExecInvocation(restArgs);
+
+      if (command === "net" && args[0] === "usershare" && args[1] === "info") {
+        callback(null, "share present", "");
+        return {} as never;
+      }
+
+      if (command === "mountpoint") {
+        const error = new Error("not mounted") as Error & {
+          code?: number;
+          stderr?: string;
+        };
+        error.code = 1;
+        error.stderr = "not mounted";
+        callback(error, "", "not mounted");
+        return {} as never;
+      }
+
+      if (command === "net" && args[0] === "usershare" && args[1] === "delete") {
+        callback(null, "", "");
+        return {} as never;
+      }
+
+      callback(null, "", "");
+      return {} as never;
+    });
+
+    const result = await removeLocalFolderShare("local-cleanup-dir");
+
+    expect(result.removed).toBe(true);
+    await expect(lstat(exportedDir)).rejects.toMatchObject({ code: "ENOENT" });
   });
 
   it("serializes concurrent add requests for the same source path", async () => {

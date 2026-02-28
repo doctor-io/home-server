@@ -1,27 +1,29 @@
 "use client";
 
-import {
-    Activity,
-    ArrowDown,
-    ArrowUp,
-    Cpu,
-    Gauge,
-    HardDrive,
-    MemoryStick,
-    Network,
-    Search,
-    Container,
-} from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { useSystemMetrics } from "@/hooks/useSystemMetrics";
 import { useDockerStats } from "@/hooks/useDockerStats";
+import { useSystemMetrics } from "@/hooks/useSystemMetrics";
+import {
+  formatUptimeShort
+} from "@/lib/client/format";
 import {
   calculateDockerTotals,
   containerToProcess,
-  nudge,
   getStatusBadgeColor,
+  nudge,
 } from "@/lib/client/monitor-utils";
-import { formatBytes, formatUptimeShort, formatPercent } from "@/lib/client/format";
+import {
+  Activity,
+  ArrowDown,
+  ArrowUp,
+  Container,
+  Cpu,
+  Gauge,
+  HardDrive,
+  MemoryStick,
+  Network,
+  Search,
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
 type MonitorTab = "processes" | "resources" | "network";
 type SortKey = "cpu" | "memory" | "network" | "disk";
@@ -35,100 +37,6 @@ type ProcessItem = {
   network: number;
   disk: number;
 };
-
-const processSeed: ProcessItem[] = [
-  {
-    name: "Docker Engine",
-    status: "Running",
-    pid: 1221,
-    cpu: 12.4,
-    memory: 1810,
-    network: 1.9,
-    disk: 0.3,
-  },
-  {
-    name: "Grafana",
-    status: "Running",
-    pid: 1874,
-    cpu: 4.1,
-    memory: 422,
-    network: 0.8,
-    disk: 0.2,
-  },
-  {
-    name: "Plex Media Server",
-    status: "Running",
-    pid: 2131,
-    cpu: 17.3,
-    memory: 2630,
-    network: 3.4,
-    disk: 2.1,
-  },
-  {
-    name: "Nextcloud",
-    status: "Running",
-    pid: 2318,
-    cpu: 6.8,
-    memory: 980,
-    network: 1.2,
-    disk: 0.6,
-  },
-  {
-    name: "Home Assistant",
-    status: "Sleeping",
-    pid: 2592,
-    cpu: 2.1,
-    memory: 744,
-    network: 0.3,
-    disk: 0.1,
-  },
-  {
-    name: "Pi-hole DNS",
-    status: "Running",
-    pid: 2820,
-    cpu: 1.6,
-    memory: 192,
-    network: 0.9,
-    disk: 0.1,
-  },
-  {
-    name: "Uptime Kuma",
-    status: "Background",
-    pid: 3014,
-    cpu: 0.9,
-    memory: 214,
-    network: 0.4,
-    disk: 0.1,
-  },
-  {
-    name: "Nginx Proxy",
-    status: "Running",
-    pid: 3367,
-    cpu: 2.8,
-    memory: 310,
-    network: 1.1,
-    disk: 0.2,
-  },
-  {
-    name: "PostgreSQL",
-    status: "Running",
-    pid: 3599,
-    cpu: 8.2,
-    memory: 1268,
-    network: 0.6,
-    disk: 1.7,
-  },
-  {
-    name: "Vaultwarden",
-    status: "Running",
-    pid: 4016,
-    cpu: 1.4,
-    memory: 280,
-    network: 0.4,
-    disk: 0.1,
-  },
-];
-
 
 function MetricCard({
   label,
@@ -190,7 +98,7 @@ export function Monitor() {
     31, 33, 32, 34, 36, 35, 33, 32, 34, 35, 37, 36, 34, 33, 34, 35, 36, 35, 34,
     33, 34, 35, 34, 33,
   ]);
-  const [processes, setProcesses] = useState<ProcessItem[]>(processSeed);
+  const [processes, setProcesses] = useState<ProcessItem[]>([]);
 
   // Real system metrics
   const { data: systemMetrics } = useSystemMetrics();
@@ -242,7 +150,8 @@ export function Monitor() {
 
   const filteredProcesses = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const allProcesses = dockerProcesses.length > 0 ? dockerProcesses : processes;
+    const allProcesses =
+      dockerProcesses.length > 0 ? dockerProcesses : processes;
     const filtered = q
       ? allProcesses.filter((p) => p.name.toLowerCase().includes(q))
       : allProcesses;
@@ -303,7 +212,8 @@ export function Monitor() {
               icon={MemoryStick}
               value={`${systemMetrics?.memory.usedPercent?.toFixed(1) ?? "--"}%`}
               sub={
-                systemMetrics?.memory.usedBytes && systemMetrics?.memory.totalBytes
+                systemMetrics?.memory.usedBytes &&
+                systemMetrics?.memory.totalBytes
                   ? `${(systemMetrics.memory.usedBytes / 1024 / 1024 / 1024).toFixed(1)} / ${(systemMetrics.memory.totalBytes / 1024 / 1024 / 1024).toFixed(1)} GB`
                   : "--"
               }
@@ -378,7 +288,9 @@ export function Monitor() {
 
             {filteredProcesses.length === 0 ? (
               <div className="px-3 py-8 text-center text-sm text-muted-foreground">
-                {query ? "No containers match your search" : "No containers running"}
+                {query
+                  ? "No containers match your search"
+                  : "No containers running"}
               </div>
             ) : (
               filteredProcesses.map((p) => (
@@ -434,8 +346,13 @@ export function Monitor() {
               </div>
               <HistoryBars values={cpuHistory} color="bg-primary/85" />
               <p className="mt-2 text-xs text-muted-foreground">
-                Current {systemMetrics?.cpu.normalizedPercent?.toFixed(1) ?? "--"}% | Peak{" "}
-                {cpuHistory.length > 0 ? Math.max(...cpuHistory).toFixed(0) : "--"}%
+                Current{" "}
+                {systemMetrics?.cpu.normalizedPercent?.toFixed(1) ?? "--"}% |
+                Peak{" "}
+                {cpuHistory.length > 0
+                  ? Math.max(...cpuHistory).toFixed(0)
+                  : "--"}
+                %
               </p>
             </div>
 
@@ -446,7 +363,8 @@ export function Monitor() {
               </div>
               <HistoryBars values={memHistory} color="bg-chart-2/85" />
               <p className="mt-2 text-xs text-muted-foreground">
-                Current {systemMetrics?.memory.usedPercent?.toFixed(1) ?? "--"}% |
+                Current {systemMetrics?.memory.usedPercent?.toFixed(1) ?? "--"}%
+                |
                 {systemMetrics?.memory.usedBytes
                   ? ` Used ${(systemMetrics.memory.usedBytes / 1024 / 1024 / 1024).toFixed(1)} GB`
                   : ""}
@@ -524,7 +442,8 @@ export function Monitor() {
                 <div className="grid grid-cols-2 gap-2">
                   <div className="rounded-lg bg-secondary/40 p-2">
                     <p className="mb-1 flex items-center gap-1 text-xs uppercase tracking-wider text-muted-foreground">
-                      <ArrowDown className="size-3 text-status-green" /> Download
+                      <ArrowDown className="size-3 text-status-green" />{" "}
+                      Download
                     </p>
                     <p className="text-sm font-mono text-foreground">
                       {systemMetrics.wifi.downloadMbps?.toFixed(1) ?? "--"} Mbps
@@ -545,7 +464,9 @@ export function Monitor() {
                     </p>
                   </div>
                   <div className="rounded-lg bg-secondary/40 p-2">
-                    <p className="mb-1 text-xs text-muted-foreground">TX Rate</p>
+                    <p className="mb-1 text-xs text-muted-foreground">
+                      TX Rate
+                    </p>
                     <p className="text-sm font-mono text-foreground">
                       {systemMetrics.wifi.txRateMbps?.toFixed(0) ?? "--"} Mbps
                     </p>
@@ -566,8 +487,8 @@ export function Monitor() {
             {/* Docker Network Stats */}
             <div className="rounded-xl border border-glass-border bg-glass p-3">
               <div className="mb-2 flex items-center gap-2 text-xs font-medium text-foreground">
-                <Container className="size-3.5 text-primary" /> Container Network
-                Activity
+                <Container className="size-3.5 text-primary" /> Container
+                Network Activity
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div className="rounded-lg bg-secondary/40 p-2 text-center">
@@ -612,7 +533,9 @@ export function Monitor() {
                   </p>
                 </div>
                 <div className="rounded-lg bg-secondary/40 p-2">
-                  <p className="mb-1 text-xs text-muted-foreground">Containers</p>
+                  <p className="mb-1 text-xs text-muted-foreground">
+                    Containers
+                  </p>
                   <p className="text-sm font-mono text-foreground">
                     {dockerStats.length} total
                   </p>
