@@ -207,9 +207,9 @@ async function runInstallOrRedeployOperation(
 
   let composeSourceInput = params.composeSource;
   if (
-    params.action === "install" &&
     existingStack &&
     !params.resetToCatalog &&
+    (params.action === "install" || params.action === "redeploy") &&
     (typeof composeSourceInput !== "string" || composeSourceInput.trim().length === 0)
   ) {
     try {

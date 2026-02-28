@@ -211,6 +211,7 @@ export function AppConfiguratorPanel({
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const initialClassicRef = useRef<ClassicConfigState>(initialClassicState);
+  const initialComposeRef = useRef(initialComposeDraft);
   const { saveAppSettings, installApp, installCustomApp } = useStoreActions();
 
   useEffect(() => {
@@ -222,6 +223,7 @@ export function AppConfiguratorPanel({
     setDidSave(false);
     setSaveError(null);
     initialClassicRef.current = initialClassicState;
+    initialComposeRef.current = initialComposeDraft;
   }, [
     context,
     initialClassicState,
@@ -320,6 +322,7 @@ export function AppConfiguratorPanel({
             current: classicState,
             initial: initialClassicRef.current,
             composeSource: composeDraft,
+            initialComposeSource: initialComposeRef.current,
           }),
         );
       } else if (context === "catalog_install") {

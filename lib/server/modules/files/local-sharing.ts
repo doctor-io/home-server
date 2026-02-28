@@ -530,13 +530,21 @@ async function releaseShareExport(
   }
 }
 
+async function getShareExportState(record: LocalShareRecord): Promise<{
+  isMounted: boolean;
+  isExported: boolean;
+}> {
+  const exportResolved = await resolveExportPath(record.sharedPath);
+  const [isMounted, isExported] = await Promise.all([
+    isMountPoint(exportResolved.absolutePath),
+    isUsersharePresent(record.shareName),
+  ]);
+  return { isMounted, isExported };
+}
+
 async function isShareExportActive(record: LocalShareRecord) {
   try {
-    const exportResolved = await resolveExportPath(record.sharedPath);
-    const [isMounted, isExported] = await Promise.all([
-      isMountPoint(exportResolved.absolutePath),
-      isUsersharePresent(record.shareName),
-    ]);
+    const { isMounted, isExported } = await getShareExportState(record);
     return isMounted || isExported;
   } catch (error) {
     if (isPathCleanupNotRequiredError(error)) {
@@ -548,12 +556,23 @@ async function isShareExportActive(record: LocalShareRecord) {
 
 async function getShareExportActivity(record: LocalShareRecord) {
   try {
-    const active = await isShareExportActive(record);
+    const state = await getShareExportState(record);
     return {
-      active,
+      active: state.isMounted || state.isExported,
+      isMounted: state.isMounted,
+      isExported: state.isExported,
       unknown: false,
     };
   } catch (error) {
+    if (isPathCleanupNotRequiredError(error)) {
+      return {
+        active: false,
+        isMounted: false,
+        isExported: false,
+        unknown: false,
+      };
+    }
+
     logServerAction({
       level: "warn",
       layer: "service",
@@ -570,6 +589,8 @@ async function getShareExportActivity(record: LocalShareRecord) {
     });
     return {
       active: false,
+      isMounted: false,
+      isExported: false,
       unknown: true,
     };
   }
@@ -781,8 +802,8 @@ export async function removeLocalFolderShare(shareId: string) {
         mappedError.code === "path_outside_root";
       if (!tolerateCleanupError) {
         const activity = await getShareExportActivity(record);
-        const stillActive = activity.active;
-        if (stillActive) {
+        const stillMounted = activity.isMounted;
+        if (stillMounted) {
           throw mappedError;
         }
       }
@@ -797,6 +818,7 @@ export async function removeLocalFolderShare(shareId: string) {
           shareId: record.id,
           sourcePath: record.sourcePath,
           sharedPath: record.sharedPath,
+          toleratedCode: mappedError.code,
         },
         error,
       });

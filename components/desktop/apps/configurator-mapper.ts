@@ -758,6 +758,7 @@ export function buildSettingsPayloadFromClassic(input: {
   current: ClassicConfigState;
   initial: ClassicConfigState;
   composeSource?: string;
+  initialComposeSource?: string;
 }) {
   const payload: {
     appId: string;
@@ -770,8 +771,13 @@ export function buildSettingsPayloadFromClassic(input: {
     appId: input.appId,
     displayName: input.current.title,
     iconUrl: input.current.iconUrl.trim() || null,
-    composeSource: input.composeSource,
   };
+
+  const nextCompose = input.composeSource?.trim();
+  const initialCompose = input.initialComposeSource?.trim();
+  if (nextCompose && nextCompose.length > 0 && nextCompose !== initialCompose) {
+    payload.composeSource = input.composeSource;
+  }
 
   const currentEnv = toEnvPayload(input.current);
   const initialEnv = toEnvPayload(input.initial);

@@ -237,17 +237,18 @@ function parseDashboardUrlFromComposePrimary(primary: {
 
 function resolveAppActionTarget(app: AppItem): AppActionTarget {
   const mapped = appConnectionMap[app.id] ?? appConnectionMap[toSlug(app.name)];
+  const mappedPath = mapped ? extractUrlPath(mapped.dashboardUrl) : "";
+  const fallbackContainerName = app.containerName?.trim() ?? "";
 
   if (app.webUiPort !== null) {
     const protocol = typeof window !== "undefined" ? window.location.protocol : "http:";
     const hostname = typeof window !== "undefined" ? window.location.hostname : "localhost";
-    const path = mapped ? extractUrlPath(mapped.dashboardUrl) : "";
 
     return {
       appId: app.id,
       appName: app.name,
-      dashboardUrl: `${protocol}//${hostname}:${app.webUiPort}${path}`,
-      containerName: app.containerName ?? mapped?.containerName ?? app.id,
+      dashboardUrl: `${protocol}//${hostname}:${app.webUiPort}${mappedPath}`,
+      containerName: fallbackContainerName,
     };
   }
 
@@ -257,7 +258,7 @@ function resolveAppActionTarget(app: AppItem): AppActionTarget {
       appId: app.id,
       appName: app.name,
       dashboardUrl,
-      containerName: app.containerName ?? mapped.containerName,
+      containerName: fallbackContainerName,
     };
   }
 
@@ -265,7 +266,7 @@ function resolveAppActionTarget(app: AppItem): AppActionTarget {
     appId: app.id,
     appName: app.name,
     dashboardUrl: "",
-    containerName: app.containerName ?? app.id,
+    containerName: fallbackContainerName,
   };
 }
 
@@ -358,7 +359,7 @@ export function AppGrid({
           status: derivedStatus,
           category: catalog?.categories[0] ?? visual.category,
           webUiPort: installed?.webUiPort ?? catalog?.webUiPort ?? fallbackPort,
-          containerName: installed?.containerName ?? mapped?.containerName ?? appId,
+          containerName: installed?.containerName ?? null,
         } satisfies AppItem;
       })
       .sort((left, right) => left.name.localeCompare(right.name));
@@ -426,13 +427,18 @@ export function AppGrid({
     app: AppItem,
     options?: {
       forceLookup?: boolean;
+      requireContainerName?: boolean;
+      requireDashboardUrl?: boolean;
     },
   ): Promise<AppActionTarget | null> {
     const fallback = resolveAppActionTarget(app);
     const shouldForceLookup = options?.forceLookup ?? false;
-    if (!shouldForceLookup && fallback.dashboardUrl.trim().length > 0) {
-      return fallback;
-    }
+    const requireContainerName = options?.requireContainerName ?? false;
+    const requireDashboardUrl = options?.requireDashboardUrl ?? false;
+
+    let resolvedDashboardUrl = "";
+    let resolvedContainerName = fallback.containerName.trim();
+
     try {
       const response = await fetch(
         `/api/v1/apps/${encodeURIComponent(app.id)}/dashboard-url`,
@@ -445,56 +451,51 @@ export function AppGrid({
           data?: { url?: string };
         };
         const rawUrl = json.url ?? json.data?.url ?? "";
-        const containerName = json.containerName?.trim();
-        const nextContainerName =
-          containerName && containerName.length > 0
-            ? containerName
-            : fallback.containerName;
-        if (rawUrl.trim().length > 0) {
-          return {
-            ...fallback,
-            dashboardUrl: toCurrentHostUrl(rawUrl),
-            containerName: nextContainerName,
-          };
+        const containerName = json.containerName?.trim() ?? "";
+        if (containerName.length > 0) {
+          resolvedContainerName = containerName;
         }
-        if (nextContainerName.length > 0) {
-          return {
-            ...fallback,
-            containerName: nextContainerName,
-          };
+        if (rawUrl.trim().length > 0) {
+          resolvedDashboardUrl = toCurrentHostUrl(rawUrl);
         }
       }
     } catch {
       // fallback to compose endpoint
     }
 
-    try {
-      const response = await fetch(
-        `/api/v1/store/apps/${encodeURIComponent(app.id)}/compose?source=installed`,
-        { cache: "no-store" },
-      );
-      if (!response.ok) {
-        return shouldForceLookup ? fallback : null;
+    if (!resolvedDashboardUrl) {
+      try {
+        const response = await fetch(
+          `/api/v1/store/apps/${encodeURIComponent(app.id)}/compose?source=installed`,
+          { cache: "no-store" },
+        );
+        if (response.ok) {
+          const json = (await response.json()) as InstalledComposeResponse;
+          const primary = json.data?.primary;
+          if (primary) {
+            resolvedDashboardUrl = parseDashboardUrlFromComposePrimary(primary);
+          }
+        }
+      } catch {
+        // keep fallback
       }
-
-      const json = (await response.json()) as InstalledComposeResponse;
-      const primary = json.data?.primary;
-      if (!primary) {
-        return null;
-      }
-
-      const dashboardUrl = parseDashboardUrlFromComposePrimary(primary);
-      if (!dashboardUrl) {
-        return shouldForceLookup ? fallback : null;
-      }
-
-      return {
-        ...fallback,
-        dashboardUrl,
-      };
-    } catch {
-      return shouldForceLookup ? fallback : null;
     }
+
+    const target: AppActionTarget = {
+      ...fallback,
+      dashboardUrl: resolvedDashboardUrl || fallback.dashboardUrl,
+      containerName: resolvedContainerName,
+    };
+
+    if (requireDashboardUrl && target.dashboardUrl.trim().length === 0) {
+      return shouldForceLookup ? null : fallback.dashboardUrl.trim().length > 0 ? fallback : null;
+    }
+
+    if (requireContainerName && target.containerName.trim().length === 0) {
+      return null;
+    }
+
+    return target;
   }
 
   async function openDashboardForApp(app: AppItem) {
@@ -510,7 +511,9 @@ export function AppGrid({
     });
 
     try {
-      const resolvedTarget = await resolveActionTarget(app);
+      const resolvedTarget = await resolveActionTarget(app, {
+        requireDashboardUrl: true,
+      });
       if (!resolvedTarget || resolvedTarget.dashboardUrl.trim().length === 0) {
         logClientAction({
           level: "warn",
@@ -606,6 +609,7 @@ export function AppGrid({
       } else if (action === "logs") {
         const resolvedTarget = await resolveActionTarget(menuApp, {
           forceLookup: true,
+          requireContainerName: true,
         });
         if (!resolvedTarget) {
           closeContextMenu();
@@ -615,6 +619,7 @@ export function AppGrid({
       } else if (action === "terminal") {
         const resolvedTarget = await resolveActionTarget(menuApp, {
           forceLookup: true,
+          requireContainerName: true,
         });
         if (!resolvedTarget) {
           closeContextMenu();
@@ -631,7 +636,9 @@ export function AppGrid({
         }
         onOpenSettings?.(resolvedTarget);
       } else if (action === "copy-url") {
-        const resolvedTarget = await resolveActionTarget(menuApp);
+        const resolvedTarget = await resolveActionTarget(menuApp, {
+          requireDashboardUrl: true,
+        });
         if (!resolvedTarget) {
           closeContextMenu();
           return;

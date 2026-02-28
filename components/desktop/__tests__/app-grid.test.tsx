@@ -40,6 +40,7 @@ describe("AppGrid context menu", () => {
           name: "Plex",
           status: "running",
           webUiPort: 32400,
+          containerName: "plex",
           updatedAt: "2026-02-24T00:00:00.000Z",
         },
       ],
@@ -96,6 +97,7 @@ describe("AppGrid context menu", () => {
           name: "Plex",
           status: "running",
           webUiPort: 32410,
+          containerName: "plex",
           updatedAt: "2026-02-24T00:00:00.000Z",
         },
       ],
@@ -140,6 +142,38 @@ describe("AppGrid context menu", () => {
       });
     });
     expect(openSpy).not.toHaveBeenCalled();
+  });
+
+  it("prefers backend-resolved dashboard url over static fallback mapping", async () => {
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          url: "http://localhost:32000/web",
+          containerName: "plex-runtime",
+          source: "installed_stack",
+          warnings: [],
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      ),
+    );
+
+    render(<AppGrid animationsEnabled={false} />);
+
+    openContextMenuFor("Plex");
+    fireEvent.click(screen.getByRole("button", { name: "Open Dashboard" }));
+
+    await waitFor(() => {
+      expect(openSpy).toHaveBeenCalledWith(
+        "http://localhost:32000/web",
+        "_blank",
+        "noopener,noreferrer",
+      );
+    });
+    fetchSpy.mockRestore();
   });
 
   it("routes logs, terminal, and settings actions through callbacks", async () => {
@@ -191,6 +225,61 @@ describe("AppGrid context menu", () => {
         containerName: "plex",
       });
     });
+    fetchSpy.mockRestore();
+  });
+
+  it("does not route logs or terminal when container cannot be resolved", async () => {
+    const onViewLogs = vi.fn();
+    const onOpenTerminal = vi.fn();
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          url: "http://localhost:32400/web",
+          containerName: null,
+          source: "installed_stack",
+          warnings: ["container_name_unresolved"],
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      ),
+    );
+
+    useInstalledAppsMock.mockReturnValue({
+      data: [
+        {
+          id: "plex",
+          name: "Plex",
+          status: "running",
+          webUiPort: 32400,
+          containerName: null,
+          updatedAt: "2026-02-24T00:00:00.000Z",
+        },
+      ],
+      isLoading: false,
+      isError: false,
+    });
+
+    render(
+      <AppGrid
+        animationsEnabled={false}
+        onViewLogs={onViewLogs}
+        onOpenTerminal={onOpenTerminal}
+      />,
+    );
+
+    openContextMenuFor("Plex");
+    fireEvent.click(screen.getByRole("button", { name: "View Logs" }));
+
+    openContextMenuFor("Plex");
+    fireEvent.click(screen.getByRole("button", { name: "Open in Terminal" }));
+
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalled();
+    });
+    expect(onViewLogs).not.toHaveBeenCalled();
+    expect(onOpenTerminal).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
   });
 
