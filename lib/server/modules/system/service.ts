@@ -3,7 +3,7 @@ import "server-only";
 import { LruCache } from "@/lib/server/cache/lru";
 import { serverEnv } from "@/lib/server/env";
 import { logServerAction } from "@/lib/server/logging/logger";
-import type { StorageMetrics, SystemMetricsSnapshot } from "@/lib/shared/contracts/system";
+import type { SmartDiskInfo, StorageMetrics, SystemMetricsSnapshot } from "@/lib/shared/contracts/system";
 import os from "node:os";
 import { statfs } from "node:fs/promises";
 import path from "node:path";
@@ -22,6 +22,30 @@ const HELPER_STATUS_UNAVAILABLE_BACKOFF_MS = 15_000;
 const HELPER_STATUS_ERROR_LOG_COOLDOWN_MS = 30_000;
 const STORAGE_DETAILS_CACHE_TTL_MS = 60_000;
 const WIFI_NETWORKS_CACHE_TTL_MS = 30_000;
+
+/** Filesystem types that are virtual/pseudo and should not appear as real disk volumes. */
+const VIRTUAL_FS_TYPES = new Set([
+  "overlay",
+  "tmpfs",
+  "squashfs",
+  "devtmpfs",
+  "sysfs",
+  "proc",
+  "cgroup",
+  "cgroup2",
+  "nsfs",
+  "fusectl",
+  "hugetlbfs",
+  "mqueue",
+  "debugfs",
+  "tracefs",
+  "securityfs",
+  "configfs",
+  "pstore",
+  "autofs",
+  "efivarfs",
+  "bpf",
+]);
 
 type CachedStorageDetails = Pick<StorageMetrics, "volumes" | "raid" | "smart">;
 
@@ -122,30 +146,84 @@ function summarizeSmartHealth(
 
   let healthyDisks = 0;
   let failingDisks = 0;
+  const disks: SmartDiskInfo[] = [];
 
   for (const disk of diskLayout) {
-    const smartStatus =
+    if (typeof disk.device !== "string" || disk.device.trim().length === 0) continue;
+
+    const rawStatus =
       typeof disk.smartStatus === "string"
         ? disk.smartStatus.trim().toLowerCase()
         : "";
 
+    let diskStatus: SmartDiskInfo["status"];
     if (
-      smartStatus.includes("fail") ||
-      smartStatus.includes("error") ||
-      smartStatus.includes("pred") ||
-      smartStatus.includes("bad")
+      rawStatus.includes("fail") ||
+      rawStatus.includes("error") ||
+      rawStatus.includes("pred") ||
+      rawStatus.includes("bad")
     ) {
+      diskStatus = "degraded";
       failingDisks += 1;
-      continue;
+    } else if (
+      rawStatus.includes("ok") ||
+      rawStatus.includes("good") ||
+      rawStatus.includes("pass")
+    ) {
+      diskStatus = "healthy";
+      healthyDisks += 1;
+    } else {
+      diskStatus = "unknown";
     }
 
-    if (
-      smartStatus.includes("ok") ||
-      smartStatus.includes("good") ||
-      smartStatus.includes("pass")
-    ) {
-      healthyDisks += 1;
-    }
+    const temperatureCelsius =
+      disk.temperature !== null &&
+      typeof disk.temperature === "number" &&
+      Number.isFinite(disk.temperature) &&
+      disk.temperature > 0
+        ? Math.round(disk.temperature)
+        : null;
+
+    const smartDataHours = disk.smartData?.power_on_time?.hours;
+    const powerOnHours =
+      typeof smartDataHours === "number" &&
+      Number.isFinite(smartDataHours) &&
+      smartDataHours >= 0
+        ? Math.round(smartDataHours)
+        : null;
+
+    const sizeBytes =
+      typeof disk.size === "number" && Number.isFinite(disk.size) && disk.size > 0
+        ? disk.size
+        : null;
+
+    disks.push({
+      device: disk.device.trim(),
+      name:
+        typeof disk.name === "string" && disk.name.trim().length > 0
+          ? disk.name.trim()
+          : null,
+      vendor:
+        typeof disk.vendor === "string" && disk.vendor.trim().length > 0
+          ? disk.vendor.trim()
+          : null,
+      type:
+        typeof disk.type === "string" && disk.type.trim().length > 0
+          ? disk.type.trim().toUpperCase()
+          : null,
+      sizeBytes,
+      status: diskStatus,
+      smartStatus:
+        typeof disk.smartStatus === "string" && disk.smartStatus.trim().length > 0
+          ? disk.smartStatus.trim()
+          : "Unknown",
+      temperatureCelsius,
+      powerOnHours,
+    });
+  }
+
+  if (disks.length === 0) {
+    return null;
   }
 
   const status =
@@ -164,6 +242,7 @@ function summarizeSmartHealth(
     failingDisks,
     checkedAt: new Date().toISOString(),
     message,
+    disks,
   };
 }
 
@@ -198,10 +277,24 @@ async function collectStorageDetailMetrics(): Promise<CachedStorageDetails> {
     mediaTypeByDevice.set(baseDeviceFromPartition(disk.device), mediaType);
   }
 
+  // Track seen devices so we only include one entry per physical device
+  // (e.g. /dev/nvme0n1p2 mounted at both / and /boot should show only one).
+  const seenDevices = new Set<string>();
+
   const volumes = fsSizes
     .map((fsSize) => {
       const totalBytesRaw = toFiniteNumber(fsSize.size);
       if (totalBytesRaw === null || totalBytesRaw <= 0) {
+        return null;
+      }
+
+      const filesystem =
+        typeof fsSize.type === "string" && fsSize.type.trim().length > 0
+          ? fsSize.type.trim()
+          : null;
+
+      // Skip virtual / pseudo filesystems (Docker overlay layers, tmpfs, snap, etc.)
+      if (filesystem && VIRTUAL_FS_TYPES.has(filesystem.toLowerCase())) {
         return null;
       }
 
@@ -231,11 +324,17 @@ async function collectStorageDetailMetrics(): Promise<CachedStorageDetails> {
         typeof fsSize.fs === "string" && fsSize.fs.trim().length > 0
           ? fsSize.fs
           : mountPath;
-      const mediaType = mediaTypeByDevice.get(baseDeviceFromPartition(device)) ?? null;
-      const filesystem =
-        typeof fsSize.type === "string" && fsSize.type.trim().length > 0
-          ? fsSize.type.trim()
-          : null;
+
+      // Deduplicate real block devices — keep only the first (most significant) mount point
+      const baseDevice = baseDeviceFromPartition(device);
+      if (baseDevice.startsWith("/dev/") && seenDevices.has(device)) {
+        return null;
+      }
+      if (baseDevice.startsWith("/dev/")) {
+        seenDevices.add(device);
+      }
+
+      const mediaType = mediaTypeByDevice.get(baseDevice) ?? null;
 
       return {
         id: `${device}:${mountPath}`,

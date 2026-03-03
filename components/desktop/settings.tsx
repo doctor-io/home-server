@@ -1096,11 +1096,73 @@ function StorageSection({
       <InfoBanner
         text={
           data.smart
-            ? `${data.smart.message}${smartCheckedLabel ? ` Last check: ${smartCheckedLabel}.` : ""}`
+            ? `${data.smart.message}${smartCheckedLabel ? ` Last checked: ${smartCheckedLabel}.` : ""}`
             : "S.M.A.R.T. status unavailable on this host."
         }
         variant={data.smart?.status === "degraded" ? "warning" : "info"}
       />
+      {data.smart && data.smart.disks.length > 0 && (
+        <div className="rounded-xl border border-glass-border bg-secondary/20 overflow-hidden">
+          {data.smart.disks.map((disk, index) => (
+            <div
+              key={disk.device}
+              className={`flex items-center justify-between px-3 py-2.5 ${
+                index < data.smart!.disks.length - 1 ? "border-b border-glass-border" : ""
+              }`}
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <HardDrive className="size-3.5 shrink-0 text-primary" />
+                <div className="flex flex-col min-w-0">
+                  <span className="text-xs font-medium text-foreground font-mono truncate">
+                    {disk.device}
+                  </span>
+                  {disk.name && (
+                    <span className="text-xs text-muted-foreground truncate">
+                      {disk.name}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-3 shrink-0 ml-3">
+                {disk.type && (
+                  <span className="text-xs text-muted-foreground">{disk.type}</span>
+                )}
+                {disk.sizeBytes !== null && (
+                  <span className="text-xs text-muted-foreground">
+                    {formatStorageSize(disk.sizeBytes)}
+                  </span>
+                )}
+                {disk.temperatureCelsius !== null && (
+                  <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
+                    <Thermometer className="size-3" />
+                    {disk.temperatureCelsius}°C
+                  </span>
+                )}
+                {disk.powerOnHours !== null && (
+                  <span className="text-xs text-muted-foreground">
+                    {disk.powerOnHours >= 8_760
+                      ? `${(disk.powerOnHours / 8_760).toFixed(1)}yr`
+                      : disk.powerOnHours >= 24
+                        ? `${Math.floor(disk.powerOnHours / 24)}d`
+                        : `${disk.powerOnHours}h`}
+                  </span>
+                )}
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                    disk.status === "healthy"
+                      ? "bg-status-green/15 text-status-green"
+                      : disk.status === "degraded"
+                        ? "bg-status-red/15 text-status-red"
+                        : "bg-secondary text-muted-foreground"
+                  }`}
+                >
+                  {disk.smartStatus}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

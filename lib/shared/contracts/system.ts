@@ -62,12 +62,25 @@ export type RaidMetrics = {
   status: "healthy" | "degraded" | "unknown";
 };
 
+export type SmartDiskInfo = {
+  device: string;
+  name: string | null;
+  vendor: string | null;
+  type: string | null;
+  sizeBytes: number | null;
+  status: "healthy" | "degraded" | "unknown";
+  smartStatus: string;
+  temperatureCelsius: number | null;
+  powerOnHours: number | null;
+};
+
 export type SmartHealthMetrics = {
   status: "healthy" | "degraded" | "unknown";
   healthyDisks: number;
   failingDisks: number;
   checkedAt: string;
   message: string;
+  disks: SmartDiskInfo[];
 };
 
 export type WifiAccessPoint = {
