@@ -553,7 +553,7 @@ DBUS_HELPER_SOCKET_PATH=/run/home-server/dbus-helper.sock
 
 # Docker/App Stacks
 STORE_STACKS_ROOT=/var/lib/home-server/stacks
-STORE_DATA_ROOT=/DATA/AppData
+STORE_APP_DATA_ROOT=/DATA/Apps
 EOF
 
 	# Store for downstream steps
@@ -826,8 +826,47 @@ print_summary() {
 
 
 
+redirect_to_update_if_installed() {
+	# If an existing installation is detected, run update.sh instead to preserve data.
+	# Set HOMEIO_FORCE_REINSTALL=true to skip this check and do a full reinstall.
+	if [[ "${HOMEIO_FORCE_REINSTALL:-false}" == "true" ]]; then
+		return
+	fi
+
+	local has_install_dir=false
+	local has_service=false
+
+	[[ -d "${INSTALL_DIR}" && -f "${INSTALL_DIR}/package.json" ]] && has_install_dir=true
+	systemctl cat "${SERVICE_NAME}.service" >/dev/null 2>&1 && has_service=true
+
+	if [[ "${has_install_dir}" == "false" && "${has_service}" == "false" ]]; then
+		return
+	fi
+
+	echo ""
+	print_warn "Existing HomeIO installation detected."
+	print_warn "Running update.sh instead to preserve your data and configuration."
+	print_warn "To force a full reinstall, set HOMEIO_FORCE_REINSTALL=true."
+	echo ""
+
+	local update_url="https://raw.githubusercontent.com/doctor-io/home-server/${REPO_BRANCH}/scripts/update.sh"
+	local tmp_update
+	tmp_update="$(mktemp /tmp/homeio-update-XXXXXX.sh)"
+
+	if ! curl -fsSL "${update_url}" -o "${tmp_update}"; then
+		print_error "Failed to download update script from ${update_url}"
+		print_error "Run the update manually: curl -fsSL ${update_url} | sudo bash"
+		rm -f "${tmp_update}"
+		exit 1
+	fi
+
+	chmod +x "${tmp_update}"
+	exec bash "${tmp_update}"
+}
+
 main() {
 	run_step "Checking root privileges..." require_root
+	redirect_to_update_if_installed
 	run_step "Checking apt availability..." ensure_apt
 	run_step "Validating installer configuration..." validate_identifiers
 	run_step "Configuring hostname..." configure_hostname

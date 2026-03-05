@@ -23,6 +23,7 @@ import {
   listStarredPathsFromDb,
   setPathStarredInDb,
 } from "@/lib/server/modules/files/stars-repository";
+import { listTrashEntriesFromDb } from "@/lib/server/modules/files/trash-repository";
 import type {
   FileInfoResponse,
   FileListEntry,
@@ -35,6 +36,7 @@ import type {
   FileRenameResponse,
   FileServiceErrorCode,
   FileToggleStarResponse,
+  FileUploadResponse,
   FileWriteResponse,
 } from "@/lib/shared/contracts/files";
 
@@ -67,6 +69,17 @@ const IMAGE_MIME_BY_EXTENSION: Record<string, string> = {
   webp: "image/webp",
   svg: "image/svg+xml",
   bmp: "image/bmp",
+};
+
+const VIDEO_MIME_BY_EXTENSION: Record<string, string> = {
+  mp4: "video/mp4",
+  webm: "video/webm",
+  ogg: "video/ogg",
+  ogv: "video/ogg",
+  mov: "video/quicktime",
+  mkv: "video/x-matroska",
+  avi: "video/x-msvideo",
+  m4v: "video/mp4",
 };
 
 export const MAX_TEXT_READ_BYTES = 2 * 1024 * 1024;
@@ -234,6 +247,7 @@ function isTextExtension(extension: string | null) {
 export function getMimeTypeForExtension(extension: string | null) {
   if (!extension) return null;
   if (extension in IMAGE_MIME_BY_EXTENSION) return IMAGE_MIME_BY_EXTENSION[extension];
+  if (extension in VIDEO_MIME_BY_EXTENSION) return VIDEO_MIME_BY_EXTENSION[extension];
   if (extension === "pdf") return "application/pdf";
   if (TEXT_EXTENSIONS.has(extension)) return "text/plain; charset=utf-8";
   return null;
@@ -244,6 +258,7 @@ function toViewerMode(extension: string | null): FileReadMode {
   if (TEXT_EXTENSIONS.has(extension)) return "text";
   if (extension in IMAGE_MIME_BY_EXTENSION) return "image";
   if (extension === "pdf") return "pdf";
+  if (extension in VIDEO_MIME_BY_EXTENSION) return "video";
   return "binary_unsupported";
 }
 
@@ -395,8 +410,16 @@ export async function listDirectory(params: ListDirectoryParams = {}): Promise<F
       withFileTypes: true,
     });
     const output: FileListEntry[] = [];
-    const starredPathSet = new Set(await listStarredPathsFromDb());
     const listingTrash = isTrashPathSegments(resolved.segments);
+
+    const [starredPathSet, trashMetaMap] = await Promise.all([
+      listStarredPathsFromDb().then((paths) => new Set(paths)),
+      listingTrash
+        ? listTrashEntriesFromDb().then(
+            (rows) => new Map(rows.map((r) => [r.trashPath, r])),
+          )
+        : Promise.resolve(new Map<string, { originalPath: string; deletedAt: Date }>()),
+    ]);
 
     const visibleEntries = entries.filter(
       (entry) => includeHidden || listingTrash || !isHiddenName(entry.name),
@@ -417,6 +440,7 @@ export async function listDirectory(params: ListDirectoryParams = {}): Promise<F
       if (!type) continue;
 
       const entryPublicPath = toPublicPath([...resolved.segments, entry.name]);
+      const trashMeta = trashMetaMap.get(entryPublicPath);
       output.push({
         name: entry.name,
         path: entryPublicPath,
@@ -426,6 +450,10 @@ export async function listDirectory(params: ListDirectoryParams = {}): Promise<F
         modifiedAt: info.mtime.toISOString(),
         mtimeMs: info.mtimeMs,
         starred: starredPathSet.has(entryPublicPath),
+        ...(trashMeta && {
+          trashOriginalPath: trashMeta.originalPath,
+          trashDeletedAt: trashMeta.deletedAt.toISOString(),
+        }),
       });
     }
 
@@ -656,6 +684,49 @@ export async function resolveReadableFileAbsolutePath(input: {
   };
 }
 
+export async function resolveDownloadableFolderAbsolutePath(input: {
+  path: string;
+  includeHidden?: boolean;
+}) {
+  let resolved: ResolvedFilesPath | undefined;
+
+  try {
+    resolved = await resolveFilePath(input.path, Boolean(input.includeHidden), {
+      allowEmpty: false,
+    });
+    const linkInfo = await lstat(resolved.absolutePath);
+    if (linkInfo.isSymbolicLink()) {
+      throw new FileServiceError("Symlinks are not allowed", {
+        code: "symlink_blocked",
+        statusCode: 403,
+      });
+    }
+    if (!linkInfo.isDirectory()) {
+      throw new FileServiceError("Path is not a directory", {
+        code: "not_a_directory",
+        statusCode: 400,
+      });
+    }
+  } catch (error) {
+    throw mapFsError(
+      error,
+      "Failed to resolve folder",
+      resolved?.absolutePath,
+    );
+  }
+
+  const folderName = path.basename(resolved.absolutePath);
+  const parentAbsolutePath = path.dirname(resolved.absolutePath);
+
+  return {
+    root: resolved.rootPath,
+    path: resolved.relativePath,
+    absolutePath: resolved.absolutePath,
+    parentAbsolutePath,
+    folderName,
+  };
+}
+
 export async function createDirectoryEntry(
   params: CreateEntryParams,
 ): Promise<FileCreateResponse> {
@@ -838,6 +909,12 @@ export async function pasteEntry(params: PasteEntryParams): Promise<FilePasteRes
         targetPath.absolutePath,
         sourceInfo.isDirectory(),
       );
+      // Migrate star to new path so favourites don't go stale after a move
+      const wasStarred = await isPathStarredInDb(sourcePath.relativePath);
+      if (wasStarred) {
+        await setPathStarredInDb(sourcePath.relativePath, false);
+        await setPathStarredInDb(targetPath.relativePath, true);
+      }
     }
 
     return {
@@ -1011,4 +1088,202 @@ export async function toggleStarEntry(
   } catch (error) {
     throw mapFsError(error, "Failed to update star status", resolved?.absolutePath);
   }
+}
+
+export async function getStarredEntries(): Promise<FileListResponse> {
+  const starredPaths = await listStarredPathsFromDb();
+  const output: FileListEntry[] = [];
+
+  await Promise.all(
+    starredPaths.map(async (starredPath) => {
+      try {
+        const resolved = await resolveFilePath(starredPath, true, {
+          allowEmpty: false,
+        });
+        const info = await lstat(resolved.absolutePath);
+        if (info.isSymbolicLink()) return;
+        const type = info.isDirectory() ? "folder" : info.isFile() ? "file" : null;
+        if (!type) return;
+        output.push({
+          name: path.basename(resolved.relativePath),
+          path: resolved.relativePath,
+          type,
+          ext: type === "file" ? getExtension(path.basename(resolved.relativePath)) : null,
+          sizeBytes: type === "file" ? info.size : null,
+          modifiedAt: info.mtime.toISOString(),
+          mtimeMs: info.mtimeMs,
+          starred: true,
+        });
+      } catch {
+        // File no longer exists — silently skip stale star
+      }
+    }),
+  );
+
+  output.sort((a, b) => a.name.localeCompare(b.name));
+
+  const rootResolved = await resolveFilePath("", true, { allowEmpty: true });
+
+  return {
+    root: rootResolved.rootPath,
+    cwd: "Starred",
+    entries: output,
+  };
+}
+
+export type SearchFilesParams = {
+  query: string;
+  /** Relative path within FILES_ROOT to search under (default: root) */
+  basePath?: string;
+  includeHidden?: boolean;
+  /** Maximum results to return (default: 200) */
+  limit?: number;
+};
+
+export async function searchFiles(params: SearchFilesParams): Promise<FileListResponse> {
+  const includeHidden = Boolean(params.includeHidden);
+  const query = params.query.trim().toLowerCase();
+  const limit = params.limit ?? 200;
+
+  if (query.length === 0) {
+    throw new FileServiceError("Search query is empty", {
+      code: "invalid_path",
+      statusCode: 400,
+    });
+  }
+
+  let baseResolved: ResolvedFilesPath;
+  try {
+    baseResolved = await resolveFilePath(params.basePath, includeHidden);
+    const info = await lstat(baseResolved.absolutePath);
+    if (!info.isDirectory()) {
+      throw new FileServiceError("Path is not a directory", {
+        code: "not_a_directory",
+        statusCode: 400,
+      });
+    }
+  } catch (error) {
+    throw mapFsError(error, "Failed to resolve search base path");
+  }
+
+  const output: FileListEntry[] = [];
+
+  async function walk(absoluteDir: string, relativeDir: string) {
+    if (output.length >= limit) return;
+
+    let dirEntries: { name: string; isDirectory(): boolean; isFile(): boolean; isSymbolicLink(): boolean }[];
+    try {
+      dirEntries = (await readdir(absoluteDir, { withFileTypes: true })).map((d) => ({
+        name: d.name.toString(),
+        isDirectory: () => d.isDirectory(),
+        isFile: () => d.isFile(),
+        isSymbolicLink: () => d.isSymbolicLink(),
+      }));
+    } catch {
+      return;
+    }
+
+    for (const entry of dirEntries) {
+      if (output.length >= limit) return;
+
+      if (!includeHidden && isHiddenName(entry.name)) continue;
+      // Never descend into Trash from the root
+      if (relativeDir === "" && entry.name === "Trash") continue;
+
+      const absoluteEntryPath = path.join(absoluteDir, entry.name);
+      let info: Awaited<ReturnType<typeof lstat>>;
+      try {
+        info = await lstat(absoluteEntryPath);
+      } catch {
+        continue;
+      }
+      if (info.isSymbolicLink()) continue;
+
+      const type = info.isDirectory() ? "folder" : info.isFile() ? "file" : null;
+      if (!type) continue;
+
+      const entryRelativePath = relativeDir ? `${relativeDir}/${entry.name}` : entry.name;
+
+      if (entry.name.toLowerCase().includes(query)) {
+        output.push({
+          name: entry.name,
+          path: entryRelativePath,
+          type,
+          ext: type === "file" ? getExtension(entry.name) : null,
+          sizeBytes: type === "file" ? info.size : null,
+          modifiedAt: info.mtime.toISOString(),
+          mtimeMs: info.mtimeMs,
+        });
+      }
+
+      if (type === "folder") {
+        await walk(absoluteEntryPath, entryRelativePath);
+      }
+    }
+  }
+
+  await walk(baseResolved.absolutePath, baseResolved.relativePath);
+
+  output.sort((a, b) => a.name.localeCompare(b.name));
+
+  return {
+    root: baseResolved.rootPath,
+    cwd: baseResolved.relativePath,
+    entries: output,
+  };
+}
+
+export type UploadFilesParams = {
+  /** Relative path of the target directory within FILES_ROOT */
+  destinationPath: string;
+  files: { name: string; buffer: Buffer }[];
+  includeHidden?: boolean;
+};
+
+export async function uploadFiles(params: UploadFilesParams): Promise<FileUploadResponse> {
+  const includeHidden = Boolean(params.includeHidden);
+  const destination = await assertDirectoryPath(params.destinationPath, includeHidden, {
+    allowEmpty: true,
+  });
+
+  const uploaded: FileUploadResponse["uploaded"] = [];
+  const skipped: string[] = [];
+
+  await Promise.all(
+    params.files.map(async ({ name, buffer }) => {
+      let safeName: string;
+      try {
+        safeName = ensureSafeName(name, includeHidden);
+      } catch {
+        skipped.push(name);
+        return;
+      }
+
+      const relativePath = joinRelativePath(destination.segments, safeName);
+      let targetPath: ResolvedFilesPath;
+      try {
+        targetPath = await resolveFilePath(relativePath, includeHidden, {
+          allowEmpty: false,
+          allowMissingLeaf: true,
+        });
+      } catch {
+        skipped.push(name);
+        return;
+      }
+
+      if (targetPath.exists || (await pathExists(targetPath.absolutePath))) {
+        skipped.push(name);
+        return;
+      }
+
+      await writeFile(targetPath.absolutePath, buffer);
+      uploaded.push({
+        name: safeName,
+        path: targetPath.relativePath,
+        sizeBytes: buffer.length,
+      });
+    }),
+  );
+
+  return { uploaded, skipped };
 }

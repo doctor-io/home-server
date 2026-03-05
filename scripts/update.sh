@@ -148,6 +148,26 @@ install_dependencies_if_needed() {
 	fi
 }
 
+run_database_migrations() {
+	print_status "Running database migrations..."
+
+	if [[ ! -f "${ENV_FILE}" ]]; then
+		print_error "Environment file not found: ${ENV_FILE}. Cannot run migrations."
+		exit 1
+	fi
+
+	# Check if there are any pending migration files
+	if [[ ! -d "${INSTALL_DIR}/drizzle" ]] || [[ -z "$(ls -A "${INSTALL_DIR}/drizzle"/*.sql 2>/dev/null)" ]]; then
+		print_status "No migration files found in ${INSTALL_DIR}/drizzle. Skipping."
+		return
+	fi
+
+	(set -a && source "${ENV_FILE}" && set +a && cd "${INSTALL_DIR}" && npm run db:migrate --silent) \
+		|| { print_error "Database migration failed. Rolling back."; exit 1; }
+
+	print_status "Database migrations applied successfully."
+}
+
 build_app() {
 	print_status "Building Next.js application..."
 	cd "${INSTALL_DIR}" && npm run build --silent 1>/dev/null
@@ -344,6 +364,7 @@ main() {
 	fi
 
 	install_dependencies_if_needed
+	run_database_migrations
 	build_app
 	start_service
 	configure_reverse_proxy

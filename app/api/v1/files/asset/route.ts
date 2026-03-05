@@ -41,7 +41,11 @@ export async function GET(request: NextRequest) {
           path: filePath,
           includeHidden: serverEnv.FILES_ALLOW_HIDDEN,
         });
-        if (!(details.mode === "image" || details.mode === "pdf")) {
+        if (
+          details.mode !== "image" &&
+          details.mode !== "pdf" &&
+          details.mode !== "video"
+        ) {
           return NextResponse.json(
             {
               error: "Unsupported asset preview type",
@@ -57,6 +61,45 @@ export async function GET(request: NextRequest) {
           path: filePath,
           includeHidden: serverEnv.FILES_ALLOW_HIDDEN,
         });
+
+        // For video files, support HTTP Range requests so the browser
+        // can seek without downloading the whole file first.
+        if (details.mode === "video") {
+          const rangeHeader = request.headers.get("range");
+          const { absolutePath } = resolved;
+          const fileSize = details.sizeBytes;
+
+          if (rangeHeader) {
+            const [startStr, endStr] = rangeHeader.replace(/bytes=/, "").split("-");
+            const start = parseInt(startStr, 10);
+            const end = endStr ? parseInt(endStr, 10) : fileSize - 1;
+            const chunkSize = end - start + 1;
+
+            const stream = createReadStream(absolutePath, { start, end });
+            return new NextResponse(Readable.toWeb(stream) as ReadableStream, {
+              status: 206,
+              headers: {
+                "Content-Range": `bytes ${start}-${end}/${fileSize}`,
+                "Accept-Ranges": "bytes",
+                "Content-Length": String(chunkSize),
+                "Content-Type": details.mimeType ?? "application/octet-stream",
+                "Cache-Control": "no-store",
+              },
+            });
+          }
+
+          const stream = createReadStream(absolutePath);
+          return new NextResponse(Readable.toWeb(stream) as ReadableStream, {
+            status: 200,
+            headers: {
+              "Accept-Ranges": "bytes",
+              "Content-Length": String(fileSize),
+              "Content-Type": details.mimeType ?? "application/octet-stream",
+              "Cache-Control": "no-store",
+            },
+          });
+        }
+
         const stream = createReadStream(resolved.absolutePath);
 
         return new NextResponse(Readable.toWeb(stream) as ReadableStream, {

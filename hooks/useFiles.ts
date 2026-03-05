@@ -103,6 +103,13 @@ export function buildDownloadUrl(filePath: string) {
   return `/api/v1/files/download?${params.toString()}`;
 }
 
+export function buildZipUrl(folderPath: string) {
+  const params = new URLSearchParams({
+    path: folderPath,
+  });
+  return `/api/v1/files/zip?${params.toString()}`;
+}
+
 async function fetchRoot() {
   return withClientTiming(
     {
@@ -477,13 +484,18 @@ async function fetchDirectoryWithHidden(filePath: string, includeHidden: boolean
   );
 }
 
-export function useFilesDirectory(pathSegments: string[], includeHidden = false) {
+export function useFilesDirectory(
+  pathSegments: string[],
+  includeHidden = false,
+  options: { enabled?: boolean } = {},
+) {
   const filePath = toFilePath(pathSegments);
 
   return useQuery({
     queryKey: queryKeys.filesList(filePath, includeHidden),
     queryFn: () => fetchDirectoryWithHidden(filePath, includeHidden),
     staleTime: 3_000,
+    enabled: options.enabled !== false,
   });
 }
 
@@ -604,6 +616,153 @@ export function useToggleFileStar() {
     mutationFn: toggleStar,
     onSuccess: (_data, pathValue) => {
       invalidateFileListPath(queryClient, getParentPath(pathValue));
+      void queryClient.invalidateQueries({ queryKey: queryKeys.filesStarred });
+    },
+  });
+}
+
+async function fetchStarredFiles() {
+  return withClientTiming(
+    {
+      layer: "hook",
+      action: "hooks.useFiles.fetchStarred",
+      meta: { endpoint: "/api/v1/files/starred" },
+    },
+    async () => {
+      const response = await fetch("/api/v1/files/starred", {
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        const errorBody = (await response.json().catch(() => ({}))) as {
+          error?: string;
+          code?: string;
+        };
+        throw new Error(
+          errorBody.error ??
+            `Failed to fetch starred items (${response.status})`,
+        );
+      }
+      const json = (await response.json()) as ListFilesApiResponse;
+      return json.data;
+    },
+  );
+}
+
+export function useStarredFiles() {
+  return useQuery({
+    queryKey: queryKeys.filesStarred,
+    queryFn: fetchStarredFiles,
+    staleTime: 5_000,
+  });
+}
+
+async function uploadFilesToPath(payload: {
+  destinationPath: string;
+  files: File[];
+  includeHidden?: boolean;
+}) {
+  return withClientTiming(
+    {
+      layer: "hook",
+      action: "hooks.useFiles.upload",
+      meta: { endpoint: "/api/v1/files/upload" },
+    },
+    async () => {
+      const formData = new FormData();
+      formData.append("path", payload.destinationPath);
+      if (payload.includeHidden) formData.append("includeHidden", "true");
+      for (const file of payload.files) {
+        formData.append("file", file);
+      }
+
+      const response = await fetch("/api/v1/files/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorBody = (await response.json().catch(() => ({}))) as {
+          error?: string;
+          code?: string;
+        };
+        throw new Error(
+          errorBody.error ??
+            `Upload failed (${response.status})${errorBody.code ? ` [${errorBody.code}]` : ""}`,
+        );
+      }
+
+      const json = (await response.json()) as {
+        data: { uploaded: { name: string; path: string; sizeBytes: number }[]; skipped: string[] };
+      };
+      return json.data;
+    },
+  );
+}
+
+async function searchFilesRequest(params: {
+  query: string;
+  basePath?: string;
+  includeHidden?: boolean;
+}) {
+  const searchParams = new URLSearchParams({ q: params.query });
+  if (params.basePath) searchParams.set("path", params.basePath);
+  if (params.includeHidden) searchParams.set("includeHidden", "true");
+  const endpoint = `/api/v1/files/search?${searchParams.toString()}`;
+
+  return withClientTiming(
+    {
+      layer: "hook",
+      action: "hooks.useFiles.search",
+      meta: { endpoint, query: params.query },
+    },
+    async () => {
+      const response = await fetch(endpoint, { cache: "no-store" });
+      if (!response.ok) {
+        const errorBody = (await response.json().catch(() => ({}))) as {
+          error?: string;
+          code?: string;
+        };
+        throw new Error(
+          errorBody.error ??
+            `Search failed (${response.status})${errorBody.code ? ` [${errorBody.code}]` : ""}`,
+        );
+      }
+      const json = (await response.json()) as ListFilesApiResponse;
+      return json.data;
+    },
+  );
+}
+
+export function useSearchFiles(params: {
+  query: string;
+  basePath?: string;
+  includeHidden?: boolean;
+  enabled?: boolean;
+}) {
+  return useQuery({
+    queryKey: queryKeys.filesSearch(
+      params.query,
+      params.basePath ?? "",
+      params.includeHidden ?? false,
+    ),
+    queryFn: () =>
+      searchFilesRequest({
+        query: params.query,
+        basePath: params.basePath,
+        includeHidden: params.includeHidden,
+      }),
+    enabled: Boolean(params.enabled) && params.query.trim().length >= 2,
+    staleTime: 10_000,
+  });
+}
+
+export function useUploadFiles() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: uploadFilesToPath,
+    onSuccess: (_data, variables) => {
+      invalidateFileListPath(queryClient, variables.destinationPath);
     },
   });
 }

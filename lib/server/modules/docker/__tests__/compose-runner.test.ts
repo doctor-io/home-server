@@ -51,7 +51,7 @@ services:
     expect(sanitizeStackName("AdGuard Home!")).toBe("adguard-home");
   });
 
-  it("converts named volumes to bind mounts under DATA/AppData in legacy mode", () => {
+  it("converts named volumes to bind mounts under DATA/Apps in legacy mode", () => {
     const compose = `
 services:
   twofauth:
@@ -118,8 +118,12 @@ volumes:
     expect(normalized.composeContent).toContain(
       '- "/DATA/Apps/home-assistant/var/lib/homeassistant/media:/var/lib/homeassistant/media"',
     );
-    expect(normalized.composeContent).not.toContain("big-bear-home-assistant_config:");
-    expect(normalized.composeContent).not.toContain("big-bear-home-assistant_media:");
+    expect(normalized.composeContent).not.toContain(
+      "big-bear-home-assistant_config:",
+    );
+    expect(normalized.composeContent).not.toContain(
+      "big-bear-home-assistant_media:",
+    );
     expect(Array.from(normalized.bindMountDirectories)).toContain(
       "/DATA/Apps/home-assistant/config",
     );

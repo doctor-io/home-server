@@ -1,7 +1,7 @@
 "use client";
 
-import { useDesktopAppearance } from "@/hooks/useDesktopAppearance";
 import { CurrentUserError, useCurrentUser } from "@/hooks/useCurrentUser";
+import { useDesktopAppearance } from "@/hooks/useDesktopAppearance";
 import { readLockState, writeLockState } from "@/lib/desktop/lock-state";
 import {
   Activity,
@@ -16,8 +16,8 @@ import {
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppGrid, type AppActionTarget } from "./app-grid";
-import { AppConfiguratorPanel } from "./apps/app-configurator-panel";
 import { AppStore } from "./app-store";
+import { AppConfiguratorPanel } from "./apps/app-configurator-panel";
 import { Dock } from "./dock";
 import { FileManager } from "./file-manager";
 import { LockScreen } from "./lock-screen";
@@ -51,8 +51,7 @@ export function DesktopShell() {
     error: currentUserError,
     isLoading: isLoadingUser,
     isError: isCurrentUserError,
-  } =
-    useCurrentUser();
+  } = useCurrentUser();
   const [openWindows, setOpenWindows] = useState<string[]>([]);
   const [closingWindows, setClosingWindows] = useState<string[]>([]);
   const [focusedWindow, setFocusedWindow] = useState<string | null>(null);
@@ -61,7 +60,9 @@ export function DesktopShell() {
   const [isLogoutPending, setIsLogoutPending] = useState(false);
   const [isSettingsSearchOpen, setIsSettingsSearchOpen] = useState(false);
   const [settingsSearchQuery, setSettingsSearchQuery] = useState("");
-  const [settingsSectionRequest, setSettingsSectionRequest] = useState<string | null>(null);
+  const [settingsSectionRequest, setSettingsSectionRequest] = useState<
+    string | null
+  >(null);
   const [terminalCommandRequest, setTerminalCommandRequest] = useState<{
     id: number;
     command: string;
@@ -69,11 +70,10 @@ export function DesktopShell() {
   const [terminalMode, setTerminalMode] = useState<"interactive" | "logs">(
     "interactive",
   );
-  const [appSettingsTarget, setAppSettingsTarget] = useState<AppActionTarget | null>(null);
+  const [appSettingsTarget, setAppSettingsTarget] =
+    useState<AppActionTarget | null>(null);
   const terminalCommandIdRef = useRef(0);
-  const [displayWallpaper, setDisplayWallpaper] = useState(
-    "/images/1.jpg",
-  );
+  const [displayWallpaper, setDisplayWallpaper] = useState("/images/1.jpg");
   const [nextWallpaper, setNextWallpaper] = useState<string | null>(null);
   const [isWallpaperFading, setIsWallpaperFading] = useState(false);
   const closeTimersRef = useRef<Record<string, number>>({});
@@ -349,24 +349,27 @@ export function DesktopShell() {
     }
   }, [router, setLockState]);
 
-  const handleUnlock = useCallback(async (password: string) => {
-    const response = await fetch("/api/auth/unlock", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ password }),
-    });
+  const handleUnlock = useCallback(
+    async (password: string) => {
+      const response = await fetch("/api/auth/unlock", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ password }),
+      });
 
-    if (!response.ok) {
-      const json = (await response.json().catch(() => ({}))) as {
-        error?: string;
-      };
-      throw new Error(json.error ?? "Invalid password");
-    }
+      if (!response.ok) {
+        const json = (await response.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        throw new Error(json.error ?? "Invalid password");
+      }
 
-    setLockState(false);
-  }, [setLockState]);
+      setLockState(false);
+    },
+    [setLockState],
+  );
 
   useEffect(() => {
     if (!isSettingsSearchOpen) return;
@@ -514,8 +517,8 @@ export function DesktopShell() {
             title="Files"
             icon={<FolderOpen className="size-4 text-sky-400" />}
             onClose={() => closeWindow("files")}
-            defaultWidth={940}
-            defaultHeight={580}
+            defaultWidth={1100}
+            defaultHeight={679}
             zIndex={getWindowZ("files")}
             onFocus={() => setFocusedWindow("files")}
             isClosing={closingWindows.includes("files")}
@@ -575,7 +578,9 @@ export function DesktopShell() {
             isClosing={closingWindows.includes("app-store")}
             animationsEnabled={appearance.animationsEnabled}
           >
-            <AppStore onOpenCustomInstall={() => openWindow("custom-install")} />
+            <AppStore
+              onOpenCustomInstall={() => openWindow("custom-install")}
+            />
           </Window>
         )}
 

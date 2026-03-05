@@ -26,6 +26,7 @@ export type FileReadMode =
   | "text"
   | "image"
   | "pdf"
+  | "video"
   | "binary_unsupported"
   | "too_large";
 
@@ -38,6 +39,10 @@ export type FileListEntry = {
   modifiedAt: string;
   mtimeMs: number;
   starred?: boolean;
+  /** Only present for entries inside Trash */
+  trashOriginalPath?: string;
+  /** Only present for entries inside Trash (ISO string) */
+  trashDeletedAt?: string;
 };
 
 export type FileListResponse = {
@@ -78,6 +83,17 @@ export type FileWriteResponse = {
   sizeBytes: number;
   modifiedAt: string;
   mtimeMs: number;
+};
+
+export type FileUploadResult = {
+  name: string;
+  path: string;
+  sizeBytes: number;
+};
+
+export type FileUploadResponse = {
+  uploaded: FileUploadResult[];
+  skipped: string[];
 };
 
 export type FileCreateRequest = {

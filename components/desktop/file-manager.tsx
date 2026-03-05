@@ -4,6 +4,7 @@ import { NetworkStorageDialog } from "@/components/desktop/network-storage-dialo
 import {
   buildAssetUrl,
   buildDownloadUrl,
+  buildZipUrl,
   toFilePath,
   useCreateFile,
   useCreateFolder,
@@ -14,7 +15,10 @@ import {
   usePasteFileEntry,
   useRenameFileEntry,
   useSaveFileContent,
+  useSearchFiles,
+  useStarredFiles,
   useToggleFileStar,
+  useUploadFiles,
 } from "@/hooks/useFiles";
 import {
   useCreateLocalFolderShare,
@@ -30,7 +34,7 @@ import {
   useRestoreFromTrash,
 } from "@/hooks/useTrashActions";
 import { formatBytesCompact } from "@/lib/client/format";
-import type { FileListEntry } from "@/lib/shared/contracts/files";
+import type { FileInfoResponse, FileListEntry } from "@/lib/shared/contracts/files";
 import {
   ArrowUp,
   ChevronRight,
@@ -48,23 +52,28 @@ import {
   FileVideo,
   Folder,
   FolderOpen,
+  Globe,
   HardDrive,
   Home,
   Info,
   LayoutGrid,
   Link2,
   List,
+  Loader2,
   Plus,
   Save,
   Scissors,
   Search,
   SortAsc,
+  SortDesc,
   Star,
   Trash2,
+  Upload,
   Users,
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 
 // --- Types ---
 
@@ -79,6 +88,8 @@ type FileEntry = {
   modifiedAt: string;
   mtimeMs: number;
   starred?: boolean;
+  trashOriginalPath?: string;
+  trashDeletedAt?: string;
 };
 
 // --- Helpers ---
@@ -124,6 +135,8 @@ function toUiFileEntry(entry: FileListEntry): FileEntry {
     modifiedAt: entry.modifiedAt,
     mtimeMs: entry.mtimeMs,
     starred: entry.starred ?? false,
+    trashOriginalPath: entry.trashOriginalPath,
+    trashDeletedAt: entry.trashDeletedAt,
   };
 }
 
@@ -334,6 +347,8 @@ type SidebarSection = {
   }[];
 };
 
+const STARRED_VIRTUAL_PATH = ["⭐Starred"] as const;
+
 const sidebarSections: SidebarSection[] = [
   {
     title: "Favorites",
@@ -342,6 +357,11 @@ const sidebarSections: SidebarSection[] = [
         name: "Home",
         icon: <Home className="size-4 text-muted-foreground" />,
         path: [],
+      },
+      {
+        name: "Starred",
+        icon: <Star className="size-4 text-amber-400 fill-amber-400" />,
+        path: [...STARRED_VIRTUAL_PATH],
       },
       {
         name: "Documents",
@@ -386,14 +406,21 @@ type CreateEntryDialogState = {
   name: string;
   error: string | null;
 };
+type RenameDialogState = {
+  entry: FileEntry;
+  name: string;
+  error: string | null;
+};
 
 export function FileManager() {
   const rootRef = useRef<HTMLDivElement>(null);
   const [currentPath, setCurrentPath] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortBy>("name");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [showContextMenu, setShowContextMenu] = useState<{
     x: number;
     y: number;
@@ -403,7 +430,15 @@ export function FileManager() {
   const [openFile, setOpenFile] = useState<OpenFileState | null>(null);
   const [fileDrafts, setFileDrafts] = useState<Record<string, string>>({});
   const [editorNotice, setEditorNotice] = useState<string | null>(null);
-  const [statusNotice, setStatusNotice] = useState<string | null>(null);
+  const [statusNotice, setStatusNoticeRaw] = useState<string | null>(null);
+  const statusNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function setStatusNotice(msg: string | null) {
+    if (statusNoticeTimerRef.current) clearTimeout(statusNoticeTimerRef.current);
+    setStatusNoticeRaw(msg);
+    if (msg !== null) {
+      statusNoticeTimerRef.current = setTimeout(() => setStatusNoticeRaw(null), 4000);
+    }
+  }
   const [showNetworkDialog, setShowNetworkDialog] = useState(false);
   const [clipboardState, setClipboardState] = useState<ClipboardState | null>(
     null,
@@ -412,9 +447,22 @@ export function FileManager() {
   const [includeHidden, setIncludeHidden] = useState(false);
   const [createEntryDialog, setCreateEntryDialog] =
     useState<CreateEntryDialogState | null>(null);
+  const [renameDialog, setRenameDialog] =
+    useState<RenameDialogState | null>(null);
+  const [fileInfoDialog, setFileInfoDialog] =
+    useState<FileInfoResponse | null>(null);
+  const [pendingEntryPath, setPendingEntryPath] = useState<string | null>(null);
+  const [showEmptyTrashConfirm, setShowEmptyTrashConfirm] = useState(false);
+
+  const isStarredView = currentPath.length === 1 && currentPath[0] === STARRED_VIRTUAL_PATH[0];
 
   const filesRootQuery = useFilesRoot();
-  const directoryQuery = useFilesDirectory(currentPath, includeHidden);
+  const directoryQuery = useFilesDirectory(
+    isStarredView ? [] : currentPath,
+    includeHidden,
+    { enabled: !isStarredView },
+  );
+  const starredFilesQuery = useStarredFiles();
   const systemMetricsQuery = useSystemMetrics();
   const networkSharesQuery = useNetworkShares();
   const localSharesQuery = useLocalFolderShares();
@@ -431,18 +479,43 @@ export function FileManager() {
   const renameFileEntryMutation = useRenameFileEntry();
   const getFileInfoMutation = useFileEntryInfo();
   const toggleStarMutation = useToggleFileStar();
+  const uploadFilesMutation = useUploadFiles();
+  const uploadInputRef = useRef<HTMLInputElement>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [globalSearch, setGlobalSearch] = useState(false);
   const openFilePath = openFile ? toFilePath(openFile.path) : null;
   const fileContentQuery = useFileContent(openFilePath);
+  const globalSearchQuery = useSearchFiles({
+    query: searchQuery,
+    basePath: undefined, // always search from root
+    includeHidden,
+    enabled: globalSearch && searchQuery.trim().length >= 2,
+  });
 
-  const currentEntries = useMemo(
-    () => (directoryQuery.data?.entries ?? []).map(toUiFileEntry),
-    [directoryQuery.data?.entries],
-  );
+  const isGlobalSearchActive =
+    globalSearch && searchQuery.trim().length >= 2;
+
+  const currentEntries = useMemo(() => {
+    if (isGlobalSearchActive) {
+      return (globalSearchQuery.data?.entries ?? []).map(toUiFileEntry);
+    }
+    const rawEntries = isStarredView
+      ? (starredFilesQuery.data?.entries ?? [])
+      : (directoryQuery.data?.entries ?? []);
+    return rawEntries.map(toUiFileEntry);
+  }, [
+    isGlobalSearchActive,
+    globalSearchQuery.data?.entries,
+    isStarredView,
+    starredFilesQuery.data?.entries,
+    directoryQuery.data?.entries,
+  ]);
 
   const sortedEntries = useMemo(() => {
     let entries = [...currentEntries];
 
-    if (searchQuery) {
+    // Local filter only applies when NOT in global search mode
+    if (searchQuery && !isGlobalSearchActive) {
       entries = entries.filter((e) =>
         e.name.toLowerCase().includes(searchQuery.toLowerCase()),
       );
@@ -452,19 +525,20 @@ export function FileManager() {
     const folders = entries.filter((e) => e.type === "folder");
     const files = entries.filter((e) => e.type === "file");
 
+    const dir = sortDir === "asc" ? 1 : -1;
     const sortFn = (a: FileEntry, b: FileEntry) => {
-      if (sortBy === "name") return a.name.localeCompare(b.name);
+      if (sortBy === "name") return dir * a.name.localeCompare(b.name);
       if (sortBy === "modified") {
         return (
-          new Date(b.modifiedAt).getTime() - new Date(a.modifiedAt).getTime()
+          dir * (new Date(a.modifiedAt).getTime() - new Date(b.modifiedAt).getTime())
         );
       }
-      if (sortBy === "size") return (b.sizeBytes ?? 0) - (a.sizeBytes ?? 0);
+      if (sortBy === "size") return dir * ((a.sizeBytes ?? 0) - (b.sizeBytes ?? 0));
       return 0;
     };
 
     return [...folders.sort(sortFn), ...files.sort(sortFn)];
-  }, [currentEntries, searchQuery, sortBy]);
+  }, [currentEntries, searchQuery, sortBy, sortDir]);
 
   const openFileKey = openFilePath;
   const openFileLanguage = openFile
@@ -561,15 +635,127 @@ export function FileManager() {
     setEditorNotice(null);
   }, [openFileKey]);
 
+  // Keyboard navigation — only fires when no input/textarea is focused
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      // Don't hijack keystrokes while an input, textarea, or contenteditable is focused
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        (e.target as HTMLElement)?.isContentEditable
+      ) {
+        return;
+      }
+      // Don't steal shortcuts while any dialog overlay is open
+      if (
+        createEntryDialog ||
+        renameDialog ||
+        fileInfoDialog ||
+        showEmptyTrashConfirm ||
+        showContextMenu
+      ) {
+        return;
+      }
+
+      if (e.key === "Escape") {
+        e.preventDefault();
+        if (openFile) {
+          setOpenFile(null);
+        } else if (selectedFile || selectedFiles.size > 0) {
+          clearSelection();
+        } else if (searchQuery) {
+          setSearchQuery("");
+        }
+        return;
+      }
+
+      // Arrow-key navigation only makes sense in the directory view
+      if (openFile) return;
+
+      const entries = sortedEntries;
+      if (entries.length === 0) return;
+
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        const currentIdx = selectedFile
+          ? entries.findIndex((en) => en.name === selectedFile)
+          : -1;
+        const nextIdx =
+          e.key === "ArrowDown"
+            ? Math.min(currentIdx + 1, entries.length - 1)
+            : Math.max(currentIdx - 1, 0);
+        setSelectedFile(entries[nextIdx].name);
+        setSelectedFiles(new Set([entries[nextIdx].name]));
+        return;
+      }
+
+      if (e.key === "Enter" || e.key === "ArrowRight") {
+        if (!selectedFile) return;
+        const entry = entries.find((en) => en.name === selectedFile);
+        if (!entry) return;
+        e.preventDefault();
+        navigateTo(entry);
+        return;
+      }
+
+      if (e.key === "Backspace" || e.key === "ArrowLeft") {
+        if (currentPath.length > 0 && !isStarredView) {
+          e.preventDefault();
+          navigateUp();
+        }
+        return;
+      }
+
+      if (e.key === "Delete") {
+        const toDelete = selectedFiles.size > 0 ? [...selectedFiles] : selectedFile ? [selectedFile] : [];
+        if (toDelete.length === 0) return;
+        e.preventDefault();
+        for (const name of toDelete) {
+          const entry = entries.find((en) => en.name === name);
+          if (!entry) continue;
+          if (isTrashView) {
+            void handleDeleteFromTrash(entry);
+          } else {
+            void handleMoveSelectedToTrash(entry);
+          }
+        }
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [
+    sortedEntries,
+    selectedFile,
+    selectedFiles,
+    openFile,
+    currentPath,
+    isStarredView,
+    isTrashView,
+    searchQuery,
+    createEntryDialog,
+    renameDialog,
+    fileInfoDialog,
+    showEmptyTrashConfirm,
+    showContextMenu,
+  ]);
+
+  function clearSelection() {
+    setSelectedFile(null);
+    setSelectedFiles(new Set());
+  }
+
   function openFileInEditor(path: string[], entry: FileEntry) {
     setOpenFile({ path, entry });
     setSelectedFile(entry.name);
+    setSelectedFiles(new Set([entry.name]));
   }
 
   function navigateTo(entry: FileEntry) {
     if (entry.type === "folder") {
       setCurrentPath(entry.path.split("/").filter(Boolean));
-      setSelectedFile(null);
+      clearSelection();
       setOpenFile(null);
       return;
     }
@@ -579,7 +765,7 @@ export function FileManager() {
 
   function navigateToPath(pathSegments: string[]) {
     setCurrentPath(normalizePathForBackend(pathSegments));
-    setSelectedFile(null);
+    clearSelection();
     setSearchQuery("");
     setOpenFile(null);
     setStatusNotice(null);
@@ -587,8 +773,57 @@ export function FileManager() {
 
   function navigateUp() {
     setCurrentPath((prev) => prev.slice(0, -1));
-    setSelectedFile(null);
+    clearSelection();
     setOpenFile(null);
+  }
+
+  function handleEntryClick(e: React.MouseEvent, entry: FileEntry) {
+    if (e.ctrlKey || e.metaKey) {
+      // Ctrl/Cmd+click: toggle individual item
+      setSelectedFiles((prev) => {
+        const next = new Set(prev);
+        if (next.has(entry.name)) {
+          next.delete(entry.name);
+        } else {
+          next.add(entry.name);
+        }
+        return next;
+      });
+      setSelectedFile(entry.name);
+    } else if (e.shiftKey && selectedFile) {
+      // Shift+click: range-select from anchor to clicked item
+      const anchorIdx = sortedEntries.findIndex((en) => en.name === selectedFile);
+      const clickedIdx = sortedEntries.findIndex((en) => en.name === entry.name);
+      if (anchorIdx !== -1 && clickedIdx !== -1) {
+        const [from, to] =
+          anchorIdx <= clickedIdx
+            ? [anchorIdx, clickedIdx]
+            : [clickedIdx, anchorIdx];
+        setSelectedFiles(
+          new Set(sortedEntries.slice(from, to + 1).map((en) => en.name)),
+        );
+      }
+      setSelectedFile(entry.name);
+    } else {
+      // Plain click
+      setSelectedFiles(new Set([entry.name]));
+      setSelectedFile(entry.name);
+    }
+  }
+
+  async function handleTrashSelected() {
+    const names = [...selectedFiles];
+    if (names.length === 0) return;
+    clearSelection();
+    for (const name of names) {
+      const entry = sortedEntries.find((en) => en.name === name);
+      if (!entry) continue;
+      try {
+        await moveToTrashMutation.mutateAsync({ path: entry.path });
+      } catch {
+        // individual errors surfaced by mutation error handling
+      }
+    }
   }
 
   async function handleCreateEntry(kind: "file" | "folder", name: string) {
@@ -734,6 +969,7 @@ export function FileManager() {
   }
 
   async function handleMoveSelectedToTrash(entry: FileEntry) {
+    setPendingEntryPath(entry.path);
     try {
       const result = await moveToTrashMutation.mutateAsync({
         path: entry.path,
@@ -747,10 +983,13 @@ export function FileManager() {
       setStatusNotice(
         error instanceof Error ? error.message : "Failed to move item to Trash",
       );
+    } finally {
+      setPendingEntryPath(null);
     }
   }
 
   async function handleRestoreFromTrash(entry: FileEntry) {
+    setPendingEntryPath(entry.path);
     try {
       const result = await restoreFromTrashMutation.mutateAsync({
         path: entry.path,
@@ -764,10 +1003,13 @@ export function FileManager() {
           ? error.message
           : "Failed to restore item from Trash",
       );
+    } finally {
+      setPendingEntryPath(null);
     }
   }
 
   async function handleDeleteFromTrash(entry: FileEntry) {
+    setPendingEntryPath(entry.path);
     try {
       await deleteFromTrashMutation.mutateAsync({
         path: entry.path,
@@ -780,27 +1022,24 @@ export function FileManager() {
           ? error.message
           : "Failed to permanently delete item",
       );
+    } finally {
+      setPendingEntryPath(null);
     }
   }
 
-  async function handleEmptyTrash() {
-    if (!isTrashView || currentEntries.length === 0 || isEmptyingTrash) {
-      return;
-    }
-    if (typeof window !== "undefined") {
-      const confirmed = window.confirm(
-        `Permanently delete ${currentEntries.length} item${currentEntries.length > 1 ? "s" : ""} from Trash?`,
-      );
-      if (!confirmed) {
-        return;
-      }
-    }
+  function handleEmptyTrash() {
+    const totalCount = directoryQuery.data?.entries.length ?? currentEntries.length;
+    if (!isTrashView || totalCount === 0 || isEmptyingTrash) return;
+    setShowEmptyTrashConfirm(true);
+  }
 
+  async function confirmEmptyTrash() {
+    setShowEmptyTrashConfirm(false);
     setIsEmptyingTrash(true);
     try {
       const result = await emptyTrashMutation.mutateAsync();
       setStatusNotice(
-        `Trash emptied (${result.deletedCount} item${result.deletedCount > 1 ? "s" : ""})`,
+        `Trash emptied (${result.deletedCount} item${result.deletedCount !== 1 ? "s" : ""})`,
       );
     } catch (error) {
       setStatusNotice(
@@ -811,28 +1050,41 @@ export function FileManager() {
     }
   }
 
-  async function handleRenameEntry(entry: FileEntry) {
+  function handleRenameEntry(entry: FileEntry) {
     if (isTrashView) {
       setStatusNotice("Rename is disabled in Trash");
       return;
     }
-    const newName = window.prompt("Rename item", entry.name);
-    if (!newName || newName.trim() === entry.name) {
+    setRenameDialog({ entry, name: entry.name, error: null });
+  }
+
+  function closeRenameDialog() {
+    if (renameFileEntryMutation.isPending) return;
+    setRenameDialog(null);
+  }
+
+  async function submitRenameDialog() {
+    if (!renameDialog) return;
+    const newName = renameDialog.name.trim();
+    if (!newName || newName === renameDialog.entry.name) {
+      setRenameDialog(null);
       return;
     }
-
     try {
       const result = await renameFileEntryMutation.mutateAsync({
-        path: entry.path,
-        newName: newName.trim(),
+        path: renameDialog.entry.path,
+        newName,
       });
+      setRenameDialog(null);
       setSelectedFile(null);
       setStatusNotice(
-        `Renamed to ${result.path.split("/").pop() ?? newName.trim()}`,
+        `Renamed to ${result.path.split("/").pop() ?? newName}`,
       );
     } catch (error) {
-      setStatusNotice(
-        error instanceof Error ? error.message : "Failed to rename item",
+      const message =
+        error instanceof Error ? error.message : "Failed to rename item";
+      setRenameDialog((prev) =>
+        prev ? { ...prev, error: message } : prev,
       );
     }
   }
@@ -840,9 +1092,7 @@ export function FileManager() {
   async function handleGetInfo(entry: FileEntry) {
     try {
       const info = await getFileInfoMutation.mutateAsync(entry.path);
-      setStatusNotice(
-        `${info.name} | ${info.type} | ${formatBytesCompact(info.sizeBytes)} | perms ${info.permissions}`,
-      );
+      setFileInfoDialog(info);
     } catch (error) {
       setStatusNotice(
         error instanceof Error ? error.message : "Failed to get item info",
@@ -863,9 +1113,33 @@ export function FileManager() {
     }
   }
 
+  async function handleUploadFiles(files: File[]) {
+    if (files.length === 0 || isTrashView || isStarredView) return;
+    const destinationPath = toFilePath(currentPath);
+    try {
+      const result = await uploadFilesMutation.mutateAsync({
+        destinationPath,
+        files,
+        includeHidden,
+      });
+      const uploaded = result.uploaded.length;
+      const skipped = result.skipped.length;
+      if (uploaded > 0 && skipped === 0) {
+        setStatusNotice(`Uploaded ${uploaded} file${uploaded !== 1 ? "s" : ""}`);
+      } else if (uploaded > 0) {
+        setStatusNotice(`Uploaded ${uploaded}, skipped ${skipped} (already exist)`);
+      } else {
+        setStatusNotice(`Skipped ${skipped} file${skipped !== 1 ? "s" : ""} (already exist)`);
+      }
+    } catch (error) {
+      setStatusNotice(error instanceof Error ? error.message : "Upload failed");
+    }
+  }
+
   function handleDownloadEntry(entry: FileEntry) {
-    if (entry.type !== "file") {
-      setStatusNotice("Download is only available for files");
+    if (entry.type === "folder") {
+      const zipUrl = buildZipUrl(entry.path);
+      window.open(zipUrl, "_blank", "noopener,noreferrer");
       return;
     }
     const downloadUrl = buildDownloadUrl(entry.path);
@@ -1049,41 +1323,86 @@ export function FileManager() {
           </nav>
 
           <div className="flex items-center gap-1 shrink-0">
-            <button
-              onClick={() => {
-                openCreateEntryDialog("folder");
-              }}
-              disabled={createFolderMutation.isPending}
-              className="relative inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-              aria-label="New folder"
-              title="New folder"
-            >
-              <Folder className="size-3.5" />
-              <Plus className="absolute -right-0.5 -top-0.5 size-2.5" />
-            </button>
-            <button
-              onClick={() => {
-                openCreateEntryDialog("file");
-              }}
-              disabled={createFileMutation.isPending}
-              className="relative inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-              aria-label="New file"
-              title="New file"
-            >
-              <File className="size-3.5" />
-              <Plus className="absolute -right-0.5 -top-0.5 size-2.5" />
-            </button>
+            {!isTrashView && !isStarredView && (
+              <>
+                <button
+                  onClick={() => {
+                    openCreateEntryDialog("folder");
+                  }}
+                  disabled={createFolderMutation.isPending}
+                  className="relative inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label="New folder"
+                  title="New folder"
+                >
+                  <Folder className="size-3.5" />
+                  <Plus className="absolute -right-0.5 -top-0.5 size-2.5" />
+                </button>
+                <button
+                  onClick={() => {
+                    openCreateEntryDialog("file");
+                  }}
+                  disabled={createFileMutation.isPending}
+                  className="relative inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label="New file"
+                  title="New file"
+                >
+                  <File className="size-3.5" />
+                  <Plus className="absolute -right-0.5 -top-0.5 size-2.5" />
+                </button>
+                <button
+                  onClick={() => uploadInputRef.current?.click()}
+                  disabled={uploadFilesMutation.isPending}
+                  className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label="Upload files"
+                  title="Upload files"
+                >
+                  <Upload className="size-3.5" />
+                </button>
+                <input
+                  ref={uploadInputRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files ?? []);
+                    void handleUploadFiles(files);
+                    e.target.value = "";
+                  }}
+                />
+              </>
+            )}
           </div>
 
-          <div className="relative w-40 shrink-0">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 size-3 text-muted-foreground" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search..."
-              className="h-7 w-full pl-7 pr-2 rounded-lg bg-secondary/40 border border-glass-border text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary/40 focus:bg-secondary/60 transition-all"
-            />
+          <div className="flex items-center gap-1 shrink-0">
+            <div className="relative w-36">
+              {globalSearchQuery.isFetching ? (
+                <Loader2 className="absolute left-2 top-1/2 -translate-y-1/2 size-3 text-primary animate-spin" />
+              ) : (
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 size-3 text-muted-foreground" />
+              )}
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={globalSearch ? "Search everywhere..." : "Search..."}
+                className={`h-7 w-full pl-7 pr-2 rounded-lg bg-secondary/40 border text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:bg-secondary/60 transition-all ${
+                  globalSearch
+                    ? "border-primary/40 focus:border-primary/60"
+                    : "border-glass-border focus:border-primary/40"
+                }`}
+              />
+            </div>
+            <button
+              onClick={() => setGlobalSearch((v) => !v)}
+              className={`inline-flex size-7 items-center justify-center rounded-lg text-xs transition-colors cursor-pointer ${
+                globalSearch
+                  ? "bg-primary/20 text-primary hover:bg-primary/30"
+                  : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+              }`}
+              title={globalSearch ? "Switch to local search" : "Search everywhere (recursive)"}
+            >
+              <Globe className="size-3.5" />
+            </button>
           </div>
 
           {/* Sort */}
@@ -1117,20 +1436,24 @@ export function FileManager() {
               )}
             </button>
             <button
-              onClick={() =>
-                setSortBy((s) =>
-                  s === "name"
-                    ? "modified"
-                    : s === "modified"
-                      ? "size"
-                      : "name",
-                )
-              }
+              onClick={() => {
+                setSortBy((s) => {
+                  const next = s === "name" ? "modified" : s === "modified" ? "size" : "name";
+                  setSortDir("asc"); // reset direction when switching field
+                  return next;
+                });
+              }}
               className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-secondary/50 text-xs text-muted-foreground transition-colors cursor-pointer"
-              title={`Sort by: ${sortBy}`}
+              title={`Sort by: ${sortBy} (click to change field)`}
             >
-              <SortAsc className="size-3" />
               <span className="capitalize hidden xl:inline">{sortBy}</span>
+            </button>
+            <button
+              onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
+              className="flex items-center p-1 rounded-lg hover:bg-secondary/50 text-muted-foreground transition-colors cursor-pointer"
+              title={sortDir === "asc" ? "Ascending — click to reverse" : "Descending — click to reverse"}
+            >
+              {sortDir === "asc" ? <SortAsc className="size-3" /> : <SortDesc className="size-3" />}
             </button>
           </div>
 
@@ -1162,7 +1485,33 @@ export function FileManager() {
         </div>
 
         {/* File area */}
-        <div className="flex-1 overflow-y-auto p-3">
+        <div
+          className="flex-1 overflow-y-auto p-3 relative"
+          onDragOver={(e) => {
+            if (isTrashView || isStarredView) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "copy";
+            setIsDragOver(true);
+          }}
+          onDragLeave={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+              setIsDragOver(false);
+            }
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            setIsDragOver(false);
+            if (isTrashView || isStarredView) return;
+            const files = Array.from(e.dataTransfer.files);
+            void handleUploadFiles(files);
+          }}
+        >
+          {isDragOver && !isTrashView && !isStarredView && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-primary/60 bg-primary/5 pointer-events-none">
+              <Upload className="size-8 text-primary/70 mb-2" />
+              <span className="text-sm text-primary/80 font-medium">Drop files to upload</span>
+            </div>
+          )}
           {openFile ? (
             <div className="flex h-full flex-col overflow-hidden rounded-xl border border-glass-border bg-card/75">
               <div className="flex items-center gap-2 border-b border-glass-border bg-popover/70 px-3 py-2">
@@ -1240,6 +1589,17 @@ export function FileManager() {
                     src={openFileAssetUrl}
                     className="h-full w-full border-0 bg-card/90"
                   />
+                ) : openFileViewer?.mode === "video" ? (
+                  <div className="flex h-full items-center justify-center overflow-auto bg-black/95 p-4">
+                    { }
+                    <video
+                      key={openFileAssetUrl}
+                      src={openFileAssetUrl}
+                      controls
+                      className="max-h-full max-w-full"
+                      style={{ outline: "none" }}
+                    />
+                  </div>
                 ) : openFileViewer?.mode === "too_large" ? (
                   <div className="flex h-full items-center justify-center p-6 text-center text-sm text-muted-foreground">
                     This file is too large to open in the editor.
@@ -1272,11 +1632,19 @@ export function FileManager() {
             </div>
           ) : sortedEntries.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground">
-              <FolderOpen className="size-12 opacity-30" />
+              {isGlobalSearchActive && globalSearchQuery.isFetching ? (
+                <Loader2 className="size-10 animate-spin opacity-40" />
+              ) : (
+                <FolderOpen className="size-12 opacity-30" />
+              )}
               <span className="text-sm">
-                {searchQuery
-                  ? "No matching files found"
-                  : "This folder is empty"}
+                {isGlobalSearchActive
+                  ? globalSearchQuery.isFetching
+                    ? "Searching..."
+                    : "No results found"
+                  : searchQuery
+                    ? "No matching files found"
+                    : "This folder is empty"}
               </span>
             </div>
           ) : viewMode === "grid" ? (
@@ -1284,18 +1652,23 @@ export function FileManager() {
               {sortedEntries.map((entry) => (
                 <button
                   key={entry.name}
-                  onClick={() => setSelectedFile(entry.name)}
+                  title={isGlobalSearchActive ? entry.path : entry.name}
+                  onClick={(e) => handleEntryClick(e, entry)}
                   onDoubleClick={() => navigateTo(entry)}
                   onContextMenu={(e) => handleContextMenu(e, entry)}
                   className={`flex flex-col items-center gap-2 p-3 rounded-xl transition-all cursor-pointer ${
-                    selectedFile === entry.name
+                    selectedFiles.has(entry.name)
                       ? "bg-primary/15 border border-primary/30"
                       : "border border-transparent hover:bg-secondary/40"
                   }`}
                 >
                   <div className="relative">
-                    {getLargeFileIcon(entry)}
-                    {entry.starred && (
+                    {pendingEntryPath === entry.path ? (
+                      <div className="size-10 flex items-center justify-center">
+                        <Loader2 className="size-6 text-primary animate-spin" />
+                      </div>
+                    ) : getLargeFileIcon(entry)}
+                    {entry.starred && pendingEntryPath !== entry.path && (
                       <Star className="absolute -top-1 -right-1 size-3 text-amber-400 fill-amber-400" />
                     )}
                   </div>
@@ -1317,37 +1690,61 @@ export function FileManager() {
               {/* List header */}
               <div className="flex items-center gap-3 px-3 py-2 border-b border-glass-border text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 <span className="flex-1 min-w-0">Name</span>
+                {isTrashView && (
+                  <span className="w-48 text-right hidden lg:block">Original Location</span>
+                )}
+                {isGlobalSearchActive && (
+                  <span className="w-48 text-right hidden lg:block">Location</span>
+                )}
                 <span className="w-20 text-right hidden sm:block">Size</span>
                 <span className="w-32 text-right hidden md:block">
-                  Modified
+                  {isTrashView ? "Deleted" : "Modified"}
                 </span>
               </div>
               {sortedEntries.map((entry) => (
                 <button
                   key={entry.name}
-                  onClick={() => setSelectedFile(entry.name)}
+                  onClick={(e) => handleEntryClick(e, entry)}
                   onDoubleClick={() => navigateTo(entry)}
                   onContextMenu={(e) => handleContextMenu(e, entry)}
                   className={`flex items-center gap-3 px-3 py-2 transition-colors cursor-pointer text-left ${
-                    selectedFile === entry.name
+                    selectedFiles.has(entry.name)
                       ? "bg-primary/15"
                       : "hover:bg-secondary/30"
                   }`}
                 >
                   <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                    {getFileIcon(entry)}
+                    {pendingEntryPath === entry.path ? (
+                      <Loader2 className="size-4 text-primary animate-spin shrink-0" />
+                    ) : getFileIcon(entry)}
                     <span className="text-xs text-foreground truncate">
                       {entry.name}
                     </span>
-                    {entry.starred && (
+                    {entry.starred && pendingEntryPath !== entry.path && (
                       <Star className="size-3 text-amber-400 fill-amber-400 shrink-0" />
                     )}
                   </div>
+                  {isTrashView && (
+                    <span className="w-48 text-right text-xs text-muted-foreground shrink-0 truncate hidden lg:block" title={entry.trashOriginalPath}>
+                      {entry.trashOriginalPath ?? "—"}
+                    </span>
+                  )}
+                  {isGlobalSearchActive && (
+                    <span className="w-48 text-right text-xs text-muted-foreground shrink-0 truncate hidden lg:block" title={entry.path}>
+                      {entry.path.includes("/")
+                        ? entry.path.slice(0, entry.path.lastIndexOf("/"))
+                        : "/"}
+                    </span>
+                  )}
                   <span className="w-20 text-right text-xs text-muted-foreground shrink-0 hidden sm:block">
                     {entry.type === "folder" ? "—" : (entry.size ?? "0 B")}
                   </span>
                   <span className="w-32 text-right text-xs text-muted-foreground shrink-0 hidden md:block">
-                    {entry.modified}
+                    {isTrashView
+                      ? entry.trashDeletedAt
+                        ? new Date(entry.trashDeletedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                        : "—"
+                      : entry.modified}
                   </span>
                 </button>
               ))}
@@ -1357,11 +1754,28 @@ export function FileManager() {
 
         {/* Status bar */}
         <div className="flex items-center justify-between px-3 py-1.5 border-t border-glass-border bg-card/60 text-xs text-muted-foreground">
-          <span>
-            {folderCount > 0 &&
-              `${folderCount} folder${folderCount > 1 ? "s" : ""}`}
-            {folderCount > 0 && fileCount > 0 && ", "}
-            {fileCount > 0 && `${fileCount} file${fileCount > 1 ? "s" : ""}`}
+          <span className="flex items-center gap-3">
+            <span>
+              {folderCount > 0 &&
+                `${folderCount} folder${folderCount > 1 ? "s" : ""}`}
+              {folderCount > 0 && fileCount > 0 && ", "}
+              {fileCount > 0 && `${fileCount} file${fileCount > 1 ? "s" : ""}`}
+            </span>
+            {selectedFiles.size > 1 && (
+              <span className="flex items-center gap-1.5 text-primary">
+                <span>{selectedFiles.size} selected</span>
+                {!isTrashView && !isStarredView && (
+                  <button
+                    onClick={() => void handleTrashSelected()}
+                    className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-status-red/10 text-status-red hover:bg-status-red/20 transition-colors cursor-pointer"
+                    title="Move selected to Trash"
+                  >
+                    <Trash2 className="size-3" />
+                    <span>Trash selected</span>
+                  </button>
+                )}
+              </span>
+            )}
           </span>
           <div className="flex items-center gap-3">
             {statusNotice ? (
@@ -1412,7 +1826,7 @@ export function FileManager() {
           <ContextMenuItem
             icon={<Link2 className="size-3.5" />}
             label="Copy Path"
-            onClick={() => {
+            onClick={async () => {
               const entry = showContextMenu.entry;
               setShowContextMenu(null);
               const hostname = systemMetricsQuery.data?.hostname ?? "";
@@ -1425,7 +1839,27 @@ export function FileManager() {
                   ? `${filesRootPath}/${entry.path}`
                   : `/${entry.path}`;
               }
-              void navigator.clipboard.writeText(fullPath);
+              try {
+                if (navigator.clipboard?.writeText) {
+                  await navigator.clipboard.writeText(fullPath);
+                } else {
+                  // Fallback for non-secure contexts (HTTP)
+                  const el = document.createElement("textarea");
+                  el.value = fullPath;
+                  el.style.position = "fixed";
+                  el.style.opacity = "0";
+                  document.body.appendChild(el);
+                  el.select();
+                  const ok = document.execCommand("copy");
+                  document.body.removeChild(el);
+                  if (!ok) throw new Error("execCommand failed");
+                }
+                toast.success("Path copied to clipboard");
+              } catch {
+                toast.error("Could not copy automatically", {
+                  description: fullPath,
+                });
+              }
             }}
           />
           {!isTrashView ? (
@@ -1482,17 +1916,15 @@ export function FileManager() {
               void handleToggleStar(entry);
             }}
           />
-          {showContextMenu.entry.type === "file" ? (
-            <ContextMenuItem
-              icon={<Download className="size-3.5" />}
-              label="Download"
-              onClick={() => {
-                const entry = showContextMenu.entry;
-                setShowContextMenu(null);
-                handleDownloadEntry(entry);
-              }}
-            />
-          ) : null}
+          <ContextMenuItem
+            icon={<Download className="size-3.5" />}
+            label={showContextMenu.entry.type === "folder" ? "Download as Zip" : "Download"}
+            onClick={() => {
+              const entry = showContextMenu.entry;
+              setShowContextMenu(null);
+              handleDownloadEntry(entry);
+            }}
+          />
           {showContextMenu.entry.type === "folder" && !isTrashView ? (
             <>
               <ContextMenuItem
@@ -1652,6 +2084,180 @@ export function FileManager() {
                 className="rounded-lg bg-primary/20 px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/30 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Create
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {renameDialog ? (
+        <div
+          className="absolute inset-0 z-[205] flex items-center justify-center bg-background/35 px-4 backdrop-blur-[1px]"
+          onClick={() => {
+            closeRenameDialog();
+          }}
+        >
+          <div
+            className="w-full max-w-xs rounded-xl border border-glass-border bg-popover/95 p-3 shadow-2xl shadow-black/45"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Rename item"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-2 flex items-center gap-2 text-sm font-medium text-foreground">
+              {renameDialog.entry.type === "folder" ? (
+                <Folder className="size-4 text-sky-400" />
+              ) : (
+                <File className="size-4 text-emerald-400" />
+              )}
+              <span>Rename</span>
+            </div>
+            <label className="mb-2 block text-xs text-muted-foreground">
+              New name
+              <input
+                autoFocus
+                type="text"
+                value={renameDialog.name}
+                onChange={(event) =>
+                  setRenameDialog((prev) =>
+                    prev
+                      ? { ...prev, name: event.target.value, error: null }
+                      : prev,
+                  )
+                }
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    void submitRenameDialog();
+                  } else if (event.key === "Escape") {
+                    event.preventDefault();
+                    closeRenameDialog();
+                  }
+                }}
+                className="mt-1 h-8 w-full rounded-lg border border-glass-border bg-secondary/30 px-2 text-xs text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary/40 focus:bg-secondary/50"
+                placeholder={renameDialog.entry.name}
+              />
+            </label>
+            {renameDialog.error ? (
+              <div className="mb-2 text-xs text-status-red">
+                {renameDialog.error}
+              </div>
+            ) : null}
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  closeRenameDialog();
+                }}
+                disabled={renameFileEntryMutation.isPending}
+                className="rounded-lg px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  void submitRenameDialog();
+                }}
+                disabled={
+                  renameDialog.name.trim().length === 0 ||
+                  renameDialog.name.trim() === renameDialog.entry.name ||
+                  renameFileEntryMutation.isPending
+                }
+                className="rounded-lg bg-primary/20 px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/30 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {renameFileEntryMutation.isPending ? "Renaming…" : "Rename"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {showEmptyTrashConfirm ? (
+        <div
+          className="absolute inset-0 z-[205] flex items-center justify-center bg-background/35 px-4 backdrop-blur-[1px]"
+          onClick={() => setShowEmptyTrashConfirm(false)}
+        >
+          <div
+            className="w-full max-w-xs rounded-xl border border-glass-border bg-popover/95 p-4 shadow-2xl shadow-black/45"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Empty Trash"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
+              <Trash2 className="size-4 text-status-red shrink-0" />
+              <span>Empty Trash</span>
+            </div>
+            <p className="mb-4 text-xs text-muted-foreground leading-relaxed">
+              Permanently delete{" "}
+              <span className="font-semibold text-foreground">
+                {directoryQuery.data?.entries.length ?? currentEntries.length}{" "}
+                item{(directoryQuery.data?.entries.length ?? currentEntries.length) !== 1 ? "s" : ""}
+              </span>{" "}
+              from Trash? This cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowEmptyTrashConfirm(false)}
+                className="rounded-lg px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => void confirmEmptyTrash()}
+                className="rounded-lg bg-status-red/15 px-2.5 py-1 text-xs font-medium text-status-red transition-colors hover:bg-status-red/25"
+              >
+                Empty Trash
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {fileInfoDialog ? (
+        <div
+          className="absolute inset-0 z-[205] flex items-center justify-center bg-background/35 px-4 backdrop-blur-[1px]"
+          onClick={() => setFileInfoDialog(null)}
+        >
+          <div
+            className="w-full max-w-sm rounded-xl border border-glass-border bg-popover/95 p-4 shadow-2xl shadow-black/45"
+            role="dialog"
+            aria-modal="true"
+            aria-label="File info"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="mb-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {getFileIcon({ ...fileInfoDialog, modified: "", modifiedAt: "", mtimeMs: 0 } as FileEntry)}
+                <span className="text-sm font-semibold text-foreground truncate max-w-56">{fileInfoDialog.name}</span>
+              </div>
+              <button
+                onClick={() => setFileInfoDialog(null)}
+                className="rounded-md p-1 text-muted-foreground hover:bg-secondary/50 hover:text-foreground transition-colors"
+              >
+                <X className="size-3.5" />
+              </button>
+            </div>
+            {/* Info rows */}
+            <div className="space-y-1.5 text-xs">
+              {[
+                { label: "Type", value: fileInfoDialog.type === "folder" ? "Folder" : (fileInfoDialog.ext ? fileInfoDialog.ext.toUpperCase() + " file" : "File") },
+                { label: "Size", value: fileInfoDialog.type === "folder" ? "—" : formatBytesCompact(fileInfoDialog.sizeBytes) },
+                { label: "Modified", value: new Date(fileInfoDialog.modifiedAt).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }) },
+                { label: "Created", value: new Date(fileInfoDialog.createdAt).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }) },
+                { label: "Path", value: fileInfoDialog.path },
+                { label: "Permissions", value: fileInfoDialog.permissions },
+                { label: "Starred", value: fileInfoDialog.starred ? "Yes" : "No" },
+              ].map(({ label, value }) => (
+                <div key={label} className="flex items-start gap-2 rounded-lg px-2.5 py-1.5 bg-secondary/20">
+                  <span className="w-24 shrink-0 text-muted-foreground">{label}</span>
+                  <span className="text-foreground font-mono break-all">{value}</span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 flex justify-end">
+              <button
+                onClick={() => setFileInfoDialog(null)}
+                className="rounded-lg px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground"
+              >
+                Close
               </button>
             </div>
           </div>

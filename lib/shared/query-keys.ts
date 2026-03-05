@@ -11,12 +11,15 @@ export const queryKeys = {
   storeOperation: (operationId: string) =>
     ["store", "operation", operationId] as const,
   filesRoot: ["files", "root"] as const,
+  filesStarred: ["files", "starred"] as const,
   filesList: (filePath: string, includeHidden = false) =>
     ["files", "list", filePath, includeHidden] as const,
   fileContent: (filePath: string) => ["files", "content", filePath] as const,
   networkShares: ["files", "network", "shares"] as const,
   localFolderShares: ["files", "shared", "folders"] as const,
   trashEntries: (filePath: string) => ["files", "trash", "entries", filePath] as const,
+  filesSearch: (query: string, basePath: string, includeHidden: boolean) =>
+    ["files", "search", query, basePath, includeHidden] as const,
   currentWeather: (latitude: number | null, longitude: number | null) =>
     ["weather", "current", latitude, longitude] as const,
 };
