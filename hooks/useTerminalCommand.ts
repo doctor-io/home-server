@@ -1,17 +1,16 @@
 "use client";
 
-import { useMutation } from "@tanstack/react-query";
+import { useCallback, useState } from "react";
 import { withClientTiming } from "@/lib/client/logger";
 import type {
   TerminalExecuteRequest,
   TerminalExecuteResult,
 } from "@/lib/shared/contracts/terminal";
 
-type TerminalMutationResponse = {
-  data: TerminalExecuteResult;
-};
-
-async function postTerminalCommand(payload: TerminalExecuteRequest) {
+async function postTerminalCommand(
+  payload: TerminalExecuteRequest,
+  signal?: AbortSignal,
+): Promise<TerminalExecuteResult> {
   return withClientTiming(
     {
       layer: "hook",
@@ -28,6 +27,7 @@ async function postTerminalCommand(payload: TerminalExecuteRequest) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(payload),
+        signal,
       });
 
       if (!response.ok) {
@@ -40,20 +40,35 @@ async function postTerminalCommand(payload: TerminalExecuteRequest) {
         );
       }
 
-      const json = (await response.json()) as TerminalMutationResponse;
+      const json = (await response.json()) as { data: TerminalExecuteResult };
       return json.data;
     },
   );
 }
 
 export function useTerminalCommand() {
-  const mutation = useMutation({
-    mutationFn: postTerminalCommand,
-  });
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [executeError, setExecuteError] = useState<Error | null>(null);
 
-  return {
-    executeCommand: mutation.mutateAsync,
-    isExecuting: mutation.isPending,
-    executeError: mutation.error,
-  };
+  const executeCommand = useCallback(
+    async (payload: TerminalExecuteRequest, signal?: AbortSignal) => {
+      setIsExecuting(true);
+      setExecuteError(null);
+      try {
+        const result = await postTerminalCommand(payload, signal);
+        return result;
+      } catch (error) {
+        const err = error instanceof Error ? error : new Error("Unknown error");
+        if (err.name !== "AbortError") {
+          setExecuteError(err);
+        }
+        throw error;
+      } finally {
+        setIsExecuting(false);
+      }
+    },
+    [],
+  );
+
+  return { executeCommand, isExecuting, executeError };
 }

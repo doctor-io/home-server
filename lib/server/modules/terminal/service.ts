@@ -113,8 +113,24 @@ function toOutputLine(type: TerminalOutputLine["type"], content: string): Termin
   };
 }
 
+/**
+ * Matches ANSI / VT100 escape sequences that programs emit for colours,
+ * cursor movement, window titles, etc.  Stripping them keeps the HTTP
+ * terminal output readable as plain text.
+ *
+ * Covers:
+ *   CSI sequences  ESC [ … final-byte   (colours, erase, cursor, …)
+ *   OSC sequences  ESC ] … BEL          (window title, hyperlinks, …)
+ */
+const ANSI_ESCAPE_RE =
+  /\x1b(?:\[\??[0-9;]*[A-Za-z]|\][^\x07]*\x07|[()][AB012]|[<=>])/g;
+
 function trimOutput(content: string) {
-  return content.replace(/\r\n/g, "\n").trimEnd();
+  return content
+    .replace(ANSI_ESCAPE_RE, "") // strip ANSI escape sequences
+    .replace(/\r\n/g, "\n") // normalise Windows CRLF
+    .replace(/\r/g, "") // strip bare CR (progress-bar overwrites)
+    .trimEnd();
 }
 
 function toHomePath(rawPath: string) {

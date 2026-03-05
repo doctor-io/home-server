@@ -45,6 +45,38 @@ type TerminalUpgradeRequest = IncomingMessage & {
 
 const activeTerminalSessionIdsByUser = new Map<string, Set<string>>();
 
+/**
+ * Allowlist of environment variable names that are safe to forward to PTY
+ * child processes.  Deliberately excludes any application secrets such as
+ * DATABASE_URL, AUTH_SESSION_SECRET, API keys, etc. that live in process.env.
+ */
+const PTY_SAFE_ENV_KEYS = new Set([
+  "HOME",
+  "USER",
+  "LOGNAME",
+  "SHELL",
+  "PATH",
+  "LANG",
+  "LC_ALL",
+  "LC_CTYPE",
+  "LC_MESSAGES",
+  "COLORTERM",
+  "DISPLAY",
+  "XDG_RUNTIME_DIR",
+  "XDG_SESSION_TYPE",
+  "DBUS_SESSION_BUS_ADDRESS",
+]);
+
+/** Build a minimal, safe environment for PTY child processes. */
+function buildPtyEnv(): Record<string, string> {
+  const env: Record<string, string> = { TERM: "xterm-256color" };
+  for (const key of PTY_SAFE_ENV_KEYS) {
+    const val = process.env[key];
+    if (val !== undefined) env[key] = val;
+  }
+  return env;
+}
+
 function parseCookies(headerValue: string | undefined) {
   if (!headerValue) return {} as Record<string, string>;
   const parsed: Record<string, string> = {};
@@ -223,7 +255,7 @@ export function initializeWebSocketServer(server: Server): void {
           cols: 80,
           rows: 24,
           cwd,
-          env: process.env as { [key: string]: string },
+          env: buildPtyEnv(),
         });
 
         attachPty(nextPty, () => {
@@ -245,7 +277,7 @@ export function initializeWebSocketServer(server: Server): void {
           cols: 80,
           rows: 24,
           cwd,
-          env: process.env as { [key: string]: string },
+          env: buildPtyEnv(),
         });
 
         attachPty(nextPty, (exitCode: { exitCode: number; signal?: number }) => {
