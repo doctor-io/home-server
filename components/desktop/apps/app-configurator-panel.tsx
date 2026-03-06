@@ -71,11 +71,6 @@ function parsePort(value: string) {
   return parsed;
 }
 
-function parseRunPort(value: string) {
-  const parsed = parsePort(value);
-  return parsed;
-}
-
 function defaultViewForContext(context: AppConfiguratorContext): ConfiguratorView {
   if (context === "custom_install") return "docker_run";
   return "classic";
@@ -339,7 +334,6 @@ export function AppConfiguratorPanel({
         await installCustomApp({
           name: dockerRunState.name.trim(),
           iconUrl: dockerRunState.iconUrl.trim() || undefined,
-          webUiPort: parseRunPort(dockerRunState.webUiPort),
           repositoryUrl: dockerRunState.repositoryUrl.trim() || undefined,
           sourceType: "docker-run",
           source: dockerRunState.source,
@@ -348,7 +342,6 @@ export function AppConfiguratorPanel({
         await installCustomApp({
           name: classicState.title.trim() || "Custom App",
           iconUrl: classicState.iconUrl.trim() || undefined,
-          webUiPort: parsePort(classicState.webUi.port),
           sourceType: "docker-compose",
           source: composeDraft,
         });

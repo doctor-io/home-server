@@ -216,7 +216,7 @@ export function AppGrid({
 
   const apps = useMemo(() => {
     const installedApps = installedAppsQuery.data ?? [];
-    const installedCatalog = installedCatalogQuery.data ?? [];
+    const installedCatalog = installedCatalogQuery.data?.apps ?? [];
     const installedById = new Map(installedApps.map((app) => [app.id, app]));
     const catalogById = new Map(installedCatalog.map((app) => [app.id, app]));
     const ids = Array.from(
@@ -270,7 +270,7 @@ export function AppGrid({
       .sort((left, right) => left.name.localeCompare(right.name));
   }, [
     installedAppsQuery.data,
-    installedCatalogQuery.data,
+    installedCatalogQuery.data?.apps,
     operationsByApp,
     statusByAppId,
   ]);

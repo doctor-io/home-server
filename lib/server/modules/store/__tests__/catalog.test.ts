@@ -1,137 +1,104 @@
+import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-describe("store catalog", () => {
-  const originalFetch = global.fetch;
+vi.mock("@/lib/server/modules/store/catalog-config", () => ({
+  readStoreCatalogConfig: vi.fn(),
+  resolveStoreCatalogsRoot: vi.fn(() => "/tmp"),
+  writeStoreCatalogConfig: vi.fn(),
+}));
 
-  beforeEach(() => {
+vi.mock("@/lib/server/storage/data-root", () => ({
+  ensureDataRootDirectories: vi.fn(),
+}));
+
+import { readStoreCatalogConfig } from "@/lib/server/modules/store/catalog-config";
+
+describe("store catalog", () => {
+  let repoRoot = "";
+
+  beforeEach(async () => {
     vi.resetModules();
+    repoRoot = await mkdtemp(path.join(os.tmpdir(), "casaos-catalog-"));
+    await mkdir(path.join(repoRoot, "Apps", "AdGuardHome"), { recursive: true });
+    await writeFile(
+      path.join(repoRoot, "Apps", "AdGuardHome", "docker-compose.yml"),
+      `name: adguardhome
+services:
+  adguardhome:
+    image: adguard/adguardhome:v1
+    ports:
+      - "3001:3000"
+x-casaos:
+  main: adguardhome
+  category: Network
+  title:
+    en_us: AdGuard Home
+  description:
+    en_us: Network DNS blocker
+  icon: https://example.com/logo.png
+  screenshot_link:
+    - https://example.com/screenshot.png
+  tips:
+    before_install:
+      en_us: Read this first
+  scheme: http
+  index: /
+  port_map: "3001"
+`,
+      "utf8",
+    );
+    await writeFile(
+      path.join(repoRoot, "category-list.json"),
+      JSON.stringify([{ name: "Network", description: "Network apps" }]),
+      "utf8",
+    );
+    await writeFile(
+      path.join(repoRoot, "featured-apps.json"),
+      JSON.stringify([{ appid: "adguardhome" }]),
+      "utf8",
+    );
+    await writeFile(
+      path.join(repoRoot, "recommend-list.json"),
+      JSON.stringify([{ appid: "adguardhome" }]),
+      "utf8",
+    );
+    vi.mocked(readStoreCatalogConfig).mockResolvedValue({
+      defaultCatalogPath: repoRoot,
+      repoUrl: "https://github.com/IceWhaleTech/CasaOS-AppStore",
+      updatedAt: new Date().toISOString(),
+    });
   });
 
   afterEach(() => {
-    global.fetch = originalFetch;
+    vi.clearAllMocks();
   });
 
-  it("normalizes templates from upstream catalog", async () => {
-    global.fetch = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          templates: [
-            {
-              name: "adguard-home",
-              title: "AdGuard Home",
-              description: "Network DNS blocker",
-              note: "A note",
-              categories: ["Network"],
-              logo: "https://example.com/logo.png",
-              repository: {
-                url: "https://github.com/bigbeartechworld/big-bear-portainer",
-                stackfile: "Apps/adguard-home/docker-compose.yml",
-              },
-              env: [
-                {
-                  name: "TZ",
-                  default: "UTC",
-                },
-              ],
-            },
-          ],
-        }),
-        {
-          status: 200,
-          headers: {
-            etag: "W/abc",
-            "last-modified": "Mon, 01 Jan 2026 00:00:00 GMT",
-          },
-        },
-      ),
-    ) as typeof fetch;
+  it("indexes CasaOS compose apps from the local catalog checkout", async () => {
+    const { getStoreCatalogSnapshot } = await import("@/lib/server/modules/store/catalog");
+    const snapshot = await getStoreCatalogSnapshot({ bypassCache: true });
 
-    const { listStoreCatalogTemplates } = await import("@/lib/server/modules/store/catalog");
-    const result = await listStoreCatalogTemplates({
-      bypassCache: true,
-    });
-
-    expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({
-      appId: "adguard-home",
-      templateName: "adguard-home",
+    expect(snapshot.apps).toHaveLength(1);
+    expect(snapshot.apps[0]).toMatchObject({
+      appId: "adguardhome",
       name: "AdGuard Home",
-      platform: "Docker",
-      stackFile: "Apps/adguard-home/docker-compose.yml",
-      repositoryUrl: "https://github.com/bigbeartechworld/big-bear-portainer",
+      description: "Network DNS blocker",
+      categories: ["Network"],
+      repositoryUrl: "https://github.com/IceWhaleTech/CasaOS-AppStore",
+      stackFile: "Apps/AdGuardHome/docker-compose.yml",
+      port: 3001,
+      screenshots: ["https://example.com/screenshot.png"],
     });
-    expect(result[0].env).toEqual([
+    expect(snapshot.categories).toEqual([
       {
-        name: "TZ",
-        default: "UTC",
+        id: "network",
+        name: "Network",
+        description: "Network apps",
+        appCount: 1,
       },
     ]);
-  });
-
-  it("removes BigBearCasaOS from categories", async () => {
-    global.fetch = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          templates: [
-            {
-              name: "immich",
-              title: "Immich",
-              description: "Photos",
-              categories: ["BigBearCasaOS", "Media", "Media"],
-              repository: {
-                url: "https://github.com/bigbeartechworld/big-bear-portainer",
-                stackfile: "Apps/Immich/docker-compose.yml",
-              },
-            },
-          ],
-        }),
-        { status: 200 },
-      ),
-    ) as typeof fetch;
-
-    const { listStoreCatalogTemplates } = await import("@/lib/server/modules/store/catalog");
-    const result = await listStoreCatalogTemplates({
-      bypassCache: true,
-    });
-
-    expect(result).toHaveLength(1);
-    expect(result[0]?.categories).toEqual(["Media"]);
-  });
-
-  it("falls back to cached catalog when fetch fails", async () => {
-    const fetchMock = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          templates: [
-            {
-              name: "homepage",
-              title: "Homepage",
-              description: "Dashboard",
-              categories: ["Productivity"],
-              repository: {
-                url: "https://github.com/bigbeartechworld/big-bear-portainer",
-                stackfile: "Apps/Homepage/docker-compose.yml",
-              },
-            },
-          ],
-        }),
-        { status: 200 },
-      ),
-    ) as typeof fetch;
-    global.fetch = fetchMock;
-
-    const { listStoreCatalogTemplates } = await import("@/lib/server/modules/store/catalog");
-    const first = await listStoreCatalogTemplates({
-      bypassCache: true,
-    });
-
-    expect(first).toHaveLength(1);
-
-    fetchMock.mockRejectedValueOnce(new Error("network down"));
-    const second = await listStoreCatalogTemplates({
-      bypassCache: true,
-    });
-
-    expect(second).toEqual(first);
+    expect(snapshot.featuredAppIds).toEqual(["adguardhome"]);
+    expect(snapshot.recommendedAppIds).toEqual(["adguardhome"]);
   });
 });

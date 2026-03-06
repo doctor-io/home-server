@@ -21,10 +21,12 @@ import {
   Package,
   RefreshCw,
   Search,
+  Sparkles,
+  Star,
   Trash2,
   Wrench,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 
 function operationLabel(operation: AppOperationState | undefined) {
   if (!operation) return null;
@@ -74,8 +76,7 @@ function StatusBadge({
 
     return (
       <span className="flex items-center gap-1 text-xs font-medium text-primary animate-pulse">
-        <Loader2 className="size-3 animate-spin" /> {operationLabel(operation)}
-        ...
+        <Loader2 className="size-3 animate-spin" /> {operationLabel(operation)}...
       </span>
     );
   }
@@ -121,7 +122,6 @@ function StoreLogo({
   const [failed, setFailed] = useState(false);
 
   if (logoUrl && !failed) {
-     
     return (
       <img
         src={logoUrl}
@@ -139,6 +139,13 @@ function StoreLogo({
     />
   );
 }
+
+type CatalogCategory = {
+  id: string;
+  name: string;
+  description: string;
+  appCount: number;
+};
 
 type AppStoreDetailPanelProps = {
   app: StoreAppSummary | null;
@@ -168,8 +175,8 @@ function AppStoreDetailPanel({
   onCustomInstall,
 }: AppStoreDetailPanelProps) {
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center gap-3 px-5 py-3 border-b border-glass-border shrink-0">
+    <div className="flex h-full flex-col">
+      <div className="flex items-center gap-3 border-b border-glass-border px-5 py-3 shrink-0">
         <button
           onClick={onBack}
           className="text-xs text-primary hover:underline cursor-pointer"
@@ -198,12 +205,18 @@ function AppStoreDetailPanel({
               />
             </div>
             <div className="flex-1 min-w-0">
-              <h2 className="text-lg font-semibold text-foreground">
-                {detail.name}
-              </h2>
-              <p className="text-xs text-muted-foreground mt-1">
-                {detail.description}
-              </p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-lg font-semibold text-foreground">{detail.name}</h2>
+                {detail.categories.map((category) => (
+                  <span
+                    key={category}
+                    className="rounded-full border border-glass-border bg-glass px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-muted-foreground"
+                  >
+                    {category}
+                  </span>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">{detail.description}</p>
               <div className="mt-3">
                 <StatusBadge app={detail} operation={operation} />
               </div>
@@ -221,44 +234,53 @@ function AppStoreDetailPanel({
                     />
                   </div>
                   {operation.message ? (
-                    <p className="text-xs text-status-red">
-                      {operation.message}
-                    </p>
+                    <p className="text-xs text-status-red">{operation.message}</p>
                   ) : null}
                 </div>
               ) : null}
             </div>
           </div>
 
-          <div className="p-3 rounded-xl bg-glass border border-glass-border text-xs text-muted-foreground">
+          <div className="rounded-2xl border border-glass-border bg-glass p-4 text-xs leading-5 text-muted-foreground">
             {detail.note}
           </div>
 
+          {detail.screenshots.length > 0 ? (
+            <div className="space-y-2">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                Screenshots
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {detail.screenshots.slice(0, 4).map((screenshot, index) => (
+                  <div
+                    key={`${screenshot}-${index}`}
+                    className="overflow-hidden rounded-2xl border border-glass-border bg-glass"
+                  >
+                    <img
+                      src={screenshot}
+                      alt={`${detail.name} screenshot ${index + 1}`}
+                      className="h-44 w-full object-cover"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             <div className="p-3 rounded-xl bg-glass border border-glass-border">
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                Platform
-              </p>
-              <p className="mt-1 text-xs text-foreground font-medium">
-                {detail.platform}
-              </p>
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Platform</p>
+              <p className="mt-1 text-xs text-foreground font-medium">{detail.platform}</p>
             </div>
             {detail.webUiPort ? (
               <div className="p-3 rounded-xl bg-glass border border-glass-border">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                  Web UI Port
-                </p>
-                <p className="mt-1 text-xs text-foreground font-mono font-medium">
-                  {detail.webUiPort}
-                </p>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Web UI Port</p>
+                <p className="mt-1 text-xs text-foreground font-mono font-medium">{detail.webUiPort}</p>
               </div>
             ) : null}
-            <div className="p-3 rounded-xl bg-glass border border-glass-border">
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                Repository URL
-              </p>
-              {detail.repositoryUrl.startsWith("http://") ||
-              detail.repositoryUrl.startsWith("https://") ? (
+            <div className="p-3 rounded-xl bg-glass border border-glass-border md:col-span-2">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Repository URL</p>
+              {detail.repositoryUrl.startsWith("http://") || detail.repositoryUrl.startsWith("https://") ? (
                 <a
                   href={detail.repositoryUrl}
                   target="_blank"
@@ -268,9 +290,7 @@ function AppStoreDetailPanel({
                   {detail.repositoryUrl}
                 </a>
               ) : (
-                <p className="mt-1 text-xs text-foreground break-all">
-                  {detail.repositoryUrl}
-                </p>
+                <p className="mt-1 text-xs text-foreground break-all">{detail.repositoryUrl}</p>
               )}
             </div>
           </div>
@@ -279,7 +299,7 @@ function AppStoreDetailPanel({
             <p className="text-xs text-status-red">{actionError}</p>
           ) : null}
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {detail.status === "not_installed" ? (
               <button
                 onClick={onInstall}
@@ -330,6 +350,105 @@ function AppStoreDetailPanel({
   );
 }
 
+function CategorySidebar({
+  categories,
+  selectedCategory,
+  onSelect,
+}: {
+  categories: CatalogCategory[];
+  selectedCategory: string | null;
+  onSelect: (category: string | null) => void;
+}) {
+  return (
+    <aside className="w-56 shrink-0 border-r border-glass-border bg-glass/30 p-4 overflow-y-auto">
+      <div className="mb-4">
+        <p className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">
+          Categories
+        </p>
+      </div>
+      <div className="space-y-1">
+        <button
+          type="button"
+          onClick={() => onSelect(null)}
+          className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs transition-colors ${
+            selectedCategory === null
+              ? "bg-primary/15 text-primary"
+              : "text-muted-foreground hover:bg-secondary/40 hover:text-foreground"
+          }`}
+        >
+          <span>All</span>
+        </button>
+        {categories.map((category) => (
+          <button
+            key={category.id}
+            type="button"
+            onClick={() => onSelect(category.name)}
+            className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs transition-colors ${
+              selectedCategory === category.name
+                ? "bg-primary/15 text-primary"
+                : "text-muted-foreground hover:bg-secondary/40 hover:text-foreground"
+            }`}
+            title={category.description}
+          >
+            <span className="truncate">{category.name}</span>
+            <span className="rounded-full border border-glass-border px-1.5 py-0.5 text-[10px]">
+              {category.appCount}
+            </span>
+          </button>
+        ))}
+      </div>
+    </aside>
+  );
+}
+
+function SectionCard({
+  title,
+  icon,
+  apps,
+  onSelect,
+}: {
+  title: string;
+  icon: ReactNode;
+  apps: StoreAppSummary[];
+  onSelect: (appId: string) => void;
+}) {
+  if (apps.length === 0) return null;
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center gap-2">
+        {icon}
+        <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+      </div>
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
+        {apps.map((app) => (
+          <button
+            key={`${title}-${app.id}`}
+            type="button"
+            onClick={() => onSelect(app.id)}
+            className="rounded-2xl border border-glass-border bg-glass/40 p-4 text-left hover:bg-secondary/40 transition-colors"
+          >
+            <div className="flex items-start gap-3">
+              <div className="size-12 rounded-2xl bg-card/60 border border-glass-border flex items-center justify-center overflow-hidden shrink-0">
+                <StoreLogo
+                  logoUrl={app.logoUrl}
+                  alt={`${app.name} logo`}
+                  className="size-7 object-contain"
+                  fallbackLabel="section-app-logo-fallback"
+                />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">{app.name}</p>
+                <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{app.description}</p>
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function AppStore({
   onOpenCustomInstall,
 }: {
@@ -337,6 +456,7 @@ export function AppStore({
 }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "installed">("all");
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [customInstallTemplate, setCustomInstallTemplate] =
@@ -350,11 +470,14 @@ export function AppStore({
     useStoreActions();
 
   const catalogQuery = useStoreCatalog({
+    category: selectedCategory ?? undefined,
     search: search.trim() || undefined,
     installedOnly: filter === "installed",
   });
 
-  const apps = useMemo(() => catalogQuery.data ?? [], [catalogQuery.data]);
+  const catalog = catalogQuery.data;
+  const apps = useMemo(() => catalog?.apps ?? [], [catalog]);
+  const categories = catalog?.categories ?? [];
 
   const selectedSummary = useMemo(
     () => apps.find((app) => app.id === selectedAppId) ?? null,
@@ -382,9 +505,17 @@ export function AppStore({
         }
       : undefined);
 
-  const installedCount = apps.filter(
-    (app) => app.status !== "not_installed",
-  ).length;
+  const installedCount = apps.filter((app) => app.status !== "not_installed").length;
+  const appById = useMemo(() => new Map(apps.map((app) => [app.id, app])), [apps]);
+  const featuredApps = useMemo(
+    () => (catalog?.featuredAppIds ?? []).map((id) => appById.get(id)).filter(Boolean) as StoreAppSummary[],
+    [appById, catalog?.featuredAppIds],
+  );
+  const recommendedApps = useMemo(
+    () => (catalog?.recommendedAppIds ?? []).map((id) => appById.get(id)).filter(Boolean) as StoreAppSummary[],
+    [appById, catalog?.recommendedAppIds],
+  );
+  const shouldShowSections = filter === "all" && !search.trim() && !selectedCategory;
 
   async function startInstall(app: StoreAppSummary) {
     setActionError(null);
@@ -556,7 +687,7 @@ export function AppStore({
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full flex-col">
       <div className="flex items-center gap-3 px-5 py-3 border-b border-glass-border shrink-0">
         <div className="flex items-center gap-1 bg-glass rounded-lg p-0.5">
           <button
@@ -600,6 +731,12 @@ export function AppStore({
       {uninstallDialog}
 
       <div className="flex flex-1 overflow-hidden">
+        <CategorySidebar
+          categories={categories}
+          selectedCategory={selectedCategory}
+          onSelect={setSelectedCategory}
+        />
+
         <div className="flex-1 overflow-y-auto p-4">
           {actionError ? (
             <div className="mb-3 rounded-lg border border-status-red/30 bg-status-red/10 px-3 py-2 text-xs text-status-red">
@@ -608,123 +745,155 @@ export function AppStore({
           ) : null}
 
           {catalogQuery.isLoading ? (
-            <div className="text-sm text-muted-foreground">
-              Loading app catalog...
-            </div>
+            <div className="text-sm text-muted-foreground">Loading app catalog...</div>
           ) : catalogQuery.isError ? (
-            <div className="text-sm text-status-red">
-              Unable to load app catalog.
-            </div>
+            <div className="text-sm text-status-red">Unable to load app catalog.</div>
           ) : apps.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground">
               <Search className="size-8 opacity-30" />
               <span className="text-sm">No apps found</span>
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
-              {apps.map((app) => {
-                const operation = operationsByApp[app.id];
-                const busy = isOperationBusy(operation);
+            <div className="space-y-6">
+              {shouldShowSections ? (
+                <>
+                  <SectionCard
+                    title="Featured Apps"
+                    icon={<Star className="size-4 text-primary" />}
+                    apps={featuredApps}
+                    onSelect={setSelectedAppId}
+                  />
+                  <SectionCard
+                    title="Recommended for You"
+                    icon={<Sparkles className="size-4 text-primary" />}
+                    apps={recommendedApps}
+                    onSelect={setSelectedAppId}
+                  />
+                </>
+              ) : null}
 
-                return (
-                  <div
-                    key={app.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => setSelectedAppId(app.id)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        setSelectedAppId(app.id);
-                      }
-                    }}
-                    className="flex items-center gap-3 p-3 rounded-xl hover:bg-secondary/40 border border-transparent hover:border-glass-border transition-all cursor-pointer text-left"
-                  >
-                    <div className="size-12 rounded-2xl bg-glass border border-glass-border flex items-center justify-center overflow-hidden shrink-0">
-                      <StoreLogo
-                        logoUrl={app.logoUrl}
-                        alt={`${app.name} logo`}
-                        className="size-7 object-contain"
-                        fallbackLabel="app-logo-fallback"
-                      />
-                    </div>
+              <section className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-sm font-semibold text-foreground">
+                      {selectedCategory ? selectedCategory : filter === "installed" ? "Installed Apps" : "Catalog"}
+                    </h2>
+                    <p className="text-xs text-muted-foreground">{apps.length} apps</p>
+                  </div>
+                </div>
 
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-foreground truncate">
-                          {app.name}
-                        </span>
-                        {app.webUiPort ? (
-                          <span className="shrink-0 text-[10px] font-mono px-1.5 py-0.5 rounded bg-glass border border-glass-border text-muted-foreground">
-                            :{app.webUiPort}
-                          </span>
-                        ) : null}
-                      </div>
-                      <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
-                        {app.description}
-                      </p>
-                      {operation ? (
-                        <div className="mt-1">
-                          <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                            <div
-                              className="h-full rounded-full bg-primary transition-all"
-                              style={{
-                                width: `${Math.max(2, operation.progressPercent)}%`,
-                              }}
-                            />
-                          </div>
-                          <p className="text-[11px] text-muted-foreground mt-1">
-                            {operation.step} • {operation.progressPercent}%
-                          </p>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+                  {apps.map((app) => {
+                    const operation = operationsByApp[app.id];
+                    const busy = isOperationBusy(operation);
+
+                    return (
+                      <div
+                        key={app.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setSelectedAppId(app.id)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            setSelectedAppId(app.id);
+                          }
+                        }}
+                        className="flex items-center gap-3 p-3 rounded-xl hover:bg-secondary/40 border border-transparent hover:border-glass-border transition-all cursor-pointer text-left"
+                      >
+                        <div className="size-12 rounded-2xl bg-glass border border-glass-border flex items-center justify-center overflow-hidden shrink-0">
+                          <StoreLogo
+                            logoUrl={app.logoUrl}
+                            alt={`${app.name} logo`}
+                            className="size-7 object-contain"
+                            fallbackLabel="app-logo-fallback"
+                          />
                         </div>
-                      ) : null}
-                    </div>
 
-                    <div
-                      className="shrink-0 flex flex-col items-end gap-1.5"
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      <StatusBadge app={app} operation={operation} />
-                      {app.status === "not_installed" ? (
-                        <button
-                          onClick={() => void startInstall(app)}
-                          disabled={busy}
-                          className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-primary/15 text-primary rounded-md hover:bg-primary/25 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-medium text-foreground truncate">{app.name}</span>
+                            {app.webUiPort ? (
+                              <span className="shrink-0 text-[10px] font-mono px-1.5 py-0.5 rounded bg-glass border border-glass-border text-muted-foreground">
+                                :{app.webUiPort}
+                              </span>
+                            ) : null}
+                          </div>
+                          <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{app.description}</p>
+                          <div className="mt-1 flex items-center gap-1 flex-wrap">
+                            {app.categories.slice(0, 2).map((category) => (
+                              <span
+                                key={`${app.id}-${category}`}
+                                className="rounded-full border border-glass-border px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                              >
+                                {category}
+                              </span>
+                            ))}
+                          </div>
+                          {operation ? (
+                            <div className="mt-1">
+                              <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                                <div
+                                  className="h-full rounded-full bg-primary transition-all"
+                                  style={{
+                                    width: `${Math.max(2, operation.progressPercent)}%`,
+                                  }}
+                                />
+                              </div>
+                              <p className="text-[11px] text-muted-foreground mt-1">
+                                {operation.step} • {operation.progressPercent}%
+                              </p>
+                            </div>
+                          ) : null}
+                        </div>
+
+                        <div
+                          className="shrink-0 flex flex-col items-end gap-1.5"
+                          onClick={(event) => event.stopPropagation()}
                         >
-                          <Download className="size-3" /> Install
-                        </button>
-                      ) : (
-                        <div className="flex items-center gap-1">
-                          {app.updateAvailable ? (
+                          <StatusBadge app={app} operation={operation} />
+                          {app.status === "not_installed" ? (
                             <button
-                              onClick={() => void startUpdate(app)}
+                              onClick={() => void startInstall(app)}
                               disabled={busy}
                               className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-primary/15 text-primary rounded-md hover:bg-primary/25 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                             >
-                              <ArrowUpCircle className="size-3" /> Update
+                              <Download className="size-3" /> Install
                             </button>
                           ) : (
-                            <button
-                              onClick={() => void startRedeploy(app)}
-                              disabled={busy}
-                              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-primary/15 text-primary rounded-md hover:bg-primary/25 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                            >
-                              <RefreshCw className="size-3" />
-                            </button>
+                            <div className="flex items-center gap-1">
+                              {app.updateAvailable ? (
+                                <button
+                                  onClick={() => void startUpdate(app)}
+                                  disabled={busy}
+                                  className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-primary/15 text-primary rounded-md hover:bg-primary/25 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                                >
+                                  <ArrowUpCircle className="size-3" /> Update
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => void startRedeploy(app)}
+                                  disabled={busy}
+                                  className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-primary/15 text-primary rounded-md hover:bg-primary/25 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                                >
+                                  <RefreshCw className="size-3" />
+                                </button>
+                              )}
+                              <button
+                                onClick={() => void startUninstall(app)}
+                                disabled={busy}
+                                className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-status-red/15 text-status-red rounded-md hover:bg-status-red/25 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                              >
+                                <Trash2 className="size-3" />
+                              </button>
+                            </div>
                           )}
-                          <button
-                            onClick={() => void startUninstall(app)}
-                            disabled={busy}
-                            className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-status-red/15 text-status-red rounded-md hover:bg-status-red/25 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                          >
-                            <Trash2 className="size-3" />
-                          </button>
                         </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
             </div>
           )}
         </div>

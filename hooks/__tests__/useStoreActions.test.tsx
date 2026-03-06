@@ -220,7 +220,6 @@ describe("useStoreActions", () => {
       await result.current.installCustomApp({
         name: "My App",
         iconUrl: "https://example.com/icon.png",
-        webUiPort: 8088,
         sourceType: "docker-run",
         source: "docker run --name myapp -p 8088:80 nginx:latest",
       });
@@ -234,7 +233,6 @@ describe("useStoreActions", () => {
       body: JSON.stringify({
         name: "My App",
         iconUrl: "https://example.com/icon.png",
-        webUiPort: 8088,
         sourceType: "docker-run",
         source: "docker run --name myapp -p 8088:80 nginx:latest",
       }),

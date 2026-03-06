@@ -8,7 +8,6 @@ import {
   extractComposeImages,
   getComposeRuntimeInfo,
   materializeInlineStackFiles,
-  materializeStackFiles,
   runComposeDown,
   runComposeRestart,
   runComposeStart,
@@ -24,7 +23,6 @@ import {
 } from "@/lib/server/modules/store/custom-apps";
 import {
   extractPrimaryServiceWithName,
-  fetchComposeFileFromGitHub,
   parseComposeFile,
 } from "@/lib/server/modules/docker/compose-parser";
 import { pullDockerImage } from "@/lib/server/modules/store/docker-client";
@@ -185,14 +183,7 @@ async function resolveStoreComposeSource(appId: string) {
     return template.composeContent;
   }
 
-  const source = await fetchComposeFileFromGitHub({
-    repositoryUrl: template.repositoryUrl,
-    stackFile: template.stackFile,
-  });
-  if (!source) {
-    throw new Error("Unable to fetch store compose source");
-  }
-  return source;
+  return readFile(template.composePath, "utf8");
 }
 
 function emitEvent(event: StoreOperationEvent) {
@@ -299,6 +290,7 @@ async function runInstallOrRedeployOperation(
   const hasComposeSource = typeof composeSourceInput === "string" &&
     composeSourceInput.trim().length > 0;
   const requestedEnv = params.env ?? {};
+  const templateComposeSource = hasComposeSource ? null : await resolveStoreComposeSource(params.appId);
 
   let composeSourcePrimary:
     | ReturnType<typeof extractPrimaryServiceWithName>
@@ -345,7 +337,7 @@ async function runInstallOrRedeployOperation(
   const requestedPort =
     typeof params.webUiPort === "number"
       ? params.webUiPort
-      : existingStack?.webUiPort ?? composeSourcePort ?? null;
+      : existingStack?.webUiPort ?? composeSourcePort ?? template.port ?? null;
 
   if (requestedPort !== null) {
     assertValidPort(requestedPort);
@@ -376,33 +368,14 @@ async function runInstallOrRedeployOperation(
     message: "Materializing compose files",
   });
 
-  const materialized = hasComposeSource
-      ? await materializeInlineStackFiles({
-        appId: params.appId,
-        stackName,
-        composeContent: composeSourceInput as string,
-        env: effectiveEnv,
-        webUiPort: requestedPort,
-        storageMappingStrategy,
-      })
-    : isCustomStoreTemplate(template)
-    ? await materializeInlineStackFiles({
-        appId: params.appId,
-        stackName,
-        composeContent: template.composeContent,
-        env: effectiveEnv,
-        webUiPort: requestedPort,
-        storageMappingStrategy,
-      })
-    : await materializeStackFiles({
-        appId: params.appId,
-        stackName,
-        repositoryUrl: template.repositoryUrl,
-        stackFile: template.stackFile,
-        env: effectiveEnv,
-        webUiPort: requestedPort,
-        storageMappingStrategy,
-      });
+  const materialized = await materializeInlineStackFiles({
+    appId: params.appId,
+    stackName,
+    composeContent: hasComposeSource ? (composeSourceInput as string) : (templateComposeSource as string),
+    env: effectiveEnv,
+    webUiPort: requestedPort,
+    storageMappingStrategy,
+  });
 
   await patchOperationAndEmit({
     operationId,

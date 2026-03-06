@@ -8,6 +8,7 @@ import {
 } from "@/lib/server/logging/logger";
 import { hasAnyUsers } from "@/lib/server/modules/auth/repository";
 import { AuthError, registerUser } from "@/lib/server/modules/auth/service";
+import { bootstrapDefaultCasaosCatalog } from "@/lib/server/modules/store/catalog";
 import {
   ensureDataRootDirectories,
   resolveDataRootDirectory,
@@ -57,6 +58,15 @@ export async function POST(request: Request) {
         },
       },
       async () => ensureDataRootDirectories(),
+    );
+
+    await withServerTiming(
+      {
+        layer: "system",
+        action: "store.catalog.bootstrap",
+        requestId,
+      },
+      async () => bootstrapDefaultCasaosCatalog(),
     );
 
     const user = await withServerTiming(

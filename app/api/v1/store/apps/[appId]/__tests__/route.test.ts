@@ -25,6 +25,7 @@ describe("GET /api/v1/store/apps/:appId", () => {
       remoteDigest: null,
       note: "note",
       env: [],
+      screenshots: [],
       installedConfig: null,
     });
 

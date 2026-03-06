@@ -367,7 +367,7 @@ export function useSettingsBackend() {
   ]);
 
   const updates = useMemo(() => {
-    const entries = (updatesQuery.data ?? []).map(mapUpdateToViewModel);
+    const entries = (updatesQuery.data?.apps ?? []).map(mapUpdateToViewModel);
 
     return {
       entries,
@@ -384,7 +384,7 @@ export function useSettingsBackend() {
   }, [
     checkUpdatesMutation.error,
     checkUpdatesMutation.isPending,
-    updatesQuery.data,
+    updatesQuery.data?.apps,
     updatesQuery.error,
     updatesQuery.isLoading,
   ]);

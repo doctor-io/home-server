@@ -3,10 +3,13 @@
 import { render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-const appConfiguratorPanelMock = vi.fn(() => null);
+const appConfiguratorPanelMock = vi.fn((props: unknown) => props);
 
 vi.mock("@/components/desktop/apps/app-configurator-panel", () => ({
-  AppConfiguratorPanel: (props: unknown) => appConfiguratorPanelMock(props),
+  AppConfiguratorPanel: (props: unknown) => {
+    appConfiguratorPanelMock(props);
+    return null;
+  },
 }));
 
 import { AppSettingsPanel } from "@/components/desktop/apps/app-settings-panel";
@@ -21,7 +24,7 @@ describe("AppSettingsPanel wrapper", () => {
           containerName: "plex",
           dashboardUrl: "http://localhost:32400",
         }}
-      />,
+      />, 
     );
 
     expect(appConfiguratorPanelMock).toHaveBeenCalledWith(
@@ -50,6 +53,7 @@ describe("AppSettingsPanel wrapper", () => {
           remoteDigest: null,
           note: "",
           env: [],
+          screenshots: [],
           installedConfig: null,
         }}
       />,

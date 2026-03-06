@@ -3,7 +3,8 @@ import "server-only";
 import { logServerAction, withServerTiming } from "@/lib/server/logging/logger";
 import {
   findStoreCatalogTemplateByAppId,
-  listStoreCatalogTemplates,
+  getStoreCatalogSnapshot,
+  type StoreCatalogCategory,
 } from "@/lib/server/modules/store/catalog";
 import {
   findCustomStoreTemplateByAppId,
@@ -29,7 +30,7 @@ function includesSearch(text: string, search: string) {
 
 function toSummary(
   template:
-    | Awaited<ReturnType<typeof listStoreCatalogTemplates>>[number]
+    | Awaited<ReturnType<typeof getStoreCatalogSnapshot>>["apps"][number]
     | Awaited<ReturnType<typeof listCustomStoreTemplates>>[number],
   installed: Awaited<ReturnType<typeof listInstalledStacksFromDb>>[number] | undefined,
   updateState?: {
@@ -70,7 +71,6 @@ async function resolveUpdateState(
     };
   }
 
-  // Use cached update status from database instead of checking Docker every time
   return {
     updateAvailable: !installed.isUpToDate,
     localDigest: installed.localDigest,
@@ -78,7 +78,7 @@ async function resolveUpdateState(
   };
 }
 
-export async function listStoreApps(options?: {
+export async function getStoreCatalogView(options?: {
   category?: string;
   search?: string;
   installedOnly?: boolean;
@@ -87,7 +87,7 @@ export async function listStoreApps(options?: {
   return withServerTiming(
     {
       layer: "service",
-      action: "store.apps.list",
+      action: "store.apps.catalog-view",
       meta: {
         category: options?.category ?? null,
         search: options?.search ?? null,
@@ -96,13 +96,13 @@ export async function listStoreApps(options?: {
       },
     },
     async () => {
-      const [templates, customTemplates, installedStacks] = await Promise.all([
-        listStoreCatalogTemplates(),
+      const [catalogSnapshot, customTemplates, installedStacks] = await Promise.all([
+        getStoreCatalogSnapshot(),
         listCustomStoreTemplates(),
         listInstalledStacksFromDb(),
       ]);
 
-      const allTemplates = [...templates, ...customTemplates];
+      const allTemplates = [...catalogSnapshot.apps, ...customTemplates];
       const installedByAppId = new Map(installedStacks.map((item) => [item.appId, item]));
       const updateStateEntries = await Promise.all(
         installedStacks.map(async (stack) => [stack.appId, await resolveUpdateState(stack)] as const),
@@ -141,9 +141,37 @@ export async function listStoreApps(options?: {
         apps = apps.filter((app) => app.updateAvailable);
       }
 
-      return apps;
+      const categories: StoreCatalogCategory[] = customTemplates.length > 0
+        ? [
+            ...catalogSnapshot.categories,
+            {
+              id: "custom",
+              name: "Custom",
+              description: "Custom compose apps",
+              appCount: customTemplates.length,
+            },
+          ]
+        : catalogSnapshot.categories;
+
+      return {
+        apps,
+        categories,
+        featuredAppIds: catalogSnapshot.featuredAppIds,
+        recommendedAppIds: catalogSnapshot.recommendedAppIds,
+        sourcePath: catalogSnapshot.sourcePath,
+      };
     },
   );
+}
+
+export async function listStoreApps(options?: {
+  category?: string;
+  search?: string;
+  installedOnly?: boolean;
+  updatesOnly?: boolean;
+}) {
+  const view = await getStoreCatalogView(options);
+  return view.apps;
 }
 
 export async function getStoreAppDetail(appId: string): Promise<StoreAppDetail | null> {
@@ -173,6 +201,7 @@ export async function getStoreAppDetail(appId: string): Promise<StoreAppDetail |
         ...toSummary(sourceTemplate, installedConfig ?? undefined, updateState),
         note: sourceTemplate.note,
         env: sourceTemplate.env,
+        screenshots: sourceTemplate.screenshots,
         installedConfig,
       };
     },
@@ -233,12 +262,10 @@ export async function saveAppSettings(input: {
     async () => {
       const { appId, displayName, iconUrl, env, webUiPort, composeSource } = input;
 
-      // 1. Always save metadata immediately
       if (displayName !== undefined || iconUrl !== undefined) {
         await patchInstalledStackMeta(appId, { displayName, iconUrl });
       }
 
-      // 2. Trigger redeploy if config changed
       if (env !== undefined || webUiPort !== undefined || composeSource !== undefined) {
         const result = await startStoreOperation({
           appId,
@@ -281,7 +308,6 @@ export async function checkAllAppsForUpdates() {
             stackName: app.stackName,
           });
 
-          // Update DB with fresh check results
           const { updateStackUpdateStatus } = await import("@/lib/server/modules/apps/stacks-repository");
           await updateStackUpdateStatus({
             appId: app.appId,

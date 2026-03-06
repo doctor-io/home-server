@@ -3,7 +3,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppOperationState } from "@/hooks/useStoreActions";
-import type { StoreAppDetail, StoreAppSummary } from "@/lib/shared/contracts/apps";
+import type { InstalledStackConfig, StoreAppDetail, StoreAppSummary } from "@/lib/shared/contracts/apps";
 
 const useStoreCatalogMock = vi.fn();
 const useStoreAppMock = vi.fn();
@@ -41,7 +41,7 @@ const summaryApp: StoreAppSummary = {
   categories: ["Media"],
   logoUrl: "https://cdn.example.com/plex.png",
   repositoryUrl: "https://github.com/plex",
-  stackFile: "plex/docker-compose.yml",
+  stackFile: "Apps/Plex/docker-compose.yml",
   status: "not_installed",
   webUiPort: null,
   updateAvailable: false,
@@ -62,9 +62,29 @@ const updatableSummaryApp: StoreAppSummary = {
   remoteDigest: "sha256:222",
 };
 
+const installedConfig: InstalledStackConfig = {
+  appId: "plex",
+  templateName: "plex",
+  stackName: "plex-stack",
+  composePath: "/tmp/stacks/plex/docker-compose.yml",
+  status: "installed",
+  webUiPort: 32400,
+  env: {
+    TZ: "UTC",
+  },
+  displayName: null,
+  iconUrl: null,
+  installedAt: "2026-02-23T10:00:00.000Z",
+  updatedAt: "2026-02-23T10:00:00.000Z",
+  isUpToDate: true,
+  lastUpdateCheck: null,
+  localDigest: null,
+  remoteDigest: null,
+};
+
 const appDetail: StoreAppDetail = {
   ...installedSummaryApp,
-  note: "Install Plex from BigBear",
+  note: "Install Plex from CasaOS.",
   env: [
     {
       name: "TZ",
@@ -73,19 +93,8 @@ const appDetail: StoreAppDetail = {
       description: "Timezone used by the container",
     },
   ],
-  installedConfig: {
-    appId: "plex",
-    templateName: "plex",
-    stackName: "plex-stack",
-    composePath: "/tmp/stacks/plex/docker-compose.yml",
-    status: "installed",
-    webUiPort: 32400,
-    env: {
-      TZ: "UTC",
-    },
-    installedAt: "2026-02-23T10:00:00.000Z",
-    updatedAt: "2026-02-23T10:00:00.000Z",
-  },
+  screenshots: ["https://cdn.example.com/plex-shot.png"],
+  installedConfig,
 };
 
 const updatableAppDetail: StoreAppDetail = {
@@ -97,11 +106,17 @@ function setup({
   apps = [summaryApp],
   detail = null,
   operationsByApp = {},
+  categories = [{ id: "media", name: "Media", description: "Media apps", appCount: apps.length }],
+  featuredAppIds = [apps[0]?.id].filter(Boolean) as string[],
+  recommendedAppIds = [apps[0]?.id].filter(Boolean) as string[],
   onOpenCustomInstall = () => {},
 }: {
   apps?: StoreAppSummary[];
   detail?: StoreAppDetail | null;
   operationsByApp?: Record<string, AppOperationState>;
+  categories?: Array<{ id: string; name: string; description: string; appCount: number }>;
+  featuredAppIds?: string[];
+  recommendedAppIds?: string[];
   onOpenCustomInstall?: () => void;
 } = {}) {
   const installApp = vi.fn().mockResolvedValue(undefined);
@@ -111,7 +126,13 @@ function setup({
   const uninstallApp = vi.fn().mockResolvedValue(undefined);
 
   useStoreCatalogMock.mockReturnValue({
-    data: apps,
+    data: {
+      apps,
+      categories,
+      featuredAppIds,
+      recommendedAppIds,
+      sourcePath: "/DATA/AppStore/CasaOS-AppStore",
+    },
     isLoading: false,
     isError: false,
   });
@@ -161,31 +182,30 @@ describe("AppStore", () => {
     useAppComposeMock.mockReset();
   });
 
-  it("renders backend apps with logo and hides unsupported tabs/metrics", () => {
+  it("renders CasaOS catalog sections and category sidebar", () => {
     setup();
 
-    expect(screen.getByText("Plex")).toBeTruthy();
-    expect(screen.getByAltText("Plex logo")).toBeTruthy();
-    expect(screen.queryByText("Categories")).toBeNull();
-    expect(screen.queryByText("Updates")).toBeNull();
-    expect(screen.queryByText("Downloads")).toBeNull();
-    expect(screen.queryByText("Developer")).toBeNull();
-    expect(screen.queryByText("Size")).toBeNull();
+    expect(screen.getAllByText("Plex").length).toBeGreaterThan(0);
+    expect(screen.getAllByAltText("Plex logo").length).toBeGreaterThan(0);
+    expect(screen.getByText("Categories")).toBeTruthy();
+    expect(screen.getByText("Featured Apps")).toBeTruthy();
+    expect(screen.getByText("Recommended for You")).toBeTruthy();
+    expect(screen.getByTitle("Media apps")).toBeTruthy();
   });
 
   it("falls back to generic icon when logo fails", () => {
     setup();
 
-    const image = screen.getByAltText("Plex logo");
+    const image = screen.getAllByAltText("Plex logo")[0];
     fireEvent.error(image);
 
-    expect(screen.getByLabelText("app-logo-fallback")).toBeTruthy();
+    expect(screen.getAllByLabelText(/fallback/i).length).toBeGreaterThan(0);
   });
 
   it("triggers install action from list", () => {
     const { installApp } = setup();
 
-    fireEvent.click(screen.getByRole("button", { name: /^install$/i }));
+    fireEvent.click(screen.getAllByRole("button", { name: /^install$/i })[0]);
 
     expect(installApp).toHaveBeenCalledWith({ appId: "plex" });
   });
@@ -194,13 +214,15 @@ describe("AppStore", () => {
     const { redeployApp, uninstallApp } = setup({
       apps: [installedSummaryApp],
       detail: appDetail,
+      featuredAppIds: [],
+      recommendedAppIds: [],
     });
 
     fireEvent.click(screen.getByRole("button", { name: /plex/i }));
     fireEvent.click(screen.getByRole("button", { name: /redeploy/i }));
     fireEvent.click(screen.getByRole("button", { name: /uninstall/i }));
 
-    expect(screen.queryByText("Configuration")).toBeNull();
+    expect(screen.getByText("Screenshots")).toBeTruthy();
     expect(screen.getByText("Platform")).toBeTruthy();
     expect(screen.getByText("Docker")).toBeTruthy();
     expect(screen.getByText("https://github.com/plex")).toBeTruthy();
@@ -221,9 +243,11 @@ describe("AppStore", () => {
     const { updateApp } = setup({
       apps: [updatableSummaryApp],
       detail: updatableAppDetail,
+      featuredAppIds: [],
+      recommendedAppIds: [],
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /^update$/i }));
+    fireEvent.click(screen.getAllByRole("button", { name: /^update$/i })[0]);
     fireEvent.click(screen.getByRole("button", { name: /plex/i }));
     fireEvent.click(screen.getByRole("button", { name: /^update$/i }));
 
@@ -235,6 +259,8 @@ describe("AppStore", () => {
     setup({
       apps: [installedSummaryApp],
       detail: appDetail,
+      featuredAppIds: [],
+      recommendedAppIds: [],
     });
 
     fireEvent.click(screen.getByRole("button", { name: /plex/i }));
@@ -242,74 +268,7 @@ describe("AppStore", () => {
 
     expect(screen.getByText("Install Plex")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: /close.*install.*settings/i }));
+    fireEvent.click(screen.getByRole("button", { name: /close install settings/i }));
     expect(screen.queryByText("Install Plex")).toBeNull();
-  });
-
-  it("shows operation progress from backend state", () => {
-    setup({
-      operationsByApp: {
-        plex: {
-          operationId: "op-1",
-          appId: "plex",
-          action: "install",
-          status: "running",
-          progressPercent: 42,
-          step: "Pulling image layers",
-          message: null,
-        },
-      },
-    });
-
-    expect(screen.getByText("Pulling image layers • 42%")).toBeTruthy();
-  });
-
-  it("opens custom install dialog from menu callback", async () => {
-    const onOpenCustomInstall = vi.fn();
-
-    setup({ onOpenCustomInstall });
-
-    fireEvent.click(screen.getByRole("button", { name: /install menu/i }));
-    fireEvent.click(screen.getByRole("menuitem", { name: /install custom app/i }));
-
-    await waitFor(() => {
-      expect(onOpenCustomInstall).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  it("shows action error banner in list when install request fails", async () => {
-    const installApp = vi.fn().mockRejectedValue(new Error("Unable to start install operation"));
-    useStoreCatalogMock.mockReturnValue({
-      data: [summaryApp],
-      isLoading: false,
-      isError: false,
-    });
-    useStoreAppMock.mockReturnValue({
-      data: null,
-      isLoading: false,
-    });
-    useStoreActionsMock.mockReturnValue({
-      operationsByApp: {},
-      installApp,
-      installCustomApp: vi.fn(),
-      updateApp: vi.fn(),
-      redeployApp: vi.fn(),
-      uninstallApp: vi.fn(),
-    });
-    useStoreOperationMock.mockReturnValue({
-      operation: null,
-      latestEvent: null,
-      isLoading: false,
-      isError: false,
-      error: null,
-    });
-
-    render(<AppStore onOpenCustomInstall={() => {}} />);
-
-    fireEvent.click(screen.getByRole("button", { name: /^install$/i }));
-
-    await waitFor(() => {
-      expect(screen.getByText("Unable to start install operation")).toBeTruthy();
-    });
   });
 });

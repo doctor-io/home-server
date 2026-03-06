@@ -1,273 +1,299 @@
 import "server-only";
 
+import { promisify } from "node:util";
+import { existsSync } from "node:fs";
+import { mkdir, readdir, readFile, stat } from "node:fs/promises";
+import path from "node:path";
+import { execFile } from "node:child_process";
 import { LruCache } from "@/lib/server/cache/lru";
 import { serverEnv } from "@/lib/server/env";
 import { logServerAction, withServerTiming } from "@/lib/server/logging/logger";
-import type { StoreAppEnvDefinition } from "@/lib/shared/contracts/apps";
+import { ensureDataRootDirectories } from "@/lib/server/storage/data-root";
+import {
+  type AppDefinition,
+  parseComposeToApp,
+} from "@/lib/server/modules/store/casaos-compose-mapper";
+import {
+  readStoreCatalogConfig,
+  resolveStoreCatalogsRoot,
+  writeStoreCatalogConfig,
+} from "@/lib/server/modules/store/catalog-config";
 
-type UpstreamTemplateRepository = {
-  url?: unknown;
-  stackfile?: unknown;
-};
+const execFileAsync = promisify(execFile);
 
-type UpstreamTemplateEnv = {
+export const CASAOS_APPSTORE_REPO_URL = "https://github.com/IceWhaleTech/CasaOS-AppStore";
+const CASAOS_REPO_DIRNAME = "CasaOS-AppStore";
+const APPS_DIRECTORY_CANDIDATES = ["Apps", "Store"] as const;
+
+type CasaosCategoryEntry = {
   name?: unknown;
-  label?: unknown;
   description?: unknown;
-  default?: unknown;
 };
 
-type UpstreamTemplate = {
-  id?: unknown;
-  title?: unknown;
-  name?: unknown;
-  description?: unknown;
-  note?: unknown;
-  platform?: unknown;
-  categories?: unknown;
-  logo?: unknown;
-  port?: unknown;
-  repository?: UpstreamTemplateRepository;
-  env?: unknown;
+type CasaosAppReference = {
+  appid?: unknown;
 };
 
-type UpstreamTemplatePayload = {
-  templates?: unknown;
-};
+export type StoreCatalogTemplate = AppDefinition;
 
-type CacheMetadata = {
-  etag: string | null;
-  lastModified: string | null;
-};
-
-export type StoreCatalogTemplate = {
-  appId: string;
-  templateName: string;
+export type StoreCatalogCategory = {
+  id: string;
   name: string;
   description: string;
-  platform: string;
-  note: string;
-  categories: string[];
-  logoUrl: string | null;
-  port: number | null;
-  repositoryUrl: string;
-  stackFile: string;
-  env: StoreAppEnvDefinition[];
+  appCount: number;
 };
 
-const catalogCache = new LruCache<StoreCatalogTemplate[]>(1, serverEnv.STORE_CATALOG_TTL_MS);
-let metadata: CacheMetadata = {
-  etag: null,
-  lastModified: null,
+export type StoreCatalogSnapshot = {
+  apps: StoreCatalogTemplate[];
+  categories: StoreCatalogCategory[];
+  featuredAppIds: string[];
+  recommendedAppIds: string[];
+  sourcePath: string;
 };
 
-function slugify(value: string) {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+type CacheEntry = {
+  signature: string;
+  snapshot: StoreCatalogSnapshot;
+};
+
+const catalogCache = new LruCache<CacheEntry>(1, serverEnv.STORE_CATALOG_TTL_MS);
+
+function normalizeCategoryId(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, "-");
 }
 
-function toStringValue(value: unknown, fallback = "") {
-  return typeof value === "string" ? value : fallback;
+function defaultCatalogPath() {
+  return path.join(resolveStoreCatalogsRoot(), CASAOS_REPO_DIRNAME);
 }
 
-function toPlatform(value: unknown) {
-  if (typeof value === "string" && value.trim().length > 0) {
-    return value.trim();
+async function resolveConfiguredCatalogPath() {
+  const config = await readStoreCatalogConfig();
+  return config?.defaultCatalogPath ?? defaultCatalogPath();
+}
+
+async function ensureCasaosCatalogRepo(targetPath: string) {
+  const absoluteTarget = path.resolve(targetPath);
+  const appsDir = await resolveAppsDirectory(absoluteTarget).catch(() => null);
+  if (appsDir) {
+    return absoluteTarget;
   }
 
-  if (Array.isArray(value)) {
-    const values = value
-      .map((item) => (typeof item === "string" ? item.trim() : ""))
-      .filter((item) => item.length > 0);
+  await ensureDataRootDirectories();
+  await mkdir(path.dirname(absoluteTarget), { recursive: true });
 
-    if (values.length > 0) {
-      return Array.from(new Set(values)).join(", ");
+  if (!existsSync(absoluteTarget)) {
+    await execFileAsync("git", ["clone", "--depth=1", CASAOS_APPSTORE_REPO_URL, absoluteTarget]);
+  } else if (existsSync(path.join(absoluteTarget, ".git"))) {
+    await execFileAsync("git", ["-C", absoluteTarget, "pull", "--ff-only"]);
+  }
+
+  await writeStoreCatalogConfig({
+    defaultCatalogPath: absoluteTarget,
+    repoUrl: CASAOS_APPSTORE_REPO_URL,
+  });
+
+  return absoluteTarget;
+}
+
+async function resolveAppsDirectory(repoPath: string) {
+  for (const candidate of APPS_DIRECTORY_CANDIDATES) {
+    const fullPath = path.join(repoPath, candidate);
+    if (existsSync(fullPath)) {
+      return fullPath;
     }
   }
 
-  return "Docker";
+  throw new Error(`CasaOS catalog apps directory not found in ${repoPath}`);
 }
 
-function normalizeCategoryKey(value: string) {
-  return value.toLowerCase().replace(/\s+/g, "");
-}
-
-function toCategories(value: unknown) {
-  if (!Array.isArray(value)) {
-    return ["Uncategorized"];
+async function readJsonFile<T>(filePath: string, fallback: T): Promise<T> {
+  try {
+    const raw = await readFile(filePath, "utf8");
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
   }
+}
 
-  const categories = value
-    .map((item) => (typeof item === "string" ? item.trim() : ""))
-    .filter((item) => item.length > 0);
+async function collectComposePaths(appsDirectory: string) {
+  const entries = await readdir(appsDirectory, { withFileTypes: true });
+  return entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => path.join(appsDirectory, entry.name, "docker-compose.yml"))
+    .filter((composePath) => existsSync(composePath))
+    .sort((left, right) => left.localeCompare(right));
+}
 
-  const filtered = Array.from(
-    new Set(
-      categories.filter((category) => normalizeCategoryKey(category) !== "bigbearcasaos"),
-    ),
+async function buildSignature(repoPath: string, composePaths: string[]) {
+  const watchedFiles = [
+    path.join(repoPath, "category-list.json"),
+    path.join(repoPath, "featured-apps.json"),
+    path.join(repoPath, "recommend-list.json"),
+    ...composePaths,
+  ];
+
+  const parts = await Promise.all(
+    watchedFiles.map(async (filePath) => {
+      try {
+        const info = await stat(filePath);
+        return `${filePath}:${info.mtimeMs}:${info.size}`;
+      } catch {
+        return `${filePath}:missing`;
+      }
+    }),
   );
 
-  if (filtered.length === 0) {
-    return ["Uncategorized"];
-  }
-
-  return filtered;
+  return parts.join("|");
 }
 
-function toEnvDefinitions(value: unknown): StoreAppEnvDefinition[] {
-  if (!Array.isArray(value)) return [];
-
-  return value
-    .map((item) => item as UpstreamTemplateEnv)
-    .filter((item) => typeof item?.name === "string" && item.name.trim().length > 0)
-    .map((item) => ({
-      name: String(item.name).trim(),
-      label: typeof item.label === "string" ? item.label : undefined,
-      description: typeof item.description === "string" ? item.description : undefined,
-      default: typeof item.default === "string" ? item.default : undefined,
-    }));
-}
-
-function normalizeTemplate(item: UpstreamTemplate, index: number): StoreCatalogTemplate | null {
-  const repository = item.repository ?? {};
-  const repositoryUrl = toStringValue(repository.url);
-  const stackFile = toStringValue(repository.stackfile);
-  if (!repositoryUrl || !stackFile) {
-    return null;
-  }
-
-  const templateName = toStringValue(item.name, toStringValue(item.title, `app-${index + 1}`));
-  const displayName = toStringValue(item.title, templateName);
-  const description = toStringValue(item.description, "No description");
-  const note = toStringValue(item.note, description);
-  const appIdBase = slugify(templateName || displayName || `app-${index + 1}`);
-  const appId = appIdBase.length > 0 ? appIdBase : `app-${index + 1}`;
-
-  const port =
-    typeof item.port === "number" && Number.isInteger(item.port) && item.port > 0
-      ? item.port
-      : null;
-
+function mapCatalogApp(input: AppDefinition, repoPath: string): StoreCatalogTemplate {
   return {
-    appId,
-    templateName,
-    name: displayName,
-    description,
-    platform: toPlatform(item.platform),
-    note,
-    categories: toCategories(item.categories),
-    logoUrl: toStringValue(item.logo) || null,
-    port,
-    repositoryUrl,
-    stackFile,
-    env: toEnvDefinitions(item.env),
+    ...input,
+    repositoryUrl: CASAOS_APPSTORE_REPO_URL,
+    stackFile: path.relative(repoPath, input.composePath),
   };
 }
 
-function normalizePayload(payload: UpstreamTemplatePayload): StoreCatalogTemplate[] {
-  if (!Array.isArray(payload.templates)) {
-    return [];
+function buildCatalogCategories(input: {
+  apps: StoreCatalogTemplate[];
+  categoryEntries: CasaosCategoryEntry[];
+  includeCustomCategory?: boolean;
+}) {
+  const counts = new Map<string, number>();
+  for (const app of input.apps) {
+    for (const category of app.categories) {
+      counts.set(category, (counts.get(category) ?? 0) + 1);
+    }
   }
 
-  const seen = new Set<string>();
-  const result: StoreCatalogTemplate[] = [];
-
-  payload.templates.forEach((raw, index) => {
-    const normalized = normalizeTemplate((raw ?? {}) as UpstreamTemplate, index);
-    if (!normalized) return;
-
-    let dedupedId = normalized.appId;
-    let suffix = 2;
-    while (seen.has(dedupedId)) {
-      dedupedId = `${normalized.appId}-${suffix++}`;
-    }
-    seen.add(dedupedId);
-
-    result.push({
-      ...normalized,
-      appId: dedupedId,
+  const ordered: StoreCatalogCategory[] = [];
+  for (const item of input.categoryEntries) {
+    const name = typeof item.name === "string" ? item.name.trim() : "";
+    if (!name) continue;
+    ordered.push({
+      id: normalizeCategoryId(name),
+      name,
+      description:
+        typeof item.description === "string" && item.description.trim().length > 0
+          ? item.description.trim()
+          : `${name} apps`,
+      appCount: counts.get(name) ?? 0,
     });
-  });
+  }
 
-  return result.sort((a, b) => a.name.localeCompare(b.name));
+  const known = new Set(ordered.map((item) => item.name));
+  for (const [name, appCount] of Array.from(counts.entries()).sort((left, right) =>
+    left[0].localeCompare(right[0]),
+  )) {
+    if (known.has(name)) continue;
+    ordered.push({
+      id: normalizeCategoryId(name),
+      name,
+      description: `${name} apps`,
+      appCount,
+    });
+  }
+
+  if (input.includeCustomCategory && !ordered.some((item) => item.name === "Custom")) {
+    ordered.push({
+      id: normalizeCategoryId("Custom"),
+      name: "Custom",
+      description: "Custom compose apps",
+      appCount: counts.get("Custom") ?? 0,
+    });
+  }
+
+  return ordered.filter((item) => item.appCount > 0);
 }
 
-export async function listStoreCatalogTemplates(options?: { bypassCache?: boolean }) {
+function normalizeReferences(entries: CasaosAppReference[]) {
+  return entries
+    .map((entry) => (typeof entry.appid === "string" ? entry.appid.trim() : ""))
+    .filter((appid) => appid.length > 0);
+}
+
+async function buildStoreCatalogSnapshot(repoPath: string): Promise<StoreCatalogSnapshot> {
+  const appsDirectory = await resolveAppsDirectory(repoPath);
+  const composePaths = await collectComposePaths(appsDirectory);
+  const signature = await buildSignature(repoPath, composePaths);
+  const cached = catalogCache.get("casaos-catalog");
+  if (cached && cached.signature === signature) {
+    return cached.snapshot;
+  }
+
+  const [categoryEntries, featuredEntries, recommendedEntries] = await Promise.all([
+    readJsonFile<CasaosCategoryEntry[]>(path.join(repoPath, "category-list.json"), []),
+    readJsonFile<CasaosAppReference[]>(path.join(repoPath, "featured-apps.json"), []),
+    readJsonFile<CasaosAppReference[]>(path.join(repoPath, "recommend-list.json"), []),
+  ]);
+
+  const apps = composePaths
+    .map((composePath) => mapCatalogApp(parseComposeToApp(composePath), repoPath))
+    .sort((left, right) => left.name.localeCompare(right.name));
+
+  const snapshot: StoreCatalogSnapshot = {
+    apps,
+    categories: buildCatalogCategories({ apps, categoryEntries }),
+    featuredAppIds: normalizeReferences(featuredEntries),
+    recommendedAppIds: normalizeReferences(recommendedEntries),
+    sourcePath: repoPath,
+  };
+
+  catalogCache.set("casaos-catalog", { signature, snapshot }, serverEnv.STORE_CATALOG_TTL_MS);
+  return snapshot;
+}
+
+export async function bootstrapDefaultCasaosCatalog(options?: { forceRefresh?: boolean }) {
   return withServerTiming(
     {
       layer: "service",
-      action: "store.catalog.fetch",
-      meta: {
-        bypassCache: Boolean(options?.bypassCache),
-        source: serverEnv.STORE_TEMPLATE_URL,
-      },
+      action: "store.catalog.bootstrap",
+      meta: { forceRefresh: Boolean(options?.forceRefresh) },
     },
     async () => {
-      const cached = catalogCache.get("bigbear-catalog");
-
-      if (!options?.bypassCache && cached) {
-        return cached;
+      const configuredPath = await resolveConfiguredCatalogPath();
+      const repoPath = await ensureCasaosCatalogRepo(configuredPath);
+      if (options?.forceRefresh) {
+        catalogCache.delete("casaos-catalog");
       }
+      const snapshot = await buildStoreCatalogSnapshot(repoPath);
+      return {
+        path: repoPath,
+        indexedApps: snapshot.apps.length,
+      };
+    },
+  );
+}
 
-      const headers = new Headers();
-      if (metadata.etag) headers.set("If-None-Match", metadata.etag);
-      if (metadata.lastModified) headers.set("If-Modified-Since", metadata.lastModified);
+export async function getStoreCatalogSnapshot(options?: { bypassCache?: boolean }) {
+  return withServerTiming(
+    {
+      layer: "service",
+      action: "store.catalog.snapshot",
+      meta: { bypassCache: Boolean(options?.bypassCache) },
+    },
+    async () => {
+      const repoPath = await resolveConfiguredCatalogPath();
 
       try {
-        let response = await fetch(serverEnv.STORE_TEMPLATE_URL, {
-          method: "GET",
-          headers,
-          cache: "no-store",
-        });
-
-        if (response.status === 304) {
-          if (cached) {
-            catalogCache.set("bigbear-catalog", cached, serverEnv.STORE_CATALOG_TTL_MS);
-            return cached;
-          }
-
-          // Metadata can outlive in-memory cache; retry once without validators.
-          metadata = { etag: null, lastModified: null };
-          response = await fetch(serverEnv.STORE_TEMPLATE_URL, {
-            method: "GET",
-            cache: "no-store",
-          });
+        if (options?.bypassCache) {
+          catalogCache.delete("casaos-catalog");
         }
 
-        if (!response.ok) {
-          throw new Error(
-            `Failed to fetch template catalog (${response.status}) from ${serverEnv.STORE_TEMPLATE_URL}`,
-          );
-        }
-
-        const json = (await response.json()) as UpstreamTemplatePayload;
-        const normalized = normalizePayload(json);
-
-        metadata = {
-          etag: response.headers.get("etag"),
-          lastModified: response.headers.get("last-modified"),
-        };
-
-        catalogCache.set("bigbear-catalog", normalized, serverEnv.STORE_CATALOG_TTL_MS);
-        return normalized;
+        const ensuredPath = await ensureCasaosCatalogRepo(repoPath);
+        return await buildStoreCatalogSnapshot(ensuredPath);
       } catch (error) {
+        const cached = catalogCache.get("casaos-catalog");
         if (cached) {
           logServerAction({
             level: "warn",
             layer: "service",
-            action: "store.catalog.fetch",
+            action: "store.catalog.snapshot",
             status: "error",
-            message: "Template catalog fetch failed; serving cached catalog",
+            message: "Falling back to cached CasaOS catalog snapshot",
             error,
-            meta: {
-              source: serverEnv.STORE_TEMPLATE_URL,
-              cachedEntries: cached.length,
-            },
           });
-          return cached;
+          return cached.snapshot;
         }
 
         throw error;
@@ -276,10 +302,12 @@ export async function listStoreCatalogTemplates(options?: { bypassCache?: boolea
   );
 }
 
-export async function findStoreCatalogTemplateByAppId(
-  appId: string,
-  options?: { bypassCache?: boolean },
-) {
-  const templates = await listStoreCatalogTemplates(options);
-  return templates.find((template) => template.appId === appId) ?? null;
+export async function listStoreCatalogTemplates(options?: { bypassCache?: boolean }) {
+  const snapshot = await getStoreCatalogSnapshot(options);
+  return snapshot.apps;
+}
+
+export async function findStoreCatalogTemplateByAppId(appId: string) {
+  const apps = await listStoreCatalogTemplates();
+  return apps.find((app) => app.appId === appId) ?? null;
 }

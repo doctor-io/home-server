@@ -44,12 +44,6 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((value) => value !== "false"),
-  STORE_TEMPLATE_URL: z
-    .string()
-    .url()
-    .default(
-      "https://raw.githubusercontent.com/bigbeartechworld/big-bear-portainer/main/templates.json",
-    ),
   STORE_CATALOG_TTL_MS: z.coerce
     .number()
     .int()

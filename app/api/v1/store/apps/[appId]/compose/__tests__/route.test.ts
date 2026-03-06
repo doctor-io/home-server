@@ -8,12 +8,15 @@ vi.mock("@/lib/server/modules/store/catalog", () => ({
   findStoreCatalogTemplateByAppId: vi.fn(),
 }));
 
+vi.mock("@/lib/server/modules/store/custom-apps", () => ({
+  findCustomStoreTemplateByAppId: vi.fn(),
+}));
+
 vi.mock("@/lib/server/modules/apps/stacks-repository", () => ({
   findInstalledStackByAppId: vi.fn(),
 }));
 
 vi.mock("@/lib/server/modules/docker/compose-parser", () => ({
-  fetchComposeFileFromGitHub: vi.fn(),
   parseComposeFile: vi.fn(),
   extractPrimaryServiceWithName: vi.fn(),
 }));
@@ -26,9 +29,9 @@ import { readFile } from "node:fs/promises";
 import { GET } from "@/app/api/v1/store/apps/[appId]/compose/route";
 import { findInstalledStackByAppId } from "@/lib/server/modules/apps/stacks-repository";
 import { findStoreCatalogTemplateByAppId } from "@/lib/server/modules/store/catalog";
+import { findCustomStoreTemplateByAppId } from "@/lib/server/modules/store/custom-apps";
 import {
   extractPrimaryServiceWithName,
-  fetchComposeFileFromGitHub,
   parseComposeFile,
 } from "@/lib/server/modules/docker/compose-parser";
 import { resolveStoreStacksRoot } from "@/lib/server/storage/data-root";
@@ -42,16 +45,23 @@ describe("GET /api/v1/store/apps/:appId/compose", () => {
       templateName: "immich",
       name: "Immich",
       description: "Photos",
-      platform: "linux",
+      platform: "Docker Compose",
       note: "note",
-      categories: ["selfhosted"],
+      categories: ["Gallery"],
       logoUrl: null,
-      port: null,
-      repositoryUrl: "https://github.com/bigbeartechworld/big-bear-portainer",
-      stackFile: "Apps/immich/docker-compose.yml",
+      repositoryUrl: "https://github.com/IceWhaleTech/CasaOS-AppStore",
+      stackFile: "Apps/Immich/docker-compose.yml",
+      composePath: "/tmp/CasaOS-AppStore/Apps/Immich/docker-compose.yml",
       env: [],
+      screenshots: [],
+      image: null,
+      volumes: [],
+      port: 2283,
+      scheme: "http",
+      index: "/",
+      mainServiceName: "immich-server",
     });
-    vi.mocked(fetchComposeFileFromGitHub).mockResolvedValue(rawCompose);
+    vi.mocked(readFile).mockResolvedValue(rawCompose);
     vi.mocked(parseComposeFile).mockReturnValue({
       services: {
         "immich-server": {
@@ -162,5 +172,56 @@ describe("GET /api/v1/store/apps/:appId/compose", () => {
     expect(response.status).toBe(404);
     const json = (await response.json()) as { code: string };
     expect(json.code).toBe("installed_compose_missing");
+  });
+
+  it("returns custom catalog compose from stored content", async () => {
+    const rawCompose = `services:\n  app:\n    image: nginx:latest\n`;
+    vi.mocked(findStoreCatalogTemplateByAppId).mockResolvedValue(null);
+    vi.mocked(findCustomStoreTemplateByAppId).mockResolvedValue({
+      appId: "custom-nginx",
+      templateName: "custom-nginx",
+      name: "Custom Nginx",
+      description: "Custom app installed from docker compose",
+      platform: "Docker Compose",
+      note: "Custom app",
+      categories: ["Custom"],
+      logoUrl: null,
+      repositoryUrl: "custom://local",
+      stackFile: "custom/custom-nginx/docker-compose.yml",
+      composePath: "/tmp/custom/custom-nginx/docker-compose.yml",
+      env: [],
+      screenshots: [],
+      image: "nginx:latest",
+      volumes: [],
+      port: 8080,
+      scheme: "http",
+      index: "/",
+      mainServiceName: "app",
+      isCustom: true,
+      sourceType: "docker-compose",
+      composeContent: rawCompose,
+      sourceText: rawCompose,
+    });
+    vi.mocked(parseComposeFile).mockReturnValue({
+      services: {
+        app: {
+          image: "nginx:latest",
+        },
+      },
+    });
+    vi.mocked(extractPrimaryServiceWithName).mockReturnValue({
+      name: "app",
+      service: {
+        image: "nginx:latest",
+      },
+    });
+
+    const response = await GET(new Request("http://localhost/api/v1/store/apps/custom-nginx/compose?source=catalog"), {
+      params: Promise.resolve({ appId: "custom-nginx" }),
+    });
+
+    expect(response.status).toBe(200);
+    const json = (await response.json()) as { data: { compose: string } };
+    expect(json.data.compose).toBe(rawCompose);
   });
 });

@@ -1,6 +1,7 @@
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+@AGENTS.md
 
 ## Commands
 
@@ -16,11 +17,13 @@ npm run db:reset     # Full database reset (destructive)
 ```
 
 Run a single test file:
+
 ```bash
 npx vitest run path/to/file.test.ts
 ```
 
 Run tests matching a pattern:
+
 ```bash
 npx vitest run --reporter=verbose -t "test name pattern"
 ```

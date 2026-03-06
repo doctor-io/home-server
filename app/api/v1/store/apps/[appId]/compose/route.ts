@@ -8,9 +8,9 @@ import {
 } from "@/lib/server/logging/logger";
 import { findInstalledStackByAppId } from "@/lib/server/modules/apps/stacks-repository";
 import { findStoreCatalogTemplateByAppId } from "@/lib/server/modules/store/catalog";
+import { findCustomStoreTemplateByAppId } from "@/lib/server/modules/store/custom-apps";
 import {
   extractPrimaryServiceWithName,
-  fetchComposeFileFromGitHub,
   parseComposeFile,
 } from "@/lib/server/modules/docker/compose-parser";
 import { resolveStoreStacksRoot } from "@/lib/server/storage/data-root";
@@ -28,12 +28,6 @@ function isPathWithinRoot(candidatePath: string, rootPath: string) {
   return relative === "" || (!relative.startsWith("..") && !nodePath.isAbsolute(relative));
 }
 
-/**
- * GET /api/v1/store/apps/[appId]/compose
- *
- * Fetches and parses the docker-compose.yml for an app from its GitHub repository.
- * This is used to pre-fill the app settings dialog with default values.
- */
 export async function GET(request: Request, context: RouteContext) {
   const requestId = createRequestId();
   const { appId } = await context.params;
@@ -64,7 +58,9 @@ export async function GET(request: Request, context: RouteContext) {
         let primaryAppId = appId;
 
         if (source === "catalog") {
-          const template = await findStoreCatalogTemplateByAppId(appId);
+          const template =
+            (await findStoreCatalogTemplateByAppId(appId)) ??
+            (await findCustomStoreTemplateByAppId(appId));
           if (!template) {
             return NextResponse.json(
               {
@@ -75,21 +71,11 @@ export async function GET(request: Request, context: RouteContext) {
             );
           }
 
-          const fetchedCompose = await fetchComposeFileFromGitHub({
-            repositoryUrl: template.repositoryUrl,
-            stackFile: template.stackFile,
-          });
-          if (!fetchedCompose) {
-            return NextResponse.json(
-              {
-                error: "Failed to fetch or parse docker-compose.yml",
-                code: "parse_error",
-              },
-              { status: 500 },
-            );
+          if ("composeContent" in template && typeof template.composeContent === "string") {
+            compose = template.composeContent;
+          } else {
+            compose = await readFile(template.composePath, "utf8");
           }
-
-          compose = fetchedCompose;
           primaryAppId = template.appId;
         } else {
           const installed = await findInstalledStackByAppId(appId);

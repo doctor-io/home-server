@@ -20,6 +20,10 @@ vi.mock("@/lib/server/modules/auth/service", () => {
   };
 });
 
+vi.mock("@/lib/server/modules/store/catalog", () => ({
+  bootstrapDefaultCasaosCatalog: vi.fn(),
+}));
+
 vi.mock("@/lib/server/storage/data-root", () => ({
   ensureDataRootDirectories: vi.fn(),
   resolveDataRootDirectory: vi.fn(() => "/DATA"),
@@ -28,6 +32,7 @@ vi.mock("@/lib/server/storage/data-root", () => ({
 import { POST } from "@/app/api/auth/register/route";
 import { hasAnyUsers } from "@/lib/server/modules/auth/repository";
 import { registerUser } from "@/lib/server/modules/auth/service";
+import { bootstrapDefaultCasaosCatalog } from "@/lib/server/modules/store/catalog";
 import { ensureDataRootDirectories } from "@/lib/server/storage/data-root";
 
 describe("POST /api/auth/register", () => {
@@ -50,12 +55,17 @@ describe("POST /api/auth/register", () => {
     expect(json.error).toContain("disabled");
     expect(registerUser).not.toHaveBeenCalled();
     expect(ensureDataRootDirectories).not.toHaveBeenCalled();
+    expect(bootstrapDefaultCasaosCatalog).not.toHaveBeenCalled();
   });
 
-  it("allows first registration when no users exist", async () => {
+  it("allows first registration when no users exist and bootstraps the catalog", async () => {
     vi.mocked(hasAnyUsers).mockResolvedValueOnce(false);
+    vi.mocked(bootstrapDefaultCasaosCatalog).mockResolvedValueOnce({
+      path: "/DATA/AppStore/CasaOS-AppStore",
+      indexedApps: 10,
+    });
     vi.mocked(registerUser).mockResolvedValueOnce({
-      id: "u1",
+      id: "11111111-1111-1111-1111-111111111111",
       username: "admin",
     });
 
@@ -76,5 +86,6 @@ describe("POST /api/auth/register", () => {
     expect(response.status).toBe(201);
     expect(json.data.username).toBe("admin");
     expect(ensureDataRootDirectories).toHaveBeenCalledTimes(1);
+    expect(bootstrapDefaultCasaosCatalog).toHaveBeenCalledTimes(1);
   });
 });

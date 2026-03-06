@@ -19,7 +19,7 @@ describe("useStoreCatalog", () => {
             categories: ["Media"],
             logoUrl: "https://cdn.example.com/plex.png",
             repositoryUrl: "https://github.com/plex",
-            stackFile: "plex/docker-compose.yml",
+            stackFile: "Apps/Plex/docker-compose.yml",
             status: "not_installed",
             webUiPort: null,
             updateAvailable: false,
@@ -29,6 +29,17 @@ describe("useStoreCatalog", () => {
         ],
         meta: {
           count: 1,
+          categories: [
+            {
+              id: "media",
+              name: "Media",
+              description: "Media apps",
+              appCount: 1,
+            },
+          ],
+          featuredAppIds: ["plex"],
+          recommendedAppIds: ["plex"],
+          sourcePath: "/DATA/AppStore/CasaOS-AppStore",
         },
       }),
     });
@@ -52,7 +63,8 @@ describe("useStoreCatalog", () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(result.current.data).toHaveLength(1);
+    expect(result.current.data?.apps).toHaveLength(1);
+    expect(result.current.data?.categories[0]?.name).toBe("Media");
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/v1/store/apps?category=Media&search=plex&installedOnly=true&updatesOnly=true",
       { cache: "no-store" },

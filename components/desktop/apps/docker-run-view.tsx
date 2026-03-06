@@ -13,7 +13,7 @@ export function DockerRunView({ state, onChange }: DockerRunViewProps) {
   return (
     <section className="flex-1 overflow-y-auto px-4 py-3">
       <p className="mb-3 text-[11px] text-muted-foreground">
-        Docker Run is available for custom installs only.
+        Docker Run is available for custom installs only. Web UI metadata is derived from the published ports in the command.
       </p>
 
       <div className="space-y-3">
@@ -36,23 +36,6 @@ export function DockerRunView({ state, onChange }: DockerRunViewProps) {
             value={state.iconUrl}
             onChange={(event) => update({ iconUrl: event.target.value })}
             placeholder="https://..."
-            className="h-9 rounded-lg border border-glass-border bg-secondary/35 px-2.5 text-xs text-foreground outline-none focus:border-primary/50"
-          />
-        </label>
-
-        <label className="flex flex-col gap-1 text-[11px] text-muted-foreground">
-          Web UI Port
-          <input
-            aria-label="Web UI Port"
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={65535}
-            value={state.webUiPort}
-            onChange={(event) =>
-              update({ webUiPort: event.target.value.replace(/[^0-9]/g, "") })
-            }
-            placeholder="8080"
             className="h-9 rounded-lg border border-glass-border bg-secondary/35 px-2.5 text-xs text-foreground outline-none focus:border-primary/50"
           />
         </label>

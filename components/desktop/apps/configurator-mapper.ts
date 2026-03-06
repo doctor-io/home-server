@@ -53,7 +53,6 @@ export type ClassicConfigState = {
 export type DockerRunState = {
   name: string;
   iconUrl: string;
-  webUiPort: string;
   repositoryUrl: string;
   source: string;
 };
@@ -805,7 +804,6 @@ export function buildInitialDockerRunState(input: {
   return {
     name: appName,
     iconUrl: input.iconUrl,
-    webUiPort,
     repositoryUrl: "",
     source: `docker run --name ${toAppId(appName)} -p ${webUiPort}:80 nginx:latest`,
   } satisfies DockerRunState;

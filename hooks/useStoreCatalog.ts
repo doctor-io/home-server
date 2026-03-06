@@ -5,11 +5,30 @@ import { withClientTiming } from "@/lib/client/logger";
 import type { StoreAppSummary } from "@/lib/shared/contracts/apps";
 import { queryKeys } from "@/lib/shared/query-keys";
 
+type StoreCatalogCategory = {
+  id: string;
+  name: string;
+  description: string;
+  appCount: number;
+};
+
 type StoreCatalogResponse = {
   data: StoreAppSummary[];
   meta: {
     count: number;
+    categories: StoreCatalogCategory[];
+    featuredAppIds: string[];
+    recommendedAppIds: string[];
+    sourcePath: string;
   };
+};
+
+export type StoreCatalogResult = {
+  apps: StoreAppSummary[];
+  categories: StoreCatalogCategory[];
+  featuredAppIds: string[];
+  recommendedAppIds: string[];
+  sourcePath: string;
 };
 
 type UseStoreCatalogOptions = {
@@ -31,7 +50,7 @@ function buildCatalogUrl(options?: UseStoreCatalogOptions) {
   return query.length > 0 ? `/api/v1/store/apps?${query}` : "/api/v1/store/apps";
 }
 
-async function fetchStoreCatalog(options?: UseStoreCatalogOptions) {
+async function fetchStoreCatalog(options?: UseStoreCatalogOptions): Promise<StoreCatalogResult> {
   const endpoint = buildCatalogUrl(options);
 
   return withClientTiming(
@@ -52,7 +71,13 @@ async function fetchStoreCatalog(options?: UseStoreCatalogOptions) {
       }
 
       const json = (await response.json()) as StoreCatalogResponse;
-      return json.data;
+      return {
+        apps: json.data,
+        categories: json.meta.categories,
+        featuredAppIds: json.meta.featuredAppIds,
+        recommendedAppIds: json.meta.recommendedAppIds,
+        sourcePath: json.meta.sourcePath,
+      };
     },
   );
 }

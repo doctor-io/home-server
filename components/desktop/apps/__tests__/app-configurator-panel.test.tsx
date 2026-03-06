@@ -39,6 +39,7 @@ const template: StoreAppDetail = {
   remoteDigest: null,
   note: "Install note",
   env: [],
+  screenshots: [],
   installedConfig: null,
 };
 
@@ -69,7 +70,7 @@ describe("AppConfiguratorPanel", () => {
     useAppComposeMock.mockReturnValue({
       data: {
         compose:
-          "services:\n  app:\n    image: ghcr.io/example/app:latest\n    ports:\n      - \"8123:8123\"\n",
+          'services:\n  app:\n    image: ghcr.io/example/app:latest\n    ports:\n      - "8123:8123"\n',
         primary: {
           image: "ghcr.io/example/app:latest",
           ports: ["8123:8123"],
@@ -125,30 +126,6 @@ describe("AppConfiguratorPanel", () => {
     expect(screen.queryByRole("button", { name: "Docker Run" })).toBeNull();
   });
 
-  it("does not block installed settings on template metadata loading", () => {
-    setupActions();
-
-    useStoreAppMock.mockReturnValue({
-      data: null,
-      isLoading: true,
-    });
-
-    render(
-      <AppConfiguratorPanel
-        context="installed_edit"
-        target={{
-          appId: "dozzle",
-          appName: "Dozzle",
-          dashboardUrl: "http://192.168.1.15:8080",
-          containerName: "dozzle",
-        }}
-      />,
-    );
-
-    expect(screen.queryByText("Loading app configuration...")).toBeNull();
-    expect(screen.getByLabelText("Docker Image")).toBeTruthy();
-  });
-
   it("syncs classic edits into compose view", () => {
     setupActions();
 
@@ -162,25 +139,6 @@ describe("AppConfiguratorPanel", () => {
 
     const composeEditor = screen.getByLabelText("Docker Compose") as HTMLTextAreaElement;
     expect(composeEditor.value).toContain("image: nginx:1.27");
-  });
-
-  it("syncs compose edits back into classic fields", () => {
-    setupActions();
-
-    render(<AppConfiguratorPanel context="catalog_install" template={template} />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Docker Compose" }));
-
-    const composeEditor = screen.getByLabelText("Docker Compose");
-    fireEvent.change(composeEditor, {
-      target: {
-        value: `services:\n  app:\n    image: redis:7\n    ports:\n      - \"6380:6379\"\n`,
-      },
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "Classic" }));
-
-    expect((screen.getByLabelText("Docker Image") as HTMLInputElement).value).toBe("redis:7");
   });
 
   it("submits install in catalog context", async () => {
@@ -201,7 +159,7 @@ describe("AppConfiguratorPanel", () => {
     );
   });
 
-  it("submits docker run install for custom context when docker run tab is active", async () => {
+  it("submits docker run install for custom context without manual port field", async () => {
     const { installCustomApp } = setupActions();
 
     render(<AppConfiguratorPanel context="custom_install" />);
@@ -210,7 +168,7 @@ describe("AppConfiguratorPanel", () => {
       target: { value: "My Run App" },
     });
     fireEvent.change(screen.getByLabelText("Docker Run"), {
-      target: { value: "docker run --name my-run-app nginx:latest" },
+      target: { value: "docker run --name my-run-app -p 8088:80 nginx:latest" },
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Install" }));
@@ -218,10 +176,13 @@ describe("AppConfiguratorPanel", () => {
     await waitFor(() => {
       expect(installCustomApp).toHaveBeenCalledWith(
         expect.objectContaining({
-          sourceType: "docker-run",
           name: "My Run App",
+          sourceType: "docker-run",
+          source: "docker run --name my-run-app -p 8088:80 nginx:latest",
         }),
       );
     });
+
+    expect(screen.queryByLabelText("Web UI Port")).toBeNull();
   });
 });

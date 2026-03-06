@@ -1,20 +1,25 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
+import path from "node:path";
 import { desc, eq, sql } from "drizzle-orm";
+import yaml from "js-yaml";
 import { db } from "@/lib/server/db/drizzle";
 import { customStoreApps } from "@/lib/server/db/schema";
 import { withServerTiming } from "@/lib/server/logging/logger";
+import {
+  parseComposeContentToApp,
+  type AppDefinition,
+} from "@/lib/server/modules/store/casaos-compose-mapper";
 import type { StoreCatalogTemplate } from "@/lib/server/modules/store/catalog";
 
 export type CustomStoreSourceType = "docker-compose" | "docker-run";
 
-export type CustomStoreTemplate = StoreCatalogTemplate & {
+export type CustomStoreTemplate = AppDefinition & {
   isCustom: true;
   sourceType: CustomStoreSourceType;
   composeContent: string;
   sourceText: string;
-  webUiUrl: string | null;
 };
 
 export type StoreTemplateSource = StoreCatalogTemplate | CustomStoreTemplate;
@@ -22,10 +27,15 @@ export type StoreTemplateSource = StoreCatalogTemplate | CustomStoreTemplate;
 type UpsertCustomStoreTemplateInput = {
   name: string;
   iconUrl?: string;
-  webUiUrl?: string;
   sourceType: CustomStoreSourceType;
   sourceText: string;
   repositoryUrl?: string;
+};
+
+type ComposeLike = {
+  name?: unknown;
+  services?: Record<string, Record<string, unknown>>;
+  [key: string]: unknown;
 };
 
 function normalize(value: string | undefined) {
@@ -279,36 +289,121 @@ export function convertDockerRunToCompose(command: string, fallbackServiceName: 
   return lines.join("\n");
 }
 
-export function extractPortFromWebUi(webUi: string | null | undefined) {
-  if (!webUi) return undefined;
-  const raw = webUi.trim();
-  if (!raw) return undefined;
-
-  if (/^\d+$/.test(raw)) {
-    const port = Number(raw);
-    if (!Number.isInteger(port) || port < 1 || port > 65535) {
-      throw new Error("webUi must contain a valid port between 1 and 65535");
-    }
-    return port;
+function parseComposeDocument(content: string) {
+  const parsed = yaml.load(content) as ComposeLike | null;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Docker compose source must be valid YAML");
   }
 
-  const withProtocol = raw.includes("://") ? raw : `http://${raw}`;
-  try {
-    const parsed = new URL(withProtocol);
-    const port = parsed.port ? Number(parsed.port) : undefined;
-
-    if (port === undefined) {
-      return undefined;
-    }
-
-    if (!Number.isInteger(port) || port < 1 || port > 65535) {
-      throw new Error("webUi must contain a valid port between 1 and 65535");
-    }
-
-    return port;
-  } catch {
-    throw new Error("webUi must be a valid URL, host:port, or plain port");
+  if (!parsed.services || typeof parsed.services !== "object" || Array.isArray(parsed.services)) {
+    throw new Error("Docker compose source must include a services section");
   }
+
+  return parsed;
+}
+
+function parseFirstPublishedPort(service: Record<string, unknown>) {
+  const ports = service.ports;
+  if (!Array.isArray(ports)) return null;
+
+  for (const entry of ports) {
+    if (typeof entry === "string") {
+      const [mappingPart] = entry.split("/");
+      const segments = mappingPart.split(":").filter(Boolean);
+      const published = segments.length >= 2 ? segments[segments.length - 2] : segments[0];
+      const parsed = Number.parseInt(published, 10);
+      if (Number.isInteger(parsed) && parsed >= 1 && parsed <= 65535) {
+        return parsed;
+      }
+      continue;
+    }
+
+    if (!entry || typeof entry !== "object") continue;
+    const candidate = entry as { published?: unknown; target?: unknown };
+    const published = typeof candidate.published === "number" || typeof candidate.published === "string"
+      ? Number.parseInt(String(candidate.published), 10)
+      : typeof candidate.target === "number" || typeof candidate.target === "string"
+        ? Number.parseInt(String(candidate.target), 10)
+        : NaN;
+    if (Number.isInteger(published) && published >= 1 && published <= 65535) {
+      return published;
+    }
+  }
+
+  return null;
+}
+
+function augmentCustomComposeMetadata(input: {
+  appId: string;
+  name: string;
+  iconUrl?: string;
+  sourceType: CustomStoreSourceType;
+  composeContent: string;
+}) {
+  const parsed = parseComposeDocument(input.composeContent);
+  const services = parsed.services as Record<string, Record<string, unknown>>;
+  const existingCasaos =
+    parsed["x-casaos"] && typeof parsed["x-casaos"] === "object" && !Array.isArray(parsed["x-casaos"])
+      ? (parsed["x-casaos"] as Record<string, unknown>)
+      : {};
+
+  const serviceNames = Object.keys(services);
+  const mainService =
+    typeof existingCasaos.main === "string" && services[existingCasaos.main]
+      ? existingCasaos.main
+      : serviceNames[0] ?? "app";
+  const detectedPort = parseFirstPublishedPort(services[mainService] ?? {});
+
+  parsed.name = typeof parsed.name === "string" && parsed.name.trim().length > 0 ? parsed.name : input.appId;
+  parsed["x-casaos"] = {
+    ...existingCasaos,
+    main: mainService,
+    title:
+      existingCasaos.title && typeof existingCasaos.title === "object"
+        ? existingCasaos.title
+        : { en_us: input.name },
+    icon:
+      typeof existingCasaos.icon === "string" && existingCasaos.icon.trim().length > 0
+        ? existingCasaos.icon
+        : input.iconUrl,
+    category:
+      typeof existingCasaos.category === "string" && existingCasaos.category.trim().length > 0
+        ? existingCasaos.category
+        : "Custom",
+    description:
+      existingCasaos.description && typeof existingCasaos.description === "object"
+        ? existingCasaos.description
+        : {
+            en_us:
+              input.sourceType === "docker-run"
+                ? "Custom app installed from docker run"
+                : "Custom app installed from docker compose",
+          },
+    tips:
+      existingCasaos.tips && typeof existingCasaos.tips === "object"
+        ? existingCasaos.tips
+        : {
+            before_install: {
+              en_us: "Managed as a custom CasaOS compose app.",
+            },
+          },
+    scheme:
+      typeof existingCasaos.scheme === "string" && existingCasaos.scheme.trim().length > 0
+        ? existingCasaos.scheme
+        : "http",
+    index:
+      typeof existingCasaos.index === "string" && existingCasaos.index.trim().length > 0
+        ? existingCasaos.index
+        : "/",
+    port_map:
+      existingCasaos.port_map ?? (detectedPort !== null ? String(detectedPort) : undefined),
+  };
+
+  return yaml.dump(parsed, {
+    lineWidth: -1,
+    noRefs: true,
+    sortKeys: false,
+  });
 }
 
 function mapRow(row: typeof customStoreApps.$inferSelect): CustomStoreTemplate {
@@ -316,27 +411,17 @@ function mapRow(row: typeof customStoreApps.$inferSelect): CustomStoreTemplate {
     row.sourceType === "docker-run" || row.sourceType === "docker-compose"
       ? row.sourceType
       : "docker-compose";
+  const virtualComposePath = path.join(process.cwd(), "custom", row.appId, "docker-compose.yml");
+  const parsed = parseComposeContentToApp(virtualComposePath, row.composeContent);
 
   return {
-    appId: row.appId,
-    templateName: row.name,
-    name: row.name,
-    description:
-      sourceType === "docker-run"
-        ? "Custom app installed from docker run"
-        : "Custom app installed from docker compose",
-    platform: sourceType === "docker-run" ? "Docker Run" : "Docker Compose",
-    note: "Custom app definition managed from App Store.",
-    categories: ["Custom"],
-    logoUrl: row.iconUrl,
+    ...parsed,
     repositoryUrl: row.repositoryUrl ?? "custom://local",
     stackFile: `custom/${row.appId}/docker-compose.yml`,
-    env: [],
     isCustom: true,
     sourceType,
     composeContent: row.composeContent,
     sourceText: row.sourceText,
-    webUiUrl: row.webUiUrl,
   };
 }
 
@@ -361,10 +446,7 @@ function normalizeComposeContent(input: {
     return convertDockerRunToCompose(sourceText, input.fallbackServiceName);
   }
 
-  if (!sourceText.includes("services:")) {
-    throw new Error("Docker compose source must include a services section");
-  }
-
+  parseComposeDocument(sourceText);
   return sourceText;
 }
 
@@ -437,6 +519,13 @@ export async function upsertCustomStoreTemplate(input: UpsertCustomStoreTemplate
         sourceText: input.sourceText,
         fallbackServiceName: name,
       });
+      const casaosComposeContent = augmentCustomComposeMetadata({
+        appId,
+        name,
+        iconUrl: input.iconUrl,
+        sourceType: input.sourceType,
+        composeContent,
+      });
 
       const rows = await db
         .insert(customStoreApps)
@@ -444,10 +533,10 @@ export async function upsertCustomStoreTemplate(input: UpsertCustomStoreTemplate
           appId,
           name,
           iconUrl: normalize(input.iconUrl),
-          webUiUrl: normalize(input.webUiUrl),
+          webUiUrl: null,
           sourceType: input.sourceType,
           sourceText: input.sourceText.trim(),
-          composeContent,
+          composeContent: casaosComposeContent,
           repositoryUrl: normalize(input.repositoryUrl),
           updatedAt: sql`NOW()`,
         })
@@ -456,10 +545,10 @@ export async function upsertCustomStoreTemplate(input: UpsertCustomStoreTemplate
           set: {
             name,
             iconUrl: normalize(input.iconUrl),
-            webUiUrl: normalize(input.webUiUrl),
+            webUiUrl: null,
             sourceType: input.sourceType,
             sourceText: input.sourceText.trim(),
-            composeContent,
+            composeContent: casaosComposeContent,
             repositoryUrl: normalize(input.repositoryUrl),
             updatedAt: sql`NOW()`,
           },

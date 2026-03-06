@@ -55,6 +55,7 @@ export type StoreAppSummary = {
 export type StoreAppDetail = StoreAppSummary & {
   note: string;
   env: StoreAppEnvDefinition[];
+  screenshots: string[];
   installedConfig: InstalledStackConfig | null;
 };
 

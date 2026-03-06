@@ -4,7 +4,7 @@ import {
   logServerAction,
   withServerTiming,
 } from "@/lib/server/logging/logger";
-import { listStoreApps } from "@/lib/server/modules/store/service";
+import { getStoreCatalogView } from "@/lib/server/modules/store/service";
 
 export const runtime = "nodejs";
 
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
         const installedOnly = searchParams.get("installedOnly") === "true";
         const updatesOnly = searchParams.get("updatesOnly") === "true";
 
-        const apps = await listStoreApps({
+        const catalog = await getStoreCatalogView({
           category,
           search,
           installedOnly,
@@ -34,9 +34,13 @@ export async function GET(request: NextRequest) {
 
         return NextResponse.json(
           {
-            data: apps,
+            data: catalog.apps,
             meta: {
-              count: apps.length,
+              count: catalog.apps.length,
+              categories: catalog.categories,
+              featuredAppIds: catalog.featuredAppIds,
+              recommendedAppIds: catalog.recommendedAppIds,
+              sourcePath: catalog.sourcePath,
             },
           },
           {

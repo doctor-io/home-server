@@ -319,7 +319,6 @@ export function useStoreActions() {
       appId: string;
       displayName?: string;
       env?: Record<string, string>;
-      webUiPort?: number;
       composeSource?: string;
       resetToCatalog?: boolean;
     }) => {
@@ -439,7 +438,6 @@ export function useStoreActions() {
     mutationFn: async (input: {
       name: string;
       iconUrl?: string;
-      webUiPort?: number;
       repositoryUrl?: string;
       sourceType: "docker-compose" | "docker-run";
       source: string;
