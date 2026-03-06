@@ -66,6 +66,10 @@ let storageDetailsCache:
       expiresAt: number;
     }
   | null = null;
+/** Last successfully collected storage details — persists beyond cache TTL for stale serving. */
+let storageDetailsLastKnown: CachedStorageDetails | null = null;
+/** True while a background (or first-ever) storage detail collection is in flight. */
+let storageDetailsRefreshing = false;
 let helperStatusUnavailableUntil = 0;
 let lastHelperStatusErrorLogAt = 0;
 
@@ -255,12 +259,11 @@ function readStorageDetailsCache() {
   return storageDetailsCache.value;
 }
 
-async function collectStorageDetailMetrics(): Promise<CachedStorageDetails> {
-  const cached = readStorageDetailsCache();
-  if (cached) {
-    return cached;
-  }
-
+/**
+ * Execute the expensive storage detail collection (fsSize + diskLayout probes).
+ * Updates both the TTL cache and the persistent lastKnown value.
+ */
+async function executeStorageDetailCollection(): Promise<CachedStorageDetails> {
   const [fsSizes, diskLayout] = await Promise.all([
     withFallback("system.metrics.storage.fsSize", () => si.fsSize(), []),
     withFallback("system.metrics.storage.diskLayout", () => si.diskLayout(), []),
@@ -362,8 +365,56 @@ async function collectStorageDetailMetrics(): Promise<CachedStorageDetails> {
     value: details,
     expiresAt: Date.now() + STORAGE_DETAILS_CACHE_TTL_MS,
   };
+  storageDetailsLastKnown = details;
 
   return details;
+}
+
+/**
+ * Returns storage details using a stale-while-revalidate strategy:
+ *  - Fresh cache hit  → return immediately (no I/O).
+ *  - Stale but data exists → return last-known value instantly; kick off a
+ *    background refresh so the *next* call gets fresh data.
+ *  - First call ever → must await the probe (no prior data to serve).
+ *
+ * This prevents the 1-3 s fsSize/diskLayout probes from blocking every SSE push
+ * after the 60-second TTL expires.
+ */
+async function collectStorageDetailMetrics(): Promise<CachedStorageDetails> {
+  // 1) Fresh cache hit — no I/O needed.
+  const cached = readStorageDetailsCache();
+  if (cached) return cached;
+
+  // 2) We have a previously collected value. Serve it immediately and refresh
+  //    in the background so the next cache miss gets fresh data.
+  if (storageDetailsLastKnown !== null) {
+    if (!storageDetailsRefreshing) {
+      storageDetailsRefreshing = true;
+      void executeStorageDetailCollection()
+        .catch((error) => {
+          logServerAction({
+            level: "warn",
+            layer: "service",
+            action: "system.metrics.storage.background-refresh",
+            status: "error",
+            message: "Background storage detail refresh failed",
+            error,
+          });
+        })
+        .finally(() => {
+          storageDetailsRefreshing = false;
+        });
+    }
+    return storageDetailsLastKnown;
+  }
+
+  // 3) First call ever — must await synchronously (no stale value to serve).
+  storageDetailsRefreshing = true;
+  try {
+    return await executeStorageDetailCollection();
+  } finally {
+    storageDetailsRefreshing = false;
+  }
 }
 
 async function collectStorageMetrics() {

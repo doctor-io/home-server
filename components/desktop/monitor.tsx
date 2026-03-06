@@ -9,10 +9,10 @@ import {
   calculateDockerTotals,
   containerToProcess,
   getStatusBadgeColor,
-  nudge,
 } from "@/lib/client/monitor-utils";
 import {
   Activity,
+  AlertTriangle,
   ArrowDown,
   ArrowUp,
   Container,
@@ -27,16 +27,6 @@ import { useEffect, useMemo, useState } from "react";
 
 type MonitorTab = "processes" | "resources" | "network";
 type SortKey = "cpu" | "memory" | "network" | "disk";
-
-type ProcessItem = {
-  name: string;
-  status: "Running" | "Sleeping" | "Background";
-  pid: number;
-  cpu: number;
-  memory: number;
-  network: number;
-  disk: number;
-};
 
 function MetricCard({
   label,
@@ -70,39 +60,43 @@ function MetricCard({
 function HistoryBars({ values, color }: { values: number[]; color: string }) {
   return (
     <div className="flex h-16 items-end gap-1 rounded-xl border border-glass-border bg-glass p-2">
-      {values.map((v, i) => (
-        <span
-          key={`${i}-${v}`}
-          className={`w-1.5 rounded-sm ${color} transition-all duration-300`}
-          style={{ height: `${Math.max(6, Math.round(v))}%` }}
-        />
-      ))}
+      {values.length === 0 ? (
+        <span className="m-auto text-xs text-muted-foreground">Collecting…</span>
+      ) : (
+        values.map((v, i) => (
+          <span
+            key={`${i}-${v}`}
+            className={`w-1.5 rounded-sm ${color} transition-all duration-300`}
+            style={{ height: `${Math.max(6, Math.round(v))}%` }}
+          />
+        ))
+      )}
     </div>
   );
+}
+
+/** Format bytes to a human-readable string (KB / MB / GB / TB). */
+function formatBytes(bytes: number): string {
+  if (bytes >= 1024 ** 4) return `${(bytes / 1024 ** 4).toFixed(2)} TB`;
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
+  if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(0)} MB`;
+  return `${(bytes / 1024).toFixed(0)} KB`;
 }
 
 export function Monitor() {
   const [tab, setTab] = useState<MonitorTab>("processes");
   const [query, setQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortKey>("cpu");
-  const [cpu, setCpu] = useState(21.8);
-  const [memory, setMemory] = useState(34.1);
-  const [disk, setDisk] = useState(47.2);
-  const [download, setDownload] = useState(24.8);
-  const [upload, setUpload] = useState(8.3);
-  const [cpuHistory, setCpuHistory] = useState<number[]>([
-    18, 21, 17, 24, 23, 20, 28, 26, 22, 19, 21, 25, 24, 20, 23, 22, 19, 26, 24,
-    21, 18, 22, 27, 24,
-  ]);
-  const [memHistory, setMemHistory] = useState<number[]>([
-    31, 33, 32, 34, 36, 35, 33, 32, 34, 35, 37, 36, 34, 33, 34, 35, 36, 35, 34,
-    33, 34, 35, 34, 33,
-  ]);
-  const [processes, setProcesses] = useState<ProcessItem[]>([]);
+  const [cpuHistory, setCpuHistory] = useState<number[]>([]);
+  const [memHistory, setMemHistory] = useState<number[]>([]);
 
-  // Real system metrics
+  // Real system metrics (updated continuously via useSystemSse)
   const { data: systemMetrics } = useSystemMetrics();
-  const { stats: dockerStats, isConnected: dockerConnected } = useDockerStats();
+  const {
+    stats: dockerStats,
+    daemonAvailable,
+    isConnected: dockerConnected,
+  } = useDockerStats();
 
   // Calculate total Docker stats
   const dockerTotals = useMemo(
@@ -110,7 +104,7 @@ export function Monitor() {
     [dockerStats],
   );
 
-  // Update history with real system metrics
+  // Append real system metrics to rolling history arrays
   useEffect(() => {
     if (!systemMetrics) return;
 
@@ -119,27 +113,6 @@ export function Monitor() {
 
     setCpuHistory((prev) => [...prev.slice(-23), cpuValue]);
     setMemHistory((prev) => [...prev.slice(-23), memValue]);
-
-    // Keep fake data for processes tab fallback
-    const timer = setInterval(() => {
-      setCpu((v) => nudge(v, 7, 72));
-      setMemory((v) => nudge(v, 22, 79));
-      setDisk((v) => nudge(v, 35, 91, 1.1));
-      setDownload((v) => nudge(v, 3.5, 44, 3.4));
-      setUpload((v) => nudge(v, 1.2, 21, 1.8));
-
-      setProcesses((prev) =>
-        prev.map((p) => ({
-          ...p,
-          cpu: nudge(p.cpu, 0.1, 28, 1.6),
-          memory: nudge(p.memory, 140, 2900, 38),
-          network: nudge(p.network, 0.1, 6.2, 0.5),
-          disk: nudge(p.disk, 0.1, 4.8, 0.3),
-        })),
-      );
-    }, 2200);
-
-    return () => clearInterval(timer);
   }, [systemMetrics]);
 
   // Convert Docker stats to process format
@@ -150,14 +123,12 @@ export function Monitor() {
 
   const filteredProcesses = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const allProcesses =
-      dockerProcesses.length > 0 ? dockerProcesses : processes;
     const filtered = q
-      ? allProcesses.filter((p) => p.name.toLowerCase().includes(q))
-      : allProcesses;
+      ? dockerProcesses.filter((p) => p.name.toLowerCase().includes(q))
+      : dockerProcesses;
 
     return [...filtered].sort((a, b) => b[sortBy] - a[sortBy]);
-  }, [dockerProcesses, processes, query, sortBy]);
+  }, [dockerProcesses, query, sortBy]);
 
   return (
     <div className="flex h-full flex-col">
@@ -223,8 +194,12 @@ export function Monitor() {
               label="Containers"
               icon={Container}
               value={`${dockerStats.length}`}
-              sub={`${dockerStats.filter((c) => c.state === "running").length} running`}
-              color="text-chart-4"
+              sub={
+                daemonAvailable === false
+                  ? "daemon unreachable"
+                  : `${dockerStats.filter((c) => c.state === "running").length} running`
+              }
+              color={daemonAvailable === false ? "text-status-amber" : "text-chart-4"}
             />
             <MetricCard
               label="Network RX"
@@ -247,11 +222,17 @@ export function Monitor() {
               <div className="flex items-center gap-2 text-xs font-medium text-foreground">
                 <Container className="size-3.5" />
                 <span>Docker Containers</span>
-                {dockerConnected && (
+                {dockerConnected && daemonAvailable !== false && (
                   <span className="text-status-green">● Live</span>
                 )}
               </div>
-              {dockerStats.length === 0 && (
+              {daemonAvailable === false && (
+                <span className="flex items-center gap-1 text-xs text-status-amber">
+                  <AlertTriangle className="size-3.5" />
+                  Docker daemon unreachable
+                </span>
+              )}
+              {daemonAvailable !== false && dockerStats.length === 0 && (
                 <span className="text-xs text-muted-foreground">
                   No containers running
                 </span>
@@ -288,9 +269,11 @@ export function Monitor() {
 
             {filteredProcesses.length === 0 ? (
               <div className="px-3 py-8 text-center text-sm text-muted-foreground">
-                {query
-                  ? "No containers match your search"
-                  : "No containers running"}
+                {daemonAvailable === false
+                  ? "Cannot connect to Docker daemon"
+                  : query
+                    ? "No containers match your search"
+                    : "No containers running"}
               </div>
             ) : (
               filteredProcesses.map((p) => (
@@ -375,16 +358,32 @@ export function Monitor() {
               <div className="mb-2 flex items-center gap-2 text-xs font-medium text-foreground">
                 <HardDrive className="size-3.5 text-chart-4" /> Disk Usage
               </div>
-              <div className="h-2 overflow-hidden rounded-full bg-secondary/60">
-                <div
-                  className="h-full bg-chart-4 transition-all duration-300"
-                  style={{ width: `${disk}%` }}
-                />
-              </div>
-              <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-                <span>2.64 TB / 5.64 TB</span>
-                <span className="font-mono">{disk.toFixed(1)}%</span>
-              </div>
+              {systemMetrics?.storage ? (
+                <>
+                  <div className="h-2 overflow-hidden rounded-full bg-secondary/60">
+                    <div
+                      className="h-full bg-chart-4 transition-all duration-300"
+                      style={{
+                        width: `${systemMetrics.storage.usedPercent.toFixed(1)}%`,
+                      }}
+                    />
+                  </div>
+                  <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                    <span>
+                      {formatBytes(systemMetrics.storage.usedBytes)}
+                      {" / "}
+                      {formatBytes(systemMetrics.storage.totalBytes)}
+                    </span>
+                    <span className="font-mono">
+                      {systemMetrics.storage.usedPercent.toFixed(1)}%
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <p className="py-2 text-center text-xs text-muted-foreground">
+                  Storage data unavailable
+                </p>
+              )}
             </div>
 
             <div className="rounded-xl border border-glass-border bg-glass p-3">
@@ -490,20 +489,26 @@ export function Monitor() {
                 <Container className="size-3.5 text-primary" /> Container
                 Network Activity
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-lg bg-secondary/40 p-2 text-center">
-                  <p className="text-xl font-mono text-foreground">
-                    {(dockerTotals.totalNetworkRx / 1024 / 1024).toFixed(1)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">MB Received</p>
+              {daemonAvailable === false ? (
+                <p className="py-2 text-center text-xs text-muted-foreground">
+                  Docker daemon unreachable
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-lg bg-secondary/40 p-2 text-center">
+                    <p className="text-xl font-mono text-foreground">
+                      {(dockerTotals.totalNetworkRx / 1024 / 1024).toFixed(1)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">MB Received</p>
+                  </div>
+                  <div className="rounded-lg bg-secondary/40 p-2 text-center">
+                    <p className="text-xl font-mono text-foreground">
+                      {(dockerTotals.totalNetworkTx / 1024 / 1024).toFixed(1)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">MB Sent</p>
+                  </div>
                 </div>
-                <div className="rounded-lg bg-secondary/40 p-2 text-center">
-                  <p className="text-xl font-mono text-foreground">
-                    {(dockerTotals.totalNetworkTx / 1024 / 1024).toFixed(1)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">MB Sent</p>
-                </div>
-              </div>
+              )}
             </div>
 
             {/* System Info */}
@@ -537,7 +542,9 @@ export function Monitor() {
                     Containers
                   </p>
                   <p className="text-sm font-mono text-foreground">
-                    {dockerStats.length} total
+                    {daemonAvailable === false
+                      ? "unavailable"
+                      : `${dockerStats.length} total`}
                   </p>
                 </div>
               </div>

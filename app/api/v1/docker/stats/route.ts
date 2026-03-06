@@ -11,7 +11,8 @@ export const runtime = "nodejs";
 /**
  * GET /api/v1/docker/stats
  *
- * Returns current stats for all Docker containers (CPU, memory, network, I/O)
+ * Returns current stats for all Docker containers (CPU, memory, network, I/O).
+ * Response shape: { data: { containers: ContainerStats[]; daemonAvailable: boolean } }
  */
 export async function GET() {
   const requestId = createRequestId();
@@ -24,10 +25,10 @@ export async function GET() {
         requestId,
       },
       async () => {
-        const stats = await getAllContainersStats();
+        const result = await getAllContainersStats();
 
         return NextResponse.json({
-          data: stats,
+          data: result,
         });
       },
     );

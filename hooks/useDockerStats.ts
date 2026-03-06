@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
-import type { ContainerStats } from "@/lib/shared/contracts/docker";
+import type { ContainerStats, DockerStatsPayload } from "@/lib/shared/contracts/docker";
 
 /**
- * Hook to subscribe to real-time Docker container stats via SSE
+ * Hook to subscribe to real-time Docker container stats via SSE.
+ * Exposes `daemonAvailable` so the UI can distinguish "no containers" from
+ * "Docker daemon is unreachable".
  */
 export function useDockerStats() {
   const [stats, setStats] = useState<ContainerStats[]>([]);
+  const [daemonAvailable, setDaemonAvailable] = useState<boolean | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,8 +22,9 @@ export function useDockerStats() {
 
         eventSource.addEventListener("stats.updated", (event) => {
           try {
-            const data = JSON.parse(event.data) as ContainerStats[];
-            setStats(data);
+            const payload = JSON.parse(event.data) as DockerStatsPayload;
+            setStats(payload.containers);
+            setDaemonAvailable(payload.daemonAvailable);
             setError(null);
           } catch (err) {
             console.error("Failed to parse Docker stats:", err);
@@ -39,6 +43,7 @@ export function useDockerStats() {
 
         eventSource.onerror = () => {
           setIsConnected(false);
+          setDaemonAvailable(null); // Reset — connection lost, state unknown
           eventSource?.close();
 
           // Reconnect after 5 seconds
@@ -66,6 +71,7 @@ export function useDockerStats() {
 
   return {
     stats,
+    daemonAvailable,
     isConnected,
     error,
   };
@@ -76,6 +82,7 @@ export function useDockerStats() {
  */
 export function useDockerStatsSnapshot() {
   const [stats, setStats] = useState<ContainerStats[]>([]);
+  const [daemonAvailable, setDaemonAvailable] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -89,8 +96,9 @@ export function useDockerStatsSnapshot() {
           throw new Error(`HTTP ${response.status}`);
         }
 
-        const json = await response.json();
-        setStats(json.data);
+        const json = (await response.json()) as { data: DockerStatsPayload };
+        setStats(json.data.containers);
+        setDaemonAvailable(json.data.daemonAvailable);
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to fetch stats");
@@ -104,6 +112,7 @@ export function useDockerStatsSnapshot() {
 
   return {
     stats,
+    daemonAvailable,
     isLoading,
     error,
   };

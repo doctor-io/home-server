@@ -22,6 +22,12 @@ export type ContainerStats = {
   blockWrite: number;
 };
 
+export type DockerStatsResult = {
+  containers: ContainerStats[];
+  /** false when the Docker daemon socket is unreachable or returns an error. */
+  daemonAvailable: boolean;
+};
+
 type DockerContainer = {
   Id: string;
   Names: string[];
@@ -115,7 +121,8 @@ function dockerRequest<T>(path: string, method = "GET"): Promise<T> {
 }
 
 /**
- * Calculate CPU percentage from Docker stats
+ * Calculate CPU percentage from Docker stats.
+ * Result is clamped to [0, cpuCount * 100] to prevent values > 100% per core.
  */
 function calculateCpuPercent(stats: DockerStatsResponse): number {
   const cpuDelta =
@@ -126,7 +133,8 @@ function calculateCpuPercent(stats: DockerStatsResponse): number {
 
   if (systemDelta > 0 && cpuDelta > 0) {
     const cpuCount = stats.cpu_stats.online_cpus || 1;
-    return Number(((cpuDelta / systemDelta) * cpuCount * 100).toFixed(2));
+    const raw = (cpuDelta / systemDelta) * cpuCount * 100;
+    return Number(Math.max(0, Math.min(raw, cpuCount * 100)).toFixed(2));
   }
 
   return 0;
@@ -189,7 +197,7 @@ function getBlockStats(stats: DockerStatsResponse): {
 }
 
 /**
- * List all containers
+ * List all containers (catches errors, returns empty array on failure).
  */
 export async function listContainers(): Promise<DockerContainer[]> {
   try {
@@ -236,9 +244,14 @@ export async function getContainerStats(
 
 /**
  * Collect fresh stats from Docker for all containers and update the cache.
+ * Calls dockerRequest directly (no catch) so daemon errors propagate to the caller.
  */
 async function collectAllContainersStats(): Promise<ContainerStats[]> {
-  const containers = await listContainers();
+  // May throw — getAllContainersStats handles the error and sets daemonAvailable: false
+  const containers = await dockerRequest<DockerContainer[]>(
+    "/containers/json?all=true",
+  );
+
   const statsPromises = containers.map(async (container) => {
     const stats = await getContainerStats(container.Id);
 
@@ -265,29 +278,33 @@ async function collectAllContainersStats(): Promise<ContainerStats[]> {
   });
 
   const results = await Promise.all(statsPromises);
-  const stats = results.filter((stat): stat is ContainerStats => stat !== null);
-  statsCache.set(STATS_CACHE_KEY, stats);
-  return stats;
+  const statsList = results.filter(
+    (stat): stat is ContainerStats => stat !== null,
+  );
+  statsCache.set(STATS_CACHE_KEY, statsList);
+  return statsList;
 }
 
 /**
  * Get stats for all containers, returning cached data if fresh (< 5s old).
+ * Returns daemonAvailable: false when the Docker daemon socket cannot be reached.
  */
-export async function getAllContainersStats(): Promise<ContainerStats[]> {
+export async function getAllContainersStats(): Promise<DockerStatsResult> {
   try {
     const cached = statsCache.get(STATS_CACHE_KEY);
-    if (cached) return cached;
+    if (cached) return { containers: cached, daemonAvailable: true };
 
-    return await collectAllContainersStats();
+    const containers = await collectAllContainersStats();
+    return { containers, daemonAvailable: true };
   } catch (error) {
     logServerAction({
-      level: "error",
+      level: "warn",
       layer: "service",
       action: "docker.all-stats",
       status: "error",
-      message: "Failed to get Docker container stats",
+      message: "Failed to get Docker container stats — daemon may be unavailable",
       error,
     });
-    return [];
+    return { containers: [], daemonAvailable: false };
   }
 }

@@ -19,6 +19,22 @@ import {
   toUptimeParts,
 } from "@/components/desktop/system-widgets/utils";
 
+/**
+ * Returns a Tailwind background-colour class for a progress bar based on thresholds.
+ *  - Below warnThreshold  → green  (normal)
+ *  - [warn, crit)         → amber  (warning)
+ *  - >= critThreshold     → red    (critical)
+ */
+function getResourceColor(
+  percent: number,
+  warnThreshold: number,
+  critThreshold: number,
+): string {
+  if (percent >= critThreshold) return "bg-status-red";
+  if (percent >= warnThreshold) return "bg-status-amber";
+  return "bg-status-green";
+}
+
 export function useSystemWidgetsData(): SystemWidgetsViewModel {
   const { data: metrics } = useSystemMetrics();
   const { data: installedApps } = useInstalledApps();
@@ -27,6 +43,8 @@ export function useSystemWidgetsData(): SystemWidgetsViewModel {
   return useMemo(() => {
     const cpuPercent = clampPercent(metrics?.cpu.normalizedPercent);
     const memoryPercent = clampPercent(metrics?.memory.usedPercent);
+    // Temperature: mainCelsius maps directly to a 0-100 scale (°C → %).
+    // Thresholds: warn at 60 °C, critical at 80 °C.
     const temperatureProgress = clampPercent(metrics?.temperature.mainCelsius);
 
     const resources: ResourceWidgetItem[] = [
@@ -34,21 +52,21 @@ export function useSystemWidgetsData(): SystemWidgetsViewModel {
         label: "CPU",
         value: `${cpuPercent}%`,
         progress: cpuPercent,
-        colorClassName: "bg-primary",
+        colorClassName: getResourceColor(cpuPercent, 60, 80),
         icon: Cpu,
       },
       {
         label: "Memory",
         value: formatMemoryValue(metrics?.memory.usedBytes, metrics?.memory.totalBytes),
         progress: memoryPercent,
-        colorClassName: "bg-chart-2",
+        colorClassName: getResourceColor(memoryPercent, 70, 85),
         icon: MemoryStick,
       },
       {
         label: "Temperature",
         value: formatTemperatureValue(metrics?.temperature.mainCelsius),
         progress: temperatureProgress,
-        colorClassName: "bg-status-amber",
+        colorClassName: getResourceColor(temperatureProgress, 60, 80),
         icon: Thermometer,
       },
     ];

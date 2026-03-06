@@ -12,11 +12,18 @@ export type ContainerStats = {
   blockWrite: number;
 };
 
+/** Shape returned by both the REST endpoint and the SSE "stats.updated" event. */
+export type DockerStatsPayload = {
+  containers: ContainerStats[];
+  /** false when the Docker daemon socket is unreachable. */
+  daemonAvailable: boolean;
+};
+
 export type DockerStatsResponse = {
-  data: ContainerStats[];
+  data: DockerStatsPayload;
 };
 
 export type DockerStatsStreamEvent = {
   type: "stats.updated" | "heartbeat";
-  data: ContainerStats[] | { timestamp: string };
+  data: DockerStatsPayload | { timestamp: string };
 };

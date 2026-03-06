@@ -37,6 +37,9 @@ export function useSystemMetrics() {
   return useQuery({
     queryKey: queryKeys.systemMetrics,
     queryFn: fetchSystemMetrics,
-    refetchInterval: 15_000,
+    // useSystemSse drives continuous cache updates via queryClient.setQueryData.
+    // Set staleTime to Infinity so React Query does not refetch on its own —
+    // one initial REST fetch gives us a baseline while SSE warms up.
+    staleTime: Infinity,
   });
 }
