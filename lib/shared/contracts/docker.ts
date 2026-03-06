@@ -27,3 +27,15 @@ export type DockerStatsStreamEvent = {
   type: "stats.updated" | "heartbeat";
   data: DockerStatsPayload | { timestamp: string };
 };
+
+/** Engine-level metadata returned by GET /api/v1/docker/info */
+export type DockerInfo = {
+  engineVersion: string;
+  storageDriver: string;
+  cgroupDriver: string;
+  images: number;
+};
+
+export type DockerInfoResponse = {
+  data: DockerInfo;
+};

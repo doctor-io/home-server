@@ -4,6 +4,7 @@ import { request } from "node:http";
 import { serverEnv } from "@/lib/server/env";
 import { LruCache } from "@/lib/server/cache/lru";
 import { logServerAction } from "@/lib/server/logging/logger";
+import type { DockerInfo } from "@/lib/shared/contracts/docker";
 
 const STATS_CACHE_KEY = "all";
 const statsCache = new LruCache<ContainerStats[]>(1, 5_000);
@@ -306,5 +307,38 @@ export async function getAllContainersStats(): Promise<DockerStatsResult> {
       error,
     });
     return { containers: [], daemonAvailable: false };
+  }
+}
+
+type DockerDaemonInfo = {
+  ServerVersion: string;
+  Driver: string;
+  CgroupDriver: string;
+  Images: number;
+};
+
+/**
+ * Fetch Docker engine metadata from the /info endpoint.
+ * Returns null when the daemon socket is unreachable.
+ */
+export async function getDockerInfo(): Promise<DockerInfo | null> {
+  try {
+    const info = await dockerRequest<DockerDaemonInfo>("/info");
+    return {
+      engineVersion: info.ServerVersion,
+      storageDriver: info.Driver,
+      cgroupDriver: info.CgroupDriver,
+      images: info.Images,
+    };
+  } catch (error) {
+    logServerAction({
+      level: "warn",
+      layer: "service",
+      action: "docker.info",
+      status: "error",
+      message: "Failed to fetch Docker engine info — daemon may be unavailable",
+      error,
+    });
+    return null;
   }
 }

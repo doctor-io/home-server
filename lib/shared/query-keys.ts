@@ -22,4 +22,5 @@ export const queryKeys = {
     ["files", "search", query, basePath, includeHidden] as const,
   currentWeather: (latitude: number | null, longitude: number | null) =>
     ["weather", "current", latitude, longitude] as const,
+  dockerInfo: ["docker", "info"] as const,
 };

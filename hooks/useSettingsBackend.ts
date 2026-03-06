@@ -1,13 +1,14 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { withClientTiming } from "@/lib/client/logger";
 import type { ContainerStats } from "@/lib/shared/contracts/docker";
 import type { StoreAppSummary } from "@/lib/shared/contracts/apps";
 import { queryKeys } from "@/lib/shared/query-keys";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useDockerStatsSnapshot } from "@/hooks/useDockerStats";
+import { useDockerInfo } from "@/hooks/useDockerInfo";
 import { useLocalFolderShares } from "@/hooks/useLocalFolderShares";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { useNetworkShares } from "@/hooks/useNetworkShares";
@@ -146,14 +147,30 @@ export function useSettingsBackend() {
   const localFolderSharesQuery = useLocalFolderShares();
   const networkSharesQuery = useNetworkShares();
   const dockerStatsSnapshot = useDockerStatsSnapshot();
+  const dockerInfoQuery = useDockerInfo();
   const updatesQuery = useStoreCatalog({ updatesOnly: true });
+
+  /** Timestamp (ms) of the last successful "check for updates" invocation. */
+  const lastCheckedAtRef = useRef<number | null>(null);
+  /** Cooldown window in ms — prevents button spam. */
+  const CHECK_UPDATES_COOLDOWN_MS = 30_000;
 
   const checkUpdatesMutation = useMutation({
     mutationFn: checkStoreUpdatesRequest,
     onSuccess: async () => {
+      lastCheckedAtRef.current = Date.now();
       await queryClient.invalidateQueries({ queryKey: queryKeys.storeCatalog });
     },
   });
+
+  function checkForUpdates() {
+    if (checkUpdatesMutation.isPending) return;
+    const lastChecked = lastCheckedAtRef.current;
+    if (lastChecked !== null && Date.now() - lastChecked < CHECK_UPDATES_COOLDOWN_MS) {
+      return;
+    }
+    void checkUpdatesMutation.mutateAsync(undefined);
+  }
 
   const general = useMemo(() => {
     const metrics = systemMetricsQuery.data;
@@ -236,21 +253,33 @@ export function useSettingsBackend() {
 
   const docker = useMemo(() => {
     const containers = dockerStatsSnapshot.stats.map(mapContainerToViewModel);
+    const info = dockerInfoQuery.data;
 
     return {
       containers,
       total: containers.length,
       running: containers.filter((container) => container.status === "running").length,
-      images: "--",
-      engineVersion: "--",
-      composeVersion: "--",
-      storageDriver: "--",
-      cgroupDriver: "--",
-      isLoading: dockerStatsSnapshot.isLoading,
+      images: info ? String(info.images) : "--",
+      engineVersion: info?.engineVersion ?? "--",
+      composeVersion: "--", // not exposed by the Docker API /info endpoint
+      storageDriver: info?.storageDriver ?? "--",
+      cgroupDriver: info?.cgroupDriver ?? "--",
+      isLoading: dockerStatsSnapshot.isLoading || dockerInfoQuery.isLoading,
       unavailable: Boolean(dockerStatsSnapshot.error),
-      warning: dockerStatsSnapshot.error ? "Docker stats unavailable." : null,
+      warning: dockerStatsSnapshot.error
+        ? "Docker stats unavailable."
+        : dockerInfoQuery.error
+          ? "Docker engine info unavailable."
+          : null,
     };
-  }, [dockerStatsSnapshot.error, dockerStatsSnapshot.isLoading, dockerStatsSnapshot.stats]);
+  }, [
+    dockerInfoQuery.data,
+    dockerInfoQuery.error,
+    dockerInfoQuery.isLoading,
+    dockerStatsSnapshot.error,
+    dockerStatsSnapshot.isLoading,
+    dockerStatsSnapshot.stats,
+  ]);
 
   const storage = useMemo(() => {
     const rootStorage = systemMetricsQuery.data?.storage;
@@ -423,7 +452,7 @@ export function useSettingsBackend() {
     updates,
     capabilities,
     actions: {
-      checkForUpdates: checkUpdatesMutation.mutateAsync,
+      checkForUpdates,
     },
   };
 }

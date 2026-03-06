@@ -45,6 +45,17 @@ import {
   useState,
   type ChangeEvent,
 } from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useSettingsBackend } from "@/hooks/useSettingsBackend";
 
 // =====================
@@ -1358,7 +1369,7 @@ function UsersSection() {
       <InfoBanner text="API keys allow external services and scripts to interact with your server programmatically." />
       <SettingsInput
         label="Primary API Key"
-        value="sk_live_serverlab_a8B2k9Xm4pQ7rY..."
+        value=""
         type="password"
         copyable
       />
@@ -1517,10 +1528,10 @@ function NotificationsSection() {
         </div>
         <SettingsInput label="SMTP Server" value="smtp.gmail.com" />
         <SettingsInput label="Port" value="587" />
-        <SettingsInput label="Username" value="serverlab.alerts@gmail.com" />
+        <SettingsInput label="Username" value="" />
         <SettingsInput
           label="Password"
-          value="app-specific-password"
+          value=""
           type="password"
         />
         <SettingsInput label="Recipient" value="admin@home.lan" />
@@ -1540,7 +1551,7 @@ function NotificationsSection() {
         </div>
         <SettingsInput
           label="Webhook URL"
-          value="https://discord.com/api/webhooks/1234..."
+          value=""
           type="password"
         />
         <Toggle
@@ -1651,13 +1662,13 @@ function BackupSection() {
       />
       <SettingsInput
         label="Access Key"
-        value="AKIAIOSFODNN7EXAMPLE"
+        value=""
         type="password"
         copyable
       />
       <SettingsInput
         label="Secret Key"
-        value="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+        value=""
         type="password"
       />
 
@@ -1670,7 +1681,7 @@ function BackupSection() {
       />
       <SettingsInput
         label="Encryption passphrase"
-        value="super-secret-backup-key"
+        value=""
         type="password"
         copyable
       />
@@ -1773,7 +1784,7 @@ function UpdatesSection({
 }: {
   data: ReturnType<typeof useSettingsBackend>["updates"];
   capabilities: ReturnType<typeof useSettingsBackend>["capabilities"]["updates"];
-  onCheckForUpdates: () => Promise<unknown>;
+  onCheckForUpdates: () => void;
 }) {
   const [autoCheck, setAutoCheck] = useState(true);
 
@@ -1816,9 +1827,7 @@ function UpdatesSection({
         <button
           className="px-3 py-1.5 text-xs font-medium rounded-lg bg-secondary/50 text-muted-foreground transition-colors cursor-pointer flex items-center gap-1.5 disabled:cursor-not-allowed disabled:opacity-50 enabled:hover:text-foreground enabled:hover:bg-secondary"
           disabled={capabilities.checkForUpdates.disabled || data.isChecking}
-          onClick={() => {
-            void onCheckForUpdates();
-          }}
+          onClick={onCheckForUpdates}
         >
           <RefreshCw className="size-3" />
           {data.isChecking ? "Checking..." : "Check for Updates"}
@@ -2084,18 +2093,77 @@ function PowerSection() {
       />
 
       <div className="grid grid-cols-3 gap-3 py-3">
-        <button className="flex flex-col items-center gap-2 p-4 rounded-xl border border-glass-border bg-secondary/20 hover:bg-secondary/40 transition-colors cursor-pointer group">
-          <RefreshCw className="size-5 text-status-amber group-hover:animate-spin" />
-          <span className="text-xs text-foreground">Reboot</span>
-        </button>
-        <button className="flex flex-col items-center gap-2 p-4 rounded-xl border border-glass-border bg-secondary/20 hover:bg-secondary/40 transition-colors cursor-pointer group">
-          <Power className="size-5 text-status-red" />
-          <span className="text-xs text-foreground">Shutdown</span>
-        </button>
-        <button className="flex flex-col items-center gap-2 p-4 rounded-xl border border-glass-border bg-secondary/20 hover:bg-secondary/40 transition-colors cursor-pointer group">
-          <Zap className="size-5 text-primary" />
-          <span className="text-xs text-foreground">Sleep</span>
-        </button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <button className="flex flex-col items-center gap-2 p-4 rounded-xl border border-glass-border bg-secondary/20 hover:bg-secondary/40 transition-colors cursor-pointer group">
+              <RefreshCw className="size-5 text-status-amber group-hover:animate-spin" />
+              <span className="text-xs text-foreground">Reboot</span>
+            </button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Reboot server?</AlertDialogTitle>
+              <AlertDialogDescription>
+                All running Docker containers and services will be temporarily
+                stopped and restarted. This takes about 30–60 seconds.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction className="bg-status-amber text-white hover:bg-status-amber/90">
+                Reboot now
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <button className="flex flex-col items-center gap-2 p-4 rounded-xl border border-glass-border bg-secondary/20 hover:bg-secondary/40 transition-colors cursor-pointer group">
+              <Power className="size-5 text-status-red" />
+              <span className="text-xs text-foreground">Shutdown</span>
+            </button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Shut down server?</AlertDialogTitle>
+              <AlertDialogDescription>
+                The server will power off completely. All running services will
+                stop and you will need physical or remote access to turn it back
+                on.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction className="bg-destructive text-white hover:bg-destructive/90">
+                Shut down
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <button className="flex flex-col items-center gap-2 p-4 rounded-xl border border-glass-border bg-secondary/20 hover:bg-secondary/40 transition-colors cursor-pointer group">
+              <Zap className="size-5 text-primary" />
+              <span className="text-xs text-foreground">Sleep</span>
+            </button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Put server to sleep?</AlertDialogTitle>
+              <AlertDialogDescription>
+                The server will enter suspend-to-RAM mode. Running services will
+                be paused and resume when the server wakes up. Wake-on-LAN must
+                be enabled to wake remotely.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction>Sleep</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
 
       <SectionDivider title="Schedule" />
@@ -2197,9 +2265,33 @@ function PowerSection() {
         text="Factory reset will erase all settings and restore the server to its default configuration. Your files and media will not be affected."
         variant="warning"
       />
-      <button className="self-start mt-2 px-4 py-2 text-xs font-medium rounded-lg bg-destructive/15 text-destructive hover:bg-destructive/25 transition-colors cursor-pointer">
-        Factory Reset Server
-      </button>
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <button className="self-start mt-2 px-4 py-2 text-xs font-medium rounded-lg bg-destructive/15 text-destructive hover:bg-destructive/25 transition-colors cursor-pointer">
+            Factory Reset Server
+          </button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Factory reset server?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <span className="block mb-2 font-medium text-destructive">
+                This action cannot be undone.
+              </span>
+              All application settings, Docker configurations, network
+              preferences, and user data stored in the dashboard will be
+              permanently erased. Files on disk and Docker volumes are not
+              affected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-white hover:bg-destructive/90">
+              Yes, factory reset
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
