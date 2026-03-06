@@ -268,7 +268,7 @@ describe("AppStore", () => {
 
     expect(screen.getByText("Install Plex")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: /close install settings/i }));
+    fireEvent.click(screen.getByRole("button", { name: /close configurator/i }));
     expect(screen.queryByText("Install Plex")).toBeNull();
   });
 });

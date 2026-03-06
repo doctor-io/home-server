@@ -1,4 +1,5 @@
 import { Check, Info } from "lucide-react";
+import { Toggle } from "@/components/ui/toggle";
 
 import type {
   ClassicConfigState,
@@ -312,21 +313,22 @@ export function ClassicFormView({ appIdLabel, state, onChange }: ClassicFormView
         </Field>
 
         <Field label="Privileges">
-          <button
+          <Toggle
             type="button"
-            role="switch"
-            aria-checked={state.privileged}
-            onClick={() => update({ privileged: !state.privileged })}
-            className={`relative h-6 w-10 rounded-full transition-colors ${
-              state.privileged ? "bg-primary/70" : "bg-muted"
-            }`}
+            aria-label="Privileges"
+            aria-pressed={state.privileged}
+            pressed={state.privileged}
+            variant="outline"
+            className="h-9 justify-start gap-2 px-3 text-xs"
+            onPressedChange={(pressed) => update({ privileged: pressed })}
           >
             <span
-              className={`absolute top-1 h-4 w-4 rounded-full bg-background shadow transition-transform ${
-                state.privileged ? "translate-x-5" : "translate-x-1"
+              className={`inline-block size-2 rounded-full ${
+                state.privileged ? "bg-primary" : "bg-muted-foreground/50"
               }`}
             />
-          </button>
+            {state.privileged ? "Enabled" : "Disabled"}
+          </Toggle>
         </Field>
 
         <Field label="Restart Policy">

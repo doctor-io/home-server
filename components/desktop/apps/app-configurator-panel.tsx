@@ -363,6 +363,7 @@ export function AppConfiguratorPanel({
         activeView={activeView}
         views={availableViews}
         onViewChange={setActiveView}
+        onClose={onClose}
       />
 
       {shouldBlockOnTemplateLoading ? (

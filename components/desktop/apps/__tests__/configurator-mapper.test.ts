@@ -33,6 +33,39 @@ describe("configurator-mapper", () => {
     expect(state.containerCommands).toEqual(["--config", "/config/settings.yaml"]);
   });
 
+  it("maps long syntax ports and volumes to classic state", () => {
+    const composeDraft = `services:
+  app:
+    image: ghcr.io/example/app:latest
+    ports:
+      - target: 80
+        published: 8080
+        protocol: tcp
+    volumes:
+      - type: bind
+        source: /data/app
+        target: /config
+      - type: volume
+        source: app-cache
+        target: /cache
+`;
+
+    const state = composeToClassicState({
+      composeDraft,
+      seed: {
+        title: "Example",
+        iconUrl: "",
+      },
+    });
+
+    expect(state.ports[0]?.host).toBe("8080");
+    expect(state.ports[0]?.container).toBe("80");
+    expect(state.volumes[0]?.host).toBe("/data/app");
+    expect(state.volumes[0]?.container).toBe("/config");
+    expect(state.volumes[1]?.host).toBe("app-cache");
+    expect(state.volumes[1]?.container).toBe("/cache");
+  });
+
   it("prefers app service over db sidecar when appId matches sidecar name", () => {
     const composeDraft = `services:
   app:

@@ -189,8 +189,39 @@ function parsePorts(ports: unknown): PortRow[] {
 
   return ports
     .map((item, index) => {
-      if (typeof item !== "string") return null;
-      const parsed = parsePortMapping(item);
+      let parsed: Omit<PortRow, "id"> | null = null;
+
+      if (typeof item === "string") {
+        parsed = parsePortMapping(item);
+      } else if (item && typeof item === "object") {
+        const candidate = item as {
+          published?: unknown;
+          target?: unknown;
+          protocol?: unknown;
+        };
+        const host =
+          candidate.published === undefined || candidate.published === null
+            ? ""
+            : String(candidate.published).trim();
+        const container =
+          candidate.target === undefined || candidate.target === null
+            ? ""
+            : String(candidate.target).trim();
+        const protocol =
+          typeof candidate.protocol === "string" &&
+          candidate.protocol.toLowerCase() === "udp"
+            ? "UDP"
+            : "TCP";
+
+        if (host && container) {
+          parsed = {
+            host,
+            container,
+            protocol,
+          };
+        }
+      }
+
       if (!parsed) return null;
       return {
         id: nextId(`port-${index}`),
@@ -223,8 +254,32 @@ function parseVolumes(volumes: unknown): VolumeRow[] {
 
   return volumes
     .map((item, index) => {
-      if (typeof item !== "string") return null;
-      const parsed = parseVolumeMapping(item);
+      let parsed: Omit<VolumeRow, "id"> | null = null;
+
+      if (typeof item === "string") {
+        parsed = parseVolumeMapping(item);
+      } else if (item && typeof item === "object") {
+        const candidate = item as {
+          source?: unknown;
+          target?: unknown;
+        };
+        const host =
+          candidate.source === undefined || candidate.source === null
+            ? ""
+            : String(candidate.source).trim();
+        const container =
+          candidate.target === undefined || candidate.target === null
+            ? ""
+            : String(candidate.target).trim();
+
+        if (container) {
+          parsed = {
+            host,
+            container,
+          };
+        }
+      }
+
       if (!parsed) return null;
       return {
         id: nextId(`volume-${index}`),

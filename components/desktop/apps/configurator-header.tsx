@@ -1,4 +1,4 @@
-import { TerminalSquare, Upload } from "lucide-react";
+import { X } from "lucide-react";
 
 import type { ConfiguratorView } from "@/components/desktop/apps/configurator-mapper";
 
@@ -7,6 +7,7 @@ type ConfiguratorHeaderProps = {
   activeView: ConfiguratorView;
   views: ConfiguratorView[];
   onViewChange: (view: ConfiguratorView) => void;
+  onClose?: () => void;
 };
 
 function formatViewLabel(view: ConfiguratorView) {
@@ -20,6 +21,7 @@ export function ConfiguratorHeader({
   activeView,
   views,
   onViewChange,
+  onClose,
 }: ConfiguratorHeaderProps) {
   return (
     <header className="flex items-center justify-between border-b border-glass-border px-4 py-3">
@@ -42,24 +44,17 @@ export function ConfiguratorHeader({
           ))}
         </div>
       </div>
-      <div className="flex items-center gap-2">
+      {onClose ? (
         <button
           type="button"
+          onClick={onClose}
           className="rounded-lg border border-glass-border p-1.5 text-muted-foreground transition-colors hover:bg-secondary/45 hover:text-foreground"
-          aria-label="Terminal and Logs"
-          title="Terminal and Logs"
+          aria-label="Close configurator"
+          title="Close"
         >
-          <TerminalSquare className="size-4" />
+          <X className="size-4" />
         </button>
-        <button
-          type="button"
-          className="rounded-lg border border-glass-border p-1.5 text-muted-foreground transition-colors hover:bg-secondary/45 hover:text-foreground"
-          aria-label="Export ComposeFile"
-          title="Export ComposeFile"
-        >
-          <Upload className="size-4" />
-        </button>
-      </div>
+      ) : null}
     </header>
   );
 }

@@ -11,14 +11,12 @@ vi.mock("@/lib/server/modules/store/catalog", () => ({
 vi.mock("@/lib/server/modules/docker/compose-parser", () => ({
   parseComposeFile: vi.fn(),
   extractPrimaryServiceWithName: vi.fn(),
-  fetchComposeFileFromGitHub: vi.fn(),
 }));
 
 vi.mock("@/lib/server/modules/docker/compose-runner", () => ({
   cleanupComposeDataOnUninstall: vi.fn(),
   extractComposeImages: vi.fn(),
   materializeInlineStackFiles: vi.fn(),
-  materializeStackFiles: vi.fn(),
   runComposeDown: vi.fn(),
   runComposeUp: vi.fn(),
   sanitizeStackName: vi.fn(() => "adguard-home"),
@@ -51,14 +49,12 @@ vi.mock("@/lib/server/modules/apps/stacks-repository", () => ({
 import { findStoreCatalogTemplateByAppId } from "@/lib/server/modules/store/catalog";
 import {
   extractPrimaryServiceWithName,
-  fetchComposeFileFromGitHub,
   parseComposeFile,
 } from "@/lib/server/modules/docker/compose-parser";
 import {
   cleanupComposeDataOnUninstall,
   extractComposeImages,
   materializeInlineStackFiles,
-  materializeStackFiles,
   runComposeDown,
   runComposeUp,
 } from "@/lib/server/modules/docker/compose-runner";
@@ -94,6 +90,13 @@ async function waitForLatestEventType(operationId: string, expectedType: string)
   throw new Error(`Timed out waiting for event type "${expectedType}"`);
 }
 
+async function writeCatalogComposeFile(prefix: string, composeContent: string) {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), prefix));
+  const composePath = path.join(tempDir, "docker-compose.yml");
+  await writeFile(composePath, composeContent, "utf8");
+  return { tempDir, composePath };
+}
+
 describe("store operations", () => {
   beforeEach(() => {
     vi.mocked(findStoreCatalogTemplateByAppId).mockReset();
@@ -101,9 +104,7 @@ describe("store operations", () => {
     vi.mocked(cleanupComposeDataOnUninstall).mockReset();
     vi.mocked(parseComposeFile).mockReset();
     vi.mocked(extractPrimaryServiceWithName).mockReset();
-    vi.mocked(fetchComposeFileFromGitHub).mockReset();
     vi.mocked(materializeInlineStackFiles).mockReset();
-    vi.mocked(materializeStackFiles).mockReset();
     vi.mocked(extractComposeImages).mockReset();
     vi.mocked(pullDockerImage).mockReset();
     vi.mocked(runComposeUp).mockReset();
@@ -118,6 +119,14 @@ describe("store operations", () => {
   });
 
   it("runs install flow and completes with progress updates", async () => {
+    const { tempDir, composePath } = await writeCatalogComposeFile(
+      "store-install-",
+      `services:
+  adguard-home:
+    image: ghcr.io/example/app:latest
+`,
+    );
+
     vi.mocked(findStoreCatalogTemplateByAppId).mockResolvedValue({
       appId: "adguard-home",
       templateName: "adguard-home",
@@ -130,13 +139,20 @@ describe("store operations", () => {
       port: null,
       repositoryUrl: "https://github.com/bigbeartechworld/big-bear-portainer",
       stackFile: "Apps/adguard-home/docker-compose.yml",
+      composePath,
       env: [{ name: "TZ", default: "UTC" }],
+      screenshots: [],
+      image: "ghcr.io/example/app:latest",
+      volumes: [],
+      scheme: "http",
+      index: "/",
+      mainServiceName: "adguard-home",
     });
     vi.mocked(findCustomStoreTemplateByAppId).mockResolvedValue(null);
 
     vi.mocked(findInstalledStackByAppId).mockResolvedValue(null);
     vi.mocked(findStackByWebUiPort).mockResolvedValue(null);
-    vi.mocked(materializeStackFiles).mockResolvedValue({
+    vi.mocked(materializeInlineStackFiles).mockResolvedValue({
       stackDir: "/tmp/store/stacks/adguard-home",
       composePath: "/tmp/store/stacks/adguard-home/docker-compose.yml",
       envPath: "/tmp/store/stacks/adguard-home/.env",
@@ -199,7 +215,7 @@ describe("store operations", () => {
         webUiPort: 3001,
       }),
     );
-    expect(materializeStackFiles).toHaveBeenCalledWith(
+    expect(materializeInlineStackFiles).toHaveBeenCalledWith(
       expect.objectContaining({
         appId: "adguard-home",
         storageMappingStrategy: "app_target_path",
@@ -210,9 +226,18 @@ describe("store operations", () => {
 
     const latest = await waitForLatestEventType(operationId, "operation.completed");
     expect(latest?.status).toBe("success");
+    await rm(tempDir, { recursive: true, force: true });
   });
 
   it("marks operation as failed when docker pull fails", async () => {
+    const { tempDir, composePath } = await writeCatalogComposeFile(
+      "store-install-fail-",
+      `services:
+  homepage:
+    image: ghcr.io/example/homepage:latest
+`,
+    );
+
     vi.mocked(findStoreCatalogTemplateByAppId).mockResolvedValue({
       appId: "homepage",
       templateName: "homepage",
@@ -225,13 +250,20 @@ describe("store operations", () => {
       port: null,
       repositoryUrl: "https://github.com/bigbeartechworld/big-bear-portainer",
       stackFile: "Apps/Homepage/docker-compose.yml",
+      composePath,
       env: [],
+      screenshots: [],
+      image: "ghcr.io/example/homepage:latest",
+      volumes: [],
+      scheme: "http",
+      index: "/",
+      mainServiceName: "homepage",
     });
     vi.mocked(findCustomStoreTemplateByAppId).mockResolvedValue(null);
 
     vi.mocked(findInstalledStackByAppId).mockResolvedValue(null);
     vi.mocked(findStackByWebUiPort).mockResolvedValue(null);
-    vi.mocked(materializeStackFiles).mockResolvedValue({
+    vi.mocked(materializeInlineStackFiles).mockResolvedValue({
       stackDir: "/tmp/store/stacks/homepage",
       composePath: "/tmp/store/stacks/homepage/docker-compose.yml",
       envPath: "/tmp/store/stacks/homepage/.env",
@@ -263,6 +295,7 @@ describe("store operations", () => {
 
     const latest = await waitForLatestEventType(operationId, "operation.failed");
     expect(latest?.status).toBe("error");
+    await rm(tempDir, { recursive: true, force: true });
   });
 
   it("hard-deletes stack record on uninstall and removes data when requested", async () => {
@@ -319,6 +352,14 @@ describe("store operations", () => {
   });
 
   it("uses legacy storage mapping on redeploy for existing apps", async () => {
+    const { tempDir, composePath } = await writeCatalogComposeFile(
+      "store-redeploy-",
+      `services:
+  home-assistant:
+    image: ghcr.io/example/home-assistant:latest
+`,
+    );
+
     vi.mocked(findStoreCatalogTemplateByAppId).mockResolvedValue({
       appId: "home-assistant",
       templateName: "home-assistant",
@@ -331,7 +372,14 @@ describe("store operations", () => {
       port: null,
       repositoryUrl: "https://github.com/bigbeartechworld/big-bear-portainer",
       stackFile: "Apps/home-assistant/docker-compose.yml",
+      composePath,
       env: [],
+      screenshots: [],
+      image: "ghcr.io/example/home-assistant:latest",
+      volumes: [],
+      scheme: "http",
+      index: "/",
+      mainServiceName: "home-assistant",
     });
     vi.mocked(findCustomStoreTemplateByAppId).mockResolvedValue(null);
     vi.mocked(findInstalledStackByAppId).mockResolvedValue({
@@ -346,7 +394,7 @@ describe("store operations", () => {
       updatedAt: "2026-02-24T00:00:00.000Z",
     });
     vi.mocked(findStackByWebUiPort).mockResolvedValue(null);
-    vi.mocked(materializeStackFiles).mockResolvedValue({
+    vi.mocked(materializeInlineStackFiles).mockResolvedValue({
       stackDir: "/tmp/store/stacks/home-assistant",
       composePath: "/tmp/store/stacks/home-assistant/docker-compose.yml",
       envPath: "/tmp/store/stacks/home-assistant/.env",
@@ -377,13 +425,14 @@ describe("store operations", () => {
 
     await done;
 
-    expect(materializeStackFiles).toHaveBeenCalledWith(
+    expect(materializeInlineStackFiles).toHaveBeenCalledWith(
       expect.objectContaining({
         appId: "home-assistant",
         storageMappingStrategy: "legacy_named_source",
       }),
     );
     expect(invalidateInstalledAppsCache).toHaveBeenCalledTimes(1);
+    await rm(tempDir, { recursive: true, force: true });
   });
 
   it("uses composeSource for install materialization and bypasses template env whitelist", async () => {
@@ -401,7 +450,14 @@ describe("store operations", () => {
       port: null,
       repositoryUrl: "https://github.com/bigbeartechworld/big-bear-portainer",
       stackFile: "Apps/immich/docker-compose.yml",
+      composePath: "/tmp/store/immich/docker-compose.yml",
       env: [{ name: "TZ", default: "UTC" }],
+      screenshots: [],
+      image: "ghcr.io/immich-app/immich-server:v2.5.6",
+      volumes: [],
+      scheme: "http",
+      index: "/",
+      mainServiceName: "immich-server",
     });
     vi.mocked(findCustomStoreTemplateByAppId).mockResolvedValue(null);
     vi.mocked(findInstalledStackByAppId).mockResolvedValue(null);
@@ -467,7 +523,6 @@ describe("store operations", () => {
         composeContent: composeSource,
       }),
     );
-    expect(materializeStackFiles).not.toHaveBeenCalled();
     expect(upsertInstalledStack).toHaveBeenCalledWith(
       expect.objectContaining({
         appId: "immich",
@@ -482,6 +537,7 @@ describe("store operations", () => {
   it("updates only service images and preserves other compose fields", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), "store-update-"));
     const composePath = path.join(tempDir, "docker-compose.yml");
+    const storeComposePath = path.join(tempDir, "store-compose.yml");
     const initialCompose = `services:
   app:
     image: ghcr.io/example/app:v1
@@ -494,6 +550,16 @@ describe("store operations", () => {
     image: redis:6
 `;
     await writeFile(composePath, initialCompose, "utf8");
+    await writeFile(
+      storeComposePath,
+      `services:
+  app:
+    image: ghcr.io/example/app:v2
+  redis:
+    image: redis:7
+`,
+      "utf8",
+    );
 
     vi.mocked(findStoreCatalogTemplateByAppId).mockResolvedValue({
       appId: "example",
@@ -507,15 +573,16 @@ describe("store operations", () => {
       port: null,
       repositoryUrl: "https://github.com/example/store",
       stackFile: "Apps/example/docker-compose.yml",
+      composePath: storeComposePath,
       env: [],
+      screenshots: [],
+      image: "ghcr.io/example/app:v2",
+      volumes: [],
+      scheme: "http",
+      index: "/",
+      mainServiceName: "app",
     });
     vi.mocked(findCustomStoreTemplateByAppId).mockResolvedValue(null);
-    vi.mocked(fetchComposeFileFromGitHub).mockResolvedValue(`services:
-  app:
-    image: ghcr.io/example/app:v2
-  redis:
-    image: redis:7
-`);
     vi.mocked(findInstalledStackByAppId).mockResolvedValue({
       appId: "example",
       templateName: "example",
@@ -573,8 +640,10 @@ describe("store operations", () => {
   it("treats update as no-op when installed images are already current", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), "store-update-noop-"));
     const composePath = path.join(tempDir, "docker-compose.yml");
+    const storeComposePath = path.join(tempDir, "store-compose.yml");
     const initialCompose = `services:\n  app:\n    image: ghcr.io/example/app:v2\n    environment:\n      TZ: UTC\n`;
     await writeFile(composePath, initialCompose, "utf8");
+    await writeFile(storeComposePath, `services:\n  app:\n    image: ghcr.io/example/app:v2\n`, "utf8");
 
     vi.mocked(findStoreCatalogTemplateByAppId).mockResolvedValue({
       appId: "example",
@@ -588,10 +657,16 @@ describe("store operations", () => {
       port: null,
       repositoryUrl: "https://github.com/example/store",
       stackFile: "Apps/example/docker-compose.yml",
+      composePath: storeComposePath,
       env: [],
+      screenshots: [],
+      image: "ghcr.io/example/app:v2",
+      volumes: [],
+      scheme: "http",
+      index: "/",
+      mainServiceName: "app",
     });
     vi.mocked(findCustomStoreTemplateByAppId).mockResolvedValue(null);
-    vi.mocked(fetchComposeFileFromGitHub).mockResolvedValue(`services:\n  app:\n    image: ghcr.io/example/app:v2\n`);
     vi.mocked(findInstalledStackByAppId).mockResolvedValue({
       appId: "example",
       templateName: "example",
@@ -638,6 +713,14 @@ describe("store operations", () => {
   });
 
   it("fails update with explicit error when installed compose is missing", async () => {
+    const { tempDir, composePath } = await writeCatalogComposeFile(
+      "store-update-missing-",
+      `services:
+  app:
+    image: ghcr.io/example/app:v2
+`,
+    );
+
     vi.mocked(findStoreCatalogTemplateByAppId).mockResolvedValue({
       appId: "example",
       templateName: "example",
@@ -650,7 +733,14 @@ describe("store operations", () => {
       port: null,
       repositoryUrl: "https://github.com/example/store",
       stackFile: "Apps/example/docker-compose.yml",
+      composePath,
       env: [],
+      screenshots: [],
+      image: "ghcr.io/example/app:v2",
+      volumes: [],
+      scheme: "http",
+      index: "/",
+      mainServiceName: "app",
     });
     vi.mocked(findCustomStoreTemplateByAppId).mockResolvedValue(null);
     vi.mocked(findInstalledStackByAppId).mockResolvedValue({
@@ -687,15 +777,24 @@ describe("store operations", () => {
 
     const latest = await waitForLatestEventType(operationId, "operation.failed");
     expect(latest?.message).toBe("Installed compose source is unavailable");
-    expect(fetchComposeFileFromGitHub).not.toHaveBeenCalled();
     expect(runComposeUp).not.toHaveBeenCalled();
+    await rm(tempDir, { recursive: true, force: true });
   });
 
   it("fails update when installed and store services do not match", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), "store-update-mismatch-"));
     const composePath = path.join(tempDir, "docker-compose.yml");
+    const storeComposePath = path.join(tempDir, "store-compose.yml");
     const initialCompose = `services:\n  app:\n    image: ghcr.io/example/app:v1\n`;
     await writeFile(composePath, initialCompose, "utf8");
+    await writeFile(
+      storeComposePath,
+      `services:
+  web:
+    image: ghcr.io/example/app:v2
+`,
+      "utf8",
+    );
 
     vi.mocked(findStoreCatalogTemplateByAppId).mockResolvedValue({
       appId: "example",
@@ -709,13 +808,16 @@ describe("store operations", () => {
       port: null,
       repositoryUrl: "https://github.com/example/store",
       stackFile: "Apps/example/docker-compose.yml",
+      composePath: storeComposePath,
       env: [],
+      screenshots: [],
+      image: "ghcr.io/example/app:v2",
+      volumes: [],
+      scheme: "http",
+      index: "/",
+      mainServiceName: "web",
     });
     vi.mocked(findCustomStoreTemplateByAppId).mockResolvedValue(null);
-    vi.mocked(fetchComposeFileFromGitHub).mockResolvedValue(`services:
-  web:
-    image: ghcr.io/example/app:v2
-`);
     vi.mocked(findInstalledStackByAppId).mockResolvedValue({
       appId: "example",
       templateName: "example",
@@ -758,8 +860,10 @@ describe("store operations", () => {
   it("restores backup compose when update apply fails", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), "store-update-rollback-"));
     const composePath = path.join(tempDir, "docker-compose.yml");
+    const storeComposePath = path.join(tempDir, "store-compose.yml");
     const initialCompose = `services:\n  app:\n    image: ghcr.io/example/app:v1\n`;
     await writeFile(composePath, initialCompose, "utf8");
+    await writeFile(storeComposePath, `services:\n  app:\n    image: ghcr.io/example/app:v2\n`, "utf8");
 
     vi.mocked(findStoreCatalogTemplateByAppId).mockResolvedValue({
       appId: "example",
@@ -773,10 +877,16 @@ describe("store operations", () => {
       port: null,
       repositoryUrl: "https://github.com/example/store",
       stackFile: "Apps/example/docker-compose.yml",
+      composePath: storeComposePath,
       env: [],
+      screenshots: [],
+      image: "ghcr.io/example/app:v2",
+      volumes: [],
+      scheme: "http",
+      index: "/",
+      mainServiceName: "app",
     });
     vi.mocked(findCustomStoreTemplateByAppId).mockResolvedValue(null);
-    vi.mocked(fetchComposeFileFromGitHub).mockResolvedValue(`services:\n  app:\n    image: ghcr.io/example/app:v2\n`);
     vi.mocked(findInstalledStackByAppId).mockResolvedValue({
       appId: "example",
       templateName: "example",

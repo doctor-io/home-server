@@ -80,55 +80,6 @@ function scorePrimaryServiceCandidate(input: {
 }
 
 /**
- * Fetch docker-compose.yml from a GitHub repository
- */
-export async function fetchComposeFileFromGitHub(input: {
-  repositoryUrl: string;
-  stackFile: string;
-}): Promise<string | null> {
-  try {
-    // Convert GitHub repository URL to raw content URL
-    // Example: https://github.com/bigbeartechworld/big-bear-portainer
-    // -> https://raw.githubusercontent.com/bigbeartechworld/big-bear-portainer/main/...
-
-    const repoUrl = input.repositoryUrl.replace("https://github.com/", "");
-    const rawUrl = `https://raw.githubusercontent.com/${repoUrl}/main/${input.stackFile}`;
-
-    const response = await fetch(rawUrl, {
-      headers: {
-        "User-Agent": "home-server/1.0",
-      },
-    });
-
-    if (!response.ok) {
-      logServerAction({
-        level: "warn",
-        layer: "service",
-        action: "store.compose.fetch",
-        status: "error",
-        message: `Failed to fetch compose file: ${response.status}`,
-        meta: {
-          url: rawUrl,
-        },
-      });
-      return null;
-    }
-
-    return await response.text();
-  } catch (error) {
-    logServerAction({
-      level: "error",
-      layer: "service",
-      action: "store.compose.fetch",
-      status: "error",
-      message: "Failed to fetch compose file",
-      error,
-    });
-    return null;
-  }
-}
-
-/**
  * Parse docker-compose YAML content
  */
 export function parseComposeFile(content: string): ParsedComposeFile | null {
@@ -275,30 +226,4 @@ export function extractPrimaryService(
   appId?: string,
 ): ParsedComposeService | null {
   return extractPrimaryServiceWithName(parsed, appId)?.service ?? null;
-}
-
-/**
- * Fetch and parse docker-compose.yml from GitHub repository
- */
-export async function fetchAndParseCompose(input: {
-  repositoryUrl: string;
-  stackFile: string;
-  appId?: string;
-}): Promise<ParsedComposeService | null> {
-  const content = await fetchComposeFileFromGitHub({
-    repositoryUrl: input.repositoryUrl,
-    stackFile: input.stackFile,
-  });
-
-  if (!content) {
-    return null;
-  }
-
-  const parsed = parseComposeFile(content);
-
-  if (!parsed) {
-    return null;
-  }
-
-  return extractPrimaryService(parsed, input.appId);
 }

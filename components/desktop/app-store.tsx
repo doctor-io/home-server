@@ -665,14 +665,6 @@ export function AppStore({
         {customInstallTemplate ? (
           <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm">
             <div className="relative h-[50vh] w-[min(96vw,980px)] overflow-hidden rounded-2xl border border-glass-border bg-card shadow-2xl">
-              <button
-                type="button"
-                aria-label="Close install settings"
-                onClick={() => setCustomInstallTemplate(null)}
-                className="absolute right-3 top-3 z-30 rounded-md border border-glass-border bg-card/90 px-2 py-1 text-xs text-foreground hover:bg-secondary/40 cursor-pointer"
-              >
-                Close
-              </button>
               <AppConfiguratorPanel
                 context="catalog_install"
                 template={customInstallTemplate}

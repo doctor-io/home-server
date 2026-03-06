@@ -69,21 +69,6 @@ export function sanitizeStackName(appId: string, displayName?: string) {
   return sanitized.slice(0, 63);
 }
 
-export function buildRawStackFileUrl(repositoryUrl: string, stackFile: string) {
-  const parsed = new URL(repositoryUrl);
-  if (parsed.hostname !== "github.com") {
-    throw new Error(`Unsupported repository URL: ${repositoryUrl}`);
-  }
-
-  const [owner, repoRaw] = parsed.pathname.split("/").filter(Boolean);
-  if (!owner || !repoRaw) {
-    throw new Error(`Invalid repository URL: ${repositoryUrl}`);
-  }
-
-  const repo = repoRaw.endsWith(".git") ? repoRaw.slice(0, -4) : repoRaw;
-  return `https://raw.githubusercontent.com/${owner}/${repo}/main/${stackFile}`;
-}
-
 function serializeEnvFile(env: Record<string, string>) {
   return Object.keys(env)
     .sort((a, b) => a.localeCompare(b))
@@ -504,59 +489,6 @@ export function normalizeComposeStorageBindings(
     bindMountDirectories,
     convertedNamedVolumes,
   };
-}
-
-export async function materializeStackFiles(input: {
-  appId: string;
-  stackName: string;
-  repositoryUrl: string;
-  stackFile: string;
-  env: Record<string, string>;
-  webUiPort: number | null;
-  storageMappingStrategy?: ComposeStorageMappingStrategy;
-}) {
-  const rawUrl = buildRawStackFileUrl(input.repositoryUrl, input.stackFile);
-  const response = await fetch(rawUrl, {
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch stack file (${response.status}) from ${rawUrl}`);
-  }
-
-  let composeContent = await response.text();
-  if (input.webUiPort !== null) {
-    composeContent = applyWebUiPortOverride(composeContent, input.webUiPort);
-  }
-
-  await ensureDataRootDirectories();
-  const stacksRoot = resolveStoreStacksRoot();
-  const appDataRoot = resolveStoreAppDataRoot();
-  const normalized = normalizeComposeStorageBindings(composeContent, stacksRoot, appDataRoot, {
-    appId: input.appId,
-    strategy: input.storageMappingStrategy,
-  });
-
-  const stackDir = path.join(stacksRoot, input.appId);
-  const composePath = path.join(stackDir, "docker-compose.yml");
-  const envPath = path.join(stackDir, ".env");
-
-  await mkdir(stackDir, { recursive: true });
-  await Promise.all(
-    Array.from(normalized.bindMountDirectories).map((directoryPath) =>
-      mkdir(directoryPath, { recursive: true }),
-    ),
-  );
-  await writeFile(composePath, normalized.composeContent, "utf8");
-  await writeFile(envPath, serializeEnvFile(input.env), "utf8");
-
-  return {
-    stackDir,
-    composePath,
-    envPath,
-    stackName: input.stackName,
-    webUiPort: input.webUiPort,
-  } satisfies MaterializedStack;
 }
 
 export async function materializeInlineStackFiles(input: {

@@ -1,6 +1,5 @@
 import {
   applyWebUiPortOverride,
-  buildRawStackFileUrl,
   cleanupComposeDataOnUninstall,
   normalizeComposeStorageBindings,
   sanitizeStackName,
@@ -11,17 +10,6 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("compose runner helpers", () => {
-  it("builds GitHub raw stack file URLs", () => {
-    const url = buildRawStackFileUrl(
-      "https://github.com/bigbeartechworld/big-bear-portainer",
-      "Apps/Homepage/docker-compose.yml",
-    );
-
-    expect(url).toBe(
-      "https://raw.githubusercontent.com/bigbeartechworld/big-bear-portainer/main/Apps/Homepage/docker-compose.yml",
-    );
-  });
-
   it("overrides first numeric host port mapping", () => {
     const compose = `
 services:
