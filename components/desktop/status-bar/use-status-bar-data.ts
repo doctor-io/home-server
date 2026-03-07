@@ -17,7 +17,9 @@ export function useStatusBarData() {
   const serverName = metrics?.hostname ?? "ServerLab";
   const cpuPercent = safePercent(metrics?.cpu.normalizedPercent);
   const memoryPercent = safePercent(metrics?.memory.usedPercent);
-  const stoppedAppsCount = (apps ?? []).filter((app) => app.status === "stopped").length;
+  const stoppedAppsCount = (apps ?? []).filter(
+    (app) => app.status === "stopped" || app.status === "paused",
+  ).length;
 
   const batteryPercent =
     typeof metrics?.battery.percent === "number"

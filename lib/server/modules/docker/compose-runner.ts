@@ -50,6 +50,19 @@ type ComposeStorageReferences = {
   namedVolumeSources: Set<string>;
 };
 
+type ParsedKeyValueLine = {
+  key: string;
+  value: string;
+  comment: string;
+  quote: "'" | '"' | null;
+};
+
+type ParsedLongFormVolumeItem = {
+  end: number;
+  fields: Partial<Record<"type" | "source" | "target", string>>;
+  fieldLines: Partial<Record<"type" | "source" | "target", number>>;
+};
+
 function sanitizeSegment(value: string) {
   return value
     .trim()
@@ -188,6 +201,58 @@ function parseComposeVolumeSpec(spec: string): ParsedComposeVolumeSpec | null {
   };
 }
 
+function parseKeyValueLine(line: string): ParsedKeyValueLine | null {
+  const trimmed = line.trim();
+  const match = trimmed.match(/^([A-Za-z0-9_.-]+):\s*(.*?)\s*$/);
+  if (!match) {
+    return null;
+  }
+
+  let remainder = match[2] ?? "";
+  let quote: "'" | '"' | null = null;
+  let comment = "";
+  let quoteState: "'" | '"' | null = null;
+  let commentStart = -1;
+
+  for (let index = 0; index < remainder.length; index += 1) {
+    const char = remainder[index];
+
+    if (char === "'" || char === '"') {
+      if (quoteState === char) {
+        quoteState = null;
+      } else if (quoteState === null) {
+        quoteState = char;
+      }
+      continue;
+    }
+
+    if (char === "#" && quoteState === null && index > 0 && /\s/.test(remainder[index - 1])) {
+      commentStart = index;
+      break;
+    }
+  }
+
+  if (commentStart >= 0) {
+    comment = remainder.slice(commentStart - 1);
+    remainder = remainder.slice(0, commentStart - 1).trimEnd();
+  }
+
+  if (
+    (remainder.startsWith('"') && remainder.endsWith('"')) ||
+    (remainder.startsWith("'") && remainder.endsWith("'"))
+  ) {
+    quote = remainder[0] as "'" | '"';
+    remainder = remainder.slice(1, -1);
+  }
+
+  return {
+    key: match[1],
+    value: remainder.trim(),
+    comment,
+    quote,
+  };
+}
+
 function isLikelyNamedVolumeSource(source: string) {
   if (!source) return false;
   if (source.startsWith("/")) return false;
@@ -243,6 +308,97 @@ function resolveNamedVolumeBindSource(input: {
   }
 
   return bindSource;
+}
+
+function resolveAppScopedBindSource(appDataRoot: string, appId: string, target: string) {
+  return resolveNamedVolumeBindSource({
+    appDataRoot,
+    appId,
+    source: "__ignored__",
+    target,
+    strategy: "app_target_path",
+  });
+}
+
+function shouldRewriteAppDataBindSource(input: {
+  appDataRoot: string;
+  appId: string;
+  source: string;
+  target: string;
+  strategy: ComposeStorageMappingStrategy;
+}) {
+  if (input.strategy !== "app_target_path") {
+    return false;
+  }
+
+  if (!path.isAbsolute(input.source) || !isPathWithinRoot(input.source, input.appDataRoot)) {
+    return false;
+  }
+
+  const appScopedRoot = path.join(input.appDataRoot, input.appId);
+  if (isPathWithinRoot(input.source, appScopedRoot)) {
+    return false;
+  }
+
+  const desiredSource = resolveAppScopedBindSource(input.appDataRoot, input.appId, input.target);
+  return path.resolve(input.source) !== path.resolve(desiredSource);
+}
+
+function parseLongFormVolumeItem(lines: string[], startIndex: number): ParsedLongFormVolumeItem {
+  const startLine = lines[startIndex];
+  const itemIndent = getIndentation(startLine);
+  let end = startIndex + 1;
+
+  while (end < lines.length) {
+    const line = lines[end];
+    if (isBlankOrComment(line)) {
+      end += 1;
+      continue;
+    }
+
+    if (getIndentation(line) <= itemIndent) {
+      break;
+    }
+
+    end += 1;
+  }
+
+  const fields: ParsedLongFormVolumeItem["fields"] = {};
+  const fieldLines: ParsedLongFormVolumeItem["fieldLines"] = {};
+  const firstInline = parseKeyValueLine(startLine.replace(/^(\s*-\s+)/, ""));
+  if (firstInline && (firstInline.key === "type" || firstInline.key === "source" || firstInline.key === "target")) {
+    fields[firstInline.key] = firstInline.value;
+    fieldLines[firstInline.key] = startIndex;
+  }
+
+  for (let index = startIndex + 1; index < end; index += 1) {
+    const parsed = parseKeyValueLine(lines[index]);
+    if (!parsed) continue;
+    if (parsed.key === "type" || parsed.key === "source" || parsed.key === "target") {
+      fields[parsed.key] = parsed.value;
+      fieldLines[parsed.key] = index;
+    }
+  }
+
+  return {
+    end,
+    fields,
+    fieldLines,
+  };
+}
+
+function rewriteKeyValueLine(
+  line: string,
+  expectedKey: string,
+  nextValue: string,
+  quote?: "'" | '"' | null,
+) {
+  const indent = line.match(/^\s*/)?.[0] ?? "";
+  const parsed = parseKeyValueLine(line.trim());
+  const trailingComment = parsed?.comment ?? "";
+  const quoteChar = quote ?? parsed?.quote ?? null;
+  const serializedValue = quoteChar ? `${quoteChar}${nextValue}${quoteChar}` : nextValue;
+  return `${indent}${expectedKey}: ${serializedValue}${trailingComment}`;
 }
 
 function findTopLevelSectionEnd(lines: string[], startIndex: number) {
@@ -349,7 +505,8 @@ function collectComposeStorageReferences(composeContent: string, stacksRoot: str
   const bindMountDirectories = new Set<string>();
   const namedVolumeSources = new Set<string>();
 
-  for (const line of lines) {
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith("#")) {
       continue;
@@ -385,18 +542,36 @@ function collectComposeStorageReferences(composeContent: string, stacksRoot: str
     }
 
     const volumeSpec = parseComposeVolumeSpec(listItem.spec);
-    if (!volumeSpec) {
+    if (volumeSpec) {
+      if (path.isAbsolute(volumeSpec.source) && isPathWithinRoot(volumeSpec.source, stacksRoot)) {
+        bindMountDirectories.add(volumeSpec.source);
+        continue;
+      }
+
+      if (isLikelyNamedVolumeSource(volumeSpec.source)) {
+        namedVolumeSources.add(volumeSpec.source);
+      }
       continue;
     }
 
-    if (path.isAbsolute(volumeSpec.source) && isPathWithinRoot(volumeSpec.source, stacksRoot)) {
-      bindMountDirectories.add(volumeSpec.source);
+    const longForm = parseLongFormVolumeItem(lines, index);
+    const source = longForm.fields.source;
+    if (!source) {
+      index = longForm.end - 1;
       continue;
     }
 
-    if (isLikelyNamedVolumeSource(volumeSpec.source)) {
-      namedVolumeSources.add(volumeSpec.source);
+    if (path.isAbsolute(source) && isPathWithinRoot(source, stacksRoot)) {
+      bindMountDirectories.add(source);
+      index = longForm.end - 1;
+      continue;
     }
+
+    if (isLikelyNamedVolumeSource(source)) {
+      namedVolumeSources.add(source);
+    }
+
+    index = longForm.end - 1;
   }
 
   return {
@@ -460,26 +635,93 @@ export function normalizeComposeStorageBindings(
     }
 
     const volumeSpec = parseComposeVolumeSpec(listItem.spec);
-    if (!volumeSpec || !isLikelyNamedVolumeSource(volumeSpec.source)) {
+    if (volumeSpec) {
+      let bindSource: string | null = null;
+
+      if (isLikelyNamedVolumeSource(volumeSpec.source)) {
+        bindSource = resolveNamedVolumeBindSource({
+          appDataRoot,
+          appId,
+          source: volumeSpec.source,
+          target: volumeSpec.target,
+          strategy,
+        });
+        convertedNamedVolumes.add(volumeSpec.source);
+      } else if (shouldRewriteAppDataBindSource({
+        appDataRoot,
+        appId,
+        source: volumeSpec.source,
+        target: volumeSpec.target,
+        strategy,
+      })) {
+        bindSource = resolveAppScopedBindSource(appDataRoot, appId, volumeSpec.target);
+      }
+
+      if (!bindSource) {
+        continue;
+      }
+
+      const rewrittenSpec = volumeSpec.mode
+        ? `${bindSource}:${volumeSpec.target}:${volumeSpec.mode}`
+        : `${bindSource}:${volumeSpec.target}`;
+      const quotedSpec = listItem.quote ? `${listItem.quote}${rewrittenSpec}${listItem.quote}` : rewrittenSpec;
+
+      lines[index] = `${listItem.prefix}${quotedSpec}${listItem.comment}`;
+      bindMountDirectories.add(bindSource);
       continue;
     }
 
-    const bindSource = resolveNamedVolumeBindSource({
+    const longForm = parseLongFormVolumeItem(lines, index);
+    const source = longForm.fields.source;
+    const target = longForm.fields.target;
+    if (!source || !target) {
+      index = longForm.end - 1;
+      continue;
+    }
+
+    let bindSource: string | null = null;
+    let convertedNamedVolume = false;
+
+    if (isLikelyNamedVolumeSource(source)) {
+      bindSource = resolveNamedVolumeBindSource({
+        appDataRoot,
+        appId,
+        source,
+        target,
+        strategy,
+      });
+      convertedNamedVolume = true;
+      convertedNamedVolumes.add(source);
+    } else if (shouldRewriteAppDataBindSource({
       appDataRoot,
       appId,
-      source: volumeSpec.source,
-      target: volumeSpec.target,
+      source,
+      target,
       strategy,
-    });
-    const rewrittenSpec = volumeSpec.mode
-      ? `${bindSource}:${volumeSpec.target}:${volumeSpec.mode}`
-      : `${bindSource}:${volumeSpec.target}`;
-    const quotedSpec = listItem.quote ? `${listItem.quote}${rewrittenSpec}${listItem.quote}` : rewrittenSpec;
+    })) {
+      bindSource = resolveAppScopedBindSource(appDataRoot, appId, target);
+    }
 
-    lines[index] = `${listItem.prefix}${quotedSpec}${listItem.comment}`;
+    let itemEnd = longForm.end;
+    if (bindSource) {
+      const sourceLineIndex = longForm.fieldLines.source;
+      if (typeof sourceLineIndex === "number") {
+        lines[sourceLineIndex] = rewriteKeyValueLine(lines[sourceLineIndex], "source", bindSource);
+      }
 
-    convertedNamedVolumes.add(volumeSpec.source);
-    bindMountDirectories.add(bindSource);
+      const typeLineIndex = longForm.fieldLines.type;
+      if (typeof typeLineIndex === "number") {
+        lines[typeLineIndex] = rewriteKeyValueLine(lines[typeLineIndex], "type", "bind");
+      } else if (convertedNamedVolume && typeof sourceLineIndex === "number") {
+        const indent = " ".repeat(getIndentation(lines[sourceLineIndex]));
+        lines.splice(sourceLineIndex, 0, `${indent}type: bind`);
+        itemEnd += 1;
+      }
+
+      bindMountDirectories.add(bindSource);
+    }
+
+    index = itemEnd - 1;
   }
 
   removeTopLevelVolumeDefinitions(lines, convertedNamedVolumes);
@@ -650,7 +892,7 @@ export async function getComposeStatus(input: {
   composePath: string;
   envPath: string;
   stackName: string;
-}): Promise<"running" | "stopped" | "unknown"> {
+}): Promise<"running" | "paused" | "stopped" | "unknown"> {
   const info = await getComposeRuntimeInfo(input);
   return info.status;
 }
@@ -694,7 +936,7 @@ export async function getComposeRuntimeInfo(input: {
   envPath: string;
   stackName: string;
 }): Promise<{
-  status: "running" | "stopped" | "unknown";
+  status: "running" | "paused" | "stopped" | "unknown";
   containerNames: string[];
   primaryContainerName: string | null;
 }> {
@@ -722,18 +964,24 @@ export async function getComposeRuntimeInfo(input: {
       };
     }
 
-    const allRunning = containers.every((c) => c.State === "running");
+    const normalizedStates = containers.map((container) =>
+      (container.State ?? "").trim().toLowerCase(),
+    );
+    const allRunning = normalizedStates.every((state) => state === "running");
     const anyRunning = containers.some((c) => c.State === "running");
+    const anyPaused = normalizedStates.some((state) => state === "paused");
     const containerNames = containers
       .map((c) => c.Name?.trim() ?? "")
       .filter((name) => name.length > 0);
     const primaryRunning = containers.find((c) => c.State === "running" && c.Name);
+    const primaryPaused = containers.find((c) => c.State === "paused" && c.Name);
     const primaryContainerName =
       primaryRunning?.Name?.trim() ??
+      primaryPaused?.Name?.trim() ??
       containerNames[0] ??
       null;
 
-    const status = allRunning || anyRunning ? "running" : "stopped";
+    const status = allRunning || anyRunning ? "running" : anyPaused ? "paused" : "stopped";
 
     return {
       status,

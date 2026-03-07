@@ -120,6 +120,69 @@ volumes:
     );
   });
 
+  it("converts long-form named volumes to app-scoped bind mounts in app_target_path mode", () => {
+    const compose = `
+services:
+  cloudflared:
+    image: wisdomsky/cloudflared-web:latest
+    volumes:
+      - type: volume
+        source: cloudflared_config
+        target: /config
+volumes:
+  cloudflared_config:
+`;
+
+    const normalized = normalizeComposeStorageBindings(
+      compose,
+      "/DATA/AppData",
+      "/DATA/AppData",
+      {
+        appId: "cloudflared",
+        strategy: "app_target_path",
+      },
+    );
+
+    expect(normalized.composeContent).toContain("type: bind");
+    expect(normalized.composeContent).toContain("source: /DATA/AppData/cloudflared/config");
+    expect(normalized.composeContent).not.toContain("cloudflared_config:");
+    expect(Array.from(normalized.bindMountDirectories)).toContain(
+      "/DATA/AppData/cloudflared/config",
+    );
+  });
+
+  it("rewrites CasaOS app-data bind mounts into app-scoped paths on fresh installs", () => {
+    const compose = `
+services:
+  cloudflared:
+    image: wisdomsky/cloudflared-web:latest
+    volumes:
+      - type: bind
+        source: /DATA/AppData/casaos-cloudflared/config
+        target: /config
+      - "/DATA/AppData/data:/data"
+`;
+
+    const normalized = normalizeComposeStorageBindings(
+      compose,
+      "/DATA/AppData",
+      "/DATA/AppData",
+      {
+        appId: "cloudflared",
+        strategy: "app_target_path",
+      },
+    );
+
+    expect(normalized.composeContent).toContain("source: /DATA/AppData/cloudflared/config");
+    expect(normalized.composeContent).toContain('- "/DATA/AppData/cloudflared/data:/data"');
+    expect(Array.from(normalized.bindMountDirectories)).toContain(
+      "/DATA/AppData/cloudflared/config",
+    );
+    expect(Array.from(normalized.bindMountDirectories)).toContain(
+      "/DATA/AppData/cloudflared/data",
+    );
+  });
+
   it("removes the installed stack directory during uninstall cleanup", async () => {
     const stacksRoot = resolveStoreStacksRoot();
     const appId = `cleanup-test-${Date.now()}`;
@@ -135,6 +198,37 @@ volumes:
     image: nginx:latest
     volumes:
       - "${bindDir}:/data"
+`,
+      "utf8",
+    );
+
+    await cleanupComposeDataOnUninstall({ composePath });
+
+    await expect(
+      rm(stackDir, {
+        recursive: true,
+        force: false,
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("removes long-form bind mount directories during uninstall cleanup", async () => {
+    const stacksRoot = resolveStoreStacksRoot();
+    const appId = `cleanup-long-form-${Date.now()}`;
+    const stackDir = path.join(stacksRoot, appId);
+    const composePath = path.join(stackDir, "docker-compose.yml");
+    const bindDir = path.join(stackDir, "config");
+
+    await mkdir(bindDir, { recursive: true });
+    await writeFile(
+      composePath,
+      `services:
+  app:
+    image: nginx:latest
+    volumes:
+      - type: bind
+        source: ${bindDir}
+        target: /config
 `,
       "utf8",
     );

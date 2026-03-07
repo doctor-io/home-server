@@ -12,6 +12,7 @@ import type {
   StoreAppDetail,
   StoreAppSummary,
 } from "@/lib/shared/contracts/apps";
+import { getStoreOperationLabel, isStoreOperationActiveStatus } from "@/lib/shared/store-operations";
 import {
   AlertCircle,
   ArrowUpCircle,
@@ -28,25 +29,10 @@ import {
 } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 
-function operationLabel(operation: AppOperationState | undefined) {
-  if (!operation) return null;
-
-  if (operation.status === "queued") return "Queued";
-  if (operation.status === "running") {
-    if (operation.action === "install") return "Installing";
-    if (operation.action === "update") return "Updating";
-    if (operation.action === "redeploy") return "Redeploying";
-    return "Uninstalling";
-  }
-
-  if (operation.status === "success") return "Completed";
-  return "Failed";
-}
-
 function isOperationBusy(operation: AppOperationState | undefined) {
   return Boolean(
     operation &&
-    (operation.status === "queued" || operation.status === "running"),
+    isStoreOperationActiveStatus(operation.status),
   );
 }
 
@@ -76,7 +62,7 @@ function StatusBadge({
 
     return (
       <span className="flex items-center gap-1 text-xs font-medium text-primary animate-pulse">
-        <Loader2 className="size-3 animate-spin" /> {operationLabel(operation)}...
+        <Loader2 className="size-3 animate-spin" /> {getStoreOperationLabel(operation)}...
       </span>
     );
   }

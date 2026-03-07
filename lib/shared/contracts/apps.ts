@@ -1,22 +1,3 @@
-export type InstalledApp = {
-  id: string;
-  name: string;
-  stackName: string;
-  composePath: string;
-  webUiPort?: number | null;
-  containerName?: string | null;
-  status: "running" | "stopped" | "unknown";
-  updatedAt: string;
-};
-
-export type InstalledStackStatus =
-  | "installed"
-  | "not_installed"
-  | "installing"
-  | "error"
-  | "updating"
-  | "uninstalling";
-
 export type StoreOperationAction =
   | "install"
   | "update"
@@ -28,6 +9,44 @@ export type StoreOperationAction =
   | "check-updates";
 
 export type StoreOperationStatus = "queued" | "running" | "success" | "error";
+
+export type StoreOperation = {
+  id: string;
+  appId: string;
+  action: StoreOperationAction;
+  status: StoreOperationStatus;
+  progressPercent: number;
+  currentStep: string;
+  errorMessage: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  updatedAt: string;
+};
+
+export type InstalledAppActiveOperation = Pick<
+  StoreOperation,
+  "id" | "action" | "status" | "progressPercent" | "currentStep" | "updatedAt"
+>;
+
+export type InstalledApp = {
+  id: string;
+  name: string;
+  stackName: string;
+  composePath: string;
+  webUiPort?: number | null;
+  containerName?: string | null;
+  status: "running" | "paused" | "stopped" | "unknown";
+  activeOperation?: InstalledAppActiveOperation | null;
+  updatedAt: string;
+};
+
+export type InstalledStackStatus =
+  | "installed"
+  | "not_installed"
+  | "installing"
+  | "error"
+  | "updating"
+  | "uninstalling";
 
 export type StoreAppEnvDefinition = {
   name: string;
@@ -81,19 +100,6 @@ export type DockerPullProgressDetail = {
   current: number;
   total: number;
   percent: number | null;
-};
-
-export type StoreOperation = {
-  id: string;
-  appId: string;
-  action: StoreOperationAction;
-  status: StoreOperationStatus;
-  progressPercent: number;
-  currentStep: string;
-  errorMessage: string | null;
-  startedAt: string | null;
-  finishedAt: string | null;
-  updatedAt: string;
 };
 
 export type StoreOperationEventType =

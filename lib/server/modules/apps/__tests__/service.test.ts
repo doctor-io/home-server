@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/server/modules/apps/repository", () => ({
   listInstalledAppsFromDb: vi.fn(),
+  findActiveStoreOperationsByAppIds: vi.fn(),
 }));
 
 vi.mock("@/lib/server/modules/docker/compose-runner", () => ({
@@ -17,7 +18,10 @@ vi.mock("@/lib/server/modules/docker/compose-parser", () => ({
   extractPrimaryServiceWithName: vi.fn(),
 }));
 
-import { listInstalledAppsFromDb } from "@/lib/server/modules/apps/repository";
+import {
+  findActiveStoreOperationsByAppIds,
+  listInstalledAppsFromDb,
+} from "@/lib/server/modules/apps/repository";
 import { invalidateInstalledAppsCache, listInstalledApps } from "@/lib/server/modules/apps/service";
 import { readFile } from "node:fs/promises";
 import {
@@ -28,6 +32,7 @@ import { getComposeRuntimeInfo } from "@/lib/server/modules/docker/compose-runne
 
 describe("apps service", () => {
   const repositoryMock = vi.mocked(listInstalledAppsFromDb);
+  const activeOperationsMock = vi.mocked(findActiveStoreOperationsByAppIds);
   const runtimeInfoMock = vi.mocked(getComposeRuntimeInfo);
   const readFileMock = vi.mocked(readFile);
   const parseComposeFileMock = vi.mocked(parseComposeFile);
@@ -36,6 +41,7 @@ describe("apps service", () => {
   beforeEach(() => {
     invalidateInstalledAppsCache();
     repositoryMock.mockReset();
+    activeOperationsMock.mockReset();
     runtimeInfoMock.mockReset();
     readFileMock.mockReset();
     parseComposeFileMock.mockReset();
@@ -45,6 +51,7 @@ describe("apps service", () => {
       containerNames: ["nextcloud-app-1"],
       primaryContainerName: "nextcloud-app-1",
     });
+    activeOperationsMock.mockResolvedValue({});
     readFileMock.mockResolvedValue("");
     parseComposeFileMock.mockReturnValue(null);
     extractPrimaryServiceMock.mockReturnValue(null);
@@ -58,6 +65,7 @@ describe("apps service", () => {
         stackName: "nextcloud",
         composePath: "/DATA/Apps/nextcloud/docker-compose.yml",
         status: "unknown",
+        activeOperation: null,
         updatedAt: "2026-02-22T10:00:00.000Z",
       },
     ]);
@@ -78,6 +86,7 @@ describe("apps service", () => {
         stackName: "immich",
         composePath: "/DATA/Apps/immich/docker-compose.yml",
         status: "unknown",
+        activeOperation: null,
         updatedAt: "2026-02-22T11:00:00.000Z",
       },
     ]);
@@ -112,6 +121,7 @@ describe("apps service", () => {
         composePath: "/DATA/Apps/dozzle/docker-compose.yml",
         webUiPort: null,
         status: "unknown",
+        activeOperation: null,
         updatedAt: "2026-02-22T10:00:00.000Z",
       },
     ]);
@@ -136,5 +146,40 @@ describe("apps service", () => {
 
     expect(apps[0]?.webUiPort).toBe(9999);
     expect(readFileMock).toHaveBeenCalledWith("/DATA/Apps/dozzle/docker-compose.yml", "utf8");
+  });
+
+  it("hydrates active operations for installed apps", async () => {
+    repositoryMock.mockResolvedValueOnce([
+      {
+        id: "jellyfin",
+        name: "Jellyfin",
+        stackName: "jellyfin",
+        composePath: "/DATA/Apps/jellyfin/docker-compose.yml",
+        status: "unknown",
+        activeOperation: null,
+        updatedAt: "2026-02-22T12:00:00.000Z",
+      },
+    ]);
+    activeOperationsMock.mockResolvedValueOnce({
+      jellyfin: {
+        id: "op-1",
+        action: "redeploy",
+        status: "running",
+        progressPercent: 64,
+        currentStep: "compose-up",
+        updatedAt: "2026-02-22T12:00:05.000Z",
+      },
+    });
+
+    const apps = await listInstalledApps({ bypassCache: true });
+
+    expect(apps[0]?.activeOperation).toEqual({
+      id: "op-1",
+      action: "redeploy",
+      status: "running",
+      progressPercent: 64,
+      currentStep: "compose-up",
+      updatedAt: "2026-02-22T12:00:05.000Z",
+    });
   });
 });

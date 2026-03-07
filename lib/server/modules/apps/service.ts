@@ -4,7 +4,10 @@ import path from "node:path";
 import { readFile } from "node:fs/promises";
 import { LruCache } from "@/lib/server/cache/lru";
 import { logServerAction, withServerTiming } from "@/lib/server/logging/logger";
-import { listInstalledAppsFromDb } from "@/lib/server/modules/apps/repository";
+import {
+  findActiveStoreOperationsByAppIds,
+  listInstalledAppsFromDb,
+} from "@/lib/server/modules/apps/repository";
 import {
   extractPrimaryServiceWithName,
   parseComposeFile,
@@ -114,6 +117,22 @@ async function inferComposePrimaryInfo(
   }
 }
 
+function mergeInstalledRuntimeState(input: {
+  app: InstalledApp;
+  runtimeStatus: InstalledApp["status"];
+  inferredWebUiPort: number | null;
+  containerName: string | null;
+  activeOperation: InstalledApp["activeOperation"];
+}) {
+  return {
+    ...input.app,
+    webUiPort: input.inferredWebUiPort,
+    status: input.runtimeStatus,
+    containerName: input.containerName,
+    activeOperation: input.activeOperation ?? null,
+  } satisfies InstalledApp;
+}
+
 export async function listInstalledApps(options?: { bypassCache?: boolean }) {
   return withServerTiming(
     {
@@ -140,6 +159,9 @@ export async function listInstalledApps(options?: { bypassCache?: boolean }) {
       try {
         apps = await listInstalledAppsFromDb();
         dbUnavailableUntil = 0;
+        const activeOperationsByAppId = await findActiveStoreOperationsByAppIds(
+          apps.map((app) => app.id),
+        );
 
         // Get real Docker status for each app
         const appsWithStatus = await Promise.all(
@@ -153,19 +175,21 @@ export async function listInstalledApps(options?: { bypassCache?: boolean }) {
                 envPath,
                 stackName: app.stackName,
               });
-              return {
-                ...app,
-                webUiPort: inferredWebUiPort,
-                status: runtime.status,
+              return mergeInstalledRuntimeState({
+                app,
+                inferredWebUiPort,
+                runtimeStatus: runtime.status,
                 containerName: runtime.primaryContainerName ?? composeInfo.containerName,
-              };
+                activeOperation: activeOperationsByAppId[app.id] ?? null,
+              });
             } catch {
-              return {
-                ...app,
-                webUiPort: inferredWebUiPort,
-                status: "unknown" as const,
+              return mergeInstalledRuntimeState({
+                app,
+                inferredWebUiPort,
+                runtimeStatus: "unknown",
                 containerName: composeInfo.containerName,
-              };
+                activeOperation: activeOperationsByAppId[app.id] ?? null,
+              });
             }
           }),
         );

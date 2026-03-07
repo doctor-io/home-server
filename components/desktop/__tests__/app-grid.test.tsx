@@ -274,6 +274,108 @@ describe("AppGrid context menu", () => {
     expect(screen.getByRole("button", { name: "Start Container" })).toBeTruthy();
   });
 
+  it("renders updating state from persisted active operation after refresh", () => {
+    useInstalledAppsMock.mockReturnValue({
+      data: [
+        {
+          id: "plex",
+          name: "Plex",
+          status: "running",
+          activeOperation: {
+            id: "op-redeploy-1",
+            action: "redeploy",
+            status: "running",
+            progressPercent: 45,
+            currentStep: "compose-up",
+            updatedAt: "2026-02-24T00:00:05.000Z",
+          },
+          webUiPort: 32400,
+          containerName: "plex",
+          updatedAt: "2026-02-24T00:00:00.000Z",
+        },
+      ],
+      isLoading: false,
+      isError: false,
+    });
+
+    render(<AppGrid animationsEnabled={false} />);
+
+    expect(
+      screen.getByRole("button", { name: "Open Plex" }).getAttribute("data-app-status"),
+    ).toBe("updating");
+  });
+
+  it("renders paused state for paused containers", () => {
+    useInstalledAppsMock.mockReturnValue({
+      data: [
+        {
+          id: "plex",
+          name: "Plex",
+          status: "paused",
+          webUiPort: 32400,
+          containerName: "plex",
+          updatedAt: "2026-02-24T00:00:00.000Z",
+        },
+      ],
+      isLoading: false,
+      isError: false,
+    });
+
+    render(<AppGrid animationsEnabled={false} />);
+
+    expect(
+      screen.getByRole("button", { name: "Open Plex" }).getAttribute("data-app-status"),
+    ).toBe("paused");
+  });
+
+  it("shows a global action banner for active operations", () => {
+    useInstalledAppsMock.mockReturnValue({
+      data: [
+        {
+          id: "plex",
+          name: "Plex",
+          status: "running",
+          activeOperation: {
+            id: "op-redeploy-1",
+            action: "redeploy",
+            status: "running",
+            progressPercent: 45,
+            currentStep: "compose-up",
+            updatedAt: "2026-02-24T00:00:05.000Z",
+          },
+          webUiPort: 32400,
+          containerName: "plex",
+          updatedAt: "2026-02-24T00:00:00.000Z",
+        },
+      ],
+      isLoading: false,
+      isError: false,
+    });
+
+    render(<AppGrid animationsEnabled={false} />);
+
+    expect(screen.getByText("Redeploying Plex")).toBeTruthy();
+    expect(screen.getByText("45%")).toBeTruthy();
+  });
+
+  it("shows a loader skeleton while apps are loading", () => {
+    useInstalledAppsMock.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      isError: false,
+    });
+    useStoreCatalogMock.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      isError: false,
+    });
+
+    const { container } = render(<AppGrid animationsEnabled={false} />);
+
+    expect(screen.getByText("Loading installed apps")).toBeTruthy();
+    expect(container.querySelectorAll('[aria-hidden="true"]').length).toBeGreaterThan(0);
+  });
+
   it("opens uninstall dialog and triggers backend uninstall from remove action", async () => {
     const uninstallApp = vi.fn().mockResolvedValue(undefined);
     useStoreActionsMock.mockReturnValue({

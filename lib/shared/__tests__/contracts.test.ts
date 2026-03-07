@@ -45,7 +45,21 @@ describe("shared contracts", () => {
     expectTypeOf<InstalledApp>().toMatchTypeOf<{
       id: string;
       name: string;
-      status: "running" | "stopped" | "unknown";
+      status: "running" | "paused" | "stopped" | "unknown";
+      activeOperation:
+        | {
+            action:
+              | "install"
+              | "update"
+              | "redeploy"
+              | "uninstall"
+              | "start"
+              | "stop"
+              | "restart"
+              | "check-updates";
+          }
+        | null
+        | undefined;
       updatedAt: string;
     }>();
 

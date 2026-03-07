@@ -6,6 +6,11 @@ import { useStoreActions } from "@/hooks/useStoreActions";
 import { useStoreCatalog } from "@/hooks/useStoreCatalog";
 import { logClientAction } from "@/lib/client/logger";
 import {
+  getStoreOperationActionLabel,
+  isStoreOperationActiveStatus,
+} from "@/lib/shared/store-operations";
+import {
+  AlertTriangle,
   BarChart3,
   BookOpen,
   Camera,
@@ -22,9 +27,11 @@ import {
   Globe,
   Home,
   Lock,
+  Loader2,
   Mail,
   MessageSquare,
   Music,
+  Pause,
   Play,
   RefreshCw,
   RotateCcw,
@@ -46,7 +53,7 @@ type AppItem = {
   logoUrl: string | null;
   color: string;
   bgColor: string;
-  status: "running" | "stopped" | "updating";
+  status: "running" | "paused" | "stopped" | "unknown" | "updating";
   category: string;
   webUiPort: number | null;
   containerName: string | null;
@@ -168,6 +175,62 @@ function resolveAppActionTarget(app: AppItem): AppActionTarget {
   };
 }
 
+function getAppVisualState(app: AppItem) {
+  if (app.status === "updating") {
+    return {
+      containerClass: "animate-pulse shadow-amber-500/20",
+      imageClass: "",
+      dotClass: "bg-status-amber",
+      dotInnerClass: "animate-pulse bg-status-amber",
+      ringClass: "border-status-amber/60",
+      badgeIcon: RefreshCw,
+      badgeClass: "bg-status-amber/20 text-status-amber",
+      badgeIconClass: "animate-spin",
+      title: "Redeploying",
+    };
+  }
+
+  if (app.status === "paused") {
+    return {
+      containerClass: "animate-pulse shadow-amber-500/10",
+      imageClass: "opacity-80 saturate-50",
+      dotClass: "bg-status-amber",
+      dotInnerClass: "animate-pulse bg-status-amber",
+      ringClass: "border-status-amber/40",
+      badgeIcon: Pause,
+      badgeClass: "bg-status-amber/15 text-status-amber",
+      badgeIconClass: "",
+      title: "Paused",
+    };
+  }
+
+  if (app.status === "stopped" || app.status === "unknown") {
+    return {
+      containerClass: "animate-pulse shadow-status-red/10",
+      imageClass: "opacity-65 grayscale",
+      dotClass: "bg-status-red",
+      dotInnerClass: "animate-ping bg-status-red/80",
+      ringClass: "border-status-red/35",
+      badgeIcon: AlertTriangle,
+      badgeClass: "bg-status-red/15 text-status-red",
+      badgeIconClass: "",
+      title: app.status === "unknown" ? "Status unknown" : "Down",
+    };
+  }
+
+  return {
+    containerClass: "",
+    imageClass: "",
+    dotClass: "bg-status-green",
+    dotInnerClass: "",
+    ringClass: "border-transparent",
+    badgeIcon: null,
+    badgeClass: "",
+    badgeIconClass: "",
+    title: "Running",
+  };
+}
+
 type AppGridProps = {
   iconSize?: "small" | "medium" | "large";
   animationsEnabled?: boolean;
@@ -238,14 +301,22 @@ export function AppGrid({
           derivedStatus = "updating";
         } else if (installed?.status === "running") {
           derivedStatus = "running";
+        } else if (installed?.status === "paused") {
+          derivedStatus = "paused";
         } else if (installed?.status === "stopped") {
           derivedStatus = "stopped";
+        } else if (installed?.status === "unknown") {
+          derivedStatus = "unknown";
         }
         const operationState = operationsByApp[appId];
         if (
           operationState &&
-          (operationState.status === "queued" ||
-            operationState.status === "running")
+          isStoreOperationActiveStatus(operationState.status)
+        ) {
+          derivedStatus = "updating";
+        } else if (
+          installed?.activeOperation &&
+          isStoreOperationActiveStatus(installed.activeOperation.status)
         ) {
           derivedStatus = "updating";
         }
@@ -279,6 +350,69 @@ export function AppGrid({
     installedAppsQuery.isLoading || installedCatalogQuery.isLoading;
   const isAppsError =
     installedAppsQuery.isError && installedCatalogQuery.isError;
+  const activeOperations = useMemo(() => {
+    const installedApps = installedAppsQuery.data ?? [];
+    const catalogApps = installedCatalogQuery.data?.apps ?? [];
+    const appNames = new Map<string, string>();
+
+    for (const app of installedApps) {
+      appNames.set(app.id, app.name);
+    }
+
+    for (const app of catalogApps) {
+      if (!appNames.has(app.id)) {
+        appNames.set(app.id, app.name);
+      }
+    }
+
+    const merged = new Map<
+      string,
+      {
+        appId: string;
+        appName: string;
+        action: StoreOperationAction;
+        status: "queued" | "running";
+        progressPercent: number;
+        updatedAt: string;
+      }
+    >();
+
+    for (const app of installedApps) {
+      if (
+        app.activeOperation &&
+        isStoreOperationActiveStatus(app.activeOperation.status)
+      ) {
+        merged.set(app.id, {
+          appId: app.id,
+          appName: appNames.get(app.id) ?? app.name,
+          action: app.activeOperation.action,
+          status: app.activeOperation.status,
+          progressPercent: app.activeOperation.progressPercent,
+          updatedAt: app.activeOperation.updatedAt,
+        });
+      }
+    }
+
+    for (const operation of Object.values(operationsByApp)) {
+      if (!isStoreOperationActiveStatus(operation.status)) {
+        continue;
+      }
+
+      merged.set(operation.appId, {
+        appId: operation.appId,
+        appName: appNames.get(operation.appId) ?? operation.appId,
+        action: operation.action,
+        status: operation.status,
+        progressPercent: operation.progressPercent,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+
+    return Array.from(merged.values()).sort((left, right) =>
+      right.updatedAt.localeCompare(left.updatedAt),
+    );
+  }, [installedAppsQuery.data, installedCatalogQuery.data?.apps, operationsByApp]);
+  const primaryOperation = activeOperations[0] ?? null;
 
   const filtered = apps;
   const iconContainerClass =
@@ -574,23 +708,6 @@ export function AppGrid({
       className="flex-1 px-6 pt-4 pb-6 overflow-y-auto"
       onClick={closeContextMenu}
     >
-      {/* Category filter pills */}
-      {/* <nav className="flex items-center gap-2 mb-8 flex-wrap" aria-label="Filter by category">
-        {categories.map((cat) => (
-          <button
-            key={cat}
-            onClick={() => setSelectedCategory(cat)}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer ${
-              selectedCategory === cat
-                ? "bg-primary/20 text-primary border border-primary/30"
-                : "bg-glass border border-glass-border text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-            }`}
-          >
-            {cat}
-          </button>
-        ))}
-      </nav> */}
-
       {/* App icon grid - like a real desktop */}
       {actionError ? (
         <div className="mt-4 rounded-lg border border-status-red/30 bg-status-red/10 px-3 py-2 text-xs text-status-red">
@@ -598,9 +715,61 @@ export function AppGrid({
         </div>
       ) : null}
 
+      {primaryOperation ? (
+        <div
+          className="mx-auto mt-4 flex w-full max-w-xl items-center justify-between gap-3 rounded-2xl border border-status-amber/25 bg-status-amber/10 px-4 py-3 text-xs text-status-amber shadow-lg shadow-black/10 backdrop-blur-xl"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex size-8 items-center justify-center rounded-full bg-status-amber/15">
+              <Loader2 className="size-4 animate-spin" />
+            </span>
+            <div className="min-w-0">
+              <p className="truncate font-medium text-foreground">
+                {getStoreOperationActionLabel(primaryOperation.action)} {primaryOperation.appName}
+              </p>
+              <p className="truncate text-[11px] text-muted-foreground">
+                {activeOperations.length > 1
+                  ? `${activeOperations.length} app actions in progress`
+                  : primaryOperation.status === "queued"
+                    ? "Queued"
+                    : "Applying changes"}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="hidden h-1.5 w-24 overflow-hidden rounded-full bg-white/10 sm:block">
+              <div
+                className="h-full rounded-full bg-status-amber transition-all"
+                style={{ width: `${Math.max(8, primaryOperation.progressPercent)}%` }}
+              />
+            </div>
+            <span className="tabular-nums text-[11px] text-foreground">
+              {primaryOperation.progressPercent}%
+            </span>
+          </div>
+        </div>
+      ) : null}
+
       {isAppsLoading && filtered.length === 0 ? (
-        <div className="mt-24 text-xs text-muted-foreground">
-          Loading apps...
+        <div className="mt-24" role="status" aria-live="polite">
+          <div className="mx-auto mb-6 flex w-fit items-center gap-2 rounded-full border border-glass-border bg-background/40 px-3 py-1.5 text-xs text-muted-foreground backdrop-blur-xl">
+            <Loader2 className="size-3.5 animate-spin" />
+            Loading installed apps
+          </div>
+          <div className="grid justify-center gap-x-2 gap-y-5 grid-cols-[repeat(4,minmax(0,5.5rem))] sm:grid-cols-[repeat(5,minmax(0,5.5rem))] md:grid-cols-[repeat(6,minmax(0,5.5rem))] lg:grid-cols-[repeat(8,minmax(0,5.5rem))] xl:grid-cols-[repeat(10,minmax(0,5.5rem))]">
+            {Array.from({ length: 8 }).map((_, index) => (
+              <div
+                key={`app-skeleton-${index}`}
+                className="flex flex-col items-center gap-2 p-2"
+                aria-hidden="true"
+              >
+                <div className={`${iconContainerClass} animate-pulse rounded-2xl bg-white/8`} />
+                <div className="h-3 w-14 animate-pulse rounded-full bg-white/8" />
+              </div>
+            ))}
+          </div>
         </div>
       ) : isAppsError && filtered.length === 0 ? (
         <div className="mt-24 text-xs text-status-red">
@@ -613,24 +782,40 @@ export function AppGrid({
       ) : (
         <div className="mt-24 grid justify-center gap-x-2 gap-y-5 grid-cols-[repeat(4,minmax(0,5.5rem))] sm:grid-cols-[repeat(5,minmax(0,5.5rem))] md:grid-cols-[repeat(6,minmax(0,5.5rem))] lg:grid-cols-[repeat(8,minmax(0,5.5rem))] xl:grid-cols-[repeat(10,minmax(0,5.5rem))]">
           {filtered.map((app) => (
-            <button
-              key={app.id}
-              onClick={() => void openDashboardForApp(app)}
-              onContextMenu={(e) => openContextMenu(e, app)}
-              className={`group flex flex-col items-center gap-2 p-2 rounded-xl cursor-pointer ${
-                activeAppId === app.id
-                  ? "bg-primary/15 ring-1 ring-primary/40"
-                  : "hover:bg-foreground/5"
-              } ${animationsEnabled ? "transition-all duration-200" : ""} ${
-                animationsEnabled ? "group-active:scale-95" : ""
-              }`}
-              aria-label={`Open ${app.name}`}
-            >
-              <div className="relative">
+            (() => {
+              const visualState = getAppVisualState(app);
+              const BadgeIcon = visualState.badgeIcon;
+              const animatedContainerClass = animationsEnabled
+                ? visualState.containerClass
+                : "";
+              const animatedDotInnerClass = animationsEnabled
+                ? visualState.dotInnerClass
+                : "";
+              const animatedBadgeIconClass = animationsEnabled
+                ? visualState.badgeIconClass
+                : "";
+
+              return (
+                <button
+                  key={app.id}
+                  onClick={() => void openDashboardForApp(app)}
+                  onContextMenu={(e) => openContextMenu(e, app)}
+                  className={`group flex flex-col items-center gap-2 p-2 rounded-xl cursor-pointer ${
+                    activeAppId === app.id
+                      ? "bg-primary/15 ring-1 ring-primary/40"
+                      : "hover:bg-foreground/5"
+                  } ${animationsEnabled ? "transition-all duration-200" : ""} ${
+                    animationsEnabled ? "group-active:scale-95" : ""
+                  }`}
+                  aria-label={`Open ${app.name}`}
+                  data-app-status={app.status}
+                  title={visualState.title}
+                >
+                  <div className="relative">
                 <div
-                  className={`${iconContainerClass} flex items-center justify-center ${!app.logoUrl ? `${app.bgColor} ${app.color}` : "bg-white/90"} shadow-lg shadow-black/20 ${
+                  className={`${iconContainerClass} relative flex items-center justify-center border ${visualState.ringClass} ${!app.logoUrl ? `${app.bgColor} ${app.color}` : "bg-white/90"} shadow-lg shadow-black/20 ${
                     animationsEnabled
-                      ? "transition-transform duration-200 group-hover:scale-110"
+                      ? `transition-transform duration-200 group-hover:scale-110 ${animatedContainerClass}`
                       : ""
                   } overflow-hidden`}
                 >
@@ -646,7 +831,7 @@ export function AppGrid({
                       <img
                         src={app.logoUrl}
                         alt={`${app.name} logo`}
-                        className="w-full h-full object-contain p-1.5 rounded-xl"
+                        className={`w-full h-full object-contain p-1.5 rounded-xl ${visualState.imageClass}`}
                         loading="lazy"
                         decoding="async"
                         onLoad={() => {
@@ -671,35 +856,43 @@ export function AppGrid({
                         }}
                       />
                       <app.icon
-                        className={`${iconGlyphClass} hidden`}
+                        className={`${iconGlyphClass} hidden ${visualState.imageClass}`}
                         data-fallback-icon
                       />
                     </>
                   ) : (
-                    <app.icon className={iconGlyphClass} />
+                    <app.icon className={`${iconGlyphClass} ${visualState.imageClass}`} />
                   )}
                 </div>
+                {BadgeIcon ? (
+                  <span
+                    className={`absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full border border-background ${visualState.badgeClass}`}
+                  >
+                    <BadgeIcon className={`size-2.5 ${animatedBadgeIconClass}`} />
+                  </span>
+                ) : null}
                 <span
-                  className={`absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-background ${
-                    app.status === "running"
-                      ? "bg-status-green"
-                      : app.status === "updating"
-                        ? `bg-status-amber ${animationsEnabled ? "animate-pulse" : ""}`
-                        : "bg-muted-foreground/40"
-                  }`}
+                  className={`absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-background ${visualState.dotClass}`}
                 />
+                {animatedDotInnerClass ? (
+                  <span
+                    className={`pointer-events-none absolute -bottom-0.5 -right-0.5 size-3 rounded-full ${animatedDotInnerClass}`}
+                  />
+                ) : null}
               </div>
 
-              <span
-                className={`max-w-[4.5rem] truncate text-center text-xs leading-tight font-medium text-foreground/90 ${
-                  animationsEnabled
-                    ? "transition-colors group-hover:text-foreground"
-                    : ""
-                }`}
-              >
-                {app.name}
-              </span>
-            </button>
+                  <span
+                    className={`max-w-[4.5rem] truncate text-center text-xs leading-tight font-medium text-foreground/90 ${
+                      animationsEnabled
+                        ? "transition-colors group-hover:text-foreground"
+                        : ""
+                    }`}
+                  >
+                    {app.name}
+                  </span>
+                </button>
+              );
+            })()
           ))}
         </div>
       )}
