@@ -587,6 +587,15 @@ export function collectComposeBindMountOwnershipOverrides(composeContent: string
   return Array.from(overrides.values());
 }
 
+export function resolveComposeBindMountOwnershipOverrides(
+  composeContent: string,
+  env: Record<string, string>,
+) {
+  return collectComposeBindMountOwnershipOverrides(
+    interpolateComposeVariables(composeContent, env),
+  );
+}
+
 function rewriteKeyValueLine(
   line: string,
   expectedKey: string,
@@ -966,9 +975,10 @@ export async function materializeInlineStackFiles(input: {
     appId: input.appId,
     strategy: input.storageMappingStrategy,
   });
-  const ownershipOverrides = collectComposeBindMountOwnershipOverrides(
-    normalized.composeContent,
-  );
+  const ownershipOverrides = resolveComposeBindMountOwnershipOverrides(normalized.composeContent, {
+    ...input.env,
+    AppID: input.appId,
+  });
 
   const stackDir = path.join(stacksRoot, input.appId);
   const composePath = path.join(stackDir, "docker-compose.yml");

@@ -3,6 +3,7 @@ import {
   cleanupComposeDataOnUninstall,
   collectComposeBindMountOwnershipOverrides,
   normalizeComposeStorageBindings,
+  resolveComposeBindMountOwnershipOverrides,
   sanitizeStackName,
 } from "@/lib/server/modules/docker/compose-runner";
 import { parseComposeFile } from "@/lib/server/modules/docker/compose-parser";
@@ -201,6 +202,30 @@ services:
 `;
 
     expect(collectComposeBindMountOwnershipOverrides(compose)).toEqual([
+      {
+        directoryPath: "/DATA/AppData/grafana/data",
+        uid: 472,
+        gid: 472,
+      },
+    ]);
+  });
+
+  it("resolves Grafana ownership overrides with AppID interpolation", () => {
+    const compose = `
+services:
+  grafana:
+    image: grafana/grafana:12.1.4
+    volumes:
+      - type: bind
+        source: /DATA/AppData/$AppID/data
+        target: /var/lib/grafana
+`;
+
+    expect(
+      resolveComposeBindMountOwnershipOverrides(compose, {
+        AppID: "grafana",
+      }),
+    ).toEqual([
       {
         directoryPath: "/DATA/AppData/grafana/data",
         uid: 472,
