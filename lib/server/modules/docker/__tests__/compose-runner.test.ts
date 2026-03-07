@@ -1,6 +1,7 @@
 import {
   applyWebUiPortOverride,
   cleanupComposeDataOnUninstall,
+  collectMaterializationDirectories,
   collectComposeBindMountOwnershipOverrides,
   normalizeComposeStorageBindings,
   resolveComposeBindMountOwnershipOverrides,
@@ -231,6 +232,24 @@ services:
         uid: 472,
         gid: 472,
       },
+    ]);
+  });
+
+  it("includes ownership override directories in materialization targets", () => {
+    const directories = collectMaterializationDirectories(
+      ["/DATA/AppData/grafana/var/lib/grafana"],
+      [
+        {
+          directoryPath: "/DATA/AppData/grafana/data",
+          uid: 472,
+          gid: 472,
+        },
+      ],
+    );
+
+    expect(Array.from(directories)).toEqual([
+      "/DATA/AppData/grafana/var/lib/grafana",
+      "/DATA/AppData/grafana/data",
     ]);
   });
 

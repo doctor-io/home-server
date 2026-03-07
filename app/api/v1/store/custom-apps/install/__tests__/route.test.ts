@@ -93,4 +93,29 @@ describe("POST /api/v1/store/custom-apps/install", () => {
     expect(upsertCustomStoreTemplate).not.toHaveBeenCalled();
     expect(startAppLifecycleAction).not.toHaveBeenCalled();
   });
+
+  it("returns 400 with validation message when docker run source is invalid", async () => {
+    vi.mocked(upsertCustomStoreTemplate).mockRejectedValueOnce(
+      new Error("Invalid docker run command: must start with `docker run`"),
+    );
+
+    const response = await POST(
+      new Request("http://localhost/api/v1/store/custom-apps/install", {
+        method: "POST",
+        body: JSON.stringify({
+          name: "Matter Server",
+          sourceType: "docker-run",
+          source: "docker pull ghcr.io/home-assistant-libs/python-matter-server:8.1",
+        }),
+      }),
+    );
+
+    const json = (await response.json()) as { error: string };
+
+    expect(response.status).toBe(400);
+    expect(json).toEqual({
+      error: "Invalid docker run command: must start with `docker run`",
+    });
+    expect(startAppLifecycleAction).not.toHaveBeenCalled();
+  });
 });

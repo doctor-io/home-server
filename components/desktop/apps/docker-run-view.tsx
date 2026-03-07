@@ -13,7 +13,9 @@ export function DockerRunView({ state, onChange }: DockerRunViewProps) {
   return (
     <section className="flex-1 overflow-y-auto px-4 py-3">
       <p className="mb-3 text-[11px] text-muted-foreground">
-        Docker Run is available for custom installs only. Web UI metadata is derived from the published ports in the command.
+        Docker Run is available for custom installs only. Paste a full <code>docker run ...</code>{" "}
+        command here; <code>docker pull ...</code> is not supported in this tab. Web UI
+        metadata is derived from the published ports in the command.
       </p>
 
       <div className="space-y-3">
@@ -59,6 +61,7 @@ export function DockerRunView({ state, onChange }: DockerRunViewProps) {
             rows={9}
             value={state.source}
             onChange={(event) => update({ source: event.target.value })}
+            placeholder="docker run --name myapp -p 8080:80 nginx:latest"
             className="resize-y rounded-lg border border-glass-border bg-secondary/20 px-2.5 py-1.5 font-mono text-xs text-foreground outline-none focus:border-primary/50"
           />
         </label>

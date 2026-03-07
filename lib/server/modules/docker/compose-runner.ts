@@ -596,6 +596,18 @@ export function resolveComposeBindMountOwnershipOverrides(
   );
 }
 
+export function collectMaterializationDirectories(
+  bindMountDirectories: Iterable<string>,
+  ownershipOverrides: Iterable<BindMountOwnershipOverride>,
+) {
+  const directoriesToEnsure = new Set(bindMountDirectories);
+  for (const { directoryPath } of ownershipOverrides) {
+    directoriesToEnsure.add(directoryPath);
+  }
+
+  return directoriesToEnsure;
+}
+
 function rewriteKeyValueLine(
   line: string,
   expectedKey: string,
@@ -979,6 +991,10 @@ export async function materializeInlineStackFiles(input: {
     ...input.env,
     AppID: input.appId,
   });
+  const directoriesToEnsure = collectMaterializationDirectories(
+    normalized.bindMountDirectories,
+    ownershipOverrides,
+  );
 
   const stackDir = path.join(stacksRoot, input.appId);
   const composePath = path.join(stackDir, "docker-compose.yml");
@@ -986,7 +1002,7 @@ export async function materializeInlineStackFiles(input: {
 
   await mkdir(stackDir, { recursive: true });
   await Promise.all(
-    Array.from(normalized.bindMountDirectories).map((directoryPath) =>
+    Array.from(directoriesToEnsure).map((directoryPath) =>
       mkdir(directoryPath, { recursive: true }),
     ),
   );

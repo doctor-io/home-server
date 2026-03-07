@@ -20,6 +20,19 @@ const installCustomAppSchema = z.object({
   source: z.string().trim().min(1).max(50_000),
 });
 
+function isCustomAppRequestError(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return (
+    error.message === "Custom app name is required" ||
+    error.message === "Custom app source cannot be empty" ||
+    error.message.startsWith("Invalid docker run command:") ||
+    error.message.startsWith("Invalid compose")
+  );
+}
+
 export async function POST(request: Request) {
   const requestId = createRequestId();
 
@@ -66,21 +79,27 @@ export async function POST(request: Request) {
       },
     );
   } catch (error) {
+    const status = isCustomAppRequestError(error) ? 400 : 500;
+    const message =
+      error instanceof Error && isCustomAppRequestError(error)
+        ? error.message
+        : "Unable to install custom app";
+
     logServerAction({
-      level: "error",
+      level: status === 400 ? "warn" : "error",
       layer: "api",
       action: "store.customApps.install.post.response",
-      status: "error",
+      status: status === 400 ? "warn" : "error",
       requestId,
-      message: "Unable to install custom app",
+      message,
       error,
     });
 
     return NextResponse.json(
       {
-        error: "Unable to install custom app",
+        error: message,
       },
-      { status: 500 },
+      { status },
     );
   }
 }
