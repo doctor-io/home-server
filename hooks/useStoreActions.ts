@@ -41,6 +41,7 @@ type ErrorResponsePayload = {
 };
 
 const OPERATION_SNAPSHOT_POLL_MS = 1_500;
+const MISSING_OPERATION_SNAPSHOT_LIMIT = 3;
 
 function isTerminalStatus(status: StoreOperation["status"]) {
   return status === "success" || status === "error";
@@ -129,6 +130,19 @@ export function useStoreActions() {
   const streamCleanups = useRef<Map<string, () => void>>(new Map());
   const pollCleanups = useRef<Map<string, () => void>>(new Map());
 
+  const clearTrackedOperation = useCallback((appId: string, operationId: string) => {
+    setOperationsByApp((previous) => {
+      const current = previous[appId];
+      if (!current || current.operationId !== operationId) {
+        return previous;
+      }
+
+      const next = { ...previous };
+      delete next[appId];
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
     const activeStreams = streamCleanups.current;
     const activePolls = pollCleanups.current;
@@ -176,6 +190,7 @@ export function useStoreActions() {
       let streamCleanup: (() => void) | null = null;
       let pollTimer: ReturnType<typeof setTimeout> | null = null;
       let stopped = false;
+      let missingSnapshotCount = 0;
 
       const clearPollTimer = () => {
         if (pollTimer !== null) {
@@ -217,6 +232,7 @@ export function useStoreActions() {
 
       const applySnapshotState = (snapshot: StoreOperation) => {
         if (stopped) return;
+        missingSnapshotCount = 0;
 
         const nextState = mapOperationToState(snapshot);
 
@@ -229,6 +245,7 @@ export function useStoreActions() {
 
         if (isTerminalStatus(snapshot.status)) {
           stopTracking();
+          clearTrackedOperation(snapshot.appId, snapshot.id);
           invalidateTerminalState(snapshot.appId, snapshot.id);
         }
       };
@@ -248,6 +265,18 @@ export function useStoreActions() {
           const snapshot = await fetchStoreOperationSnapshot(operationId);
           if (snapshot) {
             applySnapshotState(snapshot);
+          } else {
+            missingSnapshotCount += 1;
+
+            if (missingSnapshotCount >= MISSING_OPERATION_SNAPSHOT_LIMIT) {
+              stopTracking();
+              clearTrackedOperation(appId, operationId);
+              void Promise.all([
+                queryClient.invalidateQueries({ queryKey: queryKeys.storeCatalog }),
+                queryClient.invalidateQueries({ queryKey: queryKeys.installedApps }),
+                queryClient.invalidateQueries({ queryKey: queryKeys.storeApp(appId) }),
+              ]);
+            }
           }
         } catch {
           // Keep stream active; we'll retry on next poll.
@@ -298,6 +327,9 @@ export function useStoreActions() {
 
           if (isTerminalStatus(event.status)) {
             stopTracking();
+            if (event.status === "success") {
+              clearTrackedOperation(event.appId, event.operationId);
+            }
             invalidateTerminalState(event.appId, event.operationId);
           }
         },
@@ -311,7 +343,7 @@ export function useStoreActions() {
         stopTracking();
       });
     },
-    [queryClient],
+    [clearTrackedOperation, queryClient],
   );
 
   const installMutation = useMutation({

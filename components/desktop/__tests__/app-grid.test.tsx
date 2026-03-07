@@ -376,6 +376,28 @@ describe("AppGrid context menu", () => {
     expect(container.querySelectorAll('[aria-hidden="true"]').length).toBeGreaterThan(0);
   });
 
+  it("renders no empty-state copy when no apps are installed", () => {
+    useInstalledAppsMock.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: false,
+    });
+    useStoreCatalogMock.mockReturnValue({
+      data: {
+        apps: [],
+      },
+      isLoading: false,
+      isError: false,
+    });
+
+    render(<AppGrid animationsEnabled={false} />);
+
+    expect(screen.queryByText("No apps found.")).toBeNull();
+    expect(
+      screen.queryByText("Install an app from the App Store to see it here."),
+    ).toBeNull();
+  });
+
   it("opens uninstall dialog and triggers backend uninstall from remove action", async () => {
     const uninstallApp = vi.fn().mockResolvedValue(undefined);
     useStoreActionsMock.mockReturnValue({

@@ -1,9 +1,24 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { withClientTiming } from "@/lib/client/logger";
 import { AuthCard } from "@/components/auth/auth-card";
+
+const registerProgressSteps = [
+  {
+    title: "Creating your account",
+    description: "Saving your login and preparing your workspace.",
+  },
+  {
+    title: "Preparing storage",
+    description: "Creating the data folders Homeio needs before first use.",
+  },
+  {
+    title: "Setting up the App Store",
+    description: "Downloading and indexing the default CasaOS catalog. This can take a moment.",
+  },
+] as const;
 
 export function RegisterForm() {
   const router = useRouter();
@@ -12,6 +27,25 @@ export function RegisterForm() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStage, setSubmitStage] = useState(0);
+
+  useEffect(() => {
+    if (!isSubmitting) {
+      setSubmitStage(0);
+      return;
+    }
+
+    const stageTimers = [
+      window.setTimeout(() => setSubmitStage(1), 1200),
+      window.setTimeout(() => setSubmitStage(2), 3200),
+    ];
+
+    return () => {
+      for (const timer of stageTimers) {
+        window.clearTimeout(timer);
+      }
+    };
+  }, [isSubmitting]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -60,12 +94,47 @@ export function RegisterForm() {
     }
   }
 
+  const progressStep = registerProgressSteps[submitStage];
+
   return (
-    <AuthCard
-      title="Create account"
-      description="Create your account"
-    >
-      <form className="space-y-3" onSubmit={handleSubmit}>
+    <>
+      {isSubmitting ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 px-6 backdrop-blur-xl">
+          <div className="w-full max-w-md rounded-3xl border border-primary/20 bg-card/95 p-6 shadow-2xl shadow-black/40">
+            <div className="flex items-start gap-4">
+              <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+              <div className="min-w-0">
+                <p className="text-lg font-semibold text-foreground">
+                  {progressStep?.title}
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {progressStep?.description}
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 flex gap-2">
+              {registerProgressSteps.map((step, index) => (
+                <span
+                  key={step.title}
+                  className={`h-2 flex-1 rounded-full transition-colors ${
+                    index <= submitStage ? "bg-primary" : "bg-white/10"
+                  }`}
+                />
+              ))}
+            </div>
+            <div className="mt-4 space-y-2 text-xs text-muted-foreground">
+              <p>This first setup can take a little longer than a normal sign up.</p>
+              <p>Homeio is preparing the default App Store in the background so the system is ready right after login.</p>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <AuthCard
+        title="Create account"
+        description="Create your account"
+      >
+        <form className="space-y-3" onSubmit={handleSubmit}>
         <div className="space-y-1">
           <label className="text-sm font-medium text-foreground" htmlFor="username">
             Username
@@ -130,9 +199,10 @@ export function RegisterForm() {
           }
           className="h-10 w-full rounded-lg bg-primary text-sm font-semibold text-primary-foreground transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isSubmitting ? "Creating account..." : "Register"}
+          {isSubmitting ? "Finishing setup..." : "Register"}
         </button>
-      </form>
-    </AuthCard>
+        </form>
+      </AuthCard>
+    </>
   );
 }

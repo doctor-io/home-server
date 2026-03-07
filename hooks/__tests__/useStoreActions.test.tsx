@@ -1,7 +1,7 @@
 /* @vitest-environment jsdom */
 
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { queryKeys } from "@/lib/shared/query-keys";
 import { createTestQueryClient, createWrapper } from "@/test/query-client-wrapper";
 
@@ -16,6 +16,15 @@ vi.mock("@/hooks/useStoreOperation", () => ({
 import { useStoreActions } from "@/hooks/useStoreActions";
 
 describe("useStoreActions", () => {
+  beforeEach(() => {
+    fetchStoreOperationSnapshotMock.mockReset();
+    subscribeToStoreOperationEventsMock.mockReset();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("starts install lifecycle and invalidates queries on completion", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -104,6 +113,10 @@ describe("useStoreActions", () => {
 
     await waitFor(() => {
       expect(cleanup).toHaveBeenCalledTimes(1);
+    });
+
+    await waitFor(() => {
+      expect(result.current.operationsByApp.plex).toBeUndefined();
     });
 
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.storeCatalog });
@@ -349,8 +362,7 @@ describe("useStoreActions", () => {
 
       await waitFor(
         () => {
-          expect(result.current.operationsByApp["2fauth"]?.status).toBe("success");
-          expect(result.current.operationsByApp["2fauth"]?.progressPercent).toBe(100);
+          expect(result.current.operationsByApp["2fauth"]).toBeUndefined();
         },
         { timeout: 4_000 },
       );
@@ -371,4 +383,45 @@ describe("useStoreActions", () => {
     },
     12_000,
   );
+
+  it("clears optimistic operation state when the backend snapshot never appears", async () => {
+    vi.useFakeTimers();
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ operationId: "op-missing-1" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    fetchStoreOperationSnapshotMock.mockResolvedValue(null);
+    const cleanup = vi.fn();
+    subscribeToStoreOperationEventsMock.mockReturnValue(cleanup);
+
+    const client = createTestQueryClient();
+    const invalidateSpy = vi.spyOn(client, "invalidateQueries");
+    const { result } = renderHook(() => useStoreActions(), {
+      wrapper: createWrapper(client),
+    });
+
+    await act(async () => {
+      await result.current.installApp({
+        appId: "ghost-app",
+      });
+    });
+
+    expect(result.current.operationsByApp["ghost-app"]?.operationId).toBe("op-missing-1");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4_600);
+    });
+
+    expect(result.current.operationsByApp["ghost-app"]).toBeUndefined();
+
+    expect(cleanup).toHaveBeenCalledTimes(1);
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.storeCatalog });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.installedApps });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: queryKeys.storeApp("ghost-app"),
+    });
+  });
 });

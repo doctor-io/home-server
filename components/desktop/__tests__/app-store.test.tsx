@@ -8,6 +8,7 @@ import type { InstalledStackConfig, StoreAppDetail, StoreAppSummary } from "@/li
 const useStoreCatalogMock = vi.fn();
 const useStoreAppMock = vi.fn();
 const useStoreActionsMock = vi.fn();
+const useInstalledAppsMock = vi.fn();
 const useStoreOperationMock = vi.fn();
 const useAppComposeMock = vi.fn();
 
@@ -21,6 +22,10 @@ vi.mock("@/hooks/useStoreApp", () => ({
 
 vi.mock("@/hooks/useStoreActions", () => ({
   useStoreActions: (...args: unknown[]) => useStoreActionsMock(...args),
+}));
+
+vi.mock("@/hooks/useInstalledApps", () => ({
+  useInstalledApps: (...args: unknown[]) => useInstalledAppsMock(...args),
 }));
 
 vi.mock("@/hooks/useStoreOperation", () => ({
@@ -155,6 +160,21 @@ function setup({
     isError: false,
     error: null,
   });
+  useInstalledAppsMock.mockReturnValue({
+    data: apps.filter((app) => app.status !== "not_installed").map((app) => ({
+      id: app.id,
+      name: app.name,
+      stackName: `${app.id}-stack`,
+      composePath: `/tmp/stacks/${app.id}/docker-compose.yml`,
+      webUiPort: app.webUiPort ?? null,
+      containerName: app.id,
+      status: "running",
+      activeOperation: null,
+      updatedAt: "2026-02-23T10:00:00.000Z",
+    })),
+    isLoading: false,
+    isError: false,
+  });
   useAppComposeMock.mockReturnValue({
     data: null,
     isLoading: false,
@@ -178,6 +198,7 @@ describe("AppStore", () => {
     useStoreCatalogMock.mockReset();
     useStoreAppMock.mockReset();
     useStoreActionsMock.mockReset();
+    useInstalledAppsMock.mockReset();
     useStoreOperationMock.mockReset();
     useAppComposeMock.mockReset();
   });
@@ -208,6 +229,77 @@ describe("AppStore", () => {
     fireEvent.click(screen.getAllByRole("button", { name: /^install$/i })[0]);
 
     expect(installApp).toHaveBeenCalledWith({ appId: "plex" });
+  });
+
+  it("uses installed apps query for the installed count badge", () => {
+    useStoreCatalogMock.mockReturnValue({
+      data: {
+        apps: [summaryApp],
+        categories: [{ id: "media", name: "Media", description: "Media apps", appCount: 1 }],
+        featuredAppIds: [],
+        recommendedAppIds: [],
+        sourcePath: "/DATA/AppStore/CasaOS-AppStore",
+      },
+      isLoading: false,
+      isError: false,
+    });
+    useStoreAppMock.mockReturnValue({
+      data: null,
+      isLoading: false,
+    });
+    useStoreActionsMock.mockReturnValue({
+      operationsByApp: {},
+      installApp: vi.fn(),
+      installCustomApp: vi.fn(),
+      updateApp: vi.fn(),
+      redeployApp: vi.fn(),
+      uninstallApp: vi.fn(),
+    });
+    useStoreOperationMock.mockReturnValue({
+      operation: null,
+      latestEvent: null,
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+    useInstalledAppsMock.mockReturnValue({
+      data: [
+        {
+          id: "plex",
+          name: "Plex",
+          stackName: "plex-stack",
+          composePath: "/tmp/stacks/plex/docker-compose.yml",
+          webUiPort: 32400,
+          containerName: "plex",
+          status: "running",
+          activeOperation: null,
+          updatedAt: "2026-02-23T10:00:00.000Z",
+        },
+        {
+          id: "jellyfin",
+          name: "Jellyfin",
+          stackName: "jellyfin-stack",
+          composePath: "/tmp/stacks/jellyfin/docker-compose.yml",
+          webUiPort: 8096,
+          containerName: "jellyfin",
+          status: "running",
+          activeOperation: null,
+          updatedAt: "2026-02-23T10:00:00.000Z",
+        },
+      ],
+      isLoading: false,
+      isError: false,
+    });
+    useAppComposeMock.mockReturnValue({
+      data: null,
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    render(<AppStore onOpenCustomInstall={() => {}} />);
+
+    expect(screen.getByRole("button", { name: "Installed (2)" })).toBeTruthy();
   });
 
   it("triggers redeploy and uninstall from detail actions", async () => {

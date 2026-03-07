@@ -4,6 +4,7 @@ import {
   normalizeComposeStorageBindings,
   sanitizeStackName,
 } from "@/lib/server/modules/docker/compose-runner";
+import { parseComposeFile } from "@/lib/server/modules/docker/compose-parser";
 import { resolveStoreStacksRoot } from "@/lib/server/storage/data-root";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -143,8 +144,9 @@ volumes:
       },
     );
 
-    expect(normalized.composeContent).toContain("type: bind");
+    expect(normalized.composeContent).toContain("- type: bind");
     expect(normalized.composeContent).toContain("source: /DATA/AppData/cloudflared/config");
+    expect(parseComposeFile(normalized.composeContent)).not.toBeNull();
     expect(normalized.composeContent).not.toContain("cloudflared_config:");
     expect(Array.from(normalized.bindMountDirectories)).toContain(
       "/DATA/AppData/cloudflared/config",

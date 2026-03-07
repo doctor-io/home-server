@@ -393,12 +393,14 @@ function rewriteKeyValueLine(
   nextValue: string,
   quote?: "'" | '"' | null,
 ) {
-  const indent = line.match(/^\s*/)?.[0] ?? "";
-  const parsed = parseKeyValueLine(line.trim());
+  const prefixMatch = line.match(/^(\s*-\s+|\s*)/);
+  const prefix = prefixMatch?.[1] ?? "";
+  const lineWithoutPrefix = prefix.trim() === "-" ? line.slice(prefix.length) : line.trimStart();
+  const parsed = parseKeyValueLine(lineWithoutPrefix.trim());
   const trailingComment = parsed?.comment ?? "";
   const quoteChar = quote ?? parsed?.quote ?? null;
   const serializedValue = quoteChar ? `${quoteChar}${nextValue}${quoteChar}` : nextValue;
-  return `${indent}${expectedKey}: ${serializedValue}${trailingComment}`;
+  return `${prefix}${expectedKey}: ${serializedValue}${trailingComment}`;
 }
 
 function findTopLevelSectionEnd(lines: string[], startIndex: number) {

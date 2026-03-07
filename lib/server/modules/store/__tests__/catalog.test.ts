@@ -14,6 +14,7 @@ vi.mock("@/lib/server/storage/data-root", () => ({
 }));
 
 import { readStoreCatalogConfig } from "@/lib/server/modules/store/catalog-config";
+import { ensureDataRootDirectories } from "@/lib/server/storage/data-root";
 
 describe("store catalog", () => {
   let repoRoot = "";
@@ -79,6 +80,7 @@ x-casaos:
     const { getStoreCatalogSnapshot } = await import("@/lib/server/modules/store/catalog");
     const snapshot = await getStoreCatalogSnapshot({ bypassCache: true });
 
+    expect(ensureDataRootDirectories).toHaveBeenCalled();
     expect(snapshot.apps).toHaveLength(1);
     expect(snapshot.apps[0]).toMatchObject({
       appId: "adguardhome",

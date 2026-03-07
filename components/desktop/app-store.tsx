@@ -3,6 +3,7 @@
 import { AppStoreInstallMenu } from "@/components/desktop/app-store-install-menu";
 import { AppConfiguratorPanel } from "@/components/desktop/apps/app-configurator-panel";
 import { UninstallAppDialog } from "@/components/desktop/uninstall-app-dialog";
+import { useInstalledApps } from "@/hooks/useInstalledApps";
 import type { AppOperationState } from "@/hooks/useStoreActions";
 import { useStoreActions } from "@/hooks/useStoreActions";
 import { useStoreApp } from "@/hooks/useStoreApp";
@@ -454,6 +455,7 @@ export function AppStore({
 
   const { operationsByApp, installApp, updateApp, redeployApp, uninstallApp } =
     useStoreActions();
+  const installedAppsQuery = useInstalledApps();
 
   const catalogQuery = useStoreCatalog({
     category: selectedCategory ?? undefined,
@@ -491,7 +493,7 @@ export function AppStore({
         }
       : undefined);
 
-  const installedCount = apps.filter((app) => app.status !== "not_installed").length;
+  const installedCount = installedAppsQuery.data?.length ?? 0;
   const appById = useMemo(() => new Map(apps.map((app) => [app.id, app])), [apps]);
   const featuredApps = useMemo(
     () => (catalog?.featuredAppIds ?? []).map((id) => appById.get(id)).filter(Boolean) as StoreAppSummary[],

@@ -67,6 +67,7 @@ function defaultCatalogPath() {
 }
 
 async function resolveConfiguredCatalogPath() {
+  await ensureDataRootDirectories();
   const config = await readStoreCatalogConfig();
   return config?.defaultCatalogPath ?? defaultCatalogPath();
 }
