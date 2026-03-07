@@ -107,6 +107,13 @@ function mergeEnv(
   return merged;
 }
 
+function withComposeInterpolationEnv(env: Record<string, string>, appId: string) {
+  return {
+    AppID: appId,
+    ...env,
+  };
+}
+
 function parseFirstPublishedPort(ports: string[] | undefined): number | null {
   if (!ports || ports.length === 0) return null;
 
@@ -330,6 +337,7 @@ async function runInstallOrRedeployOperation(
       requestedEnv,
     );
   }
+  effectiveEnv = withComposeInterpolationEnv(effectiveEnv, params.appId);
 
   const composeSourcePort = hasComposeSource
     ? parseFirstPublishedPort(composeSourcePrimary?.service.ports)

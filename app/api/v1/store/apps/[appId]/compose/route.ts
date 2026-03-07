@@ -22,10 +22,44 @@ type RouteContext = {
 };
 
 type ComposeSource = "catalog" | "installed";
+const ENV_INTERPOLATION_PATTERN = /\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)/g;
 
 function isPathWithinRoot(candidatePath: string, rootPath: string) {
   const relative = nodePath.relative(rootPath, candidatePath);
   return relative === "" || (!relative.startsWith("..") && !nodePath.isAbsolute(relative));
+}
+
+function parseEnvFile(content: string) {
+  const env: Record<string, string> = {};
+
+  for (const line of content.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) {
+      continue;
+    }
+
+    const separatorIndex = trimmed.indexOf("=");
+    if (separatorIndex <= 0) {
+      continue;
+    }
+
+    const key = trimmed.slice(0, separatorIndex).trim();
+    const value = trimmed.slice(separatorIndex + 1).trim();
+    if (!key) {
+      continue;
+    }
+
+    env[key] = value.replace(/^['"]|['"]$/g, "");
+  }
+
+  return env;
+}
+
+function interpolateComposeEnv(content: string, env: Record<string, string>) {
+  return content.replace(ENV_INTERPOLATION_PATTERN, (_match, braced, bare) => {
+    const key = typeof braced === "string" && braced.length > 0 ? braced : bare;
+    return key && key in env ? env[key] ?? "" : "";
+  });
 }
 
 export async function GET(request: Request, context: RouteContext) {
@@ -112,6 +146,17 @@ export async function GET(request: Request, context: RouteContext) {
               { status: 404 },
             );
           }
+          const composeEnv = {
+            AppID: installed.appId,
+          } satisfies Record<string, string>;
+          const envPath = nodePath.join(nodePath.dirname(composePath), ".env");
+          try {
+            const envContent = await readFile(envPath, "utf8");
+            Object.assign(composeEnv, parseEnvFile(envContent));
+          } catch {
+            // Keep installed AppID fallback even when no env file is present.
+          }
+          compose = interpolateComposeEnv(compose, composeEnv);
           primaryAppId = installed.appId;
         }
 

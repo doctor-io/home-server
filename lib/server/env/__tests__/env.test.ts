@@ -25,6 +25,7 @@ describe("server env", () => {
     expect(serverEnv.WEBSOCKET_ENABLED).toBe(true);
     expect(serverEnv.AUTH_COOKIE_SECURE).toBe(false);
     expect(serverEnv.STORE_STACKS_ROOT).toBe("DATA/Apps");
+    expect(serverEnv.STORE_APP_DATA_ROOT).toBe("DATA/AppData");
     expect(serverEnv.FILES_ROOT).toBe("DATA");
     expect(serverEnv.FILES_ALLOW_HIDDEN).toBe(false);
     expect(serverEnv.TERMINAL_WS_REQUIRE_AUTH).toBe(true);
@@ -36,11 +37,13 @@ describe("server env", () => {
   it("uses /DATA/Apps as default stacks root in production", async () => {
     process.env.NODE_ENV = "production";
     delete process.env.STORE_STACKS_ROOT;
+    delete process.env.STORE_APP_DATA_ROOT;
     delete process.env.FILES_ROOT;
 
     const { serverEnv } = await import("@/lib/server/env");
 
     expect(serverEnv.STORE_STACKS_ROOT).toBe("/DATA/Apps");
+    expect(serverEnv.STORE_APP_DATA_ROOT).toBe("/DATA/AppData");
     expect(serverEnv.FILES_ROOT).toBe("/DATA");
   });
 

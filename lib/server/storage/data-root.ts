@@ -6,6 +6,7 @@ import path from "node:path";
 
 const DATA_SUBDIRECTORIES = [
   "Apps",
+  "AppData",
   "Documents",
   "Media",
   "Download",
@@ -45,7 +46,7 @@ export function resolveStoreAppDataRoot() {
     return configured;
   }
 
-  return path.join(resolvedDataRoot, "Apps");
+  return path.join(resolvedDataRoot, "AppData");
 }
 
 export function resolveDataRootDirectory() {

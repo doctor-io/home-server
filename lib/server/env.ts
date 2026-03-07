@@ -108,7 +108,7 @@ if (!parsedEnv.success) {
 const defaultStacksRoot =
   parsedEnv.data.NODE_ENV === "production" ? "/DATA/Apps" : "DATA/Apps";
 const defaultAppDataRoot =
-  parsedEnv.data.NODE_ENV === "production" ? "/DATA/Apps" : "DATA/Apps";
+  parsedEnv.data.NODE_ENV === "production" ? "/DATA/AppData" : "DATA/AppData";
 const defaultFilesRoot =
   parsedEnv.data.NODE_ENV === "production" ? "/DATA" : "DATA";
 

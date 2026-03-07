@@ -55,7 +55,7 @@ export function UninstallAppDialog({
           <label htmlFor={switchId} className="flex items-center justify-between gap-3 cursor-pointer">
             <div>
               <p className="text-sm font-medium text-foreground">Delete app data</p>
-              <p className="text-xs text-muted-foreground">Removes data stored under DATA/Apps for this app.</p>
+              <p className="text-xs text-muted-foreground">Removes data stored under DATA/AppData for this app.</p>
             </div>
             <Switch
               id={switchId}

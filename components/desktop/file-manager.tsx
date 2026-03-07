@@ -381,7 +381,7 @@ const sidebarSections: SidebarSection[] = [
       {
         name: "Apps",
         icon: <FileCog className="size-4 text-violet-400" />,
-        path: ["Apps"],
+        path: ["AppData"],
       },
     ],
   },

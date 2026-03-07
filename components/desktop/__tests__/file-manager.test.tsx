@@ -12,7 +12,10 @@ const mockUsePasteFileEntry = vi.fn();
 const mockUseRenameFileEntry = vi.fn();
 const mockUseFileEntryInfo = vi.fn();
 const mockUseToggleFileStar = vi.fn();
+const mockUseStarredFiles = vi.fn();
 const mockUseFilesRoot = vi.fn();
+const mockUseSearchFiles = vi.fn();
+const mockUseUploadFiles = vi.fn();
 const mockUseMoveToTrash = vi.fn();
 const mockUseRestoreFromTrash = vi.fn();
 const mockUseDeleteFromTrash = vi.fn();
@@ -38,6 +41,9 @@ vi.mock("@/hooks/useFiles", () => ({
   useRenameFileEntry: (...args: unknown[]) => mockUseRenameFileEntry(...args),
   useFileEntryInfo: (...args: unknown[]) => mockUseFileEntryInfo(...args),
   useToggleFileStar: (...args: unknown[]) => mockUseToggleFileStar(...args),
+  useStarredFiles: (...args: unknown[]) => mockUseStarredFiles(...args),
+  useSearchFiles: (...args: unknown[]) => mockUseSearchFiles(...args),
+  useUploadFiles: (...args: unknown[]) => mockUseUploadFiles(...args),
 }));
 
 vi.mock("@/hooks/useTrashActions", () => ({
@@ -99,7 +105,10 @@ describe("FileManager sharing and navigation", () => {
     mockUseRenameFileEntry.mockReset();
     mockUseFileEntryInfo.mockReset();
     mockUseToggleFileStar.mockReset();
+    mockUseStarredFiles.mockReset();
     mockUseFilesRoot.mockReset();
+    mockUseSearchFiles.mockReset();
+    mockUseUploadFiles.mockReset();
     mockUseMoveToTrash.mockReset();
     mockUseRestoreFromTrash.mockReset();
     mockUseDeleteFromTrash.mockReset();
@@ -168,6 +177,12 @@ describe("FileManager sharing and navigation", () => {
       mutateAsync: vi.fn(),
       isPending: false,
     });
+    mockUseStarredFiles.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
     mockUseMoveToTrash.mockReturnValue({
       mutateAsync: vi.fn(),
       isPending: false,
@@ -228,6 +243,16 @@ describe("FileManager sharing and navigation", () => {
         id: "local-1",
       }),
     });
+    mockUseUploadFiles.mockReturnValue({
+      mutateAsync: vi.fn(),
+      isPending: false,
+    });
+    mockUseSearchFiles.mockReturnValue({
+      data: { entries: [] },
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
   });
 
   it("navigates to /Shared from sidebar Shared button", async () => {
@@ -264,6 +289,18 @@ describe("FileManager sharing and navigation", () => {
     expect(
       screen.getByRole("button", { name: "nastabib.local" }),
     ).toBeTruthy();
+  });
+
+  it("navigates Apps favorite to /AppData", async () => {
+    render(<FileManager />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Apps" }));
+
+    await waitFor(() => {
+      const calls = mockUseFilesDirectory.mock.calls;
+      expect(calls.length).toBeGreaterThan(0);
+      expect(calls[calls.length - 1]?.[0]).toEqual(["AppData"]);
+    });
   });
 
   it("renders real storage usage text in sidebar", () => {

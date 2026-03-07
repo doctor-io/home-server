@@ -527,8 +527,93 @@ describe("store operations", () => {
       expect.objectContaining({
         appId: "immich",
         env: expect.objectContaining({
+          AppID: "immich",
           DB_HOSTNAME: "immich-postgres",
           CUSTOM_ENV: "yes",
+        }),
+      }),
+    );
+  });
+
+  it("injects AppID into compose interpolation env during install", async () => {
+    const composeSource = `services:\n  home-assistant:\n    image: ghcr.io/home-assistant/home-assistant:latest\n    volumes:\n      - /DATA/AppData/$AppID/config:/config\n`;
+
+    vi.mocked(findStoreCatalogTemplateByAppId).mockResolvedValue({
+      appId: "home-assistant",
+      templateName: "home-assistant",
+      name: "Home Assistant",
+      description: "automation",
+      platform: "Docker",
+      note: "note",
+      categories: ["Automation"],
+      logoUrl: null,
+      port: 8123,
+      repositoryUrl: "https://github.com/home-assistant/core",
+      stackFile: "Apps/home-assistant/docker-compose.yml",
+      composePath: "/tmp/store/home-assistant/docker-compose.yml",
+      env: [],
+      screenshots: [],
+      image: "ghcr.io/home-assistant/home-assistant:latest",
+      volumes: [],
+      scheme: "http",
+      index: "/",
+      mainServiceName: "home-assistant",
+    });
+    vi.mocked(findCustomStoreTemplateByAppId).mockResolvedValue(null);
+    vi.mocked(findInstalledStackByAppId).mockResolvedValue(null);
+    vi.mocked(findStackByWebUiPort).mockResolvedValue(null);
+    vi.mocked(parseComposeFile).mockReturnValue({
+      services: {
+        "home-assistant": {
+          image: "ghcr.io/home-assistant/home-assistant:latest",
+          volumes: ["/DATA/AppData/$AppID/config:/config"],
+        },
+      },
+    });
+    vi.mocked(extractPrimaryServiceWithName).mockReturnValue({
+      name: "home-assistant",
+      service: {
+        image: "ghcr.io/home-assistant/home-assistant:latest",
+        volumes: ["/DATA/AppData/$AppID/config:/config"],
+      },
+    });
+    vi.mocked(materializeInlineStackFiles).mockResolvedValue({
+      stackDir: "/tmp/store/stacks/home-assistant",
+      composePath: "/tmp/store/stacks/home-assistant/docker-compose.yml",
+      envPath: "/tmp/store/stacks/home-assistant/.env",
+      stackName: "home-assistant",
+      webUiPort: 8123,
+    });
+    vi.mocked(extractComposeImages).mockResolvedValue([]);
+    vi.mocked(createStoreOperation).mockResolvedValue(undefined);
+    vi.mocked(updateStoreOperation).mockResolvedValue(undefined);
+    vi.mocked(updateStackUpdateStatus).mockResolvedValue(undefined);
+    vi.mocked(runComposeUp).mockResolvedValue(undefined);
+    vi.mocked(upsertInstalledStack).mockResolvedValue(undefined);
+
+    let finished = false;
+    const done = new Promise<void>((resolve) => {
+      vi.mocked(updateStoreOperation).mockImplementation(async (_id, patch) => {
+        if (!finished && patch.status === "success") {
+          finished = true;
+          resolve();
+        }
+      });
+    });
+
+    await startStoreOperation({
+      appId: "home-assistant",
+      action: "install",
+      composeSource,
+    });
+
+    await done;
+
+    expect(materializeInlineStackFiles).toHaveBeenCalledWith(
+      expect.objectContaining({
+        appId: "home-assistant",
+        env: expect.objectContaining({
+          AppID: "home-assistant",
         }),
       }),
     );

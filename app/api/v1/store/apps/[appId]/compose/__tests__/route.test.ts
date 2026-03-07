@@ -111,7 +111,7 @@ describe("GET /api/v1/store/apps/:appId/compose", () => {
   });
 
   it("returns installed compose from disk", async () => {
-    const rawCompose = `services:\n  home-assistant:\n    image: ghcr.io/home-assistant/home-assistant:latest\n`;
+    const rawCompose = `services:\n  home-assistant:\n    image: ghcr.io/home-assistant/home-assistant:latest\n    volumes:\n      - /DATA/AppData/$AppID/config:/config\n`;
 
     vi.mocked(findInstalledStackByAppId).mockResolvedValue({
       appId: "home-assistant",
@@ -131,11 +131,14 @@ describe("GET /api/v1/store/apps/:appId/compose", () => {
       remoteDigest: null,
     });
     vi.mocked(resolveStoreStacksRoot).mockReturnValue("/DATA/Apps");
-    vi.mocked(readFile).mockResolvedValue(rawCompose);
+    vi.mocked(readFile)
+      .mockResolvedValueOnce(rawCompose)
+      .mockResolvedValueOnce("AppID=home-assistant\n");
     vi.mocked(parseComposeFile).mockReturnValue({
       services: {
         "home-assistant": {
           image: "ghcr.io/home-assistant/home-assistant:latest",
+          volumes: ["/DATA/AppData/home-assistant/config:/config"],
         },
       },
     });
@@ -158,7 +161,7 @@ describe("GET /api/v1/store/apps/:appId/compose", () => {
     };
 
     expect(response.status).toBe(200);
-    expect(json.data.compose).toBe(rawCompose);
+    expect(json.data.compose).toContain("/DATA/AppData/home-assistant/config:/config");
     expect(json.data.primaryServiceName).toBe("home-assistant");
   });
 
