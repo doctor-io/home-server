@@ -2,31 +2,37 @@ import { NextRequest } from "next/server";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/server/modules/store/service", () => ({
-  listStoreApps: vi.fn(),
+  getStoreCatalogView: vi.fn(),
 }));
 
 import { GET } from "@/app/api/v1/store/apps/route";
-import { listStoreApps } from "@/lib/server/modules/store/service";
+import { getStoreCatalogView } from "@/lib/server/modules/store/service";
 
 describe("GET /api/v1/store/apps", () => {
   it("returns filtered store apps", async () => {
-    vi.mocked(listStoreApps).mockResolvedValueOnce([
-      {
-        id: "adguard-home",
-        name: "AdGuard Home",
-        description: "dns",
-        platform: "Docker",
-        categories: ["Network"],
-        logoUrl: null,
-        repositoryUrl: "https://github.com/bigbeartechworld/big-bear-portainer",
-        stackFile: "Apps/adguard-home/docker-compose.yml",
-        status: "installed",
-        webUiPort: 3001,
-        updateAvailable: false,
-        localDigest: null,
-        remoteDigest: null,
-      },
-    ]);
+    vi.mocked(getStoreCatalogView).mockResolvedValueOnce({
+      apps: [
+        {
+          id: "adguard-home",
+          name: "AdGuard Home",
+          description: "dns",
+          platform: "Docker",
+          categories: ["Network"],
+          logoUrl: null,
+          repositoryUrl: "https://github.com/bigbeartechworld/big-bear-portainer",
+          stackFile: "Apps/adguard-home/docker-compose.yml",
+          status: "installed",
+          webUiPort: 3001,
+          updateAvailable: false,
+          localDigest: null,
+          remoteDigest: null,
+        },
+      ],
+      categories: [],
+      featuredAppIds: [],
+      recommendedAppIds: [],
+      sourcePath: "/tmp/catalog",
+    });
 
     const request = new NextRequest(
       "http://localhost/api/v1/store/apps?category=Network&installedOnly=true",
@@ -39,7 +45,7 @@ describe("GET /api/v1/store/apps", () => {
 
     expect(response.status).toBe(200);
     expect(json.meta.count).toBe(1);
-    expect(vi.mocked(listStoreApps)).toHaveBeenCalledWith({
+    expect(vi.mocked(getStoreCatalogView)).toHaveBeenCalledWith({
       category: "Network",
       search: undefined,
       installedOnly: true,
@@ -48,7 +54,7 @@ describe("GET /api/v1/store/apps", () => {
   });
 
   it("returns 500 when service fails", async () => {
-    vi.mocked(listStoreApps).mockRejectedValueOnce(new Error("boom"));
+    vi.mocked(getStoreCatalogView).mockRejectedValueOnce(new Error("boom"));
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     const response = await GET(new NextRequest("http://localhost/api/v1/store/apps"));

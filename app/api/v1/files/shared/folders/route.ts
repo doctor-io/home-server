@@ -24,6 +24,7 @@ export async function GET() {
   try {
     return await withServerTiming(
       {
+        level: "debug",
         layer: "api",
         action: "files.shared.folders.get",
         requestId,

@@ -211,6 +211,7 @@ function validateDisconnectInput(input: unknown) {
 export async function getNetworkStatus(context?: RequestContext): Promise<NetworkStatusResult> {
   return withServerTiming(
     {
+      level: "debug",
       layer: "service",
       action: "network.status.get",
       requestId: context?.requestId,

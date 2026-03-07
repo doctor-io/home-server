@@ -86,6 +86,10 @@ export function useStoreCatalog(options?: UseStoreCatalogOptions) {
   return useQuery({
     queryKey: [...queryKeys.storeCatalog, options ?? {}] as const,
     queryFn: () => fetchStoreCatalog(options),
-    staleTime: 10_000,
+    staleTime: 60_000,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false,
+    placeholderData: (previousData) => previousData,
   });
 }

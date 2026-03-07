@@ -457,6 +457,7 @@ export function isCustomStoreTemplate(template: StoreTemplateSource): template i
 export async function listCustomStoreTemplates() {
   return withServerTiming(
     {
+      level: "debug",
       layer: "service",
       action: "store.customApps.list",
     },
@@ -476,6 +477,7 @@ export async function listCustomStoreTemplates() {
 export async function findCustomStoreTemplateByAppId(appId: string) {
   return withServerTiming(
     {
+      level: "debug",
       layer: "service",
       action: "store.customApps.findById",
       meta: { appId },

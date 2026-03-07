@@ -21,6 +21,7 @@ export async function GET(_request: Request, context: Context) {
   try {
     return await withServerTiming(
       {
+        level: "debug",
         layer: "api",
         action: "store.operations.get",
         requestId,

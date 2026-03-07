@@ -34,6 +34,8 @@ export async function PATCH(request: Request, context: Context) {
   const { appId } = await context.params;
 
   try {
+    const parsed = settingsSchema.safeParse(await request.json());
+
     return await withServerTiming(
       {
         layer: "api",
@@ -41,11 +43,16 @@ export async function PATCH(request: Request, context: Context) {
         requestId,
         meta: {
           appId,
+          hasDisplayName: parsed.success ? parsed.data.displayName !== undefined : false,
+          hasIconUrl: parsed.success ? parsed.data.iconUrl !== undefined : false,
+          hasEnv: parsed.success ? parsed.data.env !== undefined : false,
+          envKeyCount: parsed.success ? Object.keys(parsed.data.env ?? {}).length : 0,
+          hasWebUiPort: parsed.success ? parsed.data.webUiPort !== undefined : false,
+          hasComposeSource: parsed.success ? parsed.data.composeSource !== undefined : false,
+          invalidPayload: !parsed.success,
         },
       },
       async () => {
-        const parsed = settingsSchema.safeParse(await request.json());
-
         if (!parsed.success) {
           return NextResponse.json(
             {
@@ -79,6 +86,9 @@ export async function PATCH(request: Request, context: Context) {
       requestId,
       message: "Failed to save app settings",
       error,
+      meta: {
+        appId,
+      },
     });
 
     return NextResponse.json(

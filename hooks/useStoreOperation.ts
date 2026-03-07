@@ -129,11 +129,12 @@ export function useStoreOperation(operationId: string | null) {
     queryKey: operationId ? queryKeys.storeOperation(operationId) : ["store", "operation", "none"],
     queryFn: () => fetchStoreOperationSnapshot(operationId as string),
     enabled: Boolean(operationId),
-    staleTime: 1_000,
+    staleTime: 5_000,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
-      return status && isTerminalStatus(status) ? false : 1_500;
+      return status && isTerminalStatus(status) ? false : 4_000;
     },
+    refetchOnWindowFocus: false,
   });
 
   useEffect(() => {

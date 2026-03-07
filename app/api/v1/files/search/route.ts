@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
   try {
     return await withServerTiming(
       {
+        level: "debug",
         layer: "api",
         action: "files.search.get",
         requestId,

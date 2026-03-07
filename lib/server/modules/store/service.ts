@@ -28,6 +28,17 @@ function includesSearch(text: string, search: string) {
   return text.toLowerCase().includes(search.toLowerCase());
 }
 
+const STORE_LIST_DESCRIPTION_LIMIT = 220;
+
+function toSummaryDescription(value: string) {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (normalized.length <= STORE_LIST_DESCRIPTION_LIMIT) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, STORE_LIST_DESCRIPTION_LIMIT - 1).trimEnd()}…`;
+}
+
 function toSummary(
   template:
     | Awaited<ReturnType<typeof getStoreCatalogSnapshot>>["apps"][number]
@@ -42,7 +53,7 @@ function toSummary(
   return {
     id: template.appId,
     name: installed?.displayName ?? template.name,
-    description: template.description,
+    description: toSummaryDescription(template.description),
     platform: template.platform,
     categories: template.categories,
     logoUrl: installed?.iconUrl ?? template.logoUrl,
@@ -86,6 +97,7 @@ export async function getStoreCatalogView(options?: {
 }) {
   return withServerTiming(
     {
+      level: "debug",
       layer: "service",
       action: "store.apps.catalog-view",
       meta: {
@@ -109,7 +121,25 @@ export async function getStoreCatalogView(options?: {
       );
       const updateStateByAppId = new Map(updateStateEntries);
 
-      let apps = allTemplates
+      let templates = allTemplates;
+
+      if (options?.category) {
+        templates = templates.filter((template) =>
+          template.categories.some(
+            (category) => category.toLowerCase() === options.category?.toLowerCase(),
+          ),
+        );
+      }
+
+      if (options?.search) {
+        templates = templates.filter(
+          (template) =>
+            includesSearch(template.name, options.search as string) ||
+            includesSearch(template.description, options.search as string),
+        );
+      }
+
+      let apps = templates
         .map((template) =>
           toSummary(
             template,
@@ -118,20 +148,6 @@ export async function getStoreCatalogView(options?: {
           ),
         )
         .sort((left, right) => left.name.localeCompare(right.name));
-
-      if (options?.category) {
-        apps = apps.filter((app) =>
-          app.categories.some((category) => category.toLowerCase() === options.category?.toLowerCase()),
-        );
-      }
-
-      if (options?.search) {
-        apps = apps.filter(
-          (app) =>
-            includesSearch(app.name, options.search as string) ||
-            includesSearch(app.description, options.search as string),
-        );
-      }
 
       if (options?.installedOnly) {
         apps = apps.filter((app) => app.status !== "not_installed");
@@ -177,6 +193,7 @@ export async function listStoreApps(options?: {
 export async function getStoreAppDetail(appId: string): Promise<StoreAppDetail | null> {
   return withServerTiming(
     {
+      level: "debug",
       layer: "service",
       action: "store.apps.detail",
       meta: {
@@ -196,9 +213,11 @@ export async function getStoreAppDetail(appId: string): Promise<StoreAppDetail |
       }
 
       const updateState = await resolveUpdateState(installedConfig);
+      const summary = toSummary(sourceTemplate, installedConfig ?? undefined, updateState);
 
       return {
-        ...toSummary(sourceTemplate, installedConfig ?? undefined, updateState),
+        ...summary,
+        description: sourceTemplate.description,
         note: sourceTemplate.note,
         env: sourceTemplate.env,
         screenshots: sourceTemplate.screenshots,
@@ -255,9 +274,16 @@ export async function saveAppSettings(input: {
       action: "store.apps.settings.save",
       meta: {
         appId: input.appId,
-        hasEnv: Boolean(input.env),
+        hasDisplayName: input.displayName !== undefined,
+        hasIconUrl: input.iconUrl !== undefined,
+        hasEnv: input.env !== undefined,
+        envKeyCount: Object.keys(input.env ?? {}).length,
         hasPort: Boolean(input.webUiPort !== undefined),
+        hasComposeSource: input.composeSource !== undefined,
       },
+      onSuccessMeta: (result) => ({
+        triggeredRedeploy: Boolean((result as { operationId?: string }).operationId),
+      }),
     },
     async () => {
       const { appId, displayName, iconUrl, env, webUiPort, composeSource } = input;

@@ -9,7 +9,7 @@ type InstalledAppsResponse = {
   data: InstalledApp[];
 };
 
-const STATUS_VERIFY_POLL_INTERVAL_MS = 2_000;
+const STATUS_VERIFY_POLL_INTERVAL_MS = 5_000;
 const STATUS_VERIFY_WINDOW_MS = 30_000;
 
 async function fetchInstalledApps() {
@@ -40,7 +40,10 @@ export function useInstalledApps() {
   return useQuery({
     queryKey: queryKeys.installedApps,
     queryFn: fetchInstalledApps,
-    staleTime: 10_000,
+    staleTime: 30_000,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false,
     refetchInterval: (query) => {
       const apps = query.state.data;
       if (!apps || apps.length === 0) {

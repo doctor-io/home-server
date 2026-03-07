@@ -6,6 +6,8 @@ import { appOperations, appStacks } from "@/lib/server/db/schema";
 import type {
   InstalledApp,
   InstalledAppActiveOperation,
+  StoreOperationAction,
+  StoreOperationStatus,
 } from "@/lib/shared/contracts/apps";
 
 export async function listInstalledAppsFromDb(): Promise<InstalledApp[]> {
@@ -85,8 +87,8 @@ export async function findActiveStoreOperationsByAppIds(
 
     activeByAppId[row.appId] = {
       id: row.id,
-      action: row.action,
-      status: row.status,
+      action: row.action as StoreOperationAction,
+      status: row.status as StoreOperationStatus,
       progressPercent: row.progressPercent,
       currentStep: row.currentStep,
       updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,

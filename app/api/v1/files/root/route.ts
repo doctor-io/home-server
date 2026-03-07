@@ -14,6 +14,7 @@ export async function GET() {
   try {
     return await withServerTiming(
       {
+        level: "debug",
         layer: "api",
         action: "files.root.get",
         requestId,
@@ -54,4 +55,3 @@ export async function GET() {
     );
   }
 }
-

@@ -63,6 +63,9 @@ export function useStoreApp(appId: string | null) {
     queryKey: appId ? queryKeys.storeApp(appId) : ["store", "app", "none"],
     queryFn: () => fetchStoreApp(appId as string),
     enabled: Boolean(appId),
-    staleTime: 10_000,
+    staleTime: 60_000,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false,
   });
 }

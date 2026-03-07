@@ -4,6 +4,7 @@ import { AppStoreInstallMenu } from "@/components/desktop/app-store-install-menu
 import { AppConfiguratorPanel } from "@/components/desktop/apps/app-configurator-panel";
 import { UninstallAppDialog } from "@/components/desktop/uninstall-app-dialog";
 import { useInstalledApps } from "@/hooks/useInstalledApps";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import type { AppOperationState } from "@/hooks/useStoreActions";
 import { useStoreActions } from "@/hooks/useStoreActions";
 import { useStoreApp } from "@/hooks/useStoreApp";
@@ -28,7 +29,10 @@ import {
   Trash2,
   Wrench,
 } from "lucide-react";
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+
+const STORE_PAGE_SIZE = 24;
+const STORE_SECTION_CARD_LIMIT = 6;
 
 function isOperationBusy(operation: AppOperationState | undefined) {
   return Boolean(
@@ -408,12 +412,16 @@ function SectionCard({
         <h2 className="text-sm font-semibold text-foreground">{title}</h2>
       </div>
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
-        {apps.map((app) => (
+        {apps.slice(0, STORE_SECTION_CARD_LIMIT).map((app) => (
           <button
             key={`${title}-${app.id}`}
             type="button"
             onClick={() => onSelect(app.id)}
             className="rounded-2xl border border-glass-border bg-glass/40 p-4 text-left hover:bg-secondary/40 transition-colors"
+            style={{
+              contentVisibility: "auto",
+              containIntrinsicSize: "96px",
+            }}
           >
             <div className="flex items-start gap-3">
               <div className="size-12 rounded-2xl bg-card/60 border border-glass-border flex items-center justify-center overflow-hidden shrink-0">
@@ -442,6 +450,7 @@ export function AppStore({
   onOpenCustomInstall: () => void;
 }) {
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search.trim(), 250);
   const [filter, setFilter] = useState<"all" | "installed">("all");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
@@ -452,6 +461,8 @@ export function AppStore({
     useState<StoreAppSummary | null>(null);
   const [uninstallError, setUninstallError] = useState<string | null>(null);
   const [uninstallPending, setUninstallPending] = useState(false);
+  const [visibleCatalogCount, setVisibleCatalogCount] = useState(STORE_PAGE_SIZE);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   const { operationsByApp, installApp, updateApp, redeployApp, uninstallApp } =
     useStoreActions();
@@ -459,13 +470,18 @@ export function AppStore({
 
   const catalogQuery = useStoreCatalog({
     category: selectedCategory ?? undefined,
-    search: search.trim() || undefined,
+    search: debouncedSearch || undefined,
     installedOnly: filter === "installed",
   });
 
   const catalog = catalogQuery.data;
   const apps = useMemo(() => catalog?.apps ?? [], [catalog]);
   const categories = catalog?.categories ?? [];
+  const visibleApps = useMemo(
+    () => apps.slice(0, visibleCatalogCount),
+    [apps, visibleCatalogCount],
+  );
+  const hasMoreApps = visibleApps.length < apps.length;
 
   const selectedSummary = useMemo(
     () => apps.find((app) => app.id === selectedAppId) ?? null,
@@ -504,6 +520,33 @@ export function AppStore({
     [appById, catalog?.recommendedAppIds],
   );
   const shouldShowSections = filter === "all" && !search.trim() && !selectedCategory;
+
+  useEffect(() => {
+    setVisibleCatalogCount(STORE_PAGE_SIZE);
+  }, [debouncedSearch, filter, selectedCategory]);
+
+  useEffect(() => {
+    const node = loadMoreRef.current;
+    if (!node || !hasMoreApps || typeof IntersectionObserver === "undefined") {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) {
+          return;
+        }
+
+        setVisibleCatalogCount((current) => Math.min(current + STORE_PAGE_SIZE, apps.length));
+      },
+      {
+        rootMargin: "240px 0px",
+      },
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [apps.length, hasMoreApps]);
 
   async function startInstall(app: StoreAppSummary) {
     setActionError(null);
@@ -763,7 +806,7 @@ export function AppStore({
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
-                  {apps.map((app) => {
+                  {visibleApps.map((app) => {
                     const operation = operationsByApp[app.id];
                     const busy = isOperationBusy(operation);
 
@@ -780,6 +823,10 @@ export function AppStore({
                           }
                         }}
                         className="flex items-center gap-3 p-3 rounded-xl hover:bg-secondary/40 border border-transparent hover:border-glass-border transition-all cursor-pointer text-left"
+                        style={{
+                          contentVisibility: "auto",
+                          containIntrinsicSize: "88px",
+                        }}
                       >
                         <div className="size-12 rounded-2xl bg-glass border border-glass-border flex items-center justify-center overflow-hidden shrink-0">
                           <StoreLogo
@@ -873,6 +920,22 @@ export function AppStore({
                     );
                   })}
                 </div>
+                {hasMoreApps ? (
+                  <div className="flex flex-col items-center gap-3 py-2">
+                    <div ref={loadMoreRef} className="h-1 w-full" aria-hidden="true" />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setVisibleCatalogCount((current) =>
+                          Math.min(current + STORE_PAGE_SIZE, apps.length),
+                        )
+                      }
+                      className="rounded-lg border border-glass-border bg-glass px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-secondary/40 hover:text-foreground"
+                    >
+                      Load more apps
+                    </button>
+                  </div>
+                ) : null}
               </section>
             </div>
           )}

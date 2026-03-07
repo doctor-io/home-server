@@ -74,4 +74,29 @@ describe("server logger", () => {
 
     expect(errorSpy).toHaveBeenCalled();
   });
+
+  it("suppresses debug logs when the server log level is info", async () => {
+    vi.doMock("@/lib/server/env", () => ({
+      serverEnv: {
+        LOG_LEVEL: "info",
+        LOG_FILE_PATH: "logs/test.log",
+        LOG_TO_FILE: false,
+      },
+    }));
+
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const { withServerTiming } = await import("@/lib/server/logging/logger");
+
+    await withServerTiming(
+      {
+        level: "debug",
+        layer: "api",
+        action: "network.status.get",
+      },
+      async () => "ok",
+    );
+
+    expect(logSpy).not.toHaveBeenCalled();
+  });
 });

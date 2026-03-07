@@ -269,6 +269,7 @@ export async function bootstrapDefaultCasaosCatalog(options?: { forceRefresh?: b
 export async function getStoreCatalogSnapshot(options?: { bypassCache?: boolean }) {
   return withServerTiming(
     {
+      level: "debug",
       layer: "service",
       action: "store.catalog.snapshot",
       meta: { bypassCache: Boolean(options?.bypassCache) },

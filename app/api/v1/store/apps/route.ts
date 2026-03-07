@@ -14,6 +14,7 @@ export async function GET(request: NextRequest) {
   try {
     return await withServerTiming(
       {
+        level: "debug",
         layer: "api",
         action: "store.apps.list.get",
         requestId,

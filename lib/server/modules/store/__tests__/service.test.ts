@@ -119,6 +119,17 @@ describe("store service", () => {
 
   it("merges catalog with installed stack state and exposes catalog meta", async () => {
     vi.mocked(listInstalledStacksFromDb).mockResolvedValueOnce([createInstalledStack()]);
+    vi.mocked(getStoreCatalogSnapshot).mockResolvedValueOnce({
+      apps: [
+        createCatalogApp({
+          description: "A".repeat(400),
+        }),
+      ],
+      categories: [{ id: "network", name: "Network", description: "Network apps", appCount: 1 }],
+      featuredAppIds: ["adguard-home"],
+      recommendedAppIds: ["adguard-home"],
+      sourcePath: "/DATA/AppStore/CasaOS-AppStore",
+    });
 
     const result = await getStoreCatalogView({ installedOnly: true });
 
@@ -128,6 +139,7 @@ describe("store service", () => {
         status: "installed",
         webUiPort: 3001,
         updateAvailable: false,
+        description: `${"A".repeat(219)}…`,
       }),
     ]);
     expect(result.categories[0]?.name).toBe("Network");
@@ -140,6 +152,7 @@ describe("store service", () => {
 
     const detail = await getStoreAppDetail("homepage");
     expect(detail?.id).toBe("homepage");
+    expect(detail?.description).toBe("DNS");
     expect(detail?.screenshots).toEqual([]);
 
     vi.mocked(findStoreCatalogTemplateByAppId).mockResolvedValueOnce(null);

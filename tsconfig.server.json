@@ -1,0 +1,30 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "./dist-server",
+    "rootDir": ".",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "ES2022",
+    "incremental": false,
+    "isolatedModules": false,
+    "jsx": "preserve",
+    "allowJs": true
+  },
+  "include": [
+    "server.ts",
+    "lib/server/**/*.ts",
+    "lib/shared/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "**/__tests__/**",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "app/**",
+    "components/**",
+    "hooks/**",
+    ".next/**"
+  ]
+}

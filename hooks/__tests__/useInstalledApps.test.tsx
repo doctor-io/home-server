@@ -37,7 +37,7 @@ describe("useInstalledApps", () => {
     expect(fetch).toHaveBeenCalledWith("/api/v1/apps", { cache: "no-store" });
   });
 
-  it("polls every 2s when app status is not running and update is recent", async () => {
+  it("polls every 5s when app status is not running and update is recent", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -65,13 +65,13 @@ describe("useInstalledApps", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 2_200));
+      await new Promise((resolve) => setTimeout(resolve, 5_200));
     });
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledTimes(2);
-    }, { timeout: 4_000 });
-  });
+    }, { timeout: 7_000 });
+  }, 12_000);
 
   it("does not poll when app is already running", async () => {
     const fetchMock = vi.fn().mockResolvedValue({

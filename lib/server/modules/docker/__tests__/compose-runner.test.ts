@@ -5,7 +5,10 @@ import {
   sanitizeStackName,
 } from "@/lib/server/modules/docker/compose-runner";
 import { parseComposeFile } from "@/lib/server/modules/docker/compose-parser";
-import { resolveStoreStacksRoot } from "@/lib/server/storage/data-root";
+import {
+  resolveStoreAppDataRoot,
+  resolveStoreStacksRoot,
+} from "@/lib/server/storage/data-root";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -185,14 +188,16 @@ services:
     );
   });
 
-  it("removes the installed stack directory during uninstall cleanup", async () => {
+  it("removes the installed stack directory during uninstall cleanup without deleting app data by default", async () => {
     const stacksRoot = resolveStoreStacksRoot();
+    const appDataRoot = resolveStoreAppDataRoot();
     const appId = `cleanup-test-${Date.now()}`;
     const stackDir = path.join(stacksRoot, appId);
     const composePath = path.join(stackDir, "docker-compose.yml");
-    const bindDir = path.join(stackDir, "data");
+    const bindDir = path.join(appDataRoot, appId, "data");
 
     await mkdir(bindDir, { recursive: true });
+    await mkdir(stackDir, { recursive: true });
     await writeFile(
       composePath,
       `services:
@@ -204,7 +209,10 @@ services:
       "utf8",
     );
 
-    await cleanupComposeDataOnUninstall({ composePath });
+    await cleanupComposeDataOnUninstall({
+      composePath,
+      removeVolumes: false,
+    });
 
     await expect(
       rm(stackDir, {
@@ -212,16 +220,25 @@ services:
         force: false,
       }),
     ).rejects.toThrow();
+
+    await expect(
+      rm(bindDir, {
+        recursive: true,
+        force: false,
+      }),
+    ).resolves.toBeUndefined();
   });
 
-  it("removes long-form bind mount directories during uninstall cleanup", async () => {
+  it("removes long-form app-data bind mount directories during uninstall cleanup when requested", async () => {
     const stacksRoot = resolveStoreStacksRoot();
+    const appDataRoot = resolveStoreAppDataRoot();
     const appId = `cleanup-long-form-${Date.now()}`;
     const stackDir = path.join(stacksRoot, appId);
     const composePath = path.join(stackDir, "docker-compose.yml");
-    const bindDir = path.join(stackDir, "config");
+    const bindDir = path.join(appDataRoot, appId, "config");
 
     await mkdir(bindDir, { recursive: true });
+    await mkdir(stackDir, { recursive: true });
     await writeFile(
       composePath,
       `services:
@@ -235,10 +252,20 @@ services:
       "utf8",
     );
 
-    await cleanupComposeDataOnUninstall({ composePath });
+    await cleanupComposeDataOnUninstall({
+      composePath,
+      removeVolumes: true,
+    });
 
     await expect(
       rm(stackDir, {
+        recursive: true,
+        force: false,
+      }),
+    ).rejects.toThrow();
+
+    await expect(
+      rm(bindDir, {
         recursive: true,
         force: false,
       }),

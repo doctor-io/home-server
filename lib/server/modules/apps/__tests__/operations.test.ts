@@ -343,12 +343,63 @@ describe("store operations", () => {
     });
     expect(cleanupComposeDataOnUninstall).toHaveBeenCalledWith({
       composePath: "/tmp/store/stacks/2fauth/docker-compose.yml",
+      removeVolumes: true,
     });
     expect(deleteInstalledStackByAppId).toHaveBeenCalledWith("2fauth");
     expect(invalidateInstalledAppsCache).toHaveBeenCalledTimes(1);
 
     const latest = await waitForLatestEventType(operationId, "operation.completed");
     expect(latest?.status).toBe("success");
+  });
+
+  it("always cleans up installed stack files during uninstall even when data deletion is disabled", async () => {
+    vi.mocked(findInstalledStackByAppId).mockResolvedValue({
+      appId: "pingvin-share",
+      templateName: "pingvin-share",
+      stackName: "pingvin-share",
+      composePath: "/var/lib/home-server/Apps/pingvin-share/docker-compose.yml",
+      status: "installed",
+      webUiPort: 3410,
+      env: {},
+      installedAt: "2026-03-07T00:00:00.000Z",
+      updatedAt: "2026-03-07T00:00:00.000Z",
+    });
+
+    vi.mocked(createStoreOperation).mockResolvedValue(undefined);
+    vi.mocked(updateStoreOperation).mockResolvedValue(undefined);
+    vi.mocked(runComposeDown).mockResolvedValue(undefined);
+    vi.mocked(cleanupComposeDataOnUninstall).mockResolvedValue(undefined);
+    vi.mocked(deleteInstalledStackByAppId).mockResolvedValue(undefined);
+
+    let finished = false;
+    const done = new Promise<void>((resolve) => {
+      vi.mocked(updateStoreOperation).mockImplementation(async (_id, patch) => {
+        if (!finished && patch.status === "success") {
+          finished = true;
+          resolve();
+        }
+      });
+    });
+
+    await startStoreOperation({
+      appId: "pingvin-share",
+      action: "uninstall",
+      removeVolumes: false,
+    });
+
+    await done;
+
+    expect(runComposeDown).toHaveBeenCalledWith({
+      composePath: "/var/lib/home-server/Apps/pingvin-share/docker-compose.yml",
+      envPath: "/var/lib/home-server/Apps/pingvin-share/.env",
+      stackName: "pingvin-share",
+      removeVolumes: false,
+    });
+    expect(cleanupComposeDataOnUninstall).toHaveBeenCalledWith({
+      composePath: "/var/lib/home-server/Apps/pingvin-share/docker-compose.yml",
+      removeVolumes: false,
+    });
+    expect(deleteInstalledStackByAppId).toHaveBeenCalledWith("pingvin-share");
   });
 
   it("uses legacy storage mapping on redeploy for existing apps", async () => {

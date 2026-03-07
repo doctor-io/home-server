@@ -1,6 +1,7 @@
-import { createServer } from "node:http";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import next from "next";
 import { parse } from "node:url";
+import compression from "compression";
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname =
@@ -9,6 +10,43 @@ const port = parseInt(process.env.HOMEIO_HTTP_PORT || process.env.PORT || "3000"
 
 const app = next({ dev, hostname, port, turbopack: false });
 const handle = app.getRequestHandler();
+
+const compressionMiddleware = compression({
+  threshold: 1024,
+  filter: (req, res) => {
+    const requestPath = req.url ?? "";
+    if (requestPath.includes("/stream")) {
+      return false;
+    }
+
+    const contentType = res.getHeader("Content-Type");
+    if (typeof contentType === "string" && contentType.includes("text/event-stream")) {
+      return false;
+    }
+
+    return compression.filter(req as never, res as never);
+  },
+}) as (
+  req: IncomingMessage,
+  res: ServerResponse<IncomingMessage>,
+  next: (error?: unknown) => void,
+) => void;
+
+async function applyCompression(
+  req: IncomingMessage,
+  res: ServerResponse<IncomingMessage>,
+) {
+  await new Promise<void>((resolve, reject) => {
+    compressionMiddleware(req, res, (error?: unknown) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      resolve();
+    });
+  });
+}
 
 async function main() {
   await app.prepare();
@@ -22,6 +60,7 @@ async function main() {
   const shutdownHooks: Array<() => Promise<unknown> | unknown> = [];
   const server = createServer(async (req, res) => {
     try {
+      await applyCompression(req, res);
       const parsedUrl = parse(req.url || "", true);
       await handle(req, res, parsedUrl);
     } catch (error) {

@@ -4,7 +4,7 @@ import { execFile } from "node:child_process";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
-import { withServerTiming } from "@/lib/server/logging/logger";
+import { logServerAction, withServerTiming } from "@/lib/server/logging/logger";
 import {
   ensureDataRootDirectories,
   resolveStoreAppDataRoot,
@@ -501,7 +501,18 @@ function removeTopLevelVolumeDefinitions(lines: string[], namesToRemove: Set<str
   }
 }
 
-function collectComposeStorageReferences(composeContent: string, stacksRoot: string): ComposeStorageReferences {
+function shouldCollectBindMountSource(source: string, cleanupRoots: string[]) {
+  if (!path.isAbsolute(source)) {
+    return false;
+  }
+
+  return cleanupRoots.some((root) => isPathWithinRoot(source, root));
+}
+
+function collectComposeStorageReferences(
+  composeContent: string,
+  cleanupRoots: string[],
+): ComposeStorageReferences {
   const lines = composeContent.split(/\r?\n/);
   const pathStack: Array<{ indent: number; key: string }> = [];
   const bindMountDirectories = new Set<string>();
@@ -545,7 +556,7 @@ function collectComposeStorageReferences(composeContent: string, stacksRoot: str
 
     const volumeSpec = parseComposeVolumeSpec(listItem.spec);
     if (volumeSpec) {
-      if (path.isAbsolute(volumeSpec.source) && isPathWithinRoot(volumeSpec.source, stacksRoot)) {
+      if (shouldCollectBindMountSource(volumeSpec.source, cleanupRoots)) {
         bindMountDirectories.add(volumeSpec.source);
         continue;
       }
@@ -563,7 +574,7 @@ function collectComposeStorageReferences(composeContent: string, stacksRoot: str
       continue;
     }
 
-    if (path.isAbsolute(source) && isPathWithinRoot(source, stacksRoot)) {
+    if (shouldCollectBindMountSource(source, cleanupRoots)) {
       bindMountDirectories.add(source);
       index = longForm.end - 1;
       continue;
@@ -1001,58 +1012,110 @@ export async function getComposeRuntimeInfo(input: {
 
 export async function cleanupComposeDataOnUninstall(input: {
   composePath: string;
+  removeVolumes?: boolean;
 }) {
+  const cleanupSummary: {
+    bindMountDirectories: string[];
+    namedVolumeSources: string[];
+    removedStackDir: string | null;
+    composeMissing: boolean;
+  } = {
+    bindMountDirectories: [],
+    namedVolumeSources: [],
+    removedStackDir: null,
+    composeMissing: false,
+  };
+
   await withServerTiming(
     {
       layer: "system",
       action: "store.compose.cleanup",
       meta: {
         composePath: input.composePath,
+        removeVolumes: input.removeVolumes ?? false,
       },
+      onSuccessMeta: () => ({
+        removeVolumes: input.removeVolumes ?? false,
+        bindMountDirectoryCount: cleanupSummary.bindMountDirectories.length,
+        namedVolumeCount: cleanupSummary.namedVolumeSources.length,
+        removedStackDir: cleanupSummary.removedStackDir,
+        composeMissing: cleanupSummary.composeMissing,
+      }),
     },
     async () => {
-      let composeContent: string;
+      const stacksRoot = resolveStoreStacksRoot();
+      const appDataRoot = resolveStoreAppDataRoot();
+      const stackDir = path.dirname(input.composePath);
+
+      let composeContent: string | null = null;
       try {
         composeContent = await readFile(input.composePath, "utf8");
       } catch (error) {
         const errorWithCode = error as NodeJS.ErrnoException;
-        if (errorWithCode.code === "ENOENT") {
-          return;
+        if (errorWithCode.code !== "ENOENT") {
+          throw error;
         }
-        throw error;
+        cleanupSummary.composeMissing = true;
       }
-      const stacksRoot = resolveStoreStacksRoot();
-      const stackDir = path.dirname(input.composePath);
-      const storage = collectComposeStorageReferences(composeContent, stacksRoot);
 
-      await Promise.all(
-        Array.from(storage.bindMountDirectories).map((directoryPath) =>
-          rm(directoryPath, {
-            recursive: true,
-            force: true,
-          }),
-        ),
-      );
+      if (input.removeVolumes && composeContent !== null) {
+        const storage = collectComposeStorageReferences(composeContent, [
+          stacksRoot,
+          appDataRoot,
+        ]);
+        cleanupSummary.bindMountDirectories = Array.from(storage.bindMountDirectories).sort();
+        cleanupSummary.namedVolumeSources = Array.from(storage.namedVolumeSources).sort();
 
-      for (const volumeName of storage.namedVolumeSources) {
-        try {
-          await execFileAsync("docker", ["volume", "rm", volumeName]);
-        } catch {
-          // Best effort cleanup for legacy named volumes.
+        logServerAction({
+          layer: "system",
+          action: "store.compose.cleanup.targets",
+          status: "info",
+          message: "Resolved compose cleanup targets",
+          meta: {
+            composePath: input.composePath,
+            bindMountDirectories: cleanupSummary.bindMountDirectories,
+            namedVolumeSources: cleanupSummary.namedVolumeSources,
+          },
+        });
+
+        await Promise.all(
+          cleanupSummary.bindMountDirectories.map((directoryPath) =>
+            rm(directoryPath, {
+              recursive: true,
+              force: true,
+            }),
+          ),
+        );
+
+        for (const volumeName of cleanupSummary.namedVolumeSources) {
+          try {
+            await execFileAsync("docker", ["volume", "rm", volumeName]);
+          } catch {
+            // Best effort cleanup for legacy named volumes.
+          }
         }
       }
 
       const normalizedStackDir = path.resolve(stackDir);
       const normalizedStacksRoot = path.resolve(stacksRoot);
+      const composeFileName = path.basename(input.composePath).toLowerCase();
+      const isComposeStackFile =
+        composeFileName === "docker-compose.yml" ||
+        composeFileName === "docker-compose.yaml";
+      const isKnownStackDirectory =
+        isPathWithinRoot(normalizedStackDir, normalizedStacksRoot) ||
+        path.basename(path.dirname(normalizedStackDir)) === "Apps";
       const shouldRemoveStackDir =
+        isComposeStackFile &&
         normalizedStackDir !== normalizedStacksRoot &&
-        isPathWithinRoot(normalizedStackDir, normalizedStacksRoot);
+        isKnownStackDirectory;
 
       if (shouldRemoveStackDir) {
         await rm(normalizedStackDir, {
           recursive: true,
           force: true,
         });
+        cleanupSummary.removedStackDir = normalizedStackDir;
       }
     },
   );

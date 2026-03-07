@@ -760,14 +760,13 @@ async function runUninstallOperation(operationId: string, params: OperationParam
     step: "cleanup",
     message: params.removeVolumes
       ? "Removing app data"
-      : "Removing installed stack record",
+      : "Removing installed stack files",
   });
 
-  if (params.removeVolumes) {
-    await cleanupComposeDataOnUninstall({
-      composePath: stack.composePath,
-    });
-  }
+  await cleanupComposeDataOnUninstall({
+    composePath: stack.composePath,
+    removeVolumes: params.removeVolumes,
+  });
 
   await patchOperationAndEmit({
     operationId,
