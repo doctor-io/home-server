@@ -1,6 +1,6 @@
 {
   "name": "my-project",
-  "version": "0.1.69",
+  "version": "0.1.70",
   "private": true,
   "scripts": {
     "dev": "node --import tsx server.ts",

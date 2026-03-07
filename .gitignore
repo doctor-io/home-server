@@ -13,5 +13,5 @@ logs/
 !app/api/v1/logs/**
 .husky/_/
 
-
+/dist-server
 /DATA

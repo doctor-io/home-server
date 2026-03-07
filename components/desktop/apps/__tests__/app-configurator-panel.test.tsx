@@ -159,6 +159,28 @@ describe("AppConfiguratorPanel", () => {
     );
   });
 
+  it("prefers injected store actions for catalog installs", async () => {
+    const { installApp: fallbackInstallApp } = setupActions();
+    const injectedInstallApp = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <AppConfiguratorPanel
+        context="catalog_install"
+        template={template}
+        actions={{
+          installApp: injectedInstallApp,
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Install" }));
+
+    await waitFor(() => {
+      expect(injectedInstallApp).toHaveBeenCalledTimes(1);
+    });
+    expect(fallbackInstallApp).not.toHaveBeenCalled();
+  });
+
   it("submits docker run install for custom context without manual port field", async () => {
     const { installCustomApp } = setupActions();
 

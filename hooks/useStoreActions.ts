@@ -35,6 +35,51 @@ type StartActionResult = {
   action: StoreOperationAction;
 };
 
+type InstallAppInput = {
+  appId: string;
+  displayName?: string;
+  env?: Record<string, string>;
+  webUiPort?: number;
+  composeSource?: string;
+  resetToCatalog?: boolean;
+};
+
+type InstallCustomAppInput = {
+  name: string;
+  iconUrl?: string;
+  repositoryUrl?: string;
+  sourceType: "docker-compose" | "docker-run";
+  source: string;
+};
+
+type SaveAppSettingsInput = {
+  appId: string;
+  displayName?: string;
+  iconUrl?: string | null;
+  env?: Record<string, string>;
+  webUiPort?: number;
+  composeSource?: string;
+};
+
+type StoreActionsHandle = {
+  operationsByApp: Record<string, AppOperationState>;
+  installApp: (input: InstallAppInput) => Promise<unknown>;
+  installCustomApp: (input: InstallCustomAppInput) => Promise<unknown>;
+  updateApp: (input: { appId: string }) => Promise<unknown>;
+  redeployApp: (input: {
+    appId: string;
+    env?: Record<string, string>;
+    webUiPort?: number;
+    composeSource?: string;
+  }) => Promise<unknown>;
+  uninstallApp: (input: { appId: string; removeVolumes?: boolean }) => Promise<unknown>;
+  saveAppSettings: (input: SaveAppSettingsInput) => Promise<unknown>;
+  startApp: (appId: string) => Promise<unknown>;
+  stopApp: (appId: string) => Promise<unknown>;
+  restartApp: (appId: string) => Promise<unknown>;
+  checkAppUpdates: (appId: string) => Promise<unknown>;
+};
+
 type ErrorResponsePayload = {
   error?: string;
   code?: string;
@@ -124,7 +169,7 @@ async function startLifecycleRequest(
   );
 }
 
-export function useStoreActions() {
+export function useStoreActions(): StoreActionsHandle {
   const queryClient = useQueryClient();
   const [operationsByApp, setOperationsByApp] = useState<Record<string, AppOperationState>>({});
   const streamCleanups = useRef<Map<string, () => void>>(new Map());
@@ -347,13 +392,7 @@ export function useStoreActions() {
   );
 
   const installMutation = useMutation({
-    mutationFn: async (input: {
-      appId: string;
-      displayName?: string;
-      env?: Record<string, string>;
-      composeSource?: string;
-      resetToCatalog?: boolean;
-    }) => {
+    mutationFn: async (input: InstallAppInput) => {
       const response = await startLifecycleRequest(
         `/api/v1/store/apps/${encodeURIComponent(input.appId)}/install`,
         {
@@ -661,3 +700,9 @@ export function useStoreActions() {
 }
 
 export type { AppOperationState };
+export type {
+  InstallAppInput,
+  InstallCustomAppInput,
+  SaveAppSettingsInput,
+  StoreActionsHandle,
+};

@@ -19,7 +19,12 @@ import {
 } from "@/components/desktop/apps/configurator-mapper";
 import { DockerRunView } from "@/components/desktop/apps/docker-run-view";
 import { useAppCompose } from "@/hooks/useAppCompose";
-import { useStoreActions } from "@/hooks/useStoreActions";
+import {
+  useStoreActions,
+  type InstallAppInput,
+  type InstallCustomAppInput,
+  type SaveAppSettingsInput,
+} from "@/hooks/useStoreActions";
 import { useStoreApp } from "@/hooks/useStoreApp";
 import type { StoreAppDetail } from "@/lib/shared/contracts/apps";
 import { Loader2 } from "lucide-react";
@@ -37,6 +42,11 @@ export type AppConfiguratorPanelProps = {
   customDefaults?: {
     name?: string;
     iconUrl?: string;
+  };
+  actions?: {
+    installApp?: (input: InstallAppInput) => Promise<unknown>;
+    installCustomApp?: (input: InstallCustomAppInput) => Promise<unknown>;
+    saveAppSettings?: (input: SaveAppSettingsInput) => Promise<unknown>;
   };
   onClose?: () => void;
 };
@@ -87,6 +97,7 @@ export function AppConfiguratorPanel({
   target,
   template,
   customDefaults,
+  actions,
   onClose,
 }: AppConfiguratorPanelProps) {
   const derivedTargetAppId = target
@@ -207,7 +218,12 @@ export function AppConfiguratorPanel({
 
   const initialClassicRef = useRef<ClassicConfigState>(initialClassicState);
   const initialComposeRef = useRef(initialComposeDraft);
-  const { saveAppSettings, installApp, installCustomApp } = useStoreActions();
+  const fallbackActions = useStoreActions();
+  const saveAppSettings =
+    actions?.saveAppSettings ?? fallbackActions.saveAppSettings;
+  const installApp = actions?.installApp ?? fallbackActions.installApp;
+  const installCustomApp =
+    actions?.installCustomApp ?? fallbackActions.installCustomApp;
 
   useEffect(() => {
     setActiveView(defaultViewForContext(context));

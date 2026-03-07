@@ -699,6 +699,9 @@ export function AppStore({
               <AppConfiguratorPanel
                 context="catalog_install"
                 template={customInstallTemplate}
+                actions={{
+                  installApp,
+                }}
                 onClose={() => setCustomInstallTemplate(null)}
               />
             </div>

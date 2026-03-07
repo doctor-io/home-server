@@ -1,7 +1,7 @@
 import "server-only";
 
 import { execFile } from "node:child_process";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { chown, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { logServerAction, withServerTiming } from "@/lib/server/logging/logger";
@@ -50,6 +50,12 @@ type ComposeStorageReferences = {
   namedVolumeSources: Set<string>;
 };
 
+type BindMountOwnershipOverride = {
+  directoryPath: string;
+  uid: number;
+  gid: number;
+};
+
 type ParsedKeyValueLine = {
   key: string;
   value: string;
@@ -62,6 +68,15 @@ type ParsedLongFormVolumeItem = {
   fields: Partial<Record<"type" | "source" | "target", string>>;
   fieldLines: Partial<Record<"type" | "source" | "target", number>>;
 };
+
+const bindMountOwnershipRules = [
+  {
+    imagePatterns: [/^grafana\/grafana(?::|@|$)/i],
+    targetPaths: new Set(["/var/lib/grafana"]),
+    uid: 472,
+    gid: 472,
+  },
+] as const;
 
 function sanitizeSegment(value: string) {
   return value
@@ -87,6 +102,49 @@ function serializeEnvFile(env: Record<string, string>) {
     .sort((a, b) => a.localeCompare(b))
     .map((key) => `${key}=${env[key] ?? ""}`)
     .join("\n");
+}
+
+function parseEnvFileContent(content: string) {
+  const env: Record<string, string> = {};
+
+  for (const line of content.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) {
+      continue;
+    }
+
+    const separatorIndex = trimmed.indexOf("=");
+    if (separatorIndex <= 0) {
+      continue;
+    }
+
+    const key = trimmed.slice(0, separatorIndex).trim();
+    let value = trimmed.slice(separatorIndex + 1).trim();
+
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+
+    env[key] = value;
+  }
+
+  return env;
+}
+
+function interpolateComposeVariables(
+  composeContent: string,
+  env: Record<string, string>,
+) {
+  return composeContent.replace(/\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?/g, (match, key: string) => {
+    if (!Object.prototype.hasOwnProperty.call(env, key)) {
+      return match;
+    }
+
+    return env[key] ?? "";
+  });
 }
 
 export function applyWebUiPortOverride(composeContent: string, webUiPort: number) {
@@ -385,6 +443,148 @@ function parseLongFormVolumeItem(lines: string[], startIndex: number): ParsedLon
     fields,
     fieldLines,
   };
+}
+
+function collectServiceImages(lines: string[]) {
+  const serviceImages = new Map<string, string>();
+  const pathStack: Array<{ indent: number; key: string }> = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) {
+      continue;
+    }
+
+    const indent = getIndentation(line);
+    while (pathStack.length > 0 && indent <= pathStack[pathStack.length - 1].indent) {
+      pathStack.pop();
+    }
+
+    const keyMatch = trimmed.match(/^([A-Za-z0-9_.-]+):(\s*#.*)?$/);
+    if (keyMatch) {
+      pathStack.push({
+        indent,
+        key: keyMatch[1],
+      });
+      continue;
+    }
+
+    const parsed = parseKeyValueLine(line);
+    if (!parsed) {
+      continue;
+    }
+
+    const pathKeys = pathStack.map((entry) => entry.key);
+    if (
+      pathKeys.length === 2 &&
+      pathKeys[0] === "services" &&
+      parsed.key === "image" &&
+      parsed.value.length > 0
+    ) {
+      serviceImages.set(pathKeys[1], parsed.value);
+    }
+  }
+
+  return serviceImages;
+}
+
+function resolveBindMountOwnershipRule(image: string, target: string) {
+  return bindMountOwnershipRules.find((rule) => {
+    if (!rule.targetPaths.has(target)) {
+      return false;
+    }
+
+    return rule.imagePatterns.some((pattern) => pattern.test(image));
+  });
+}
+
+export function collectComposeBindMountOwnershipOverrides(composeContent: string) {
+  const lines = composeContent.split(/\r?\n/);
+  const serviceImages = collectServiceImages(lines);
+  const pathStack: Array<{ indent: number; key: string }> = [];
+  const overrides = new Map<string, BindMountOwnershipOverride>();
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) {
+      continue;
+    }
+
+    const indent = getIndentation(line);
+    while (pathStack.length > 0 && indent <= pathStack[pathStack.length - 1].indent) {
+      pathStack.pop();
+    }
+
+    const keyMatch = trimmed.match(/^([A-Za-z0-9_.-]+):(\s*#.*)?$/);
+    if (keyMatch) {
+      pathStack.push({
+        indent,
+        key: keyMatch[1],
+      });
+      continue;
+    }
+
+    const pathKeys = pathStack.map((entry) => entry.key);
+    const isServiceVolumeList =
+      pathKeys.length === 3 &&
+      pathKeys[0] === "services" &&
+      pathKeys[2] === "volumes";
+
+    if (!isServiceVolumeList) {
+      continue;
+    }
+
+    const image = serviceImages.get(pathKeys[1]);
+    if (!image) {
+      continue;
+    }
+
+    const listItem = parseListItem(line);
+    if (!listItem) {
+      continue;
+    }
+
+    const volumeSpec = parseComposeVolumeSpec(listItem.spec);
+    if (volumeSpec) {
+      if (!path.isAbsolute(volumeSpec.source)) {
+        continue;
+      }
+
+      const rule = resolveBindMountOwnershipRule(image, volumeSpec.target);
+      if (!rule) {
+        continue;
+      }
+
+      overrides.set(volumeSpec.source, {
+        directoryPath: volumeSpec.source,
+        uid: rule.uid,
+        gid: rule.gid,
+      });
+      continue;
+    }
+
+    const longForm = parseLongFormVolumeItem(lines, index);
+    const source = longForm.fields.source;
+    const target = longForm.fields.target;
+    if (!source || !target || !path.isAbsolute(source)) {
+      index = longForm.end - 1;
+      continue;
+    }
+
+    const rule = resolveBindMountOwnershipRule(image, target);
+    if (rule) {
+      overrides.set(source, {
+        directoryPath: source,
+        uid: rule.uid,
+        gid: rule.gid,
+      });
+    }
+
+    index = longForm.end - 1;
+  }
+
+  return Array.from(overrides.values());
 }
 
 function rewriteKeyValueLine(
@@ -766,6 +966,9 @@ export async function materializeInlineStackFiles(input: {
     appId: input.appId,
     strategy: input.storageMappingStrategy,
   });
+  const ownershipOverrides = collectComposeBindMountOwnershipOverrides(
+    normalized.composeContent,
+  );
 
   const stackDir = path.join(stacksRoot, input.appId);
   const composePath = path.join(stackDir, "docker-compose.yml");
@@ -775,6 +978,11 @@ export async function materializeInlineStackFiles(input: {
   await Promise.all(
     Array.from(normalized.bindMountDirectories).map((directoryPath) =>
       mkdir(directoryPath, { recursive: true }),
+    ),
+  );
+  await Promise.all(
+    ownershipOverrides.map(({ directoryPath, uid, gid }) =>
+      chown(directoryPath, uid, gid),
     ),
   );
   await writeFile(composePath, normalized.composeContent, "utf8");
@@ -1046,6 +1254,8 @@ export async function cleanupComposeDataOnUninstall(input: {
       const stacksRoot = resolveStoreStacksRoot();
       const appDataRoot = resolveStoreAppDataRoot();
       const stackDir = path.dirname(input.composePath);
+      const envPath = path.join(stackDir, ".env");
+      const stackAppId = path.basename(stackDir);
 
       let composeContent: string | null = null;
       try {
@@ -1059,12 +1269,43 @@ export async function cleanupComposeDataOnUninstall(input: {
       }
 
       if (input.removeVolumes && composeContent !== null) {
+        let interpolationEnv: Record<string, string> = {
+          AppID: stackAppId,
+        };
+
+        try {
+          const envContent = await readFile(envPath, "utf8");
+          interpolationEnv = {
+            ...interpolationEnv,
+            ...parseEnvFileContent(envContent),
+          };
+        } catch (error) {
+          const errorWithCode = error as NodeJS.ErrnoException;
+          if (errorWithCode.code !== "ENOENT") {
+            throw error;
+          }
+        }
+
         const storage = collectComposeStorageReferences(composeContent, [
           stacksRoot,
           appDataRoot,
         ]);
+        const interpolatedStorage = collectComposeStorageReferences(
+          interpolateComposeVariables(composeContent, interpolationEnv),
+          [stacksRoot, appDataRoot],
+        );
         cleanupSummary.bindMountDirectories = Array.from(storage.bindMountDirectories).sort();
         cleanupSummary.namedVolumeSources = Array.from(storage.namedVolumeSources).sort();
+        if (interpolatedStorage.bindMountDirectories.size > 0) {
+          cleanupSummary.bindMountDirectories = Array.from(
+            interpolatedStorage.bindMountDirectories,
+          ).sort();
+        }
+        if (interpolatedStorage.namedVolumeSources.size > 0) {
+          cleanupSummary.namedVolumeSources = Array.from(
+            interpolatedStorage.namedVolumeSources,
+          ).sort();
+        }
 
         logServerAction({
           layer: "system",

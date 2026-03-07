@@ -1,6 +1,7 @@
 import {
   applyWebUiPortOverride,
   cleanupComposeDataOnUninstall,
+  collectComposeBindMountOwnershipOverrides,
   normalizeComposeStorageBindings,
   sanitizeStackName,
 } from "@/lib/server/modules/docker/compose-runner";
@@ -188,6 +189,38 @@ services:
     );
   });
 
+  it("collects app-data ownership overrides for Grafana bind mounts", () => {
+    const compose = `
+services:
+  grafana:
+    image: grafana/grafana:12.1.4
+    volumes:
+      - type: bind
+        source: /DATA/AppData/grafana/data
+        target: /var/lib/grafana
+`;
+
+    expect(collectComposeBindMountOwnershipOverrides(compose)).toEqual([
+      {
+        directoryPath: "/DATA/AppData/grafana/data",
+        uid: 472,
+        gid: 472,
+      },
+    ]);
+  });
+
+  it("does not collect ownership overrides for unrelated bind mounts", () => {
+    const compose = `
+services:
+  app:
+    image: nginx:latest
+    volumes:
+      - /DATA/AppData/nginx/data:/usr/share/nginx/html
+`;
+
+    expect(collectComposeBindMountOwnershipOverrides(compose)).toEqual([]);
+  });
+
   it("removes the installed stack directory during uninstall cleanup without deleting app data by default", async () => {
     const stacksRoot = resolveStoreStacksRoot();
     const appDataRoot = resolveStoreAppDataRoot();
@@ -263,6 +296,43 @@ services:
         force: false,
       }),
     ).rejects.toThrow();
+
+    await expect(
+      rm(bindDir, {
+        recursive: true,
+        force: false,
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("removes interpolated AppID app-data bind mount directories during uninstall cleanup when requested", async () => {
+    const stacksRoot = resolveStoreStacksRoot();
+    const appDataRoot = resolveStoreAppDataRoot();
+    const appId = `cleanup-appid-${Date.now()}`;
+    const stackDir = path.join(stacksRoot, appId);
+    const composePath = path.join(stackDir, "docker-compose.yml");
+    const bindDir = path.join(appDataRoot, appId, "data");
+
+    await mkdir(bindDir, { recursive: true });
+    await mkdir(stackDir, { recursive: true });
+    await writeFile(path.join(stackDir, ".env"), "", "utf8");
+    await writeFile(
+      composePath,
+      `services:
+  app:
+    image: grafana/grafana:12.1.4
+    volumes:
+      - type: bind
+        source: ${appDataRoot}/$AppID/data
+        target: /var/lib/grafana
+`,
+      "utf8",
+    );
+
+    await cleanupComposeDataOnUninstall({
+      composePath,
+      removeVolumes: true,
+    });
 
     await expect(
       rm(bindDir, {
