@@ -1,0 +1,261 @@
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@/lib/server/modules/apps/repository", () => ({
+  listInstalledAppsFromDb: vi.fn(),
+  findActiveStoreOperationsByAppIds: vi.fn(),
+}));
+
+vi.mock("@/lib/server/modules/docker/compose-runner", () => ({
+  getComposeRuntimeInfo: vi.fn(),
+}));
+
+const tempRoots = vi.hoisted(() => ({
+  dataRoot: "",
+  stacksRoot: "",
+}));
+
+vi.mock("node:fs/promises", async () => {
+  const actual = await vi.importActual("node:fs/promises");
+
+  return {
+    ...actual,
+    readFile: vi.fn(),
+  };
+});
+
+vi.mock("@/lib/server/modules/docker/compose-parser", () => ({
+  parseComposeFile: vi.fn(),
+  extractPrimaryServiceWithName: vi.fn(),
+}));
+
+vi.mock("@/lib/server/storage/data-root", () => ({
+  resolveDataRootDirectory: () => tempRoots.dataRoot,
+  resolveStoreStacksRoot: () => tempRoots.stacksRoot,
+}));
+
+import {
+    findActiveStoreOperationsByAppIds,
+    listInstalledAppsFromDb,
+} from "@/lib/server/modules/apps/repository";
+import {
+    invalidateInstalledAppsCache,
+    listInstalledApps,
+} from "@/lib/server/modules/apps/service";
+import {
+    extractPrimaryServiceWithName,
+    parseComposeFile,
+} from "@/lib/server/modules/docker/compose-parser";
+import { getComposeRuntimeInfo } from "@/lib/server/modules/docker/compose-runner";
+import { readFile } from "node:fs/promises";
+
+describe("apps service", () => {
+  const repositoryMock = vi.mocked(listInstalledAppsFromDb);
+  const activeOperationsMock = vi.mocked(findActiveStoreOperationsByAppIds);
+  const runtimeInfoMock = vi.mocked(getComposeRuntimeInfo);
+  const readFileMock = vi.mocked(readFile);
+  const parseComposeFileMock = vi.mocked(parseComposeFile);
+  const extractPrimaryServiceMock = vi.mocked(extractPrimaryServiceWithName);
+
+  beforeEach(() => {
+    invalidateInstalledAppsCache();
+    repositoryMock.mockReset();
+    activeOperationsMock.mockReset();
+    runtimeInfoMock.mockReset();
+    readFileMock.mockReset();
+    parseComposeFileMock.mockReset();
+    extractPrimaryServiceMock.mockReset();
+    runtimeInfoMock.mockResolvedValue({
+      status: "running",
+      containerNames: ["nextcloud-app-1"],
+      primaryContainerName: "nextcloud-app-1",
+    });
+    activeOperationsMock.mockResolvedValue({});
+    readFileMock.mockResolvedValue("");
+    parseComposeFileMock.mockReturnValue(null);
+    extractPrimaryServiceMock.mockReturnValue(null);
+    tempRoots.dataRoot = "";
+    tempRoots.stacksRoot = "";
+  });
+
+  it("caches installed apps", async () => {
+    repositoryMock.mockResolvedValueOnce([
+      {
+        id: "nextcloud",
+        name: "Nextcloud",
+        stackName: "nextcloud",
+        composePath: "/DATA/AppData/nextcloud/docker-compose.yml",
+        status: "unknown",
+        activeOperation: null,
+        updatedAt: "2026-02-22T10:00:00.000Z",
+      },
+    ]);
+
+    const first = await listInstalledApps();
+    const second = await listInstalledApps();
+
+    expect(first[0]?.containerName).toBe("nextcloud-app-1");
+    expect(first).toEqual(second);
+    expect(repositoryMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("bypasses cache when requested", async () => {
+    repositoryMock.mockResolvedValue([
+      {
+        id: "immich",
+        name: "Immich",
+        stackName: "immich",
+        composePath: "/DATA/AppData/immich/docker-compose.yml",
+        status: "unknown",
+        activeOperation: null,
+        updatedAt: "2026-02-22T11:00:00.000Z",
+      },
+    ]);
+
+    await listInstalledApps({ bypassCache: true });
+    await listInstalledApps({ bypassCache: true });
+
+    expect(repositoryMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("falls back to empty list when db is unavailable", async () => {
+    const unavailableError = Object.assign(
+      new Error("connect ECONNREFUSED 127.0.0.1:5432"),
+      { code: "ECONNREFUSED" },
+    );
+    repositoryMock.mockRejectedValueOnce(unavailableError);
+
+    const first = await listInstalledApps({ bypassCache: true });
+    const second = await listInstalledApps();
+
+    expect(first).toEqual([]);
+    expect(second).toEqual([]);
+    expect(repositoryMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("infers web ui port from installed compose when DB port is null", async () => {
+    repositoryMock.mockResolvedValueOnce([
+      {
+        id: "dozzle",
+        name: "Dozzle",
+        stackName: "dozzle",
+        composePath: "/DATA/AppData/dozzle/docker-compose.yml",
+        webUiPort: null,
+        status: "unknown",
+        activeOperation: null,
+        updatedAt: "2026-02-22T10:00:00.000Z",
+      },
+    ]);
+    readFileMock.mockResolvedValue(
+      'services:\n  app:\n    ports:\n      - "9999:8080"\n',
+    );
+    parseComposeFileMock.mockReturnValue({
+      services: {
+        app: {
+          ports: ["9999:8080"],
+          environment: {},
+        },
+      },
+    });
+    extractPrimaryServiceMock.mockReturnValue({
+      name: "app",
+      service: {
+        ports: ["9999:8080"],
+        environment: {},
+      },
+    });
+
+    const apps = await listInstalledApps({ bypassCache: true });
+
+    expect(apps[0]?.webUiPort).toBe(9999);
+    expect(readFileMock).toHaveBeenCalledWith(
+      "/DATA/AppData/dozzle/docker-compose.yml",
+      "utf8",
+    );
+  });
+
+  it("hydrates active operations for installed apps", async () => {
+    repositoryMock.mockResolvedValueOnce([
+      {
+        id: "jellyfin",
+        name: "Jellyfin",
+        stackName: "jellyfin",
+        composePath: "/DATA/AppData/jellyfin/docker-compose.yml",
+        status: "unknown",
+        activeOperation: null,
+        updatedAt: "2026-02-22T12:00:00.000Z",
+      },
+    ]);
+    activeOperationsMock.mockResolvedValueOnce({
+      jellyfin: {
+        id: "op-1",
+        action: "redeploy",
+        status: "running",
+        progressPercent: 64,
+        currentStep: "compose-up",
+        updatedAt: "2026-02-22T12:00:05.000Z",
+      },
+    });
+
+    const apps = await listInstalledApps({ bypassCache: true });
+
+    expect(apps[0]?.activeOperation).toEqual({
+      id: "op-1",
+      action: "redeploy",
+      status: "running",
+      progressPercent: 64,
+      currentStep: "compose-up",
+      updatedAt: "2026-02-22T12:00:05.000Z",
+    });
+  });
+
+  it("normalizes stale compose paths after restore and uses the active stack root", async () => {
+    const actualRoot = await mkdtemp(path.join(os.tmpdir(), "homeio-apps-"));
+    tempRoots.dataRoot = actualRoot;
+    tempRoots.stacksRoot = path.join(actualRoot, "missing-stacks");
+
+    const actualComposePath = path.join(
+      actualRoot,
+      "data-root",
+      "Apps",
+      "grafana",
+      "docker-compose.yml",
+    );
+    await mkdir(path.dirname(actualComposePath), { recursive: true });
+    await writeFile(
+      actualComposePath,
+      "services:\n  grafana:\n    image: grafana/grafana:latest\n",
+      "utf8",
+    );
+
+    repositoryMock.mockResolvedValueOnce([
+      {
+        id: "grafana",
+        name: "Grafana",
+        stackName: "grafana",
+        composePath: "/var/lib/home-server/Apps/grafana/docker-compose.yml",
+        status: "unknown",
+        activeOperation: null,
+        updatedAt: "2026-02-22T10:00:00.000Z",
+      },
+    ]);
+
+    runtimeInfoMock.mockResolvedValueOnce({
+      status: "running",
+      containerNames: ["grafana"],
+      primaryContainerName: "grafana",
+    });
+
+    const apps = await listInstalledApps({ bypassCache: true });
+
+    expect(runtimeInfoMock).toHaveBeenCalledWith({
+      composePath: actualComposePath,
+      envPath: path.join(path.dirname(actualComposePath), ".env"),
+      stackName: "grafana",
+    });
+    expect(apps[0]?.composePath).toBe(actualComposePath);
+    expect(apps[0]?.containerName).toBe("grafana");
+  });
+});

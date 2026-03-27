@@ -1,0 +1,328 @@
+"use client";
+
+import { getFileIcon, type FileEntry } from "@/modules/files/components/file-manager-presenters";
+import {
+  FILES_MENU_SHELL,
+  FILES_PANEL_INSET,
+} from "@/modules/files/components/file-manager-surface";
+import { formatBytesCompact } from "@/lib/client/format";
+import type { FileInfoResponse } from "@/lib/shared/contracts/files";
+import { File, Folder, Trash2, X } from "@/components/icons/platform-icons";
+
+export function CreateEntryDialog({
+  dialog,
+  isCreatePending,
+  onClose,
+  onDialogChange,
+  onSubmit,
+}: {
+  dialog: { kind: "file" | "folder"; name: string; error: string | null };
+  isCreatePending: boolean;
+  onClose: () => void;
+  onDialogChange: (value: string) => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <div
+      className="absolute inset-0 z-[205] flex items-center justify-center bg-background/35 px-4 backdrop-blur-[1px]"
+      onClick={onClose}
+    >
+      <div
+        className={`w-full max-w-xs p-3 ${FILES_MENU_SHELL}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={dialog.kind === "folder" ? "Create new folder" : "Create new file"}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="mb-2 flex items-center gap-2 text-sm font-medium text-foreground">
+          {dialog.kind === "folder" ? (
+            <Folder className="size-4 text-sky-400" />
+          ) : (
+            <File className="size-4 text-emerald-400" />
+          )}
+          <span>{dialog.kind === "folder" ? "Create New Folder" : "Create New File"}</span>
+        </div>
+
+        <label className="mb-2 block text-xs text-muted-foreground">
+          {dialog.kind === "folder" ? "Folder name" : "File name"}
+          <input
+            autoFocus
+            type="text"
+            value={dialog.name}
+            onChange={(event) => onDialogChange(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                onSubmit();
+              } else if (event.key === "Escape") {
+                event.preventDefault();
+                onClose();
+              }
+            }}
+            className="mt-1 h-8 w-full rounded-lg border border-glass-border bg-background/55 px-2 text-xs text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary/40 focus:bg-background/70"
+            placeholder={dialog.kind === "folder" ? "my-folder" : "notes.txt"}
+          />
+        </label>
+
+        {dialog.error ? (
+          <div className="mb-2 text-xs text-status-red">{dialog.error}</div>
+        ) : null}
+
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            disabled={isCreatePending}
+            className="rounded-lg px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onSubmit}
+            disabled={dialog.name.trim().length === 0 || isCreatePending}
+            className="rounded-lg bg-primary/20 px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/30 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Create
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function RenameEntryDialog({
+  dialog,
+  isRenamePending,
+  onClose,
+  onDialogChange,
+  onSubmit,
+}: {
+  dialog: { entry: FileEntry; name: string; error: string | null };
+  isRenamePending: boolean;
+  onClose: () => void;
+  onDialogChange: (value: string) => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <div
+      className="absolute inset-0 z-[205] flex items-center justify-center bg-background/35 px-4 backdrop-blur-[1px]"
+      onClick={onClose}
+    >
+      <div
+        className={`w-full max-w-xs p-3 ${FILES_MENU_SHELL}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Rename item"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="mb-2 flex items-center gap-2 text-sm font-medium text-foreground">
+          {dialog.entry.type === "folder" ? (
+            <Folder className="size-4 text-sky-400" />
+          ) : (
+            <File className="size-4 text-emerald-400" />
+          )}
+          <span>Rename</span>
+        </div>
+
+        <label className="mb-2 block text-xs text-muted-foreground">
+          New name
+          <input
+            autoFocus
+            type="text"
+            value={dialog.name}
+            onChange={(event) => onDialogChange(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                onSubmit();
+              } else if (event.key === "Escape") {
+                event.preventDefault();
+                onClose();
+              }
+            }}
+            className="mt-1 h-8 w-full rounded-lg border border-glass-border bg-background/55 px-2 text-xs text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary/40 focus:bg-background/70"
+            placeholder={dialog.entry.name}
+          />
+        </label>
+
+        {dialog.error ? (
+          <div className="mb-2 text-xs text-status-red">{dialog.error}</div>
+        ) : null}
+
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            disabled={isRenamePending}
+            className="rounded-lg px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onSubmit}
+            disabled={
+              dialog.name.trim().length === 0 ||
+              dialog.name.trim() === dialog.entry.name ||
+              isRenamePending
+            }
+            className="rounded-lg bg-primary/20 px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/30 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isRenamePending ? "Renaming…" : "Rename"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function EmptyTrashConfirmDialog({
+  itemCount,
+  onCancel,
+  onConfirm,
+}: {
+  itemCount: number;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div
+      className="absolute inset-0 z-[205] flex items-center justify-center bg-background/35 px-4 backdrop-blur-[1px]"
+      onClick={onCancel}
+    >
+      <div
+        className={`w-full max-w-xs p-4 ${FILES_MENU_SHELL}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Empty Trash"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
+          <Trash2 className="size-4 shrink-0 text-status-red" />
+          <span>Empty Trash</span>
+        </div>
+        <p className="mb-4 text-xs leading-relaxed text-muted-foreground">
+          Permanently delete{" "}
+          <span className="font-semibold text-foreground">
+            {itemCount} item{itemCount !== 1 ? "s" : ""}
+          </span>{" "}
+          from Trash? This cannot be undone.
+        </p>
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={onCancel}
+            className="rounded-lg px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="rounded-lg bg-status-red/15 px-2.5 py-1 text-xs font-medium text-status-red transition-colors hover:bg-status-red/25"
+          >
+            Empty Trash
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function FileInfoDialogOverlay({
+  fileInfo,
+  onClose,
+}: {
+  fileInfo: FileInfoResponse;
+  onClose: () => void;
+}) {
+  const rows = [
+    {
+      label: "Type",
+      value:
+        fileInfo.type === "folder"
+          ? "Folder"
+          : fileInfo.ext
+            ? `${fileInfo.ext.toUpperCase()} file`
+            : "File",
+    },
+    {
+      label: "Size",
+      value: fileInfo.type === "folder" ? "—" : formatBytesCompact(fileInfo.sizeBytes),
+    },
+    {
+      label: "Modified",
+      value: new Date(fileInfo.modifiedAt).toLocaleString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    },
+    {
+      label: "Created",
+      value: new Date(fileInfo.createdAt).toLocaleString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    },
+    { label: "Path", value: fileInfo.path },
+    { label: "Permissions", value: fileInfo.permissions },
+    { label: "Starred", value: fileInfo.starred ? "Yes" : "No" },
+  ];
+
+  return (
+    <div
+      className="absolute inset-0 z-[205] flex items-center justify-center bg-background/35 px-4 backdrop-blur-[1px]"
+      onClick={onClose}
+    >
+      <div
+        className={`w-full max-w-sm p-4 ${FILES_MENU_SHELL}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label="File info"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="mb-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {getFileIcon({
+              ...fileInfo,
+              modified: "",
+              modifiedAt: "",
+              mtimeMs: 0,
+            } as FileEntry)}
+            <span className="max-w-56 truncate text-sm font-semibold text-foreground">
+              {fileInfo.name}
+            </span>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground"
+          >
+            <X className="size-3.5" />
+          </button>
+        </div>
+
+        <div className="space-y-1.5 text-xs">
+          {rows.map(({ label, value }) => (
+            <div
+              key={label}
+              className={`flex items-start gap-2 px-2.5 py-1.5 ${FILES_PANEL_INSET}`}
+            >
+              <span className="w-24 shrink-0 text-muted-foreground">{label}</span>
+              <span className="break-all font-mono text-foreground">{value}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-3 flex justify-end">
+          <button
+            onClick={onClose}
+            className="rounded-lg px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

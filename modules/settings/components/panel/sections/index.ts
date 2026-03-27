@@ -1,0 +1,12 @@
+export { AppearanceSection } from "@/modules/settings/components/panel/sections/appearance-section";
+export { BackupSection } from "@/modules/settings/components/panel/sections/backup-section";
+export { DockerSection } from "@/modules/settings/components/panel/sections/docker-section";
+export { GeneralSection } from "@/modules/settings/components/panel/sections/general-section";
+export { NetworkSection } from "@/modules/settings/components/panel/sections/network-section";
+export { NotificationsSection } from "@/modules/settings/components/panel/sections/notifications-section";
+export { PowerSection } from "@/modules/settings/components/panel/sections/power-section";
+export { SecuritySection } from "@/modules/settings/components/panel/sections/security-section";
+export { StorageSection } from "@/modules/settings/components/panel/sections/storage-section";
+export { UpdatesSection } from "@/modules/settings/components/panel/sections/updates-section";
+export { UsersSection } from "@/modules/settings/components/panel/sections/users-section";
+export { LogsSection } from "@/modules/settings/components/panel/sections/logs-section";

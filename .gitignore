@@ -1,0 +1,26 @@
+# v0 runtime files
+__v0_runtime_loader.js
+__v0_devtools.tsx
+__v0_jsx-dev-runtime.ts
+
+# Common ignores
+node_modules/
+.next/
+.env*.local
+.DS_Store
+logs/
+!app/api/v1/logs/
+!app/api/v1/logs/**
+!lib/server/modules/logs/
+!lib/server/modules/logs/**
+.husky/_/
+.playwright-test/
+.playwright-mcp/
+/dist-server
+/DATA
+/screenshots
+# Coverage
+coverage/
+todo.md
+todo.md
+todo.md

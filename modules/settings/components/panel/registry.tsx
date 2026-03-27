@@ -1,0 +1,271 @@
+import {
+  AlertRegular,
+  ArrowSyncRegular,
+  BoxRegular,
+  DatabaseRegular,
+  DocumentRegular,
+  HardDriveRegular,
+  PaintBrushRegular,
+  PeopleRegular,
+  PowerRegular,
+  ServerRegular,
+  ShieldRegular,
+  Wifi4Regular,
+} from "@fluentui/react-icons";
+import {
+  AppearanceSection,
+  BackupSection,
+  DockerSection,
+  GeneralSection,
+  LogsSection,
+  NetworkSection,
+  NotificationsSection,
+  PowerSection,
+  SecuritySection,
+  StorageSection,
+  UpdatesSection,
+  UsersSection,
+} from "@/modules/settings/components/panel/sections";
+import type {
+  DesktopPreferencesApi,
+  SettingsBackend,
+  SettingsSection,
+  SettingsSectionDefinition,
+} from "@/modules/settings/components/panel/types";
+
+export const SETTINGS_SECTIONS: SettingsSection[] = [
+  { id: "general", label: "General", icon: ServerRegular },
+  { id: "network", label: "Network", icon: Wifi4Regular },
+  { id: "storage", label: "Storage", icon: HardDriveRegular },
+  { id: "docker", label: "Docker", icon: BoxRegular },
+  { id: "users", label: "Users & Access", icon: PeopleRegular },
+  { id: "security", label: "Security", icon: ShieldRegular },
+  { id: "notifications", label: "Notifications", icon: AlertRegular },
+  { id: "backup", label: "Backup & Restore", icon: DatabaseRegular },
+  { id: "updates", label: "Updates", icon: ArrowSyncRegular },
+  { id: "appearance", label: "Appearance", icon: PaintBrushRegular },
+  { id: "power", label: "Power", icon: PowerRegular },
+  { id: "logs", label: "Logs", icon: DocumentRegular },
+];
+
+type SettingsRegistryContext = {
+  appearance: Parameters<typeof AppearanceSection>[0]["appearance"];
+  wallpaperOptions: Parameters<typeof AppearanceSection>[0]["wallpaperOptions"];
+  accentOptions: Parameters<typeof AppearanceSection>[0]["accentOptions"];
+  onAppearanceChange: Parameters<typeof AppearanceSection>[0]["onAppearanceChange"];
+  desktopPreferences: DesktopPreferencesApi;
+  settingsBackend: SettingsBackend;
+  generalController: {
+    draft: { hostname: string; timezone: string };
+    setHostname: (value: string) => void;
+    setTimezone: (value: string) => void;
+    saveState: SettingsSectionDefinition["save"];
+    save: () => Promise<void>;
+  };
+  securityController: {
+    draft: Parameters<typeof SecuritySection>[0]["draft"];
+    patchDraft: (patch: Partial<Parameters<typeof SecuritySection>[0]["draft"]>) => void;
+    saveState: SettingsSectionDefinition["save"];
+    save: () => Promise<void>;
+  };
+  notificationController: {
+    draft: Parameters<typeof NotificationsSection>[0]["draft"];
+    patchDraft: (
+      patch: Partial<Parameters<typeof NotificationsSection>[0]["draft"]>,
+    ) => void;
+    saveState: SettingsSectionDefinition["save"];
+    save: () => Promise<void>;
+  };
+  backupController: {
+    draft: Parameters<typeof BackupSection>[0]["settingsDraft"];
+    patchDraft: (
+      patch: Partial<Parameters<typeof BackupSection>[0]["settingsDraft"]>,
+    ) => void;
+    saveState: SettingsSectionDefinition["save"];
+    save: () => Promise<void>;
+  };
+};
+
+function getDefaultSaveConfig(
+  settingsBackend: SettingsBackend,
+  sectionId: keyof SettingsBackend["capabilities"]["saveBySection"],
+) {
+  const visible = settingsBackend.capabilities.saveBySection[sectionId] ?? false;
+  if (!visible) return undefined;
+
+  return {
+    canSave: false,
+    title: settingsBackend.capabilities.saveDisabledReason,
+    pending: false,
+    label: "Save Changes",
+    onSave: undefined,
+  };
+}
+
+export function buildSettingsSectionDefinitions(
+  context: SettingsRegistryContext,
+): SettingsSectionDefinition[] {
+  return [
+    {
+      ...SETTINGS_SECTIONS[0],
+      render: () => (
+        <GeneralSection
+          data={context.settingsBackend.general}
+          preferences={{
+            ...context.settingsBackend.generalPreferences,
+            hostname: context.generalController.draft.hostname,
+            timezone: context.generalController.draft.timezone,
+          }}
+          capabilities={context.settingsBackend.capabilities.general}
+          languageValue={context.desktopPreferences.languageLabel}
+          languageOptions={context.desktopPreferences.languageOptions.map(
+            (option) => option.label,
+          )}
+          onHostnameChange={context.generalController.setHostname}
+          onTimezoneChange={context.generalController.setTimezone}
+          onLanguageChange={(value) => {
+            const nextOption = context.desktopPreferences.languageOptions.find(
+              (option) => option.label === value,
+            );
+            if (!nextOption) return;
+            context.desktopPreferences.setLanguage(nextOption.code);
+          }}
+        />
+      ),
+      save: context.generalController.saveState
+        ? {
+            ...context.generalController.saveState,
+            onSave: context.generalController.save,
+          }
+        : getDefaultSaveConfig(context.settingsBackend, "general"),
+    },
+    {
+      ...SETTINGS_SECTIONS[1],
+      render: () => (
+        <NetworkSection
+          data={context.settingsBackend.network}
+        />
+      ),
+      save: getDefaultSaveConfig(context.settingsBackend, "network"),
+    },
+    {
+      ...SETTINGS_SECTIONS[2],
+      render: () => <StorageSection data={context.settingsBackend.storage} />,
+      save: getDefaultSaveConfig(context.settingsBackend, "storage"),
+    },
+    {
+      ...SETTINGS_SECTIONS[3],
+      render: () => (
+        <DockerSection
+          data={context.settingsBackend.docker}
+          capabilities={context.settingsBackend.capabilities.docker}
+          onPruneImages={context.settingsBackend.actions.pruneDockerImages}
+          onPruneVolumes={context.settingsBackend.actions.pruneDockerVolumes}
+        />
+      ),
+      save: getDefaultSaveConfig(context.settingsBackend, "docker"),
+    },
+    {
+      ...SETTINGS_SECTIONS[4],
+      render: () => (
+        <UsersSection username={context.settingsBackend.general.username} />
+      ),
+      save: getDefaultSaveConfig(context.settingsBackend, "users"),
+    },
+    {
+      ...SETTINGS_SECTIONS[5],
+      render: () => (
+        <SecuritySection
+          data={context.settingsBackend.security}
+          draft={context.securityController.draft}
+          onChange={context.securityController.patchDraft}
+        />
+      ),
+      save: context.securityController.saveState
+        ? {
+            ...context.securityController.saveState,
+            onSave: context.securityController.save,
+          }
+        : getDefaultSaveConfig(context.settingsBackend, "security"),
+    },
+    {
+      ...SETTINGS_SECTIONS[6],
+      render: () => (
+        <NotificationsSection
+          draft={context.notificationController.draft}
+          onChange={context.notificationController.patchDraft}
+        />
+      ),
+      save: context.notificationController.saveState
+        ? {
+            ...context.notificationController.saveState,
+            onSave: context.notificationController.save,
+          }
+        : getDefaultSaveConfig(context.settingsBackend, "notifications"),
+    },
+    {
+      ...SETTINGS_SECTIONS[7],
+      render: () => (
+        <BackupSection
+          data={context.settingsBackend.backup}
+          capabilities={context.settingsBackend.capabilities.backup}
+          settingsDraft={context.backupController.draft}
+          onSettingsChange={context.backupController.patchDraft}
+          onRunBackupNow={context.settingsBackend.actions.runBackupNow}
+          onRestoreBackup={context.settingsBackend.actions.restoreBackup}
+        />
+      ),
+      save: context.backupController.saveState
+        ? {
+            ...context.backupController.saveState,
+            onSave: context.backupController.save,
+          }
+        : getDefaultSaveConfig(context.settingsBackend, "backup"),
+    },
+    {
+      ...SETTINGS_SECTIONS[8],
+      render: () => (
+        <UpdatesSection
+          data={context.settingsBackend.updates}
+          capabilities={context.settingsBackend.capabilities.updates}
+          onCheckForUpdates={context.settingsBackend.actions.checkForUpdates}
+          onApplyUpdate={context.settingsBackend.actions.applySystemUpdate}
+          autoCheckEnabled={context.desktopPreferences.preferences.autoCheckUpdates}
+          onToggleAutoCheck={(enabled) => {
+            context.desktopPreferences.setAutoCheckUpdates(enabled);
+          }}
+        />
+      ),
+      save: getDefaultSaveConfig(context.settingsBackend, "updates"),
+    },
+    {
+      ...SETTINGS_SECTIONS[9],
+      liveApply: true,
+      render: () => (
+        <AppearanceSection
+          appearance={context.appearance}
+          wallpaperOptions={context.wallpaperOptions}
+          accentOptions={context.accentOptions}
+          onAppearanceChange={context.onAppearanceChange}
+        />
+      ),
+    },
+    {
+      ...SETTINGS_SECTIONS[10],
+      render: () => (
+        <PowerSection
+          power={context.settingsBackend.power}
+          onRebootNow={context.settingsBackend.actions.rebootNow}
+          onShutdownNow={context.settingsBackend.actions.shutdownNow}
+          onSaveScheduledReboot={context.settingsBackend.actions.saveScheduledReboot}
+          onFactoryReset={context.settingsBackend.actions.factoryReset}
+        />
+      ),
+      save: getDefaultSaveConfig(context.settingsBackend, "power"),
+    },
+    {
+      ...SETTINGS_SECTIONS[11],
+      render: () => <LogsSection />,
+    },
+  ];
+}

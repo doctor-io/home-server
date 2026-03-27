@@ -1,0 +1,35 @@
+export const queryKeys = {
+  systemMetrics: ["system", "metrics"] as const,
+  systemPreferences: ["system", "preferences"] as const,
+  systemUpdates: ["system", "updates"] as const,
+  systemSecurity: ["system", "security"] as const,
+  systemBackups: ["system", "backups"] as const,
+  networkStatus: ["network", "status"] as const,
+  networkNetworks: ["network", "networks"] as const,
+  installedApps: ["apps", "installed"] as const,
+  currentUser: ["auth", "current-user"] as const,
+  storeCatalog: ["store", "catalog"] as const,
+  storeSources: ["store", "sources"] as const,
+  storeApp: (appId: string) => ["store", "app", appId] as const,
+  appCompose: (appId: string, source: "catalog" | "installed" = "catalog") =>
+    ["store", "app-compose", appId, source] as const,
+  storeOperation: (operationId: string) =>
+    ["store", "operation", operationId] as const,
+  filesRoot: ["files", "root"] as const,
+  filesStarred: ["files", "starred"] as const,
+  filesList: (filePath: string, includeHidden = false) =>
+    ["files", "list", filePath, includeHidden] as const,
+  fileContent: (filePath: string) => ["files", "content", filePath] as const,
+  networkShares: ["files", "network", "shares"] as const,
+  localFolderShares: ["files", "shared", "folders"] as const,
+  trashEntries: (filePath: string) => ["files", "trash", "entries", filePath] as const,
+  filesSearch: (query: string, basePath: string, includeHidden: boolean) =>
+    ["files", "search", query, basePath, includeHidden] as const,
+  currentWeather: (latitude: number | null, longitude: number | null) =>
+    ["weather", "current", latitude, longitude] as const,
+  dockerInfo: ["docker", "info"] as const,
+  powerSchedule: ["system", "power", "schedule"] as const,
+  powerCapabilities: ["system", "power", "capabilities"] as const,
+  logs: (source: "homeio" | "system" | "docker") =>
+    ["logs", source] as const,
+};

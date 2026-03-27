@@ -1,0 +1,261 @@
+/* @vitest-environment jsdom */
+
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import type { StoreAppDetail } from "@/lib/shared/contracts/apps";
+
+const useStoreAppMock = vi.fn();
+const useAppComposeMock = vi.fn();
+const useStoreActionsMock = vi.fn();
+
+vi.mock("@/modules/apps/hooks/useStoreApp", () => ({
+  useStoreApp: (...args: unknown[]) => useStoreAppMock(...args),
+}));
+
+vi.mock("@/modules/apps/hooks/useAppCompose", () => ({
+  useAppCompose: (...args: unknown[]) => useAppComposeMock(...args),
+}));
+
+vi.mock("@/modules/apps/hooks/useStoreActions", () => ({
+  useStoreActions: (...args: unknown[]) => useStoreActionsMock(...args),
+}));
+
+import { AppConfiguratorPanel } from "@/modules/apps/components/configurator/app-configurator-panel";
+
+const template: StoreAppDetail = {
+  id: "home-assistant",
+  name: "Home Assistant",
+  description: "Home automation",
+  platform: "linux",
+  categories: ["Automation"],
+  logoUrl: "https://example.com/ha.png",
+  repositoryUrl: "https://github.com/home-assistant/core",
+  stackFile: "compose.yml",
+  status: "not_installed",
+  webUiPort: 8123,
+  updateAvailable: false,
+  localDigest: null,
+  remoteDigest: null,
+  note: "Install note",
+  env: [],
+  screenshots: [],
+  installedConfig: null,
+};
+
+function setupActions() {
+  const saveAppSettings = vi.fn().mockResolvedValue(undefined);
+  const installApp = vi.fn().mockResolvedValue(undefined);
+  const installCustomApp = vi.fn().mockResolvedValue(undefined);
+
+  useStoreActionsMock.mockReturnValue({
+    saveAppSettings,
+    installApp,
+    installCustomApp,
+  });
+
+  return { saveAppSettings, installApp, installCustomApp };
+}
+
+describe("AppConfiguratorPanel", () => {
+  beforeEach(() => {
+    useStoreAppMock.mockReset();
+    useAppComposeMock.mockReset();
+    useStoreActionsMock.mockReset();
+
+    useStoreAppMock.mockReturnValue({
+      data: null,
+      isLoading: false,
+    });
+    useAppComposeMock.mockReturnValue({
+      data: {
+        compose:
+          'services:\n  app:\n    image: ghcr.io/example/app:latest\n    ports:\n      - "8123:8123"\n',
+        primary: {
+          image: "ghcr.io/example/app:latest",
+          ports: ["8123:8123"],
+        },
+        primaryServiceName: "app",
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+  });
+
+  it("selects compose source by context", () => {
+    setupActions();
+
+    const installedTarget = {
+      appId: "home-assistant",
+      appName: "Home Assistant",
+      dashboardUrl: "http://homeio.local:8123",
+      containerName: "home-assistant",
+    };
+
+    const { rerender } = render(
+      <AppConfiguratorPanel context="catalog_install" template={template} />,
+    );
+    expect(useAppComposeMock).toHaveBeenCalledWith(
+      "home-assistant",
+      true,
+      "catalog",
+    );
+
+    rerender(
+      <AppConfiguratorPanel context="installed_edit" target={installedTarget} />,
+    );
+    expect(useAppComposeMock).toHaveBeenCalledWith(
+      "home-assistant",
+      true,
+      "installed",
+    );
+  });
+
+  it("shows docker run tab only for custom install context", () => {
+    setupActions();
+
+    const { rerender } = render(
+      <AppConfiguratorPanel context="custom_install" />,
+    );
+
+    expect(screen.getByRole("button", { name: "Docker Run" })).toBeTruthy();
+
+    rerender(<AppConfiguratorPanel context="catalog_install" template={template} />);
+
+    expect(screen.queryByRole("button", { name: "Docker Run" })).toBeNull();
+  });
+
+  it("syncs classic edits into compose view", () => {
+    setupActions();
+
+    render(<AppConfiguratorPanel context="catalog_install" template={template} />);
+
+    fireEvent.change(screen.getByLabelText("Docker Image"), {
+      target: { value: "nginx:1.27" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Docker Compose" }));
+
+    const composeEditor = screen.getByLabelText("Docker Compose") as HTMLTextAreaElement;
+    expect(composeEditor.value).toContain("image: nginx:1.27");
+  });
+
+  it("submits install in catalog context", async () => {
+    const { installApp } = setupActions();
+
+    render(<AppConfiguratorPanel context="catalog_install" template={template} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Install" }));
+
+    await waitFor(() => {
+      expect(installApp).toHaveBeenCalledTimes(1);
+    });
+    expect(installApp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        appId: "home-assistant",
+        composeSource: expect.stringContaining("services:"),
+      }),
+    );
+  });
+
+  it("prefers injected store actions for catalog installs", async () => {
+    const { installApp: fallbackInstallApp } = setupActions();
+    const injectedInstallApp = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <AppConfiguratorPanel
+        context="catalog_install"
+        template={template}
+        actions={{
+          installApp: injectedInstallApp,
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Install" }));
+
+    await waitFor(() => {
+      expect(injectedInstallApp).toHaveBeenCalledTimes(1);
+    });
+    expect(fallbackInstallApp).not.toHaveBeenCalled();
+  });
+
+  it("submits docker run install for custom context without manual port field", async () => {
+    const { installCustomApp } = setupActions();
+
+    render(<AppConfiguratorPanel context="custom_install" />);
+
+    fireEvent.change(screen.getByLabelText("App Name"), {
+      target: { value: "My Run App" },
+    });
+    fireEvent.change(screen.getByLabelText("Docker Run"), {
+      target: { value: "docker run --name my-run-app -p 8088:80 nginx:latest" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Install" }));
+
+    await waitFor(() => {
+      expect(installCustomApp).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "My Run App",
+          sourceType: "docker-run",
+          source: "docker run --name my-run-app -p 8088:80 nginx:latest",
+        }),
+      );
+    });
+
+    expect(screen.queryByLabelText("Web UI Port")).toBeNull();
+  });
+
+  it("shows the server host instead of localhost for legacy loopback app urls", () => {
+    setupActions();
+
+    useStoreAppMock.mockReturnValue({
+      data: {
+        ...template,
+        installedConfig: {
+          displayName: "Home Assistant",
+          iconUrl: template.logoUrl,
+          env: {},
+          stackName: "home-assistant",
+          composeSource: "services:\n  app:\n    image: ghcr.io/example/app:latest\n    environment:\n      APP_URL: http://localhost:8123\n",
+        },
+      },
+      isLoading: false,
+    });
+    useAppComposeMock.mockReturnValue({
+      data: {
+        compose:
+          'services:\n  app:\n    image: ghcr.io/example/app:latest\n    environment:\n      APP_URL: "http://localhost:8123"\n    ports:\n      - "8123:8123"\n',
+        primary: {
+          image: "ghcr.io/example/app:latest",
+          environment: {
+            APP_URL: "http://localhost:8123",
+          },
+          ports: ["8123:8123"],
+        },
+        primaryServiceName: "app",
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    render(
+      <AppConfiguratorPanel
+        context="installed_edit"
+        target={{
+          appId: "home-assistant",
+          appName: "Home Assistant",
+          dashboardUrl: "http://192.168.1.12:8123",
+          containerName: "homeassistant",
+        }}
+      />,
+    );
+
+    expect(
+      (screen.getByLabelText("Web UI host") as HTMLInputElement).value,
+    ).toBe("192.168.1.12");
+  });
+});
