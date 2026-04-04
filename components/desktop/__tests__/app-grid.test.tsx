@@ -32,6 +32,10 @@ describe("AppGrid context menu", () => {
     useStoreActionsMock.mockReturnValue({
       operationsByApp: {},
       uninstallApp: vi.fn().mockResolvedValue(undefined),
+      startApp: vi.fn().mockReturnValue(new Promise<never>(() => {})),
+      stopApp: vi.fn().mockReturnValue(new Promise<never>(() => {})),
+      restartApp: vi.fn().mockReturnValue(new Promise<never>(() => {})),
+      checkAppUpdates: vi.fn().mockReturnValue(new Promise<never>(() => {})),
     });
     useInstalledAppsMock.mockReturnValue({
       data: [
@@ -48,23 +52,25 @@ describe("AppGrid context menu", () => {
       isError: false,
     });
     useStoreCatalogMock.mockReturnValue({
-      data: [
-        {
-          id: "plex",
-          name: "Plex",
-          description: "Plex media server",
-          platform: "linux",
-          categories: ["Media"],
-          logoUrl: null,
-          repositoryUrl: "https://example.com",
-          stackFile: "Apps/plex/docker-compose.yml",
-          status: "installed",
-          webUiPort: 32400,
-          updateAvailable: false,
-          localDigest: null,
-          remoteDigest: null,
-        },
-      ],
+      data: {
+        apps: [
+          {
+            id: "plex",
+            name: "Plex",
+            description: "Plex media server",
+            platform: "linux",
+            categories: ["Media"],
+            logoUrl: null,
+            repositoryUrl: "https://example.com",
+            stackFile: "Apps/plex/docker-compose.yml",
+            status: "installed",
+            webUiPort: 32400,
+            updateAvailable: false,
+            localDigest: null,
+            remoteDigest: null,
+          },
+        ],
+      },
       isLoading: false,
       isError: false,
     });
@@ -372,10 +378,7 @@ describe("AppGrid context menu", () => {
 
     render(<AppGrid animationsEnabled={false} />);
 
-    expect(screen.getByText("Loading installed apps")).toBeTruthy();
-    expect(
-      screen.getByText("Syncing installed containers and catalog metadata now."),
-    ).toBeTruthy();
+    expect(screen.getByText("Syncing containers")).toBeTruthy();
   });
 
   it("renders no empty-state copy when no apps are installed", () => {
@@ -458,6 +461,47 @@ describe("AppGrid context menu", () => {
     expect((updatesButton as HTMLButtonElement).disabled).toBe(false);
   });
 
+  it("clears optimistic status and shows error when start/stop fails", async () => {
+    const startApp = vi.fn().mockRejectedValue(new Error("Docker unavailable"));
+    useStoreActionsMock.mockReturnValue({
+      operationsByApp: {},
+      uninstallApp: vi.fn().mockResolvedValue(undefined),
+      startApp,
+      stopApp: vi.fn().mockReturnValue(new Promise<never>(() => {})),
+      restartApp: vi.fn().mockReturnValue(new Promise<never>(() => {})),
+      checkAppUpdates: vi.fn().mockReturnValue(new Promise<never>(() => {})),
+    });
+
+    useInstalledAppsMock.mockReturnValue({
+      data: [
+        {
+          id: "plex",
+          name: "Plex",
+          status: "stopped",
+          webUiPort: 32400,
+          containerName: "plex",
+          updatedAt: "2026-02-24T00:00:00.000Z",
+        },
+      ],
+      isLoading: false,
+      isError: false,
+    });
+
+    render(<AppGrid animationsEnabled={false} />);
+
+    openContextMenuFor("Plex");
+    fireEvent.click(screen.getByRole("button", { name: "Start Container" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Docker unavailable")).toBeTruthy();
+    });
+
+    // Status should be cleared back to original (stopped), not stuck as "running"
+    expect(
+      screen.getByRole("button", { name: "Open Plex" }).getAttribute("data-app-status"),
+    ).toBe("stopped");
+  });
+
   it("does not open the home page when dashboard url cannot be resolved", async () => {
     const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
 
@@ -475,23 +519,25 @@ describe("AppGrid context menu", () => {
       isError: false,
     });
     useStoreCatalogMock.mockReturnValue({
-      data: [
-        {
-          id: "unknown-app",
-          name: "Unknown App",
-          description: "No known dashboard",
-          platform: "linux",
-          categories: ["Misc"],
-          logoUrl: null,
-          repositoryUrl: "https://example.com",
-          stackFile: "Apps/unknown-app/docker-compose.yml",
-          status: "installed",
-          webUiPort: null,
-          updateAvailable: false,
-          localDigest: null,
-          remoteDigest: null,
-        },
-      ],
+      data: {
+        apps: [
+          {
+            id: "unknown-app",
+            name: "Unknown App",
+            description: "No known dashboard",
+            platform: "linux",
+            categories: ["Misc"],
+            logoUrl: null,
+            repositoryUrl: "https://example.com",
+            stackFile: "Apps/unknown-app/docker-compose.yml",
+            status: "installed",
+            webUiPort: null,
+            updateAvailable: false,
+            localDigest: null,
+            remoteDigest: null,
+          },
+        ],
+      },
       isLoading: false,
       isError: false,
     });

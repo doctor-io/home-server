@@ -489,7 +489,7 @@ export function AppConfiguratorPanel({
         </>
       )}
 
-      <footer className="flex flex-col border-t border-glass-border px-3 py-2 gap-2">
+      <footer className="flex flex-col border-t border-glass-border px-3 py-2.5 gap-2">
         {installingAppId && installingOperation ? (
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between gap-3">
@@ -500,13 +500,13 @@ export function AppConfiguratorPanel({
                     ? "Installation failed"
                     : installingOperation.step || "Installing…"}
               </span>
-              <span className="text-[10px] text-muted-foreground shrink-0">
+              <span className="text-[10px] tabular-nums text-muted-foreground shrink-0">
                 {installingOperation.progressPercent}%
               </span>
             </div>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
+            <div className="h-1 w-full overflow-hidden rounded-full bg-white/8">
               <div
-                className={`h-full rounded-full transition-all duration-300 ${
+                className={`h-full rounded-full transition-all duration-500 ${
                   installingOperation.status === "success"
                     ? "bg-status-green"
                     : installingOperation.status === "error"
@@ -523,28 +523,27 @@ export function AppConfiguratorPanel({
             ) : null}
           </div>
         ) : (
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex flex-col gap-1">
-              <span className="text-xs text-muted-foreground">
-                {didSave
-                  ? context === "installed_edit"
-                    ? "Saved successfully"
-                    : "Installation started"
-                  : context === "installed_edit"
-                    ? "Changes are local for now"
-                    : "Configure settings before installing"}
-              </span>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex min-w-0 flex-col gap-0.5">
               {saveError ? (
-                <span className="text-xs text-status-red">{saveError}</span>
-              ) : null}
+                <span className="truncate text-xs text-status-red">{saveError}</span>
+              ) : context === "installed_edit" ? (
+                <span className="text-xs text-muted-foreground">
+                  {isSaving ? "Applying changes…" : "Edit and save to redeploy"}
+                </span>
+              ) : (
+                <span className="text-xs text-muted-foreground">
+                  {didSave ? "Installation started" : "Configure settings before installing"}
+                </span>
+              )}
             </div>
             <button
               type="button"
               onClick={() => void handleSubmit()}
               disabled={isSaving || !canSubmit}
-              className="flex items-center gap-1.5 rounded-[var(--radius)] bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex shrink-0 items-center gap-1.5 rounded-[var(--radius)] bg-primary px-3.5 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {isSaving ? <Loader2 className="size-4 animate-spin" /> : null}
+              {isSaving ? <Loader2 className="size-3.5 animate-spin" /> : null}
               {buttonLabel}
             </button>
           </div>

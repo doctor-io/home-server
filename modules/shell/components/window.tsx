@@ -1,6 +1,11 @@
 "use client";
 
 import { Maximize2, Minimize2, Minus, X } from "@/components/icons/platform-icons";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 type WindowProps = {
@@ -216,31 +221,48 @@ export function Window({
         <div className="flex items-center gap-2.5">
           {/* Traffic lights */}
           <div className="flex items-center gap-1.5">
-            <button
-              onClick={onClose}
-              className="group size-3 rounded-[var(--radius)] bg-[#ff5f57] hover:brightness-110 transition-all flex items-center justify-center cursor-pointer"
-              aria-label="Close window"
-            >
-              <X className="size-2 text-[#4a0002] opacity-0 group-hover:opacity-100 transition-opacity" />
-            </button>
-            <button
-              onClick={onMinimize}
-              className="group size-3 rounded-[var(--radius)] bg-[#febc2e] hover:brightness-110 transition-all flex items-center justify-center cursor-pointer"
-              aria-label="Minimize window"
-            >
-              <Minus className="size-2 text-[#5f4a00] opacity-0 group-hover:opacity-100 transition-opacity" />
-            </button>
-            <button
-              onClick={toggleMaximize}
-              className="group size-3 rounded-[var(--radius)] bg-[#28c840] hover:brightness-110 transition-all flex items-center justify-center cursor-pointer"
-              aria-label={isMaximized ? "Restore window" : "Maximize window"}
-            >
-              {isMaximized ? (
-                <Minimize2 className="size-2 text-[#004a00] opacity-0 group-hover:opacity-100 transition-opacity" />
-              ) : (
-                <Maximize2 className="size-2 text-[#004a00] opacity-0 group-hover:opacity-100 transition-opacity" />
-              )}
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={onClose}
+                  className="group size-3 rounded-[var(--radius)] bg-[#ff5f57] hover:brightness-110 transition-all flex items-center justify-center cursor-pointer"
+                  aria-label="Close window"
+                >
+                  <X className="size-2 text-[#4a0002] opacity-0 group-hover:opacity-100 transition-opacity" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" sideOffset={6}>Close</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={onMinimize}
+                  className="group size-3 rounded-[var(--radius)] bg-[#febc2e] hover:brightness-110 transition-all flex items-center justify-center cursor-pointer"
+                  aria-label="Minimize window"
+                >
+                  <Minus className="size-2 text-[#5f4a00] opacity-0 group-hover:opacity-100 transition-opacity" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" sideOffset={6}>Minimize</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={toggleMaximize}
+                  className="group size-3 rounded-[var(--radius)] bg-[#28c840] hover:brightness-110 transition-all flex items-center justify-center cursor-pointer"
+                  aria-label={isMaximized ? "Restore window" : "Maximize window"}
+                >
+                  {isMaximized ? (
+                    <Minimize2 className="size-2 text-[#004a00] opacity-0 group-hover:opacity-100 transition-opacity" />
+                  ) : (
+                    <Maximize2 className="size-2 text-[#004a00] opacity-0 group-hover:opacity-100 transition-opacity" />
+                  )}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" sideOffset={6}>
+                {isMaximized ? "Restore" : "Maximize"}
+              </TooltipContent>
+            </Tooltip>
           </div>
         </div>
 

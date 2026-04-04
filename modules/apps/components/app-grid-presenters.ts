@@ -53,6 +53,7 @@ export type AppItem = {
   category: string;
   webUiPort: number | null;
   containerName: string | null;
+  updateAvailable: boolean;
 };
 
 export type AppActionTarget = {
@@ -220,7 +221,7 @@ export function getAppVisualState(app: AppItem) {
       badgeIcon: RefreshCw,
       badgeClass: "bg-status-amber/20 text-status-amber",
       badgeIconClass: "animate-spin",
-      title: "Redeploying",
+      title: "Processing",
     };
   }
 
@@ -341,6 +342,7 @@ export function buildAppItems(params: {
         category: catalog?.categories[0] ?? visual.category,
         webUiPort: installed?.webUiPort ?? null,
         containerName: installed?.containerName ?? null,
+        updateAvailable: catalog?.updateAvailable ?? false,
       } satisfies AppItem;
     })
     .sort((left, right) => left.name.localeCompare(right.name));

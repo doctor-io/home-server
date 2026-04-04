@@ -3,13 +3,15 @@
 import { AppGridContent } from "@/modules/apps/components/app-grid-content";
 import { useAppGridController } from "@/modules/apps/components/app-grid-controller";
 import { AppGridContextMenu } from "@/modules/apps/components/app-grid-menu";
-import type { AppActionTarget } from "@/modules/apps/components/app-grid-presenters";
+import type { AppActionTarget, AppOperationStateLike } from "@/modules/apps/components/app-grid-presenters";
 import { UninstallAppDialog } from "@/modules/apps/components/uninstall-app-dialog";
+import { X } from "@/components/icons/platform-icons";
 export type { AppActionTarget } from "@/modules/apps/components/app-grid-presenters";
 
 type AppGridProps = {
   iconSize?: "small" | "medium" | "large";
   animationsEnabled?: boolean;
+  externalOperationsByApp?: Record<string, AppOperationStateLike>;
   onOpenDashboard?: (target: AppActionTarget) => void;
   onViewLogs?: (target: AppActionTarget) => void;
   onOpenTerminal?: (target: AppActionTarget) => void;
@@ -20,6 +22,7 @@ type AppGridProps = {
 export function AppGrid({
   iconSize = "medium",
   animationsEnabled = true,
+  externalOperationsByApp,
   onOpenDashboard,
   onViewLogs,
   onOpenTerminal,
@@ -27,6 +30,7 @@ export function AppGrid({
   onCopyUrl,
 }: AppGridProps) {
   const controller = useAppGridController({
+    externalOperationsByApp,
     onCopyUrl,
     onOpenDashboard,
     onOpenSettings,
@@ -40,8 +44,15 @@ export function AppGrid({
       onClick={controller.closeContextMenu}
     >
       {controller.actionError ? (
-        <div className="mt-4 rounded-lg border border-status-red/30 bg-status-red/10 px-3 py-2 text-xs text-status-red">
-          {controller.actionError}
+        <div className="mt-4 flex items-start justify-between gap-2 rounded-lg border border-status-red/30 bg-status-red/10 px-3 py-2 text-xs text-status-red">
+          <span>{controller.actionError}</span>
+          <button
+            onClick={controller.dismissActionError}
+            className="mt-0.5 shrink-0 opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
+            aria-label="Dismiss error"
+          >
+            <X className="size-3" />
+          </button>
         </div>
       ) : null}
       <AppGridContent
@@ -58,6 +69,13 @@ export function AppGrid({
         }}
         primaryOperation={controller.primaryOperation}
       />
+
+      {controller.contextMenu ? (
+        <div
+          className="fixed inset-0 z-[219]"
+          onClick={controller.closeContextMenu}
+        />
+      ) : null}
 
       {controller.contextMenu && controller.menuApp ? (
         <AppGridContextMenu

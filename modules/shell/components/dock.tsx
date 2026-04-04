@@ -8,6 +8,11 @@ import {
   SettingsRegular,
   WindowConsoleRegular,
 } from "@fluentui/react-icons";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useRef, useState } from "react";
 
 export type DockItemDef = {
@@ -80,32 +85,34 @@ export function Dock({
           const isFocused = focusedWindow === item.id;
           return (
             <div key={item.id} className="flex flex-col items-center gap-1">
-              <button
-                onMouseEnter={() => setHoveredIndex(index)}
-                onClick={() => onItemClick?.(item.id)}
-                style={{
-                  transform: `scale(${scale})`,
-                  transition: animationsEnabled
-                    ? "transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)"
-                    : "none",
-                }}
-                className={`relative size-11 rounded-xl flex items-center justify-center cursor-pointer transition-colors ${
-                  isFocused
-                    ? "bg-primary/20 text-primary"
-                    : isRunning
-                      ? "bg-secondary/65 text-foreground hover:bg-secondary/85"
-                      : "bg-secondary/50 text-muted-foreground hover:text-foreground hover:bg-secondary/80"
-                }`}
-                aria-label={item.name}
-                aria-pressed={isFocused}
-              >
-                <item.icon className="size-5" />
-                {hoveredIndex === index && (
-                  <span className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 text-xs font-medium text-foreground bg-popover border border-glass-border rounded-lg whitespace-nowrap shadow-lg">
-                    {item.name}
-                  </span>
-                )}
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onMouseEnter={() => setHoveredIndex(index)}
+                    onClick={() => onItemClick?.(item.id)}
+                    style={{
+                      transform: `scale(${scale})`,
+                      transition: animationsEnabled
+                        ? "transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)"
+                        : "none",
+                    }}
+                    className={`relative size-11 rounded-xl flex items-center justify-center cursor-pointer transition-colors ${
+                      isFocused
+                        ? "bg-primary/20 text-primary"
+                        : isRunning
+                          ? "bg-secondary/65 text-foreground hover:bg-secondary/85"
+                          : "bg-secondary/50 text-muted-foreground hover:text-foreground hover:bg-secondary/80"
+                    }`}
+                    aria-label={item.name}
+                    aria-pressed={isFocused}
+                  >
+                    <item.icon className="size-5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side={isVertical ? (position === "left" ? "right" : "left") : "top"} sideOffset={8}>
+                  {item.name}
+                </TooltipContent>
+              </Tooltip>
               {isRunning && (
                 <span
                   className={`size-1 rounded-[var(--radius)] ${

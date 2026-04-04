@@ -4,6 +4,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { writePersistedPowerActionCompletion } from "@/lib/desktop/reboot-state";
+import { createTestQueryClient, createWrapper } from "@/test/query-client-wrapper";
 
 const { toastSuccessMock } = vi.hoisted(() => ({
   toastSuccessMock: vi.fn(),
@@ -135,6 +136,13 @@ vi.mock("@/modules/shell/components/window", () => ({
 
 import { DesktopShell } from "@/modules/shell/components/desktop-shell";
 
+function renderDesktopShell() {
+  const client = createTestQueryClient();
+  return render(<DesktopShell />, {
+    wrapper: createWrapper(client),
+  });
+}
+
 describe("DesktopShell reboot handling", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -206,7 +214,7 @@ describe("DesktopShell reboot handling", () => {
       startedAt: new Date().toISOString(),
     });
 
-    render(<DesktopShell />);
+    renderDesktopShell();
 
     expect(
       screen.getByText("Waiting for server to restart..."),
@@ -229,7 +237,7 @@ describe("DesktopShell reboot handling", () => {
       startedAt: new Date().toISOString(),
     });
 
-    render(<DesktopShell />);
+    renderDesktopShell();
 
     await waitFor(() => {
       expect(routerReplaceMock).not.toHaveBeenCalled();
@@ -251,7 +259,7 @@ describe("DesktopShell reboot handling", () => {
       startedAt: new Date().toISOString(),
     });
 
-    render(<DesktopShell />);
+    renderDesktopShell();
 
     expect(screen.getByText("Applying Homeio update...")).toBeTruthy();
   });
@@ -271,7 +279,7 @@ describe("DesktopShell reboot handling", () => {
       startedAt: null,
     });
 
-    render(<DesktopShell />);
+    renderDesktopShell();
 
     expect(screen.getByText("Loading session...")).toBeTruthy();
     expect(
@@ -304,7 +312,7 @@ describe("DesktopShell reboot handling", () => {
       completedAt: new Date().toISOString(),
     });
 
-    render(<DesktopShell />);
+    renderDesktopShell();
 
     await waitFor(() => {
       expect(toastSuccessMock).toHaveBeenCalledWith("Homeio update completed.");
@@ -330,7 +338,7 @@ describe("DesktopShell reboot handling", () => {
       startedAt: null,
     });
 
-    render(<DesktopShell />);
+    renderDesktopShell();
 
     fireEvent.click(screen.getByRole("button", { name: "Dock App Store" }));
     fireEvent.click(screen.getByRole("button", { name: "Dock Settings" }));
@@ -368,7 +376,7 @@ describe("DesktopShell reboot handling", () => {
       startedAt: null,
     });
 
-    render(<DesktopShell />);
+    renderDesktopShell();
 
     fireEvent.click(screen.getByRole("button", { name: "Dock App Store" }));
 
@@ -406,7 +414,7 @@ describe("DesktopShell reboot handling", () => {
       startedAt: null,
     });
 
-    render(<DesktopShell />);
+    renderDesktopShell();
 
     fireEvent.click(screen.getByRole("button", { name: "Dock App Store" }));
     fireEvent.click(screen.getByRole("button", { name: "Minimize App Store" }));
@@ -439,7 +447,7 @@ describe("DesktopShell reboot handling", () => {
       startedAt: null,
     });
 
-    render(<DesktopShell />);
+    renderDesktopShell();
 
     fireEvent.keyDown(window, { key: "k", metaKey: true });
 
@@ -466,7 +474,7 @@ describe("DesktopShell reboot handling", () => {
       startedAt: null,
     });
 
-    render(<DesktopShell />);
+    renderDesktopShell();
 
     fireEvent.click(screen.getByRole("button", { name: "Dock App Store" }));
     fireEvent.keyDown(window, { key: "k", metaKey: true });

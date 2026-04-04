@@ -8,11 +8,14 @@ import {
   type AppActionTarget,
   type AppGridStatus,
   type AppItem,
+  type AppOperationStateLike,
 } from "@/modules/apps/components/app-grid-presenters";
 import { useInstalledApps } from "@/modules/apps/hooks/useInstalledApps";
 import { useStoreActions } from "@/modules/apps/hooks/useStoreActions";
 import { useStoreCatalog } from "@/modules/apps/hooks/useStoreCatalog";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { isStoreOperationActiveStatus } from "@/lib/shared/store-operations";
+import { toast } from "sonner";
 
 type AppGridMenuAction =
   | "open"
@@ -27,6 +30,7 @@ type AppGridMenuAction =
   | "remove";
 
 type UseAppGridControllerOptions = {
+  externalOperationsByApp?: Record<string, AppOperationStateLike>;
   onCopyUrl?: (target: AppActionTarget) => void;
   onOpenDashboard?: (target: AppActionTarget) => void;
   onOpenSettings?: (target: AppActionTarget) => void;
@@ -35,6 +39,7 @@ type UseAppGridControllerOptions = {
 };
 
 export function useAppGridController({
+  externalOperationsByApp,
   onCopyUrl,
   onOpenDashboard,
   onOpenSettings,
@@ -76,15 +81,20 @@ export function useAppGridController({
     [installedAppsQuery.data],
   );
 
+  const mergedOperationsByApp = useMemo(
+    () => ({ ...externalOperationsByApp, ...operationsByApp }),
+    [externalOperationsByApp, operationsByApp],
+  );
+
   const apps = useMemo(
     () =>
       buildAppItems({
         installedApps,
         installedCatalogApps,
-        operationsByApp,
+        operationsByApp: mergedOperationsByApp,
         statusByAppId,
       }),
-    [installedApps, installedCatalogApps, operationsByApp, statusByAppId],
+    [installedApps, installedCatalogApps, mergedOperationsByApp, statusByAppId],
   );
 
   const activeOperations = useMemo(
@@ -92,9 +102,9 @@ export function useAppGridController({
       buildActiveAppOperations({
         installedApps,
         installedCatalogApps,
-        operationsByApp,
+        operationsByApp: mergedOperationsByApp,
       }),
-    [installedApps, installedCatalogApps, operationsByApp],
+    [installedApps, installedCatalogApps, mergedOperationsByApp],
   );
 
   const isAppsLoading =
@@ -108,20 +118,29 @@ export function useAppGridController({
   const uninstallTarget = uninstallAppId
     ? (apps.find((app) => app.id === uninstallAppId) ?? null)
     : null;
-  const menuOperation = menuApp ? operationsByApp[menuApp.id] : undefined;
+  const menuOperation = menuApp ? mergedOperationsByApp[menuApp.id] : undefined;
   const menuTarget = menuApp ? resolveAppActionTarget(menuApp) : null;
   const menuHasDashboardUrl = Boolean(
     menuTarget && menuTarget.dashboardUrl.trim().length > 0,
   );
   const isMenuAppBusy = Boolean(
-    menuOperation &&
-    (menuOperation.status === "queued" || menuOperation.status === "running"),
+    (menuOperation && isStoreOperationActiveStatus(menuOperation.status)) ||
+      menuApp?.status === "updating",
   );
 
   function closeContextMenu() {
     setContextMenu(null);
     setActiveAppId(null);
   }
+
+  useEffect(() => {
+    if (!contextMenu) return;
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") closeContextMenu();
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [contextMenu]);
 
   function updateAppStatus(appId: string, status: AppItem["status"]) {
     setStatusByAppId((previous) => ({
@@ -144,7 +163,7 @@ export function useAppGridController({
     setActionError(null);
     setActiveAppId(app.id);
     const x = Math.min(event.clientX, window.innerWidth - 220);
-    const y = Math.min(event.clientY, window.innerHeight - 260);
+    const y = Math.min(event.clientY, window.innerHeight - 320);
     setContextMenu({ x, y, appId: app.id });
   }
 
@@ -182,14 +201,25 @@ export function useAppGridController({
         await openDashboardForApp(menuApp);
       } else if (action === "start") {
         updateAppStatus(menuApp.id, "running");
-        await startApp(menuApp.id);
+        try {
+          await startApp(menuApp.id);
+          toast.success(`${menuApp.name} started`);
+        } finally {
+          clearAppStatus(menuApp.id);
+        }
       } else if (action === "stop") {
         updateAppStatus(menuApp.id, "stopped");
-        await stopApp(menuApp.id);
+        try {
+          await stopApp(menuApp.id);
+          toast.success(`${menuApp.name} stopped`);
+        } finally {
+          clearAppStatus(menuApp.id);
+        }
       } else if (action === "restart") {
         updateAppStatus(menuApp.id, "updating");
         try {
           await restartApp(menuApp.id);
+          toast.success(`${menuApp.name} restarted`);
         } finally {
           clearAppStatus(menuApp.id);
         }
@@ -205,6 +235,7 @@ export function useAppGridController({
           requireContainerName: true,
         });
         if (!resolvedTarget) {
+          setActionError("Container name is not available for this app.");
           closeContextMenu();
           return;
         }
@@ -214,6 +245,7 @@ export function useAppGridController({
           requireContainerName: true,
         });
         if (!resolvedTarget) {
+          setActionError("Container name is not available for this app.");
           closeContextMenu();
           return;
         }
@@ -239,12 +271,17 @@ export function useAppGridController({
           onCopyUrl(resolvedTarget);
         } else if (navigator.clipboard?.writeText) {
           await navigator.clipboard.writeText(resolvedTarget.dashboardUrl);
+          toast.success("URL copied to clipboard");
+        } else {
+          setActionError("Clipboard is not available. Copy the URL manually: " + resolvedTarget.dashboardUrl);
         }
       } else if (action === "remove") {
         setUninstallError(null);
         setUninstallAppId(menuApp.id);
       }
-    } catch {}
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Action failed.");
+    }
 
     closeContextMenu();
   }
@@ -279,6 +316,7 @@ export function useAppGridController({
   return {
     actionError,
     activeAppId,
+    dismissActionError: () => setActionError(null),
     activeOperationsCount: activeOperations.length,
     apps,
     closeContextMenu,

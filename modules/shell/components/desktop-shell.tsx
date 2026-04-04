@@ -17,6 +17,7 @@ import {
 } from "@/modules/apps/components/app-grid";
 import { AppStore } from "@/modules/apps/components/app-store";
 import { AppConfiguratorPanel } from "@/modules/apps/components/configurator/app-configurator-panel";
+import { useStoreActions } from "@/modules/apps/hooks/useStoreActions";
 import { FileManager } from "@/modules/files/components/file-manager";
 import { SettingsPanel } from "@/modules/settings/components/settings";
 import { CommandPalette } from "@/modules/shell/components/command-palette";
@@ -95,6 +96,7 @@ export function DesktopShell() {
   );
   const [appSettingsTarget, setAppSettingsTarget] =
     useState<AppActionTarget | null>(null);
+  const shellStoreActions = useStoreActions();
   const terminalCommandIdRef = useRef(0);
   const [displayWallpaper, setDisplayWallpaper] = useState("/images/1.jpg");
   const [nextWallpaper, setNextWallpaper] = useState<string | null>(null);
@@ -672,6 +674,7 @@ export function DesktopShell() {
           <AppGrid
             iconSize={appIconSize}
             animationsEnabled={appearance.animationsEnabled}
+            externalOperationsByApp={shellStoreActions.operationsByApp}
             onViewLogs={({ containerName }) =>
               requestLogsCommand(`docker logs --tail 200 ${containerName}`)
             }
@@ -819,6 +822,11 @@ export function DesktopShell() {
             <AppConfiguratorPanel
               context="installed_edit"
               target={appSettingsTarget}
+              actions={{ saveAppSettings: shellStoreActions.saveAppSettings }}
+              onClose={() => {
+                closeWindow("app-settings");
+                setAppSettingsTarget(null);
+              }}
             />
           </Window>
         )}

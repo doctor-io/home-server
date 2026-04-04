@@ -5,6 +5,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let mockDataRoot = "";
 
+vi.mock("@/lib/server/modules/files/stars-repository", () => ({
+  isPathStarredInDb: vi.fn(async () => false),
+  listStarredPathsFromDb: vi.fn(async () => []),
+  setPathStarredInDb: vi.fn(async () => undefined),
+}));
+
+vi.mock("@/lib/server/modules/files/trash-repository", () => ({
+  listTrashEntriesFromDb: vi.fn(async () => []),
+}));
+
 vi.mock("@/lib/server/modules/files/path-resolver", () => {
   class FilesPathError extends Error {
     code: string;

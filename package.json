@@ -1,6 +1,6 @@
 {
   "name": "homeio",
-  "version": "1.3.1-beta",
+  "version": "1.3.3",
   "description": "Self-hosted home server dashboard — desktop-style UI for managing Docker apps, files, terminal, and system resources.",
   "author": "doctor-io",
   "license": "MIT",
@@ -34,6 +34,7 @@
     ]
   },
   "dependencies": {
+    "@dawudesign/node-hexa-cli": "^0.7.6",
     "@fluentui/react-icons": "^2.0.321",
     "@hookform/resolvers": "^3.9.1",
     "@lydell/node-pty": "^1.2.0-beta.3",

@@ -61,11 +61,11 @@ export function AppGridContent({
               <Loader2 className="size-4 animate-spin" />
             </span>
             <div className="min-w-0">
-              <p className="truncate font-medium text-foreground">
+              <p className="truncate font-medium text-foreground tracking-tight">
                 {getStoreOperationActionLabel(primaryOperation.action)}{" "}
                 {primaryOperation.appName}
               </p>
-              <p className="truncate text-[11px] text-muted-foreground">
+              <p className="truncate text-[10px] uppercase tracking-[0.12em] text-muted-foreground font-mono">
                 {activeOperationsCount > 1
                   ? `${activeOperationsCount} app actions in progress`
                   : primaryOperation.status === "queued"
@@ -83,7 +83,7 @@ export function AppGridContent({
                 }}
               />
             </div>
-            <span className="tabular-nums text-[11px] text-foreground">
+            <span className="tabular-nums text-[11px] font-mono font-medium text-foreground">
               {primaryOperation.progressPercent}%
             </span>
           </div>
@@ -92,28 +92,25 @@ export function AppGridContent({
 
       {isAppsLoading && apps.length === 0 ? (
         <div className="mt-24" role="status" aria-live="polite">
-          <div className="mx-auto flex max-w-sm flex-col items-center text-center">
-            <div className="flex size-24 items-center justify-center rounded-[1.75rem] border border-glass-border bg-background/45 shadow-2xl shadow-black/20 backdrop-blur-xl">
-              <div className="flex size-14 items-center justify-center rounded-[1.25rem] bg-primary/10">
-                <Loader2 className="size-7 animate-spin text-primary blur-[0.2px]" />
-              </div>
+          <div className="mx-auto flex max-w-xs flex-col items-center text-center">
+            <div className="relative h-1 w-48 overflow-hidden rounded-full bg-glass-border/30">
+              <div className="absolute inset-0 animate-grid-scan rounded-full bg-gradient-to-r from-transparent via-primary/60 to-transparent" />
             </div>
-            <div className="mt-5 rounded-[var(--radius)] border border-glass-border bg-background/40 px-3 py-1.5 text-xs text-muted-foreground backdrop-blur-xl">
-              Loading installed apps
-            </div>
-            <p className="mt-3 text-xs leading-5 text-muted-foreground">
-              Syncing installed containers and catalog metadata now.
+            <p className="mt-4 text-[10px] uppercase tracking-[0.2em] font-mono text-muted-foreground">
+              Syncing containers
             </p>
           </div>
         </div>
       ) : isAppsError && apps.length === 0 ? (
-        <div className="mt-24 text-xs text-status-red">
-          Unable to load apps.
+        <div className="mt-24 text-center">
+          <p className="text-[10px] uppercase tracking-[0.2em] font-mono text-status-red">
+            Connection failed
+          </p>
         </div>
       ) : apps.length === 0 ? (
         <div className="mt-24 min-h-[12rem]" aria-hidden="true" />
       ) : (
-        <div className="mt-24 grid grid-cols-[repeat(4,minmax(0,5.5rem))] justify-center gap-x-2 gap-y-5 sm:grid-cols-[repeat(5,minmax(0,5.5rem))] md:grid-cols-[repeat(6,minmax(0,5.5rem))] lg:grid-cols-[repeat(8,minmax(0,5.5rem))] xl:grid-cols-[repeat(10,minmax(0,5.5rem))]">
+        <div className="mt-24 grid grid-cols-[repeat(4,minmax(0,5.5rem))] justify-center gap-x-1 gap-y-6 sm:grid-cols-[repeat(5,minmax(0,5.5rem))] md:grid-cols-[repeat(6,minmax(0,5.5rem))] lg:grid-cols-[repeat(8,minmax(0,5.5rem))] xl:grid-cols-[repeat(10,minmax(0,5.5rem))]">
           {apps.map((app) => {
             const visualState = getAppVisualState(app);
             const BadgeIcon = visualState.badgeIcon;
@@ -142,7 +139,7 @@ export function AppGridContent({
               >
                 <div className="relative">
                   <div
-                    className={`${iconContainerClass} relative flex items-center justify-center overflow-hidden border ${visualState.ringClass} ${!app.logoUrl ? `${app.bgColor} ${app.color}` : "bg-white/90"} shadow-lg shadow-black/20 ${
+                    className={`${iconContainerClass} relative flex items-center justify-center overflow-hidden border grain-overlay ${visualState.ringClass} ${!app.logoUrl ? `${app.bgColor} ${app.color}` : "bg-white/90"} shadow-lg shadow-black/20 ${
                       animationsEnabled
                         ? `transition-transform duration-200 group-hover:scale-110 ${animatedContainerClass}`
                         : ""
@@ -214,10 +211,16 @@ export function AppGridContent({
                       className={`pointer-events-none absolute -bottom-0.5 -right-0.5 size-3 rounded-[var(--radius)] ${animatedDotInnerClass}`}
                     />
                   ) : null}
+                  {app.updateAvailable && app.status === "running" ? (
+                    <span
+                      className="pointer-events-none absolute -top-0.5 -right-0.5 size-2.5 rounded-full border border-background bg-primary"
+                      title="Update available"
+                    />
+                  ) : null}
                 </div>
 
                 <span
-                  className={`max-w-[4.5rem] truncate text-center text-xs font-medium leading-tight text-foreground/90 ${
+                  className={`max-w-[4.5rem] truncate text-center text-[11px] font-medium leading-tight tracking-tight text-foreground/80 ${
                     animationsEnabled
                       ? "transition-colors group-hover:text-foreground"
                       : ""

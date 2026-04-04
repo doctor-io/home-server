@@ -4,6 +4,11 @@ import type { TerminalOutputLine } from "@/lib/shared/contracts/terminal";
 import { useTerminalCommand } from "@/modules/shell/hooks/useTerminalCommand";
 import { ChevronRight, Copy, Download, Search, X } from "@/components/icons/platform-icons";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
     useCallback,
     useEffect,
     useMemo,
@@ -530,34 +535,46 @@ Shortcuts: Ctrl+C interrupt  Ctrl+L clear  Ctrl+F search  Ctrl+W delete word`,
 
         {/* Right-side action buttons */}
         <div className="ml-auto flex items-center gap-0.5">
-          <button
-            onClick={() => setSearchOpen((o) => !o)}
-            className={`rounded p-1 transition-colors cursor-pointer ${
-              searchOpen
-                ? "text-primary"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-            title="Search output (Ctrl+F)"
-            aria-label="Search terminal output"
-          >
-            <Search className="size-3.5" />
-          </button>
-          <button
-            onClick={handleCopyAll}
-            className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground cursor-pointer"
-            title="Copy all output"
-            aria-label="Copy all terminal output"
-          >
-            <Copy className="size-3.5" />
-          </button>
-          <button
-            onClick={handleDownloadTranscript}
-            className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground cursor-pointer"
-            title="Download transcript"
-            aria-label="Download terminal transcript"
-          >
-            <Download className="size-3.5" />
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => setSearchOpen((o) => !o)}
+                className={`rounded p-1 transition-colors cursor-pointer ${
+                  searchOpen
+                    ? "text-primary"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                aria-label="Search terminal output"
+              >
+                <Search className="size-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" sideOffset={6}>Search output (Ctrl+F)</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={handleCopyAll}
+                className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground cursor-pointer"
+                aria-label="Copy all terminal output"
+              >
+                <Copy className="size-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" sideOffset={6}>Copy all output</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={handleDownloadTranscript}
+                className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground cursor-pointer"
+                aria-label="Download terminal transcript"
+              >
+                <Download className="size-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" sideOffset={6}>Download transcript</TooltipContent>
+          </Tooltip>
         </div>
       </div>
 

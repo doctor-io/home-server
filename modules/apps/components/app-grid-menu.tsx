@@ -13,6 +13,11 @@ import {
   TerminalSquare,
   Trash2,
 } from "@/components/icons/platform-icons";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { ReactNode } from "react";
 
 type AppGridAction =
@@ -59,19 +64,21 @@ export function AppGridContextMenu({
         <AppGridContextMenuItem
           icon={<Square className="size-3.5" />}
           label="Stop Container"
+          disabled={isBusy}
           onClick={() => onAction("stop")}
         />
       ) : (
         <AppGridContextMenuItem
           icon={<Play className="size-3.5" />}
           label="Start Container"
+          disabled={isBusy}
           onClick={() => onAction("start")}
         />
       )}
       <AppGridContextMenuItem
         icon={<RotateCcw className="size-3.5" />}
         label="Restart Container"
-        disabled={app.status === "updating"}
+        disabled={isBusy}
         onClick={() => onAction("restart")}
       />
       <AppGridContextMenuItem
@@ -93,7 +100,7 @@ export function AppGridContextMenu({
       <AppGridContextMenuItem
         icon={<RefreshCw className="size-3.5" />}
         label="Check Updates"
-        disabled={app.status === "updating"}
+        disabled={isBusy}
         onClick={() => onAction("update")}
       />
       <AppGridContextMenuItem
@@ -130,11 +137,10 @@ function AppGridContextMenuItem({
   onClick: () => void;
   title?: string;
 }) {
-  return (
+  const button = (
     <button
       onClick={onClick}
       disabled={disabled}
-      title={title}
       className={`flex w-full items-center gap-2.5 px-3 py-1.5 text-xs transition-colors ${
         danger
           ? "text-status-red hover:bg-status-red/10 disabled:hover:bg-transparent"
@@ -145,4 +151,17 @@ function AppGridContextMenuItem({
       {label}
     </button>
   );
+
+  if (title) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="block">{button}</span>
+        </TooltipTrigger>
+        <TooltipContent side="right" sideOffset={8}>{title}</TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return button;
 }
