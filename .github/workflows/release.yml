@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - develop
   pull_request:
     branches:
       - main
@@ -60,4 +61,3 @@ jobs:
 
       - name: Build
         run: NODE_ENV=production npm run build
-
