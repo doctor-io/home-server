@@ -22,6 +22,7 @@ import {
 } from "@/modules/files/hooks/files-api";
 
 export { buildAssetUrl, buildDownloadUrl, buildZipUrl, toFilePath } from "@/modules/files/hooks/files-api";
+export type { FilePasteCollision } from "@/modules/files/hooks/files-api";
 
 export function useFilesRoot() {
   return useQuery({
@@ -213,3 +214,4 @@ export function useUploadFiles() {
     },
   });
 }
+

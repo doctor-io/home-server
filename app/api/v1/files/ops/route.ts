@@ -34,6 +34,7 @@ const opsSchema = z.discriminatedUnion("action", [
     sourcePath: z.string().trim().min(1),
     destinationPath: z.string().trim().default(""),
     operation: z.enum(["copy", "move"]),
+    collision: z.enum(["replace", "keep-both", "skip"]).optional(),
   }),
   z.object({
     action: z.literal("rename"),
@@ -156,6 +157,7 @@ export async function POST(request: Request) {
           sourcePath: parsed.data.sourcePath,
           destinationPath: parsed.data.destinationPath,
           operation: parsed.data.operation,
+          collision: parsed.data.collision,
           includeHidden,
         });
         return NextResponse.json(

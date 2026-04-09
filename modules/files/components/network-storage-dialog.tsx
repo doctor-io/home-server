@@ -95,6 +95,13 @@ export function NetworkStorageDialog({
     if (!isOpen) {
       autoDiscoverRanRef.current = false;
       setIsAddFormOpen(false);
+      setHost("");
+      setShare("");
+      setUsername("");
+      setPassword("");
+      setLocalError(null);
+      setDiscoveredServers([]);
+      setDiscoveredShares([]);
       return;
     }
     if (autoDiscoverRanRef.current) return;

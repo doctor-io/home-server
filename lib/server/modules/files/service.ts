@@ -42,24 +42,18 @@ import type {
 } from "@/lib/shared/contracts/files";
 
 const TEXT_EXTENSIONS = new Set([
-  "txt",
-  "md",
-  "json",
-  "yaml",
-  "yml",
-  "conf",
-  "env",
-  "log",
-  "csv",
-  "sh",
-  "py",
-  "js",
-  "ts",
-  "css",
-  "html",
-  "xml",
-  "sql",
-  "ini",
+  "txt", "md", "json", "yaml", "yml", "conf", "env", "log", "csv",
+  "sh", "bash", "zsh", "fish",
+  "py", "js", "ts", "jsx", "tsx", "mjs", "cjs",
+  "css", "scss", "sass", "less",
+  "html", "htm", "xml", "svg",
+  "sql", "ini", "toml", "cfg",
+  "go", "rs", "rb", "php", "kt", "kts", "java",
+  "c", "cpp", "cc", "cxx", "h", "hpp",
+  "swift", "pl", "pm", "lua", "r", "ex", "exs",
+  "dockerfile", "makefile", "gitignore", "gitattributes",
+  "editorconfig", "prettierrc", "eslintrc", "babelrc",
+  "lock", "gradle", "pom",
 ]);
 
 const IMAGE_MIME_BY_EXTENSION: Record<string, string> = {
@@ -81,6 +75,17 @@ const VIDEO_MIME_BY_EXTENSION: Record<string, string> = {
   mkv: "video/x-matroska",
   avi: "video/x-msvideo",
   m4v: "video/mp4",
+};
+
+const AUDIO_MIME_BY_EXTENSION: Record<string, string> = {
+  mp3: "audio/mpeg",
+  wav: "audio/wav",
+  flac: "audio/flac",
+  aac: "audio/aac",
+  m4a: "audio/mp4",
+  opus: "audio/opus",
+  oga: "audio/ogg",
+  weba: "audio/webm",
 };
 
 export const MAX_TEXT_READ_BYTES = 2 * 1024 * 1024;
@@ -112,6 +117,7 @@ type PasteEntryParams = {
   sourcePath: string;
   destinationPath?: string;
   operation: FilePasteOperation;
+  collision?: "replace" | "keep-both" | "skip";
   includeHidden?: boolean;
 };
 
@@ -249,6 +255,7 @@ export function getMimeTypeForExtension(extension: string | null) {
   if (!extension) return null;
   if (extension in IMAGE_MIME_BY_EXTENSION) return IMAGE_MIME_BY_EXTENSION[extension];
   if (extension in VIDEO_MIME_BY_EXTENSION) return VIDEO_MIME_BY_EXTENSION[extension];
+  if (extension in AUDIO_MIME_BY_EXTENSION) return AUDIO_MIME_BY_EXTENSION[extension];
   if (extension === "pdf") return "application/pdf";
   if (TEXT_EXTENSIONS.has(extension)) return "text/plain; charset=utf-8";
   return null;
@@ -260,6 +267,7 @@ function toViewerMode(extension: string | null): FileReadMode {
   if (extension in IMAGE_MIME_BY_EXTENSION) return "image";
   if (extension === "pdf") return "pdf";
   if (extension in VIDEO_MIME_BY_EXTENSION) return "video";
+  if (extension in AUDIO_MIME_BY_EXTENSION) return "audio";
   return "binary_unsupported";
 }
 
@@ -970,11 +978,44 @@ export async function pasteEntry(params: PasteEntryParams): Promise<FilePasteRes
           });
         }
 
-        if (targetPath.exists || (await pathExists(targetPath.absolutePath))) {
-          throw new FileServiceError("Destination already exists", {
-            code: "destination_exists",
-            statusCode: 409,
-          });
+        const targetExists = targetPath.exists || (await pathExists(targetPath.absolutePath));
+
+        if (targetExists) {
+          if (!params.collision || params.collision === "skip") {
+            if (!params.collision) {
+              throw new FileServiceError("Destination already exists", {
+                code: "destination_exists",
+                statusCode: 409,
+              });
+            }
+            // skip: return the existing path without error
+            return {
+              root: targetPath.rootPath,
+              path: targetPath.relativePath,
+              type: sourceInfo.isDirectory() ? "folder" : "file",
+            };
+          }
+
+          if (params.collision === "keep-both") {
+            // Find a unique name: "name (1)", "name (2)", etc.
+            const baseName = path.basename(sourcePath.relativePath);
+            const ext = sourceInfo.isDirectory() ? "" : path.extname(baseName);
+            const stem = sourceInfo.isDirectory() ? baseName : baseName.slice(0, baseName.length - ext.length);
+            let counter = 1;
+            let uniqueRelativePath: string;
+            do {
+              const candidate = `${stem} (${counter})${ext}`;
+              uniqueRelativePath = joinRelativePath(destinationDirectory.segments, candidate);
+              counter++;
+            } while (await pathExists(path.join(destinationDirectory.absolutePath, `${stem} (${counter - 1})${ext}`)));
+            targetPath = await resolveFilePath(uniqueRelativePath, includeHidden, {
+              allowEmpty: false,
+              allowMissingLeaf: true,
+            });
+          } else if (params.collision === "replace") {
+            // Delete the existing target first
+            await rm(targetPath.absolutePath, { recursive: true, force: true });
+          }
         }
 
         if (
@@ -991,8 +1032,8 @@ export async function pasteEntry(params: PasteEntryParams): Promise<FilePasteRes
         if (params.operation === "copy") {
           await cp(sourcePath.absolutePath, targetPath.absolutePath, {
             recursive: sourceInfo.isDirectory(),
-            force: false,
-            errorOnExist: true,
+            force: params.collision === "replace",
+            errorOnExist: params.collision !== "replace",
           });
         } else {
           await movePath(

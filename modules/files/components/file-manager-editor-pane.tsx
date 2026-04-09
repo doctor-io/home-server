@@ -57,13 +57,18 @@ function loadMonacoFromCdn(): Promise<MonacoNamespace> {
   if (monacoLoaderPromise) return monacoLoaderPromise;
 
   monacoLoaderPromise = new Promise((resolve, reject) => {
+    const fail = (err: Error) => {
+      monacoLoaderPromise = null;
+      reject(err);
+    };
+
     const boot = () => {
       if (!win.require) {
-        reject(new Error("Monaco loader is unavailable"));
+        fail(new Error("Monaco loader is unavailable"));
         return;
       }
       win.require.config({ paths: { vs: `${MONACO_CDN_BASE}/vs` } });
-      win.require(["vs/editor/editor.main"], () => resolve(win.monaco), reject);
+      win.require(["vs/editor/editor.main"], () => resolve(win.monaco), fail);
     };
 
     if (win.require) {
@@ -78,7 +83,7 @@ function loadMonacoFromCdn(): Promise<MonacoNamespace> {
       existing.addEventListener("load", boot, { once: true });
       existing.addEventListener(
         "error",
-        () => reject(new Error("Failed to load Monaco loader script")),
+        () => fail(new Error("Failed to load Monaco loader script")),
         { once: true },
       );
       return;
@@ -89,8 +94,7 @@ function loadMonacoFromCdn(): Promise<MonacoNamespace> {
     script.src = `${MONACO_CDN_BASE}/vs/loader.min.js`;
     script.async = true;
     script.onload = boot;
-    script.onerror = () =>
-      reject(new Error("Failed to load Monaco loader script"));
+    script.onerror = () => fail(new Error("Failed to load Monaco loader script"));
     document.body.appendChild(script);
   });
 

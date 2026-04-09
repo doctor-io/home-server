@@ -44,7 +44,8 @@ export async function GET(request: NextRequest) {
         if (
           details.mode !== "image" &&
           details.mode !== "pdf" &&
-          details.mode !== "video"
+          details.mode !== "video" &&
+          details.mode !== "audio"
         ) {
           return NextResponse.json(
             {
@@ -62,9 +63,9 @@ export async function GET(request: NextRequest) {
           includeHidden: serverEnv.FILES_ALLOW_HIDDEN,
         });
 
-        // For video files, support HTTP Range requests so the browser
+        // For video/audio files, support HTTP Range requests so the browser
         // can seek without downloading the whole file first.
-        if (details.mode === "video") {
+        if (details.mode === "video" || details.mode === "audio") {
           const rangeHeader = request.headers.get("range");
           const { absolutePath } = resolved;
           const fileSize = details.sizeBytes;

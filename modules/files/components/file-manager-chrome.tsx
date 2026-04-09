@@ -95,10 +95,10 @@ export function FileManagerSidebar({
                   <button
                     key={item.name}
                     onClick={() => onNavigateToPath(item.path)}
-                    className={`flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
+                    className={`flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-sm transition-colors cursor-pointer ${
                       isActive
                         ? "bg-primary/15 text-foreground"
-                        : "text-muted-foreground hover:text-foreground hover:bg-secondary/40"
+                        : "text-foreground/60 hover:text-foreground hover:bg-secondary/40"
                     }`}
                   >
                     {item.icon}
@@ -115,10 +115,10 @@ export function FileManagerSidebar({
         <div className="mb-3 flex flex-col gap-0.5">
           <button
             onClick={() => onNavigateToPath(["Shared"])}
-            className={`flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
+            className={`flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-sm transition-colors cursor-pointer ${
               isSharedView
                 ? "bg-primary/15 text-foreground"
-                : "text-muted-foreground hover:text-foreground hover:bg-secondary/40"
+                : "text-foreground/60 hover:text-foreground hover:bg-secondary/40"
             }`}
           >
             <PeopleRegular className="size-3.5 text-sky-400" />
@@ -126,10 +126,10 @@ export function FileManagerSidebar({
           </button>
           <button
             onClick={() => onNavigateToPath(["Trash"])}
-            className={`flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
+            className={`flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-sm transition-colors cursor-pointer ${
               isTrashView
                 ? "bg-primary/15 text-foreground"
-                : "text-muted-foreground hover:text-foreground hover:bg-secondary/40"
+                : "text-foreground/60 hover:text-foreground hover:bg-secondary/40"
             }`}
           >
             <DeleteRegular className="size-3.5 text-status-red" />
@@ -173,6 +173,7 @@ type ToolbarProps = {
   sortDir: "asc" | "desc";
   uploadFilesPending: boolean;
   uploadInputRef: RefObject<HTMLInputElement | null>;
+  uploadProgress: { loaded: number; total: number } | null;
   viewMode: "grid" | "list";
   onCycleSortBy: () => void;
   onEmptyTrash: () => void;
@@ -207,6 +208,7 @@ export function FileManagerToolbar({
   sortDir,
   uploadFilesPending,
   uploadInputRef,
+  uploadProgress,
   viewMode,
   onCycleSortBy,
   onEmptyTrash,
@@ -285,15 +287,32 @@ export function FileManagerToolbar({
               <File className="size-3.5" />
               <Plus className="absolute -right-0.5 -top-0.5 size-2.5" />
             </button>
-            <button
-              onClick={() => uploadInputRef.current?.click()}
-              disabled={uploadFilesPending}
-              className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-              aria-label="Upload files"
-              title="Upload files"
-            >
-              <Upload className="size-3.5" />
-            </button>
+            <div className="relative inline-flex items-center">
+              <button
+                onClick={() => uploadInputRef.current?.click()}
+                disabled={uploadFilesPending}
+                className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label="Upload files"
+                title="Upload files"
+              >
+                {uploadFilesPending && uploadProgress ? (
+                  <Loader2 className="size-3.5 animate-spin text-primary" />
+                ) : (
+                  <Upload className="size-3.5" />
+                )}
+              </button>
+              {uploadProgress && uploadProgress.total > 0 ? (
+                <div
+                  className="absolute -bottom-1 left-0 right-0 h-0.5 overflow-hidden rounded-full bg-white/10"
+                  title={`${Math.round((uploadProgress.loaded / uploadProgress.total) * 100)}%`}
+                >
+                  <div
+                    className="h-full bg-primary transition-all duration-150"
+                    style={{ width: `${Math.min(100, Math.round((uploadProgress.loaded / uploadProgress.total) * 100))}%` }}
+                  />
+                </div>
+              ) : null}
+            </div>
             <input
               ref={uploadInputRef}
               type="file"

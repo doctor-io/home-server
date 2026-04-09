@@ -78,7 +78,7 @@ export function CreateEntryDialog({
           </button>
           <button
             onClick={onSubmit}
-            disabled={dialog.name.trim().length === 0 || isCreatePending}
+            disabled={dialog.name.trim().length === 0 || Boolean(dialog.error) || isCreatePending}
             className="rounded-lg bg-primary/20 px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/30 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Create
@@ -161,6 +161,7 @@ export function RenameEntryDialog({
             disabled={
               dialog.name.trim().length === 0 ||
               dialog.name.trim() === dialog.entry.name ||
+              Boolean(dialog.error) ||
               isRenamePending
             }
             className="rounded-lg bg-primary/20 px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/30 disabled:cursor-not-allowed disabled:opacity-50"
@@ -321,6 +322,67 @@ export function FileInfoDialogOverlay({
           >
             Close
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function PasteConflictDialog({
+  conflictName,
+  onReplace,
+  onKeepBoth,
+  onSkip,
+  onSkipAll,
+}: {
+  conflictName: string;
+  onReplace: () => void;
+  onKeepBoth: () => void;
+  onSkip: () => void;
+  onSkipAll: () => void;
+}) {
+  return (
+    <div className="absolute inset-0 z-[205] flex items-center justify-center bg-background/35 px-4 backdrop-blur-[1px]">
+      <div
+        className={`w-full max-w-sm p-4 ${FILES_MENU_SHELL}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label="File conflict"
+      >
+        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
+          <File className="size-4 shrink-0 text-status-amber" />
+          <span>Item Already Exists</span>
+        </div>
+        <p className="mb-4 text-xs leading-relaxed text-muted-foreground">
+          <span className="font-semibold text-foreground">{conflictName}</span> already exists in the destination. What would you like to do?
+        </p>
+        <div className="flex flex-col gap-2">
+          <button
+            onClick={onReplace}
+            className="rounded-lg bg-status-red/15 px-3 py-2 text-left text-xs font-medium text-status-red transition-colors hover:bg-status-red/25"
+          >
+            Replace — overwrite the existing item
+          </button>
+          <button
+            onClick={onKeepBoth}
+            className="rounded-lg bg-primary/15 px-3 py-2 text-left text-xs font-medium text-primary transition-colors hover:bg-primary/25"
+          >
+            Keep Both — rename the new item
+          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={onSkip}
+              className="flex-1 rounded-lg px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground"
+            >
+              Skip
+            </button>
+            <button
+              onClick={onSkipAll}
+              className="flex-1 rounded-lg px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground"
+            >
+              Skip All
+            </button>
+          </div>
         </div>
       </div>
     </div>
