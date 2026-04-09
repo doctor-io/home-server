@@ -3,24 +3,38 @@ __v0_runtime_loader.js
 __v0_devtools.tsx
 __v0_jsx-dev-runtime.ts
 
-# Common ignores
+# Dependencies & build artifacts
 node_modules/
 .next/
+/dist-server
+tsconfig.tsbuildinfo
+next-env.d.ts
+
+# Environment
 .env*.local
 .DS_Store
+
+# Logs
 logs/
 !app/api/v1/logs/
 !app/api/v1/logs/**
 !lib/server/modules/logs/
 !lib/server/modules/logs/**
+
+# Test artifacts
 .husky/_/
 .playwright-test/
 .playwright-mcp/
-/dist-server
+
+# Data directories
 /DATA
 /screenshots
-# Coverage
 coverage/
-todo.md
-todo.md
-todo.md
+
+# AI assistant configs (machine-specific, not project code)
+.claude/
+.codex/
+.mcp.json
+.vscode/mcp.json
+CLAUDE.md
+AGENTS.md
