@@ -1,0 +1,16 @@
+node_modules
+.next
+dist-server
+coverage
+.git
+.env*.local
+.DS_Store
+logs
+DATA
+screenshots
+.playwright-mcp
+.playwright-test
+.claude
+.codex
+*.md
+!README.md

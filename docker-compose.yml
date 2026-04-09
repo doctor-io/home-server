@@ -1,0 +1,44 @@
+services:
+  homeio:
+    build: .
+    image: ghcr.io/doctor-io/homeio:latest
+    container_name: homeio
+    restart: unless-stopped
+    ports:
+      - "12026:12026"
+    environment:
+      DATABASE_URL: postgresql://homeio:homeio@db:5432/homeio
+      # IMPORTANT: change this to a random string before exposing outside your LAN
+      AUTH_SESSION_SECRET: ${AUTH_SESSION_SECRET:-change-me-to-a-random-32-char-secret}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      STORE_STACKS_ROOT: /stacks
+      STORE_APP_DATA_ROOT: /DATA/AppData
+      FILES_ROOT: /DATA
+      DOCKER_SOCKET_PATH: /var/run/docker.sock
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - homeio_stacks:/stacks
+      - ${DATA_ROOT:-/DATA}:/DATA
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    container_name: homeio-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: homeio
+      POSTGRES_PASSWORD: homeio
+      POSTGRES_DB: homeio
+    volumes:
+      - homeio_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U homeio -d homeio"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  homeio_db:
+  homeio_stacks:
