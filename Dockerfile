@@ -15,6 +15,7 @@ COPY . .
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_OUTPUT=standalone
 # Dummy values so Next.js build doesn't fail on env validation
 ENV DATABASE_URL=postgresql://placeholder:placeholder@localhost:5432/placeholder
 ENV AUTH_SESSION_SECRET=placeholder-build-secret-32-chars-min
@@ -42,14 +43,22 @@ COPY --from=builder --chown=homeio:homeio /app/dist-server ./dist-server
 # dbus-helper sidecar
 COPY --from=builder --chown=homeio:homeio /app/services/dbus-helper ./services/dbus-helper
 
-# Migration files
-COPY --from=builder --chown=homeio:homeio /app/drizzle ./drizzle
+# node_modules needed for drizzle-kit push at runtime (migrations)
+COPY --from=deps --chown=homeio:homeio /app/node_modules ./node_modules
+
+# Drizzle config + schema for migrations
+COPY --from=builder --chown=homeio:homeio /app/drizzle.config.ts ./drizzle.config.ts
+COPY --from=builder --chown=homeio:homeio /app/lib/server/db/schema-definitions.ts ./lib/server/db/schema-definitions.ts
+
+# Entrypoint
+COPY --chown=homeio:homeio docker-entrypoint.sh ./docker-entrypoint.sh
+RUN chmod +x docker-entrypoint.sh
 
 USER homeio
 
 EXPOSE 12026
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=5 \
   CMD wget -qO- http://localhost:12026/api/health || exit 1
 
-CMD ["node", "server.js"]
+CMD ["sh", "docker-entrypoint.sh"]

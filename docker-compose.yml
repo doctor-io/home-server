@@ -1,5 +1,6 @@
 services:
   homeio:
+    build: .
     image: ghcr.io/doctor-io/homeio:latest
     container_name: homeio
     restart: unless-stopped
@@ -8,7 +9,6 @@ services:
     environment:
       DATABASE_URL: postgresql://homeio:homeio@db:5432/homeio
       AUTH_SESSION_SECRET: ${AUTH_SESSION_SECRET:?AUTH_SESSION_SECRET is required}
-      AUTH_PRIMARY_USERNAME: ${AUTH_PRIMARY_USERNAME:-admin}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       STORE_STACKS_ROOT: /stacks
       STORE_APP_DATA_ROOT: /DATA/AppData
