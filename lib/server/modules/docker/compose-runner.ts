@@ -1455,6 +1455,19 @@ export async function cleanupComposeDataOnUninstall(input: {
             // Best effort cleanup for legacy named volumes.
           }
         }
+
+        // Also remove the app's root directory under appDataRoot (e.g. /DATA/AppData/<appId>).
+        // Individual bind mount entries point to sub-directories, so the parent folder
+        // remains unless we explicitly delete it.
+        const appDataDir = path.join(appDataRoot, stackAppId);
+        const normalizedAppDataDir = path.resolve(appDataDir);
+        const normalizedAppDataRoot = path.resolve(appDataRoot);
+        if (
+          isPathWithinRoot(normalizedAppDataDir, normalizedAppDataRoot) &&
+          normalizedAppDataDir !== normalizedAppDataRoot
+        ) {
+          await rm(normalizedAppDataDir, { recursive: true, force: true });
+        }
       }
 
       const normalizedStackDir = path.resolve(stackDir);

@@ -27,6 +27,7 @@ export type FileReadMode =
   | "image"
   | "pdf"
   | "video"
+  | "audio"
   | "binary_unsupported"
   | "too_large";
 
@@ -140,10 +141,13 @@ export type FileToggleStarResponse = {
 
 export type FilePasteOperation = "copy" | "move";
 
+export type FilePasteCollision = "replace" | "keep-both" | "skip";
+
 export type FilePasteRequest = {
   sourcePath: string;
   destinationPath: string;
   operation: FilePasteOperation;
+  collision?: FilePasteCollision;
 };
 
 export type FilePasteResponse = {

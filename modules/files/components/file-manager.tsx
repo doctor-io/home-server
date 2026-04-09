@@ -12,9 +12,10 @@ import {
   CreateEntryDialog,
   EmptyTrashConfirmDialog,
   FileInfoDialogOverlay,
+  PasteConflictDialog,
   RenameEntryDialog,
 } from "@/modules/files/components/file-manager-dialogs";
-import { FileManagerContextMenu } from "@/modules/files/components/file-manager-overlays";
+import { FileManagerBackgroundContextMenu, FileManagerContextMenu } from "@/modules/files/components/file-manager-overlays";
 import {
   getEditorLanguage,
   normalizePathForBackend,
@@ -41,6 +42,7 @@ import {
   useStarredFiles,
   useToggleFileStar,
   useUploadFiles,
+  type FilePasteCollision,
 } from "@/modules/files/hooks/useFiles";
 import {
   useCreateLocalFolderShare,
@@ -65,7 +67,7 @@ import {
   VideoRegular,
 } from "@fluentui/react-icons";
 import { FILES_PANEL_SHELL } from "@/modules/files/components/file-manager-surface";
-import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useReducer, useRef } from "react";
 import { toast } from "sonner";
 
 const BYTES_PER_TB = 1024 ** 4;
@@ -136,15 +138,15 @@ const sidebarSections: FileManagerSidebarSection[] = [
   },
 ];
 
-// --- Component ---
+// --- Types ---
 
 type ViewMode = "grid" | "list";
 type SortBy = "name" | "modified" | "size";
 type OpenFileState = { path: string[]; entry: FileEntry };
 type ClipboardState = {
-  sourcePath: string;
+  sourcePaths: string[];
+  names: string[];
   operation: "copy" | "move";
-  name: string;
 };
 type CreateEntryDialogState = {
   kind: "file" | "folder";
@@ -156,59 +158,324 @@ type RenameDialogState = {
   name: string;
   error: string | null;
 };
+type PasteConflictState = {
+  /** Remaining source paths yet to be processed */
+  pendingSourcePaths: string[];
+  /** Name of the conflicting file */
+  conflictName: string;
+  destinationPath: string;
+  operation: "copy" | "move";
+};
+
+// --- State ---
+
+type FileManagerState = {
+  currentPath: string[];
+  viewMode: ViewMode;
+  selectedFile: string | null;
+  selectedFiles: Set<string>;
+  searchQuery: string;
+  debouncedSearchQuery: string;
+  sortBy: SortBy;
+  sortDir: "asc" | "desc";
+  showContextMenu: { x: number; y: number; entry: FileEntry } | null;
+  showBackgroundContextMenu: { x: number; y: number } | null;
+  openFile: OpenFileState | null;
+  fileDrafts: Record<string, string>;
+  editorNotice: string | null;
+  statusNotice: string | null;
+  showNetworkDialog: boolean;
+  clipboardState: ClipboardState | null;
+  isEmptyingTrash: boolean;
+  includeHidden: boolean;
+  createEntryDialog: CreateEntryDialogState | null;
+  renameDialog: RenameDialogState | null;
+  fileInfoDialog: FileInfoResponse | null;
+  pendingEntryPath: string | null;
+  showEmptyTrashConfirm: boolean;
+  isDragOver: boolean;
+  globalSearch: boolean;
+  uploadProgress: { loaded: number; total: number } | null;
+  pasteConflict: PasteConflictState | null;
+  searchDisplayLimit: number;
+};
+
+const SEARCH_DISPLAY_LIMIT = 100;
+
+const initialState: FileManagerState = {
+  currentPath: [],
+  viewMode: "grid",
+  selectedFile: null,
+  selectedFiles: new Set(),
+  searchQuery: "",
+  debouncedSearchQuery: "",
+  sortBy: "name",
+  sortDir: "asc",
+  showContextMenu: null,
+  showBackgroundContextMenu: null,
+  openFile: null,
+  fileDrafts: {},
+  editorNotice: null,
+  statusNotice: null,
+  showNetworkDialog: false,
+  clipboardState: null,
+  isEmptyingTrash: false,
+  includeHidden: false,
+  createEntryDialog: null,
+  renameDialog: null,
+  fileInfoDialog: null,
+  pendingEntryPath: null,
+  showEmptyTrashConfirm: false,
+  isDragOver: false,
+  globalSearch: false,
+  uploadProgress: null,
+  pasteConflict: null,
+  searchDisplayLimit: SEARCH_DISPLAY_LIMIT,
+};
+
+// --- Actions ---
+
+type Action =
+  | { type: "NAVIGATE_TO_PATH"; path: string[] }
+  | { type: "NAVIGATE_UP" }
+  | { type: "SET_VIEW_MODE"; mode: ViewMode }
+  | { type: "SELECT_FILE"; name: string | null }
+  | { type: "SET_SELECTED_FILES"; files: Set<string> }
+  | { type: "CLEAR_SELECTION" }
+  | { type: "SET_SEARCH_QUERY"; query: string }
+  | { type: "SET_DEBOUNCED_SEARCH_QUERY"; query: string }
+  | { type: "SET_SORT_BY"; by: SortBy }
+  | { type: "TOGGLE_SORT_DIR" }
+  | { type: "SHOW_CONTEXT_MENU"; x: number; y: number; entry: FileEntry }
+  | { type: "HIDE_CONTEXT_MENU" }
+  | { type: "SHOW_BACKGROUND_CONTEXT_MENU"; x: number; y: number }
+  | { type: "HIDE_BACKGROUND_CONTEXT_MENU" }
+  | { type: "OPEN_FILE"; path: string[]; entry: FileEntry }
+  | { type: "CLOSE_FILE" }
+  | { type: "SET_FILE_DRAFT"; key: string; value: string }
+  | { type: "INIT_FILE_DRAFT"; key: string; value: string }
+  | { type: "SET_EDITOR_NOTICE"; notice: string | null }
+  | { type: "SET_STATUS_NOTICE"; notice: string | null }
+  | { type: "SHOW_NETWORK_DIALOG" }
+  | { type: "HIDE_NETWORK_DIALOG" }
+  | { type: "SET_CLIPBOARD"; sourcePaths: string[]; names: string[]; operation: "copy" | "move" }
+  | { type: "CLEAR_CLIPBOARD" }
+  | { type: "SET_IS_EMPTYING_TRASH"; value: boolean }
+  | { type: "TOGGLE_INCLUDE_HIDDEN" }
+  | { type: "OPEN_CREATE_ENTRY_DIALOG"; kind: "file" | "folder" }
+  | { type: "CLOSE_CREATE_ENTRY_DIALOG" }
+  | { type: "UPDATE_CREATE_ENTRY_DIALOG"; name: string; error: string | null }
+  | { type: "SET_CREATE_ENTRY_ERROR"; error: string }
+  | { type: "OPEN_RENAME_DIALOG"; entry: FileEntry }
+  | { type: "CLOSE_RENAME_DIALOG" }
+  | { type: "UPDATE_RENAME_DIALOG"; name: string; error: string | null }
+  | { type: "SET_RENAME_ERROR"; error: string }
+  | { type: "OPEN_FILE_INFO_DIALOG"; info: FileInfoResponse }
+  | { type: "CLOSE_FILE_INFO_DIALOG" }
+  | { type: "SET_PENDING_ENTRY_PATH"; path: string | null }
+  | { type: "SHOW_EMPTY_TRASH_CONFIRM" }
+  | { type: "HIDE_EMPTY_TRASH_CONFIRM" }
+  | { type: "SET_DRAG_OVER"; value: boolean }
+  | { type: "TOGGLE_GLOBAL_SEARCH" }
+  | { type: "SET_UPLOAD_PROGRESS"; loaded: number; total: number }
+  | { type: "CLEAR_UPLOAD_PROGRESS" }
+  | { type: "SHOW_PASTE_CONFLICT"; conflict: PasteConflictState }
+  | { type: "HIDE_PASTE_CONFLICT" }
+  | { type: "LOAD_MORE_SEARCH" };
+
+function reducer(state: FileManagerState, action: Action): FileManagerState {
+  switch (action.type) {
+    case "NAVIGATE_TO_PATH":
+      return {
+        ...state,
+        currentPath: action.path,
+        selectedFile: null,
+        selectedFiles: new Set(),
+        searchQuery: "",
+        openFile: null,
+        statusNotice: null,
+        showContextMenu: null,
+        showBackgroundContextMenu: null,
+        searchDisplayLimit: SEARCH_DISPLAY_LIMIT,
+      };
+    case "NAVIGATE_UP":
+      return {
+        ...state,
+        currentPath: state.currentPath.slice(0, -1),
+        selectedFile: null,
+        selectedFiles: new Set(),
+        openFile: null,
+        showContextMenu: null,
+        showBackgroundContextMenu: null,
+      };
+    case "SET_VIEW_MODE":
+      return { ...state, viewMode: action.mode };
+    case "SELECT_FILE":
+      return { ...state, selectedFile: action.name };
+    case "SET_SELECTED_FILES":
+      return { ...state, selectedFiles: action.files };
+    case "CLEAR_SELECTION":
+      return { ...state, selectedFile: null, selectedFiles: new Set() };
+    case "SET_SEARCH_QUERY":
+      return { ...state, searchQuery: action.query, searchDisplayLimit: SEARCH_DISPLAY_LIMIT };
+    case "SET_DEBOUNCED_SEARCH_QUERY":
+      return { ...state, debouncedSearchQuery: action.query };
+    case "SET_SORT_BY":
+      return { ...state, sortBy: action.by, sortDir: "asc" };
+    case "TOGGLE_SORT_DIR":
+      return { ...state, sortDir: state.sortDir === "asc" ? "desc" : "asc" };
+    case "SHOW_CONTEXT_MENU":
+      return {
+        ...state,
+        showContextMenu: { x: action.x, y: action.y, entry: action.entry },
+        showBackgroundContextMenu: null,
+      };
+    case "HIDE_CONTEXT_MENU":
+      return { ...state, showContextMenu: null };
+    case "SHOW_BACKGROUND_CONTEXT_MENU":
+      return {
+        ...state,
+        showBackgroundContextMenu: { x: action.x, y: action.y },
+        showContextMenu: null,
+      };
+    case "HIDE_BACKGROUND_CONTEXT_MENU":
+      return { ...state, showBackgroundContextMenu: null };
+    case "OPEN_FILE":
+      return {
+        ...state,
+        openFile: { path: action.path, entry: action.entry },
+        selectedFile: action.entry.name,
+        selectedFiles: new Set([action.entry.name]),
+        editorNotice: null,
+      };
+    case "CLOSE_FILE":
+      return { ...state, openFile: null };
+    case "SET_FILE_DRAFT":
+      return { ...state, fileDrafts: { ...state.fileDrafts, [action.key]: action.value } };
+    case "INIT_FILE_DRAFT":
+      if (state.fileDrafts[action.key] !== undefined) return state;
+      return { ...state, fileDrafts: { ...state.fileDrafts, [action.key]: action.value } };
+    case "SET_EDITOR_NOTICE":
+      return { ...state, editorNotice: action.notice };
+    case "SET_STATUS_NOTICE":
+      return { ...state, statusNotice: action.notice };
+    case "SHOW_NETWORK_DIALOG":
+      return { ...state, showNetworkDialog: true };
+    case "HIDE_NETWORK_DIALOG":
+      return { ...state, showNetworkDialog: false };
+    case "SET_CLIPBOARD":
+      return {
+        ...state,
+        clipboardState: {
+          sourcePaths: action.sourcePaths,
+          names: action.names,
+          operation: action.operation,
+        },
+      };
+    case "CLEAR_CLIPBOARD":
+      return { ...state, clipboardState: null };
+    case "SET_IS_EMPTYING_TRASH":
+      return { ...state, isEmptyingTrash: action.value };
+    case "TOGGLE_INCLUDE_HIDDEN":
+      return { ...state, includeHidden: !state.includeHidden };
+    case "OPEN_CREATE_ENTRY_DIALOG":
+      return { ...state, createEntryDialog: { kind: action.kind, name: "", error: null } };
+    case "CLOSE_CREATE_ENTRY_DIALOG":
+      return { ...state, createEntryDialog: null };
+    case "UPDATE_CREATE_ENTRY_DIALOG":
+      if (!state.createEntryDialog) return state;
+      return { ...state, createEntryDialog: { ...state.createEntryDialog, name: action.name, error: action.error } };
+    case "SET_CREATE_ENTRY_ERROR":
+      if (!state.createEntryDialog) return state;
+      return { ...state, createEntryDialog: { ...state.createEntryDialog, error: action.error } };
+    case "OPEN_RENAME_DIALOG":
+      return { ...state, renameDialog: { entry: action.entry, name: action.entry.name, error: null } };
+    case "CLOSE_RENAME_DIALOG":
+      return { ...state, renameDialog: null };
+    case "UPDATE_RENAME_DIALOG":
+      if (!state.renameDialog) return state;
+      return { ...state, renameDialog: { ...state.renameDialog, name: action.name, error: action.error } };
+    case "SET_RENAME_ERROR":
+      if (!state.renameDialog) return state;
+      return { ...state, renameDialog: { ...state.renameDialog, error: action.error } };
+    case "OPEN_FILE_INFO_DIALOG":
+      return { ...state, fileInfoDialog: action.info };
+    case "CLOSE_FILE_INFO_DIALOG":
+      return { ...state, fileInfoDialog: null };
+    case "SET_PENDING_ENTRY_PATH":
+      return { ...state, pendingEntryPath: action.path };
+    case "SHOW_EMPTY_TRASH_CONFIRM":
+      return { ...state, showEmptyTrashConfirm: true };
+    case "HIDE_EMPTY_TRASH_CONFIRM":
+      return { ...state, showEmptyTrashConfirm: false };
+    case "SET_DRAG_OVER":
+      return { ...state, isDragOver: action.value };
+    case "TOGGLE_GLOBAL_SEARCH":
+      return { ...state, globalSearch: !state.globalSearch, searchDisplayLimit: SEARCH_DISPLAY_LIMIT };
+    case "SET_UPLOAD_PROGRESS":
+      return { ...state, uploadProgress: { loaded: action.loaded, total: action.total } };
+    case "CLEAR_UPLOAD_PROGRESS":
+      return { ...state, uploadProgress: null };
+    case "SHOW_PASTE_CONFLICT":
+      return { ...state, pasteConflict: action.conflict };
+    case "HIDE_PASTE_CONFLICT":
+      return { ...state, pasteConflict: null };
+    case "LOAD_MORE_SEARCH":
+      return { ...state, searchDisplayLimit: state.searchDisplayLimit + SEARCH_DISPLAY_LIMIT };
+    default:
+      return state;
+  }
+}
+
+// --- Component ---
 
 export function FileManager() {
   const rootRef = useRef<HTMLDivElement>(null);
-  const [currentPath, setCurrentPath] = useState<string[]>([]);
-  const [viewMode, setViewMode] = useState<ViewMode>("grid");
-  const [selectedFile, setSelectedFile] = useState<string | null>(null);
-  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
-  const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<SortBy>("name");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
-  const [showContextMenu, setShowContextMenu] = useState<{
-    x: number;
-    y: number;
-    entry: FileEntry;
-  } | null>(null);
-  const [sidebarCollapsed] = useState(false);
-  const [openFile, setOpenFile] = useState<OpenFileState | null>(null);
-  const [fileDrafts, setFileDrafts] = useState<Record<string, string>>({});
-  const [editorNotice, setEditorNotice] = useState<string | null>(null);
-  const [statusNotice, setStatusNoticeRaw] = useState<string | null>(null);
-  const statusNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
+  const [state, dispatch] = useReducer(reducer, initialState);
+  const statusNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const {
+    currentPath,
+    viewMode,
+    selectedFile,
+    selectedFiles,
+    searchQuery,
+    debouncedSearchQuery,
+    sortBy,
+    sortDir,
+    showContextMenu,
+    showBackgroundContextMenu,
+    openFile,
+    fileDrafts,
+    editorNotice,
+    statusNotice,
+    showNetworkDialog,
+    clipboardState,
+    isEmptyingTrash,
+    includeHidden,
+    createEntryDialog,
+    renameDialog,
+    fileInfoDialog,
+    pendingEntryPath,
+    showEmptyTrashConfirm,
+    isDragOver,
+    globalSearch,
+    uploadProgress,
+    pasteConflict,
+    searchDisplayLimit,
+  } = state;
+
   function setStatusNotice(msg: string | null) {
-    if (statusNoticeTimerRef.current)
-      clearTimeout(statusNoticeTimerRef.current);
-    setStatusNoticeRaw(msg);
+    if (statusNoticeTimerRef.current) clearTimeout(statusNoticeTimerRef.current);
+    dispatch({ type: "SET_STATUS_NOTICE", notice: msg });
     if (msg !== null) {
-      statusNoticeTimerRef.current = setTimeout(
-        () => setStatusNoticeRaw(null),
-        4000,
-      );
+      statusNoticeTimerRef.current = setTimeout(() => dispatch({ type: "SET_STATUS_NOTICE", notice: null }), 4000);
     }
   }
-  const [showNetworkDialog, setShowNetworkDialog] = useState(false);
-  const [clipboardState, setClipboardState] = useState<ClipboardState | null>(
-    null,
-  );
-  const [isEmptyingTrash, setIsEmptyingTrash] = useState(false);
-  const [includeHidden, setIncludeHidden] = useState(false);
-  const [createEntryDialog, setCreateEntryDialog] =
-    useState<CreateEntryDialogState | null>(null);
-  const [renameDialog, setRenameDialog] = useState<RenameDialogState | null>(
-    null,
-  );
-  const [fileInfoDialog, setFileInfoDialog] = useState<FileInfoResponse | null>(
-    null,
-  );
-  const [pendingEntryPath, setPendingEntryPath] = useState<string | null>(null);
-  const [showEmptyTrashConfirm, setShowEmptyTrashConfirm] = useState(false);
 
-  const isStarredView =
-    currentPath.length === 1 && currentPath[0] === STARRED_VIRTUAL_PATH[0];
+  const isStarredView = currentPath.length === 1 && currentPath[0] === STARRED_VIRTUAL_PATH[0];
+  const isTrashView = currentPath[0] === "Trash";
+  const isSharedView = currentPath[0] === "Shared";
 
   const filesRootQuery = useFilesRoot();
   const directoryQuery = useFilesDirectory(
@@ -235,18 +502,23 @@ export function FileManager() {
   const toggleStarMutation = useToggleFileStar();
   const uploadFilesMutation = useUploadFiles();
   const uploadInputRef = useRef<HTMLInputElement>(null);
-  const [isDragOver, setIsDragOver] = useState(false);
-  const [globalSearch, setGlobalSearch] = useState(false);
+
   const openFilePath = openFile ? toFilePath(openFile.path) : null;
   const fileContentQuery = useFileContent(openFilePath);
   const globalSearchQuery = useSearchFiles({
-    query: searchQuery,
-    basePath: undefined, // always search from root
+    query: debouncedSearchQuery,
+    basePath: undefined,
     includeHidden,
-    enabled: globalSearch && searchQuery.trim().length >= 2,
+    enabled: globalSearch && debouncedSearchQuery.trim().length >= 2,
   });
 
-  const isGlobalSearchActive = globalSearch && searchQuery.trim().length >= 2;
+  const isGlobalSearchActive = globalSearch && debouncedSearchQuery.trim().length >= 2;
+
+  // Search debounce
+  useEffect(() => {
+    const id = setTimeout(() => dispatch({ type: "SET_DEBOUNCED_SEARCH_QUERY", query: searchQuery }), 300);
+    return () => clearTimeout(id);
+  }, [searchQuery]);
 
   const currentEntries = useMemo(() => {
     if (isGlobalSearchActive) {
@@ -267,14 +539,12 @@ export function FileManager() {
   const sortedEntries = useMemo(() => {
     let entries = [...currentEntries];
 
-    // Local filter only applies when NOT in global search mode
     if (searchQuery && !isGlobalSearchActive) {
       entries = entries.filter((e) =>
         e.name.toLowerCase().includes(searchQuery.toLowerCase()),
       );
     }
 
-    // Folders first, then files
     const folders = entries.filter((e) => e.type === "folder");
     const files = entries.filter((e) => e.type === "file");
 
@@ -282,23 +552,23 @@ export function FileManager() {
     const sortFn = (a: FileEntry, b: FileEntry) => {
       if (sortBy === "name") return dir * a.name.localeCompare(b.name);
       if (sortBy === "modified") {
-        return (
-          dir *
-          (new Date(a.modifiedAt).getTime() - new Date(b.modifiedAt).getTime())
-        );
+        return dir * (new Date(a.modifiedAt).getTime() - new Date(b.modifiedAt).getTime());
       }
-      if (sortBy === "size")
-        return dir * ((a.sizeBytes ?? 0) - (b.sizeBytes ?? 0));
+      if (sortBy === "size") return dir * ((a.sizeBytes ?? 0) - (b.sizeBytes ?? 0));
       return 0;
     };
 
     return [...folders.sort(sortFn), ...files.sort(sortFn)];
   }, [currentEntries, isGlobalSearchActive, searchQuery, sortBy, sortDir]);
 
+  // Search result limit
+  const visibleEntries = isGlobalSearchActive
+    ? sortedEntries.slice(0, searchDisplayLimit)
+    : sortedEntries;
+  const hasMoreSearchResults = isGlobalSearchActive && sortedEntries.length > searchDisplayLimit;
+
   const openFileKey = openFilePath;
-  const openFileLanguage = openFile
-    ? getEditorLanguage(openFile.entry)
-    : "plaintext";
+  const openFileLanguage = openFile ? getEditorLanguage(openFile.entry) : "plaintext";
   const openFileViewer = fileContentQuery.data ?? null;
   const openFileContent =
     openFileKey && openFileViewer?.mode === "text"
@@ -316,8 +586,7 @@ export function FileManager() {
     !fileContentQuery.isLoading &&
     !saveFileContentMutation.isPending,
   );
-  const isTrashView = currentPath[0] === "Trash";
-  const isSharedView = currentPath[0] === "Shared";
+
   const storageMetrics = systemMetricsQuery.data?.storage;
   const storageUsageText =
     storageMetrics && storageMetrics.totalBytes > 0
@@ -330,42 +599,28 @@ export function FileManager() {
   );
   const filesRootPath = filesRootQuery.data?.rootPath ?? "";
   const rootLabel = filesRootPath.length > 0 ? filesRootPath : "/DATA";
+
   const localSharesByPath = useMemo(() => {
-    const map = new Map<
-      string,
-      {
-        id: string;
-        shareName: string;
-        sourcePath: string;
-        sharedPath: string;
-        isMounted: boolean;
-        isExported: boolean;
-      }
-    >();
+    const map = new Map<string, { id: string; shareName: string; sourcePath: string; sharedPath: string; isMounted: boolean; isExported: boolean }>();
     for (const share of localSharesQuery.data ?? []) {
       map.set(share.sourcePath, share);
       map.set(share.sharedPath, share);
     }
     return map;
   }, [localSharesQuery.data]);
+
   const locationItems = useMemo(() => {
     const shares = networkSharesQuery.data ?? [];
     const hosts = new Map<string, string[]>();
-
     for (const share of shares) {
       const segments = share.mountPath.split("/").filter(Boolean);
       const hostSegment = segments[1];
       const rootSegment = segments[0];
-      if (!hostSegment || !rootSegment) {
-        continue;
-      }
-      if (hostSegment) {
-        hosts.set(hostSegment, [rootSegment, hostSegment]);
-      }
+      if (!hostSegment || !rootSegment) continue;
+      if (hostSegment) hosts.set(hostSegment, [rootSegment, hostSegment]);
     }
-
     return Array.from(hosts.entries())
-      .sort(([left], [right]) => left.localeCompare(right))
+      .sort(([l], [r]) => l.localeCompare(r))
       .map(([host, hostPath]) => ({
         name: host,
         icon: <HardDriveRegular className="size-4 text-cyan-400" />,
@@ -373,72 +628,47 @@ export function FileManager() {
       }));
   }, [networkSharesQuery.data]);
 
+  // Init file draft when file opens
   useEffect(() => {
-    if (!openFileKey || !openFileViewer || openFileViewer.mode !== "text")
-      return;
-
-    setFileDrafts((prev) => {
-      if (prev[openFileKey] !== undefined) return prev;
-      return {
-        ...prev,
-        [openFileKey]: openFileViewer.content ?? "",
-      };
-    });
+    if (!openFileKey || !openFileViewer || openFileViewer.mode !== "text") return;
+    dispatch({ type: "INIT_FILE_DRAFT", key: openFileKey, value: openFileViewer.content ?? "" });
   }, [openFileKey, openFileViewer]);
 
+  // Clear editor notice on file change
   useEffect(() => {
-    setEditorNotice(null);
+    dispatch({ type: "SET_EDITOR_NOTICE", notice: null });
   }, [openFileKey]);
 
-  const navigateToEvent = useEffectEvent((entry: FileEntry) => {
-    navigateTo(entry);
+  // useEffectEvent handlers for keyboard shortcut effect
+  const navigateToEvent = useEffectEvent((entry: FileEntry) => navigateTo(entry));
+  const navigateUpEvent = useEffectEvent(() => navigateUp());
+  const deleteFromTrashEvent = useEffectEvent((entry: FileEntry) => { void handleDeleteFromTrash(entry); });
+  const moveToTrashEvent = useEffectEvent((entry: FileEntry) => { void handleMoveSelectedToTrash(entry); });
+  const renameEntryEvent = useEffectEvent((entry: FileEntry) => handleRenameEntry(entry));
+  const copyEntryEvent = useEffectEvent((entries: FileEntry[], op: "copy" | "move") => {
+    setClipboardFromEntries(entries, op);
   });
-  const navigateUpEvent = useEffectEvent(() => {
-    navigateUp();
-  });
-  const deleteFromTrashEvent = useEffectEvent((entry: FileEntry) => {
-    void handleDeleteFromTrash(entry);
-  });
-  const moveToTrashEvent = useEffectEvent((entry: FileEntry) => {
-    void handleMoveSelectedToTrash(entry);
-  });
+  const pasteEvent = useEffectEvent((destPath: string) => { void handlePasteToDestination(destPath); });
 
-  // Keyboard navigation — only fires when no input/textarea is focused
+  // Keyboard navigation
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      // Don't hijack keystrokes while an input, textarea, or contenteditable is focused
       const tag = (e.target as HTMLElement)?.tagName;
-      if (
-        tag === "INPUT" ||
-        tag === "TEXTAREA" ||
-        (e.target as HTMLElement)?.isContentEditable
-      ) {
-        return;
-      }
-      // Don't steal shortcuts while any dialog overlay is open
-      if (
-        createEntryDialog ||
-        renameDialog ||
-        fileInfoDialog ||
-        showEmptyTrashConfirm ||
-        showContextMenu
-      ) {
-        return;
-      }
+      if (tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement)?.isContentEditable) return;
+      if (createEntryDialog || renameDialog || fileInfoDialog || showEmptyTrashConfirm || showContextMenu || pasteConflict) return;
 
       if (e.key === "Escape") {
         e.preventDefault();
         if (openFile) {
-          setOpenFile(null);
+          dispatch({ type: "CLOSE_FILE" });
         } else if (selectedFile || selectedFiles.size > 0) {
-          clearSelection();
+          dispatch({ type: "CLEAR_SELECTION" });
         } else if (searchQuery) {
-          setSearchQuery("");
+          dispatch({ type: "SET_SEARCH_QUERY", query: "" });
         }
         return;
       }
 
-      // Arrow-key navigation only makes sense in the directory view
       if (openFile) return;
 
       const entries = sortedEntries;
@@ -446,15 +676,12 @@ export function FileManager() {
 
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         e.preventDefault();
-        const currentIdx = selectedFile
-          ? entries.findIndex((en) => en.name === selectedFile)
-          : -1;
-        const nextIdx =
-          e.key === "ArrowDown"
-            ? Math.min(currentIdx + 1, entries.length - 1)
-            : Math.max(currentIdx - 1, 0);
-        setSelectedFile(entries[nextIdx].name);
-        setSelectedFiles(new Set([entries[nextIdx].name]));
+        const currentIdx = selectedFile ? entries.findIndex((en) => en.name === selectedFile) : -1;
+        const nextIdx = e.key === "ArrowDown"
+          ? Math.min(currentIdx + 1, entries.length - 1)
+          : Math.max(currentIdx - 1, 0);
+        dispatch({ type: "SELECT_FILE", name: entries[nextIdx].name });
+        dispatch({ type: "SET_SELECTED_FILES", files: new Set([entries[nextIdx].name]) });
         return;
       }
 
@@ -476,23 +703,67 @@ export function FileManager() {
       }
 
       if (e.key === "Delete") {
-        const toDelete =
-          selectedFiles.size > 0
-            ? [...selectedFiles]
-            : selectedFile
-              ? [selectedFile]
-              : [];
+        const toDelete = selectedFiles.size > 0 ? [...selectedFiles] : selectedFile ? [selectedFile] : [];
         if (toDelete.length === 0) return;
         e.preventDefault();
         for (const name of toDelete) {
           const entry = entries.find((en) => en.name === name);
           if (!entry) continue;
-          if (isTrashView) {
-            deleteFromTrashEvent(entry);
-          } else {
-            moveToTrashEvent(entry);
-          }
+          if (isTrashView) deleteFromTrashEvent(entry);
+          else moveToTrashEvent(entry);
         }
+        return;
+      }
+
+      if (e.key === "F2") {
+        if (!selectedFile || isTrashView) return;
+        const entry = entries.find((en) => en.name === selectedFile);
+        if (!entry) return;
+        e.preventDefault();
+        renameEntryEvent(entry);
+        return;
+      }
+
+      const isMod = e.ctrlKey || e.metaKey;
+      if (!isMod) return;
+
+      if (e.key === "a" || e.key === "A") {
+        e.preventDefault();
+        dispatch({ type: "SET_SELECTED_FILES", files: new Set(entries.map((en) => en.name)) });
+        if (entries.length > 0) dispatch({ type: "SELECT_FILE", name: entries[0].name });
+        return;
+      }
+
+      if (e.key === "c" || e.key === "C") {
+        if (isTrashView) return;
+        const selected = selectedFiles.size > 0
+          ? entries.filter((en) => selectedFiles.has(en.name))
+          : selectedFile
+            ? entries.filter((en) => en.name === selectedFile)
+            : [];
+        if (selected.length === 0) return;
+        e.preventDefault();
+        copyEntryEvent(selected, "copy");
+        return;
+      }
+
+      if (e.key === "x" || e.key === "X") {
+        if (isTrashView) return;
+        const selected = selectedFiles.size > 0
+          ? entries.filter((en) => selectedFiles.has(en.name))
+          : selectedFile
+            ? entries.filter((en) => en.name === selectedFile)
+            : [];
+        if (selected.length === 0) return;
+        e.preventDefault();
+        copyEntryEvent(selected, "move");
+        return;
+      }
+
+      if (e.key === "v" || e.key === "V") {
+        if (!clipboardState || isTrashView) return;
+        e.preventDefault();
+        pasteEvent(toFilePath(currentPath));
       }
     }
 
@@ -507,435 +778,371 @@ export function FileManager() {
     isStarredView,
     isTrashView,
     searchQuery,
+    clipboardState,
     createEntryDialog,
     renameDialog,
     fileInfoDialog,
     showEmptyTrashConfirm,
     showContextMenu,
+    pasteConflict,
+    navigateToEvent,
+    navigateUpEvent,
+    deleteFromTrashEvent,
+    moveToTrashEvent,
+    renameEntryEvent,
+    copyEntryEvent,
+    pasteEvent,
   ]);
 
-  function clearSelection() {
-    setSelectedFile(null);
-    setSelectedFiles(new Set());
-  }
-
-  function openFileInEditor(path: string[], entry: FileEntry) {
-    setOpenFile({ path, entry });
-    setSelectedFile(entry.name);
-    setSelectedFiles(new Set([entry.name]));
-  }
+  // --- Navigation ---
 
   function navigateTo(entry: FileEntry) {
     if (entry.type === "folder") {
-      setCurrentPath(entry.path.split("/").filter(Boolean));
-      clearSelection();
-      setOpenFile(null);
+      dispatch({ type: "NAVIGATE_TO_PATH", path: entry.path.split("/").filter(Boolean) });
       return;
     }
-
-    openFileInEditor(entry.path.split("/").filter(Boolean), entry);
+    dispatch({ type: "OPEN_FILE", path: entry.path.split("/").filter(Boolean), entry });
   }
 
   function navigateToPath(pathSegments: string[]) {
-    setCurrentPath(normalizePathForBackend(pathSegments));
-    clearSelection();
-    setSearchQuery("");
-    setOpenFile(null);
-    setStatusNotice(null);
+    dispatch({ type: "NAVIGATE_TO_PATH", path: normalizePathForBackend(pathSegments) });
   }
 
   function navigateUp() {
-    setCurrentPath((prev) => prev.slice(0, -1));
-    clearSelection();
-    setOpenFile(null);
+    dispatch({ type: "NAVIGATE_UP" });
   }
+
+  // --- Selection ---
 
   function handleEntryClick(e: React.MouseEvent, entry: FileEntry) {
     if (e.ctrlKey || e.metaKey) {
-      // Ctrl/Cmd+click: toggle individual item
-      setSelectedFiles((prev) => {
-        const next = new Set(prev);
-        if (next.has(entry.name)) {
-          next.delete(entry.name);
-        } else {
-          next.add(entry.name);
-        }
-        return next;
-      });
-      setSelectedFile(entry.name);
+      const next = new Set(selectedFiles);
+      if (next.has(entry.name)) next.delete(entry.name);
+      else next.add(entry.name);
+      dispatch({ type: "SET_SELECTED_FILES", files: next });
+      dispatch({ type: "SELECT_FILE", name: entry.name });
     } else if (e.shiftKey && selectedFile) {
-      // Shift+click: range-select from anchor to clicked item
-      const anchorIdx = sortedEntries.findIndex(
-        (en) => en.name === selectedFile,
-      );
-      const clickedIdx = sortedEntries.findIndex(
-        (en) => en.name === entry.name,
-      );
+      const anchorIdx = sortedEntries.findIndex((en) => en.name === selectedFile);
+      const clickedIdx = sortedEntries.findIndex((en) => en.name === entry.name);
       if (anchorIdx !== -1 && clickedIdx !== -1) {
-        const [from, to] =
-          anchorIdx <= clickedIdx
-            ? [anchorIdx, clickedIdx]
-            : [clickedIdx, anchorIdx];
-        setSelectedFiles(
-          new Set(sortedEntries.slice(from, to + 1).map((en) => en.name)),
-        );
+        const [from, to] = anchorIdx <= clickedIdx ? [anchorIdx, clickedIdx] : [clickedIdx, anchorIdx];
+        dispatch({ type: "SET_SELECTED_FILES", files: new Set(sortedEntries.slice(from, to + 1).map((en) => en.name)) });
       }
-      setSelectedFile(entry.name);
+      dispatch({ type: "SELECT_FILE", name: entry.name });
     } else {
-      // Plain click
-      setSelectedFiles(new Set([entry.name]));
-      setSelectedFile(entry.name);
+      dispatch({ type: "SET_SELECTED_FILES", files: new Set([entry.name]) });
+      dispatch({ type: "SELECT_FILE", name: entry.name });
     }
   }
+
+  // --- Trash actions ---
 
   async function handleTrashSelected() {
     const names = [...selectedFiles];
     if (names.length === 0) return;
-    clearSelection();
+    dispatch({ type: "CLEAR_SELECTION" });
     for (const name of names) {
       const entry = sortedEntries.find((en) => en.name === name);
       if (!entry) continue;
       try {
         await moveToTrashMutation.mutateAsync({ path: entry.path });
-      } catch {
-        // individual errors surfaced by mutation error handling
-      }
+      } catch { /* individual errors handled by mutation */ }
     }
   }
+
+  async function handleMoveSelectedToTrash(entry: FileEntry) {
+    dispatch({ type: "SET_PENDING_ENTRY_PATH", path: entry.path });
+    try {
+      const result = await moveToTrashMutation.mutateAsync({ path: entry.path });
+      if (openFile && toFilePath(openFile.path) === entry.path) dispatch({ type: "CLOSE_FILE" });
+      dispatch({ type: "SELECT_FILE", name: null });
+      setStatusNotice(`Moved to Trash: ${result.trashPath}`);
+    } catch (error) {
+      setStatusNotice(error instanceof Error ? error.message : "Failed to move item to Trash");
+    } finally {
+      dispatch({ type: "SET_PENDING_ENTRY_PATH", path: null });
+    }
+  }
+
+  async function handleRestoreFromTrash(entry: FileEntry) {
+    dispatch({ type: "SET_PENDING_ENTRY_PATH", path: entry.path });
+    try {
+      const result = await restoreFromTrashMutation.mutateAsync({ path: entry.path, collision: "keep-both" });
+      dispatch({ type: "SELECT_FILE", name: null });
+      setStatusNotice(`Restored: ${result.restoredPath}`);
+    } catch (error) {
+      setStatusNotice(error instanceof Error ? error.message : "Failed to restore item from Trash");
+    } finally {
+      dispatch({ type: "SET_PENDING_ENTRY_PATH", path: null });
+    }
+  }
+
+  async function handleDeleteFromTrash(entry: FileEntry) {
+    dispatch({ type: "SET_PENDING_ENTRY_PATH", path: entry.path });
+    try {
+      await deleteFromTrashMutation.mutateAsync({ path: entry.path });
+      dispatch({ type: "SELECT_FILE", name: null });
+      setStatusNotice(`Deleted permanently: ${entry.name}`);
+    } catch (error) {
+      setStatusNotice(error instanceof Error ? error.message : "Failed to permanently delete item");
+    } finally {
+      dispatch({ type: "SET_PENDING_ENTRY_PATH", path: null });
+    }
+  }
+
+  // --- Empty trash ---
+
+  function handleEmptyTrash() {
+    const totalCount = directoryQuery.data?.entries.length ?? currentEntries.length;
+    if (!isTrashView || totalCount === 0 || isEmptyingTrash) return;
+    dispatch({ type: "SHOW_EMPTY_TRASH_CONFIRM" });
+  }
+
+  async function confirmEmptyTrash() {
+    dispatch({ type: "HIDE_EMPTY_TRASH_CONFIRM" });
+    dispatch({ type: "SET_IS_EMPTYING_TRASH", value: true });
+    try {
+      const result = await emptyTrashMutation.mutateAsync();
+      setStatusNotice(`Trash emptied (${result.deletedCount} item${result.deletedCount !== 1 ? "s" : ""})`);
+    } catch (error) {
+      setStatusNotice(error instanceof Error ? error.message : "Failed to empty Trash");
+    } finally {
+      dispatch({ type: "SET_IS_EMPTYING_TRASH", value: false });
+    }
+  }
+
+  // --- Create entry ---
 
   async function handleCreateEntry(kind: "file" | "folder", name: string) {
     const normalizedName = name.trim();
-    if (normalizedName.length === 0) {
-      throw new Error(`Invalid ${kind} name`);
-    }
+    if (normalizedName.length === 0) throw new Error(`Invalid ${kind} name`);
     const parentPath = toFilePath(currentPath);
-
     const result =
       kind === "folder"
-        ? await createFolderMutation.mutateAsync({
-            parentPath,
-            name: normalizedName,
-          })
-        : await createFileMutation.mutateAsync({
-            parentPath,
-            name: normalizedName,
-          });
-
-    setStatusNotice(
-      `${kind === "folder" ? "Folder" : "File"} created: ${result.path}`,
-    );
-  }
-
-  function openCreateEntryDialog(kind: "file" | "folder") {
-    setCreateEntryDialog({
-      kind,
-      name: "",
-      error: null,
-    });
-  }
-
-  function closeCreateEntryDialog() {
-    if (createFolderMutation.isPending || createFileMutation.isPending) {
-      return;
-    }
-    setCreateEntryDialog(null);
+        ? await createFolderMutation.mutateAsync({ parentPath, name: normalizedName })
+        : await createFileMutation.mutateAsync({ parentPath, name: normalizedName });
+    setStatusNotice(`${kind === "folder" ? "Folder" : "File"} created: ${result.path}`);
   }
 
   async function submitCreateEntryDialog() {
-    if (!createEntryDialog) {
-      return;
-    }
-
+    if (!createEntryDialog) return;
     const kind = createEntryDialog.kind;
     try {
       await handleCreateEntry(kind, createEntryDialog.name);
-      setCreateEntryDialog(null);
+      dispatch({ type: "CLOSE_CREATE_ENTRY_DIALOG" });
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : `Failed to create ${kind}`;
-      setCreateEntryDialog((previous) =>
-        previous
-          ? {
-              ...previous,
-              error: message,
-            }
-          : previous,
-      );
+      const message = error instanceof Error ? error.message : `Failed to create ${kind}`;
+      dispatch({ type: "SET_CREATE_ENTRY_ERROR", error: message });
       setStatusNotice(message);
     }
   }
 
-  function setClipboardFromEntry(entry: FileEntry, operation: "copy" | "move") {
-    setClipboardState({
-      sourcePath: entry.path,
+  // --- Clipboard / Paste ---
+
+  function setClipboardFromEntries(entries: FileEntry[], operation: "copy" | "move") {
+    dispatch({
+      type: "SET_CLIPBOARD",
+      sourcePaths: entries.map((e) => e.path),
+      names: entries.map((e) => e.name),
       operation,
-      name: entry.name,
     });
-    setStatusNotice(
-      `${operation === "copy" ? "Copied" : "Cut"}: ${entry.name}`,
-    );
+    const label = entries.length === 1 ? entries[0].name : `${entries.length} items`;
+    setStatusNotice(`${operation === "copy" ? "Copied" : "Cut"}: ${label}`);
   }
 
-  async function handlePasteToDestination(destinationPath: string) {
+  async function handlePasteToDestination(destinationPath: string, collision?: FilePasteCollision) {
     if (!clipboardState) {
       setStatusNotice("Clipboard is empty");
       return;
     }
 
-    try {
-      const result = await pasteFileEntryMutation.mutateAsync({
-        sourcePath: clipboardState.sourcePath,
-        destinationPath,
-        operation: clipboardState.operation,
-      });
-      setStatusNotice(
-        `${clipboardState.operation === "copy" ? "Copied" : "Moved"} to ${result.path}`,
-      );
-      if (clipboardState.operation === "move") {
-        setClipboardState(null);
-        if (
-          openFile &&
-          toFilePath(openFile.path) === clipboardState.sourcePath
-        ) {
-          setOpenFile(null);
+    const sourcePaths = clipboardState.sourcePaths;
+    let successCount = 0;
+
+    for (const sourcePath of sourcePaths) {
+      try {
+        await pasteFileEntryMutation.mutateAsync({
+          sourcePath,
+          destinationPath,
+          operation: clipboardState.operation,
+          collision,
+        });
+        successCount++;
+      } catch (error) {
+        const isConflict = error instanceof Error && error.message.toLowerCase().includes("destination already exists");
+        if (isConflict && !collision) {
+          const name = sourcePath.split("/").pop() ?? sourcePath;
+          // Show conflict dialog with remaining paths (including current)
+          const remainingIdx = sourcePaths.indexOf(sourcePath);
+          dispatch({
+            type: "SHOW_PASTE_CONFLICT",
+            conflict: {
+              pendingSourcePaths: sourcePaths.slice(remainingIdx),
+              conflictName: name,
+              destinationPath,
+              operation: clipboardState.operation,
+            },
+          });
+          return; // stop processing; user will decide
         }
+        setStatusNotice(error instanceof Error ? error.message : "Paste failed");
+        return;
       }
-    } catch (error) {
-      setStatusNotice(error instanceof Error ? error.message : "Paste failed");
-    }
-  }
-
-  function handleContextMenu(e: React.MouseEvent, entry: FileEntry) {
-    e.preventDefault();
-    const menuWidth = 220;
-    const menuHeight = 260;
-    const rootRect = rootRef.current?.getBoundingClientRect();
-
-    if (!rootRect) return;
-
-    const x = Math.min(
-      Math.max(8, e.clientX - rootRect.left),
-      rootRect.width - menuWidth - 8,
-    );
-    const y = Math.min(
-      Math.max(8, e.clientY - rootRect.top),
-      rootRect.height - menuHeight - 8,
-    );
-    setShowContextMenu({ x, y, entry });
-    setSelectedFile(entry.name);
-  }
-
-  async function handleSaveOpenFile() {
-    if (!openFileKey || !openFileViewer || openFileViewer.mode !== "text") {
-      return;
     }
 
-    const nextContent = fileDrafts[openFileKey] ?? openFileViewer.content ?? "";
-    try {
-      await saveFileContentMutation.mutateAsync({
-        path: openFileKey,
-        content: nextContent,
-        expectedMtimeMs: openFileViewer.mtimeMs,
-      });
-      setEditorNotice("Saved");
-    } catch (error) {
-      setEditorNotice(
-        error instanceof Error ? error.message : "Failed to save file",
-      );
-    }
-  }
+    const label = successCount === 1
+      ? clipboardState.names[0] ?? "item"
+      : `${successCount} items`;
+    setStatusNotice(`${clipboardState.operation === "copy" ? "Copied" : "Moved"}: ${label}`);
 
-  async function handleMoveSelectedToTrash(entry: FileEntry) {
-    setPendingEntryPath(entry.path);
-    try {
-      const result = await moveToTrashMutation.mutateAsync({
-        path: entry.path,
-      });
-      if (openFile && toFilePath(openFile.path) === entry.path) {
-        setOpenFile(null);
+    if (clipboardState.operation === "move") {
+      dispatch({ type: "CLEAR_CLIPBOARD" });
+      if (openFile && clipboardState.sourcePaths.includes(toFilePath(openFile.path))) {
+        dispatch({ type: "CLOSE_FILE" });
       }
-      setSelectedFile(null);
-      setStatusNotice(`Moved to Trash: ${result.trashPath}`);
-    } catch (error) {
-      setStatusNotice(
-        error instanceof Error ? error.message : "Failed to move item to Trash",
-      );
-    } finally {
-      setPendingEntryPath(null);
     }
   }
 
-  async function handleRestoreFromTrash(entry: FileEntry) {
-    setPendingEntryPath(entry.path);
-    try {
-      const result = await restoreFromTrashMutation.mutateAsync({
-        path: entry.path,
-        collision: "keep-both",
-      });
-      setSelectedFile(null);
-      setStatusNotice(`Restored: ${result.restoredPath}`);
-    } catch (error) {
-      setStatusNotice(
-        error instanceof Error
-          ? error.message
-          : "Failed to restore item from Trash",
-      );
-    } finally {
-      setPendingEntryPath(null);
+  async function handleConflictResolution(choice: FilePasteCollision | "skip-all") {
+    if (!pasteConflict) return;
+    dispatch({ type: "HIDE_PASTE_CONFLICT" });
+
+    if (choice === "skip-all") return;
+
+    const { pendingSourcePaths, destinationPath, operation } = pasteConflict;
+
+    if (!clipboardState) return;
+    const allSourcePaths = clipboardState.sourcePaths;
+    let successCount = 0;
+
+    for (const sourcePath of pendingSourcePaths) {
+      try {
+        const effectiveCollision: FilePasteCollision = choice === "skip" ? "skip" : choice;
+        await pasteFileEntryMutation.mutateAsync({
+          sourcePath,
+          destinationPath,
+          operation,
+          collision: effectiveCollision,
+        });
+        successCount++;
+      } catch (error) {
+        setStatusNotice(error instanceof Error ? error.message : "Paste failed");
+        return;
+      }
+    }
+
+    const processedBefore = allSourcePaths.length - pendingSourcePaths.length;
+    const total = processedBefore + successCount;
+    const label = total === 1 ? (clipboardState.names[0] ?? "item") : `${total} items`;
+    setStatusNotice(`${operation === "copy" ? "Copied" : "Moved"}: ${label}`);
+
+    if (operation === "move") {
+      dispatch({ type: "CLEAR_CLIPBOARD" });
+      if (openFile && clipboardState.sourcePaths.includes(toFilePath(openFile.path))) {
+        dispatch({ type: "CLOSE_FILE" });
+      }
     }
   }
 
-  async function handleDeleteFromTrash(entry: FileEntry) {
-    setPendingEntryPath(entry.path);
-    try {
-      await deleteFromTrashMutation.mutateAsync({
-        path: entry.path,
-      });
-      setSelectedFile(null);
-      setStatusNotice(`Deleted permanently: ${entry.name}`);
-    } catch (error) {
-      setStatusNotice(
-        error instanceof Error
-          ? error.message
-          : "Failed to permanently delete item",
-      );
-    } finally {
-      setPendingEntryPath(null);
-    }
-  }
-
-  function handleEmptyTrash() {
-    const totalCount =
-      directoryQuery.data?.entries.length ?? currentEntries.length;
-    if (!isTrashView || totalCount === 0 || isEmptyingTrash) return;
-    setShowEmptyTrashConfirm(true);
-  }
-
-  async function confirmEmptyTrash() {
-    setShowEmptyTrashConfirm(false);
-    setIsEmptyingTrash(true);
-    try {
-      const result = await emptyTrashMutation.mutateAsync();
-      setStatusNotice(
-        `Trash emptied (${result.deletedCount} item${result.deletedCount !== 1 ? "s" : ""})`,
-      );
-    } catch (error) {
-      setStatusNotice(
-        error instanceof Error ? error.message : "Failed to empty Trash",
-      );
-    } finally {
-      setIsEmptyingTrash(false);
-    }
-  }
+  // --- Rename ---
 
   function handleRenameEntry(entry: FileEntry) {
     if (isTrashView) {
       setStatusNotice("Rename is disabled in Trash");
       return;
     }
-    setRenameDialog({ entry, name: entry.name, error: null });
-  }
-
-  function closeRenameDialog() {
-    if (renameFileEntryMutation.isPending) return;
-    setRenameDialog(null);
+    dispatch({ type: "OPEN_RENAME_DIALOG", entry });
   }
 
   async function submitRenameDialog() {
     if (!renameDialog) return;
     const newName = renameDialog.name.trim();
     if (!newName || newName === renameDialog.entry.name) {
-      setRenameDialog(null);
+      dispatch({ type: "CLOSE_RENAME_DIALOG" });
       return;
     }
     try {
-      const result = await renameFileEntryMutation.mutateAsync({
-        path: renameDialog.entry.path,
-        newName,
-      });
-      setRenameDialog(null);
-      setSelectedFile(null);
+      const result = await renameFileEntryMutation.mutateAsync({ path: renameDialog.entry.path, newName });
+      dispatch({ type: "CLOSE_RENAME_DIALOG" });
+      dispatch({ type: "SELECT_FILE", name: null });
       setStatusNotice(`Renamed to ${result.path.split("/").pop() ?? newName}`);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to rename item";
-      setRenameDialog((prev) => (prev ? { ...prev, error: message } : prev));
+      const message = error instanceof Error ? error.message : "Failed to rename item";
+      dispatch({ type: "SET_RENAME_ERROR", error: message });
     }
   }
+
+  // --- Get info ---
 
   async function handleGetInfo(entry: FileEntry) {
     try {
       const info = await getFileInfoMutation.mutateAsync(entry.path);
-      setFileInfoDialog(info);
+      dispatch({ type: "OPEN_FILE_INFO_DIALOG", info });
     } catch (error) {
-      setStatusNotice(
-        error instanceof Error ? error.message : "Failed to get item info",
-      );
+      setStatusNotice(error instanceof Error ? error.message : "Failed to get item info");
     }
   }
+
+  // --- Star ---
 
   async function handleToggleStar(entry: FileEntry) {
     try {
       const result = await toggleStarMutation.mutateAsync(entry.path);
-      setStatusNotice(
-        result.starred ? `Starred ${entry.name}` : `Unstarred ${entry.name}`,
-      );
+      setStatusNotice(result.starred ? `Starred ${entry.name}` : `Unstarred ${entry.name}`);
     } catch (error) {
-      setStatusNotice(
-        error instanceof Error ? error.message : "Failed to toggle star",
-      );
+      setStatusNotice(error instanceof Error ? error.message : "Failed to toggle star");
     }
   }
+
+  // --- Upload ---
 
   async function handleUploadFiles(files: File[]) {
     if (files.length === 0 || isTrashView || isStarredView) return;
     const destinationPath = toFilePath(currentPath);
+    const totalSize = files.reduce((sum, f) => sum + f.size, 0);
     try {
       const result = await uploadFilesMutation.mutateAsync({
         destinationPath,
         files,
         includeHidden,
+        onProgress: (loaded, total) => {
+          dispatch({ type: "SET_UPLOAD_PROGRESS", loaded, total: total || totalSize });
+        },
       });
+      dispatch({ type: "CLEAR_UPLOAD_PROGRESS" });
       const uploaded = result.uploaded.length;
       const skipped = result.skipped.length;
       if (uploaded > 0 && skipped === 0) {
-        setStatusNotice(
-          `Uploaded ${uploaded} file${uploaded !== 1 ? "s" : ""}`,
-        );
+        setStatusNotice(`Uploaded ${uploaded} file${uploaded !== 1 ? "s" : ""}`);
       } else if (uploaded > 0) {
-        setStatusNotice(
-          `Uploaded ${uploaded}, skipped ${skipped} (already exist)`,
-        );
+        setStatusNotice(`Uploaded ${uploaded}, skipped ${skipped} (already exist)`);
       } else {
-        setStatusNotice(
-          `Skipped ${skipped} file${skipped !== 1 ? "s" : ""} (already exist)`,
-        );
+        setStatusNotice(`Skipped ${skipped} file${skipped !== 1 ? "s" : ""} (already exist)`);
       }
     } catch (error) {
+      dispatch({ type: "CLEAR_UPLOAD_PROGRESS" });
       setStatusNotice(error instanceof Error ? error.message : "Upload failed");
     }
   }
 
+  // --- Download ---
+
   function handleDownloadEntry(entry: FileEntry) {
     if (entry.type === "folder") {
-      const zipUrl = buildZipUrl(entry.path);
-      window.open(zipUrl, "_blank", "noopener,noreferrer");
+      window.open(buildZipUrl(entry.path), "_blank", "noopener,noreferrer");
       return;
     }
-    const downloadUrl = buildDownloadUrl(entry.path);
-    window.open(downloadUrl, "_blank", "noopener,noreferrer");
+    window.open(buildDownloadUrl(entry.path), "_blank", "noopener,noreferrer");
   }
+
+  // --- Share ---
 
   async function handleShareFolder(entry: FileEntry) {
     try {
-      const result = await createLocalShareMutation.mutateAsync({
-        path: entry.path,
-      });
+      const result = await createLocalShareMutation.mutateAsync({ path: entry.path });
       setStatusNotice(`Shared over network: /${result.sharedPath}`);
     } catch (error) {
-      setStatusNotice(
-        error instanceof Error ? error.message : "Failed to share folder",
-      );
+      setStatusNotice(error instanceof Error ? error.message : "Failed to share folder");
     }
   }
 
@@ -944,25 +1151,19 @@ export function FileManager() {
       await deleteLocalShareMutation.mutateAsync(shareId);
       setStatusNotice("Shared folder removed");
     } catch (error) {
-      setStatusNotice(
-        error instanceof Error
-          ? error.message
-          : "Failed to remove shared folder",
-      );
+      setStatusNotice(error instanceof Error ? error.message : "Failed to remove shared folder");
     }
   }
+
+  // --- Copy path ---
 
   async function handleCopyEntryPath(entry: FileEntry) {
     const hostname = systemMetricsQuery.data?.hostname ?? "";
     const networkAddress = systemMetricsQuery.data?.wifi?.ipv4 ?? hostname;
-    const absolutePath = filesRootPath
-      ? `${filesRootPath}/${entry.path}`
-      : `/${entry.path}`;
+    const absolutePath = filesRootPath ? `${filesRootPath}/${entry.path}` : `/${entry.path}`;
     const fullPath =
       entry.path === "Shared" || entry.path.startsWith("Shared/")
-        ? networkAddress
-          ? `smb://${networkAddress}${absolutePath}`
-          : absolutePath
+        ? networkAddress ? `smb://${networkAddress}${absolutePath}` : absolutePath
         : absolutePath;
 
     try {
@@ -981,41 +1182,88 @@ export function FileManager() {
       }
       toast.success("Path copied to clipboard");
     } catch {
-      toast.error("Could not copy automatically", {
-        description: fullPath,
-      });
+      toast.error("Could not copy automatically", { description: fullPath });
     }
   }
 
-  // Count items
+  // --- Save file ---
+
+  async function handleSaveOpenFile() {
+    if (!openFileKey || !openFileViewer || openFileViewer.mode !== "text") return;
+    const nextContent = fileDrafts[openFileKey] ?? openFileViewer.content ?? "";
+    try {
+      await saveFileContentMutation.mutateAsync({
+        path: openFileKey,
+        content: nextContent,
+        expectedMtimeMs: openFileViewer.mtimeMs,
+      });
+      dispatch({ type: "SET_EDITOR_NOTICE", notice: "Saved" });
+    } catch (error) {
+      dispatch({ type: "SET_EDITOR_NOTICE", notice: error instanceof Error ? error.message : "Failed to save file" });
+    }
+  }
+
+  // --- Context menus ---
+
+  function handleContextMenu(e: React.MouseEvent, entry: FileEntry) {
+    e.preventDefault();
+    e.stopPropagation();
+    const menuWidth = 220;
+    const menuHeight = 260;
+    const rootRect = rootRef.current?.getBoundingClientRect();
+    if (!rootRect) return;
+    const x = Math.min(Math.max(8, e.clientX - rootRect.left), rootRect.width - menuWidth - 8);
+    const y = Math.min(Math.max(8, e.clientY - rootRect.top), rootRect.height - menuHeight - 8);
+    dispatch({ type: "SHOW_CONTEXT_MENU", x, y, entry });
+    dispatch({ type: "SELECT_FILE", name: entry.name });
+  }
+
+  function handleBackgroundContextMenu(e: React.MouseEvent) {
+    e.preventDefault();
+    const menuWidth = 176;
+    const menuHeight = 112;
+    const rootRect = rootRef.current?.getBoundingClientRect();
+    if (!rootRect) return;
+    const x = Math.min(Math.max(8, e.clientX - rootRect.left), rootRect.width - menuWidth - 8);
+    const y = Math.min(Math.max(8, e.clientY - rootRect.top), rootRect.height - menuHeight - 8);
+    dispatch({ type: "SHOW_BACKGROUND_CONTEXT_MENU", x, y });
+  }
+
+  // --- Derived ---
+
   const folderCount = sortedEntries.filter((e) => e.type === "folder").length;
   const fileCount = sortedEntries.filter((e) => e.type === "file").length;
   const contextShare =
     showContextMenu?.entry.type === "folder"
       ? localSharesByPath.get(showContextMenu.entry.path)
       : undefined;
-  const trashItemCount =
-    directoryQuery.data?.entries.length ?? currentEntries.length;
+  const trashItemCount = directoryQuery.data?.entries.length ?? currentEntries.length;
+  const clipboardDisplayName = clipboardState
+    ? clipboardState.names.length === 1
+      ? clipboardState.names[0]
+      : `${clipboardState.names.length} items`
+    : null;
 
   return (
     <div
       ref={rootRef}
       className="relative flex h-full"
-      onClick={() => setShowContextMenu(null)}
+      onClick={() => {
+        dispatch({ type: "HIDE_CONTEXT_MENU" });
+        dispatch({ type: "HIDE_BACKGROUND_CONTEXT_MENU" });
+      }}
     >
-      {!sidebarCollapsed && (
-        <FileManagerSidebar
-          currentPath={currentPath}
-          isSharedView={isSharedView}
-          isTrashView={isTrashView}
-          locationItems={locationItems}
-          sidebarSections={sidebarSections}
-          storageUsagePercent={storageUsagePercent}
-          storageUsageText={storageUsageText}
-          onNavigateToPath={navigateToPath}
-          onOpenNetworkDialog={() => setShowNetworkDialog(true)}
-        />
-      )}
+      <FileManagerSidebar
+        currentPath={currentPath}
+        isSharedView={isSharedView}
+        isTrashView={isTrashView}
+        locationItems={locationItems}
+        sidebarSections={sidebarSections}
+        storageUsagePercent={storageUsagePercent}
+        storageUsageText={storageUsageText}
+        onNavigateToPath={navigateToPath}
+        onOpenNetworkDialog={() => dispatch({ type: "SHOW_NETWORK_DIALOG" })}
+      />
 
       <div className={`m-2 flex min-w-0 flex-1 flex-col ${FILES_PANEL_SHELL}`}>
         <FileManagerToolbar
@@ -1038,55 +1286,39 @@ export function FileManager() {
           sortDir={sortDir}
           uploadFilesPending={uploadFilesMutation.isPending}
           uploadInputRef={uploadInputRef}
+          uploadProgress={uploadProgress}
           viewMode={viewMode}
           onCycleSortBy={() => {
-            setSortBy((value) => {
-              const next =
-                value === "name"
-                  ? "modified"
-                  : value === "modified"
-                    ? "size"
-                    : "name";
-              setSortDir("asc");
-              return next;
-            });
+            const next = sortBy === "name" ? "modified" : sortBy === "modified" ? "size" : "name";
+            dispatch({ type: "SET_SORT_BY", by: next });
           }}
-          onEmptyTrash={() => {
-            void handleEmptyTrash();
-          }}
+          onEmptyTrash={() => { void handleEmptyTrash(); }}
           onNavigateToPath={navigateToPath}
           onNavigateUp={navigateUp}
-          onOpenCreateEntryDialog={openCreateEntryDialog}
-          onSearchQueryChange={setSearchQuery}
-          onSetViewMode={setViewMode}
-          onToggleGlobalSearch={() => setGlobalSearch((value) => !value)}
-          onToggleIncludeHidden={() => setIncludeHidden((value) => !value)}
-          onToggleSortDir={() =>
-            setSortDir((value) => (value === "asc" ? "desc" : "asc"))
-          }
-          onUploadInputChange={(files) => {
-            void handleUploadFiles(files);
-          }}
+          onOpenCreateEntryDialog={(kind) => dispatch({ type: "OPEN_CREATE_ENTRY_DIALOG", kind })}
+          onSearchQueryChange={(q) => dispatch({ type: "SET_SEARCH_QUERY", query: q })}
+          onSetViewMode={(mode) => dispatch({ type: "SET_VIEW_MODE", mode })}
+          onToggleGlobalSearch={() => dispatch({ type: "TOGGLE_GLOBAL_SEARCH" })}
+          onToggleIncludeHidden={() => dispatch({ type: "TOGGLE_INCLUDE_HIDDEN" })}
+          onToggleSortDir={() => dispatch({ type: "TOGGLE_SORT_DIR" })}
+          onUploadInputChange={(files) => { void handleUploadFiles(files); }}
         />
 
         <FileManagerFileArea
           canSaveOpenFile={canSaveOpenFile}
           directoryErrorMessage={
-            directoryQuery.error instanceof Error
-              ? directoryQuery.error.message
-              : "Failed to load files"
+            directoryQuery.error instanceof Error ? directoryQuery.error.message : "Failed to load files"
           }
           directoryIsError={directoryQuery.isError}
           directoryIsLoading={directoryQuery.isLoading}
           editorNotice={editorNotice}
           fileContentErrorMessage={
-            fileContentQuery.error instanceof Error
-              ? fileContentQuery.error.message
-              : "Failed to open file"
+            fileContentQuery.error instanceof Error ? fileContentQuery.error.message : "Failed to open file"
           }
           fileContentIsError={fileContentQuery.isError}
           fileContentIsLoading={fileContentQuery.isLoading}
           globalSearchIsFetching={globalSearchQuery.isFetching}
+          hasMoreSearchResults={hasMoreSearchResults}
           isDragOver={isDragOver}
           isGlobalSearchActive={isGlobalSearchActive}
           isStarredView={isStarredView}
@@ -1101,46 +1333,45 @@ export function FileManager() {
           pendingEntryPath={pendingEntryPath}
           searchQuery={searchQuery}
           selectedFiles={selectedFiles}
-          sortedEntries={sortedEntries}
+          sortedEntries={visibleEntries}
+          totalEntriesCount={sortedEntries.length}
           viewMode={viewMode}
           onChangeOpenFileDraft={(value) => {
             if (!openFileKey) return;
-            setFileDrafts((prev) => ({
-              ...prev,
-              [openFileKey]:
-                typeof value === "function"
-                  ? value(prev[openFileKey] ?? "")
-                  : value,
-            }));
+            dispatch({
+              type: "SET_FILE_DRAFT",
+              key: openFileKey,
+              value: typeof value === "function" ? value(fileDrafts[openFileKey] ?? "") : value,
+            });
           }}
-          onCloseOpenFile={() => setOpenFile(null)}
+          onCloseOpenFile={() => dispatch({ type: "CLOSE_FILE" })}
           onDragLeave={(event) => {
             if (!event.currentTarget.contains(event.relatedTarget as Node)) {
-              setIsDragOver(false);
+              dispatch({ type: "SET_DRAG_OVER", value: false });
             }
           }}
           onDragOver={(event) => {
             if (isTrashView || isStarredView) return;
             event.preventDefault();
             event.dataTransfer.dropEffect = "copy";
-            setIsDragOver(true);
+            dispatch({ type: "SET_DRAG_OVER", value: true });
           }}
           onDrop={(event) => {
             event.preventDefault();
-            setIsDragOver(false);
+            dispatch({ type: "SET_DRAG_OVER", value: false });
             if (isTrashView || isStarredView) return;
             void handleUploadFiles(Array.from(event.dataTransfer.files));
           }}
+          onBackgroundContextMenu={handleBackgroundContextMenu}
           onEntryClick={handleEntryClick}
           onEntryContextMenu={handleContextMenu}
           onOpenEntry={navigateTo}
-          onSaveOpenFile={() => {
-            void handleSaveOpenFile();
-          }}
+          onLoadMoreSearch={() => dispatch({ type: "LOAD_MORE_SEARCH" })}
+          onSaveOpenFile={() => { void handleSaveOpenFile(); }}
         />
 
         <FileManagerStatusBar
-          clipboardName={clipboardState?.name ?? null}
+          clipboardName={clipboardDisplayName}
           clipboardOperation={clipboardState?.operation ?? null}
           currentPathForDisplay={currentPathForDisplay}
           fileCount={fileCount}
@@ -1150,9 +1381,7 @@ export function FileManager() {
           rootLabel={rootLabel}
           selectedFilesCount={selectedFiles.size}
           statusNotice={statusNotice}
-          onTrashSelected={() => {
-            void handleTrashSelected();
-          }}
+          onTrashSelected={() => { void handleTrashSelected(); }}
         />
       </div>
 
@@ -1161,25 +1390,17 @@ export function FileManager() {
           contextShareActive={Boolean(contextShare)}
           entry={showContextMenu.entry}
           isTrashView={isTrashView}
-          pasteDisabled={
-            !clipboardState || isTrashView || pasteFileEntryMutation.isPending
-          }
+          pasteDisabled={!clipboardState || isTrashView || pasteFileEntryMutation.isPending}
           x={showContextMenu.x}
           y={showContextMenu.y}
-          onClose={() => setShowContextMenu(null)}
-          onCopy={() => setClipboardFromEntry(showContextMenu.entry, "copy")}
+          onClose={() => dispatch({ type: "HIDE_CONTEXT_MENU" })}
+          onCopy={() => setClipboardFromEntries([showContextMenu.entry], "copy")}
           onCopyPath={() => void handleCopyEntryPath(showContextMenu.entry)}
-          onCut={() => setClipboardFromEntry(showContextMenu.entry, "move")}
-          onDeletePermanently={() => {
-            void handleDeleteFromTrash(showContextMenu.entry);
-          }}
+          onCut={() => setClipboardFromEntries([showContextMenu.entry], "move")}
+          onDeletePermanently={() => { void handleDeleteFromTrash(showContextMenu.entry); }}
           onDownload={() => handleDownloadEntry(showContextMenu.entry)}
-          onGetInfo={() => {
-            void handleGetInfo(showContextMenu.entry);
-          }}
-          onMoveToTrash={() => {
-            void handleMoveSelectedToTrash(showContextMenu.entry);
-          }}
+          onGetInfo={() => { void handleGetInfo(showContextMenu.entry); }}
+          onMoveToTrash={() => { void handleMoveSelectedToTrash(showContextMenu.entry); }}
           onOpen={() => navigateTo(showContextMenu.entry)}
           onPaste={() => {
             const destinationPath =
@@ -1188,12 +1409,8 @@ export function FileManager() {
                 : toFilePath(currentPath);
             void handlePasteToDestination(destinationPath);
           }}
-          onRename={() => {
-            void handleRenameEntry(showContextMenu.entry);
-          }}
-          onRestore={() => {
-            void handleRestoreFromTrash(showContextMenu.entry);
-          }}
+          onRename={() => { void handleRenameEntry(showContextMenu.entry); }}
+          onRestore={() => { void handleRestoreFromTrash(showContextMenu.entry); }}
           onToggleShare={() => {
             if (contextShare) {
               void handleUnshareFolder(contextShare.id);
@@ -1210,27 +1427,34 @@ export function FileManager() {
             }
             void handleShareFolder(showContextMenu.entry);
           }}
-          onToggleStar={() => {
-            void handleToggleStar(showContextMenu.entry);
-          }}
+          onToggleStar={() => { void handleToggleStar(showContextMenu.entry); }}
+        />
+      ) : null}
+
+      {showBackgroundContextMenu ? (
+        <FileManagerBackgroundContextMenu
+          pasteDisabled={!clipboardState || pasteFileEntryMutation.isPending}
+          x={showBackgroundContextMenu.x}
+          y={showBackgroundContextMenu.y}
+          onClose={() => dispatch({ type: "HIDE_BACKGROUND_CONTEXT_MENU" })}
+          onNewFolder={() => dispatch({ type: "OPEN_CREATE_ENTRY_DIALOG", kind: "folder" })}
+          onNewFile={() => dispatch({ type: "OPEN_CREATE_ENTRY_DIALOG", kind: "file" })}
+          onPaste={() => { void handlePasteToDestination(toFilePath(currentPath)); }}
         />
       ) : null}
 
       {createEntryDialog ? (
         <CreateEntryDialog
           dialog={createEntryDialog}
-          isCreatePending={
-            createFolderMutation.isPending || createFileMutation.isPending
-          }
-          onClose={closeCreateEntryDialog}
-          onDialogChange={(value) =>
-            setCreateEntryDialog((previous) =>
-              previous ? { ...previous, name: value, error: null } : previous,
-            )
-          }
-          onSubmit={() => {
-            void submitCreateEntryDialog();
+          isCreatePending={createFolderMutation.isPending || createFileMutation.isPending}
+          onClose={() => dispatch({ type: "CLOSE_CREATE_ENTRY_DIALOG" })}
+          onDialogChange={(value) => {
+            const error = value.includes("/") || value.includes("\0")
+              ? 'Name cannot contain "/" or null characters'
+              : null;
+            dispatch({ type: "UPDATE_CREATE_ENTRY_DIALOG", name: value, error });
           }}
+          onSubmit={() => { void submitCreateEntryDialog(); }}
         />
       ) : null}
 
@@ -1238,41 +1462,48 @@ export function FileManager() {
         <RenameEntryDialog
           dialog={renameDialog}
           isRenamePending={renameFileEntryMutation.isPending}
-          onClose={closeRenameDialog}
-          onDialogChange={(value) =>
-            setRenameDialog((previous) =>
-              previous ? { ...previous, name: value, error: null } : previous,
-            )
-          }
-          onSubmit={() => {
-            void submitRenameDialog();
+          onClose={() => dispatch({ type: "CLOSE_RENAME_DIALOG" })}
+          onDialogChange={(value) => {
+            const error = value.includes("/") || value.includes("\0")
+              ? 'Name cannot contain "/" or null characters'
+              : null;
+            dispatch({ type: "UPDATE_RENAME_DIALOG", name: value, error });
           }}
+          onSubmit={() => { void submitRenameDialog(); }}
         />
       ) : null}
 
       {showEmptyTrashConfirm ? (
         <EmptyTrashConfirmDialog
           itemCount={trashItemCount}
-          onCancel={() => setShowEmptyTrashConfirm(false)}
-          onConfirm={() => {
-            void confirmEmptyTrash();
-          }}
+          onCancel={() => dispatch({ type: "HIDE_EMPTY_TRASH_CONFIRM" })}
+          onConfirm={() => { void confirmEmptyTrash(); }}
         />
       ) : null}
 
       {fileInfoDialog ? (
         <FileInfoDialogOverlay
           fileInfo={fileInfoDialog}
-          onClose={() => setFileInfoDialog(null)}
+          onClose={() => dispatch({ type: "CLOSE_FILE_INFO_DIALOG" })}
+        />
+      ) : null}
+
+      {pasteConflict ? (
+        <PasteConflictDialog
+          conflictName={pasteConflict.conflictName}
+          onReplace={() => { void handleConflictResolution("replace"); }}
+          onKeepBoth={() => { void handleConflictResolution("keep-both"); }}
+          onSkip={() => { void handleConflictResolution("skip"); }}
+          onSkipAll={() => { void handleConflictResolution("skip-all"); }}
         />
       ) : null}
 
       <NetworkStorageDialog
         isOpen={showNetworkDialog}
-        onClose={() => setShowNetworkDialog(false)}
+        onClose={() => dispatch({ type: "HIDE_NETWORK_DIALOG" })}
         onNavigateToNetwork={() => {
-          setShowNetworkDialog(false);
-          navigateToPath(["Network"]);
+          dispatch({ type: "NAVIGATE_TO_PATH", path: ["Network"] });
+          dispatch({ type: "HIDE_NETWORK_DIALOG" });
         }}
       />
     </div>

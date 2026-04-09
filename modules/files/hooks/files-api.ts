@@ -3,6 +3,7 @@ import type {
   FileCreateResponse,
   FileInfoResponse,
   FileListResponse,
+  FilePasteCollision,
   FilePasteRequest,
   FilePasteResponse,
   FileReadResponse,
@@ -13,6 +14,8 @@ import type {
   FileWriteRequest,
   FileWriteResponse,
 } from "@/lib/shared/contracts/files";
+
+export type { FilePasteCollision };
 
 type ListFilesApiResponse = {
   data: FileListResponse;
@@ -350,6 +353,7 @@ export async function uploadFilesToPath(payload: {
   destinationPath: string;
   files: File[];
   includeHidden?: boolean;
+  onProgress?: (loaded: number, total: number) => void;
 }) {
   const formData = new FormData();
   formData.append("path", payload.destinationPath);
@@ -358,23 +362,39 @@ export async function uploadFilesToPath(payload: {
     formData.append("file", file);
   }
 
-  const response = await fetch("/api/v1/files/upload", {
-    method: "POST",
-    body: formData,
-  });
+  return new Promise<{ uploaded: { name: string; path: string; sizeBytes: number }[]; skipped: string[] }>(
+    (resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", "/api/v1/files/upload");
 
-  if (!response.ok) {
-    const errorBody = await getErrorBody(response);
-    throw new Error(
-      errorBody.error ??
-        `Upload failed (${response.status})${errorBody.code ? ` [${errorBody.code}]` : ""}`,
-    );
-  }
+      if (payload.onProgress) {
+        const cb = payload.onProgress;
+        xhr.upload.addEventListener("progress", (e) => {
+          if (e.lengthComputable) cb(e.loaded, e.total);
+        });
+      }
 
-  const json = (await response.json()) as {
-    data: { uploaded: { name: string; path: string; sizeBytes: number }[]; skipped: string[] };
-  };
-  return json.data;
+      xhr.addEventListener("load", () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          const json = JSON.parse(xhr.responseText) as {
+            data: { uploaded: { name: string; path: string; sizeBytes: number }[]; skipped: string[] };
+          };
+          resolve(json.data);
+        } else {
+          let errorMsg = `Upload failed (${xhr.status})`;
+          try {
+            const body = JSON.parse(xhr.responseText) as ErrorBody;
+            if (body.error) errorMsg = body.error;
+          } catch { /* ignore */ }
+          reject(new Error(errorMsg));
+        }
+      });
+
+      xhr.addEventListener("error", () => reject(new Error("Upload failed: network error")));
+      xhr.addEventListener("abort", () => reject(new Error("Upload aborted")));
+      xhr.send(formData);
+    },
+  );
 }
 
 export async function searchFilesRequest(params: {

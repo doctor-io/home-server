@@ -198,6 +198,59 @@ export function FileManagerContextMenu({
   );
 }
 
+export function FileManagerBackgroundContextMenu({
+  pasteDisabled,
+  x,
+  y,
+  onClose,
+  onNewFolder,
+  onNewFile,
+  onPaste,
+}: {
+  pasteDisabled: boolean;
+  x: number;
+  y: number;
+  onClose: () => void;
+  onNewFolder: () => void;
+  onNewFile: () => void;
+  onPaste: () => void;
+}) {
+  return (
+    <div
+      className={`absolute z-[200] min-w-44 py-1.5 ${FILES_MENU_SHELL}`}
+      style={{ left: x, top: y }}
+      onClick={(event) => event.stopPropagation()}
+    >
+      <ContextMenuItem
+        icon={<ClipboardPaste className="size-3.5" />}
+        label="Paste"
+        disabled={pasteDisabled}
+        onClick={() => {
+          onPaste();
+          onClose();
+        }}
+      />
+      <div className="mx-2 my-1 h-px bg-border" />
+      <ContextMenuItem
+        icon={<FolderOpen className="size-3.5" />}
+        label="New Folder"
+        onClick={() => {
+          onNewFolder();
+          onClose();
+        }}
+      />
+      <ContextMenuItem
+        icon={<FileText className="size-3.5" />}
+        label="New File"
+        onClick={() => {
+          onNewFile();
+          onClose();
+        }}
+      />
+    </div>
+  );
+}
+
 function ContextMenuItem({
   danger,
   disabled,

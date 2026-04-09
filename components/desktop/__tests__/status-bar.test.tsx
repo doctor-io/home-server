@@ -394,6 +394,11 @@ describe("StatusBar", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Open date picker" }));
 
-    expect(screen.getByRole("grid", { name: "March 2026" })).toBeTruthy();
+    const expectedMonthLabel = new Intl.DateTimeFormat("en-US", {
+      month: "long",
+      year: "numeric",
+    }).format(new Date());
+
+    expect(screen.getByRole("grid", { name: expectedMonthLabel })).toBeTruthy();
   });
 });
