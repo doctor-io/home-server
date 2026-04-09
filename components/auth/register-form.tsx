@@ -1,6 +1,7 @@
 "use client";
 
-import { AuthCard } from "@/components/auth/auth-card";
+import Image from "next/image";
+import { LockKeyhole, UserRound } from "@/components/icons/platform-icons";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useState } from "react";
 
@@ -55,33 +56,19 @@ export function RegisterForm() {
     try {
       const response = await fetch("/api/auth/register", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          username,
-          password,
-          confirmPassword,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password, confirmPassword }),
       });
 
       if (!response.ok) {
-        const json = (await response.json().catch(() => ({}))) as {
-          error?: string;
-        };
-
+        const json = (await response.json().catch(() => ({}))) as { error?: string };
         throw new Error(json.error ?? "Registration failed");
       }
 
-      const loginUrl = `/login?registered=1&username=${encodeURIComponent(username)}`;
-      router.replace(loginUrl);
+      router.replace(`/login?registered=1&username=${encodeURIComponent(username)}`);
       router.refresh();
     } catch (submitError) {
-      setError(
-        submitError instanceof Error
-          ? submitError.message
-          : "Registration failed",
-      );
+      setError(submitError instanceof Error ? submitError.message : "Registration failed");
     } finally {
       setIsSubmitting(false);
     }
@@ -91,70 +78,68 @@ export function RegisterForm() {
 
   return (
     <>
+      {/* Progress overlay — same card style as login */}
       {isSubmitting ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 px-6 backdrop-blur-xl">
-          <div className="w-full max-w-md rounded-[calc(var(--radius)+0.75rem)] border border-primary/20 bg-card/95 p-6 shadow-2xl shadow-black/40">
-            <div className="flex items-start gap-4">
-              <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-[var(--radius)] border-2 border-primary/30 border-t-primary animate-spin" />
-              <div className="min-w-0">
-                <p className="text-lg font-semibold text-foreground">
-                  {progressStep?.title}
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {progressStep?.description}
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-6">
+          <div className="w-full max-w-sm text-center">
+            <div className="mx-auto mb-4 flex size-24 animate-homeio-breathe-glow items-center justify-center rounded-[var(--radius)] border border-white/14 bg-white/10 shadow-2xl shadow-black/45 backdrop-blur-md">
+              <Image src="/icon.png" alt="Homeio" width={64} height={64} className="size-16 animate-homeio-breathe blur-[0.25px]" />
+            </div>
+            <p className="text-xl font-medium text-foreground">{progressStep?.title}</p>
+            <p className="mb-5 text-xs text-muted-foreground">{progressStep?.description}</p>
+            <div className="rounded-[calc(var(--radius)+0.375rem)] border border-glass-border bg-card/85 px-3 py-3 shadow-2xl shadow-black/40 backdrop-blur-2xl">
+              <div className="flex gap-2 mb-3">
+                {registerProgressSteps.map((step, index) => (
+                  <span
+                    key={step.title}
+                    className={`h-1.5 flex-1 rounded-full transition-colors duration-500 ${
+                      index <= submitStage ? "bg-primary" : "bg-white/10"
+                    }`}
+                  />
+                ))}
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-primary/30 border-t-primary animate-spin" />
+                <p className="text-xs text-left text-muted-foreground">
+                  First setup takes a little longer — Homeio is preparing the App Store in the background.
                 </p>
               </div>
-            </div>
-            <div className="mt-5 flex gap-2">
-              {registerProgressSteps.map((step, index) => (
-                <span
-                  key={step.title}
-                  className={`h-2 flex-1 rounded-[var(--radius)] transition-colors ${
-                    index <= submitStage ? "bg-primary" : "bg-white/10"
-                  }`}
-                />
-              ))}
-            </div>
-            <div className="mt-4 space-y-2 text-xs text-muted-foreground">
-              <p>
-                This first setup can take a little longer than a normal sign up.
-              </p>
-              <p>
-                Homeio is preparing the default App Store in the background so
-                the system is ready right after login.
-              </p>
             </div>
           </div>
         </div>
       ) : null}
 
-      <AuthCard title="Create account" description="Create your account">
-        <form className="space-y-3" onSubmit={handleSubmit}>
-          <div className="space-y-1">
-            <label
-              className="text-sm font-medium text-foreground"
-              htmlFor="username"
-            >
-              Username
-            </label>
+      {/* Register form — same structure as login */}
+      <div className="w-full max-w-sm text-center">
+        <div className="mx-auto mb-4 flex size-24 animate-homeio-breathe-glow items-center justify-center rounded-[var(--radius)] border border-white/14 bg-white/10 shadow-2xl shadow-black/45 backdrop-blur-md">
+          <Image src="/icon.png" alt="Homeio" width={64} height={64} className="size-16 animate-homeio-breathe blur-[0.25px]" />
+        </div>
+
+        <p className="text-xl font-medium text-foreground">Create account</p>
+        <p className="mb-5 text-xs text-muted-foreground">Set up your Homeio instance</p>
+
+        <form
+          className="rounded-[calc(var(--radius)+0.375rem)] border border-glass-border bg-card/85 px-3 py-3 shadow-2xl shadow-black/40 backdrop-blur-2xl"
+          onSubmit={handleSubmit}
+        >
+          <div className="mb-2 flex items-center gap-2 rounded-xl border border-glass-border bg-secondary/35 px-3">
+            <UserRound className="size-4 shrink-0 text-primary" />
             <input
               id="username"
               name="username"
+              type="text"
               autoComplete="username"
               value={username}
               onChange={(event) => setUsername(event.target.value)}
-              className="h-10 w-full rounded-lg border border-glass-border bg-secondary/35 px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/40"
+              placeholder="Username"
+              className="h-9 w-full border-0 bg-transparent px-0 text-sm text-foreground outline-none placeholder:text-muted-foreground/60"
               required
+              autoFocus
             />
           </div>
 
-          <div className="space-y-1">
-            <label
-              className="text-sm font-medium text-foreground"
-              htmlFor="password"
-            >
-              Password
-            </label>
+          <div className="mb-2 flex items-center gap-2 rounded-xl border border-glass-border bg-secondary/35 px-3">
+            <LockKeyhole className="size-4 shrink-0 text-primary" />
             <input
               id="password"
               name="password"
@@ -162,18 +147,14 @@ export function RegisterForm() {
               autoComplete="new-password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              className="h-10 w-full rounded-lg border border-glass-border bg-secondary/35 px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/40"
+              placeholder="Password"
+              className="h-9 w-full border-0 bg-transparent px-0 text-sm text-foreground outline-none placeholder:text-muted-foreground/60"
               required
             />
           </div>
 
-          <div className="space-y-1">
-            <label
-              className="text-sm font-medium text-foreground"
-              htmlFor="confirmPassword"
-            >
-              Confirm password
-            </label>
+          <div className="mb-2 flex items-center gap-2 rounded-xl border border-glass-border bg-secondary/35 px-3">
+            <LockKeyhole className="size-4 shrink-0 text-primary" />
             <input
               id="confirmPassword"
               name="confirmPassword"
@@ -181,13 +162,14 @@ export function RegisterForm() {
               autoComplete="new-password"
               value={confirmPassword}
               onChange={(event) => setConfirmPassword(event.target.value)}
-              className="h-10 w-full rounded-lg border border-glass-border bg-secondary/35 px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/40"
+              placeholder="Confirm password"
+              className="h-9 w-full border-0 bg-transparent px-0 text-sm text-foreground outline-none placeholder:text-muted-foreground/60"
               required
             />
           </div>
 
           {error ? (
-            <p className="rounded-lg border border-status-red/30 bg-status-red/10 px-3 py-2 text-sm text-status-red">
+            <p className="mb-2 rounded-lg border border-status-red/30 bg-status-red/10 px-3 py-2 text-xs text-status-red">
               {error}
             </p>
           ) : null}
@@ -201,12 +183,12 @@ export function RegisterForm() {
               !confirmPassword.trim() ||
               password !== confirmPassword
             }
-            className="h-10 w-full rounded-lg bg-primary text-sm font-semibold text-primary-foreground transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-xl bg-primary py-2 text-sm font-medium text-primary-foreground transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isSubmitting ? "Finishing setup..." : "Register"}
+            {isSubmitting ? "Setting up..." : "Create account"}
           </button>
         </form>
-      </AuthCard>
+      </div>
     </>
   );
 }
