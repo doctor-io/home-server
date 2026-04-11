@@ -18,6 +18,7 @@ NGINX_SITE_NAME="${HOMEIO_NGINX_SITE_NAME:-home-server}"
 REPO_URL="${HOMEIO_REPO_URL:-https://github.com/doctor-io/homeio.git}"
 REPO_BRANCH="${HOMEIO_REPO_BRANCH:-main}"
 
+HOMEIO_RELEASE_TAG="${HOMEIO_RELEASE_TAG:-}"
 HOMEIO_RELEASE_TARBALL_URL="${HOMEIO_RELEASE_TARBALL_URL:-}"
 HOMEIO_CREATE_BACKUP="${HOMEIO_CREATE_BACKUP:-true}"
 HOMEIO_BACKUP_ROOT="${HOMEIO_BACKUP_ROOT:-/var/backups/home-server/releases}"
@@ -563,7 +564,20 @@ main() {
 	ensure_service_shutdown_behavior
 	stop_service
 
-	if [[ -n "${HOMEIO_RELEASE_TARBALL_URL}" ]]; then
+	if [[ -n "${HOMEIO_RELEASE_TAG}" ]]; then
+		if [[ "${HOMEIO_RELEASE_TAG}" == "latest" ]]; then
+			print_status "Fetching latest release URL..."
+			HOMEIO_RELEASE_TARBALL_URL="$(curl -fsSL \
+				"https://api.github.com/repos/doctor-io/homeio/releases/latest" \
+				| jq -r '.tarball_url')"
+			[[ -n "${HOMEIO_RELEASE_TARBALL_URL}" ]] || {
+				print_error "Could not fetch latest release URL."; false
+			}
+		else
+			HOMEIO_RELEASE_TARBALL_URL="https://github.com/doctor-io/homeio/archive/refs/tags/${HOMEIO_RELEASE_TAG}.tar.gz"
+		fi
+		deploy_from_tarball
+	elif [[ -n "${HOMEIO_RELEASE_TARBALL_URL}" ]]; then
 		deploy_from_tarball
 	else
 		deploy_from_git

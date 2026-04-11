@@ -15,6 +15,7 @@ import {
   AppGrid,
   type AppActionTarget,
 } from "@/modules/apps/components/app-grid";
+import { AppLogsDialog } from "@/modules/apps/components/app-logs-dialog";
 import { AppStore } from "@/modules/apps/components/app-store";
 import { AppConfiguratorPanel } from "@/modules/apps/components/configurator/app-configurator-panel";
 import { useStoreActions } from "@/modules/apps/hooks/useStoreActions";
@@ -96,6 +97,7 @@ export function DesktopShell() {
   );
   const [appSettingsTarget, setAppSettingsTarget] =
     useState<AppActionTarget | null>(null);
+  const [logsTarget, setLogsTarget] = useState<AppActionTarget | null>(null);
   const shellStoreActions = useStoreActions();
   const terminalCommandIdRef = useRef(0);
   const [displayWallpaper, setDisplayWallpaper] = useState("/images/1.jpg");
@@ -675,9 +677,7 @@ export function DesktopShell() {
             iconSize={appIconSize}
             animationsEnabled={appearance.animationsEnabled}
             externalOperationsByApp={shellStoreActions.operationsByApp}
-            onViewLogs={({ containerName }) =>
-              requestLogsCommand(`docker logs --tail 200 ${containerName}`)
-            }
+            onViewLogs={(target) => setLogsTarget(target)}
             onOpenTerminal={({ containerName }) =>
               requestTerminalCommand(
                 `docker exec ${containerName} /bin/sh -c "pwd && ls"`,
@@ -871,6 +871,11 @@ export function DesktopShell() {
           />
         )}
       </div>
+
+      <AppLogsDialog
+        target={logsTarget}
+        onClose={() => setLogsTarget(null)}
+      />
     </div>
   );
 }

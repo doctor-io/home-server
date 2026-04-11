@@ -17,6 +17,7 @@ PUBLIC_PORT="${HOMEIO_PUBLIC_PORT:-80}"
 NGINX_SITE_NAME="${HOMEIO_NGINX_SITE_NAME:-home-server}"
 REPO_URL="${HOMEIO_REPO_URL:-https://github.com/doctor-io/homeio.git}"
 REPO_BRANCH="${HOMEIO_REPO_BRANCH:-main}"
+HOMEIO_RELEASE_TAG="${HOMEIO_RELEASE_TAG:-}"
 
 NODE_VERSION="${NODE_VERSION:-22.14.0}"
 YQ_VERSION="${YQ_VERSION:-4.45.4}"
@@ -462,8 +463,60 @@ ensure_directories() {
 	mkdir -p "${INSTALL_DIR}/logs"
 }
 
+deploy_from_release_tarball() {
+	local url="${1}"
+	local tmp_dir extract_dir source_dir
+	tmp_dir="$(mktemp -d)"
+	extract_dir="${tmp_dir}/extract"
+	mkdir -p "${extract_dir}"
+
+	print_status "Downloading release from ${url}..."
+	curl -fsSL "${url}" -o "${tmp_dir}/release.tar.gz"
+	tar -xzf "${tmp_dir}/release.tar.gz" -C "${extract_dir}"
+
+	if [[ -f "${extract_dir}/package.json" ]]; then
+		source_dir="${extract_dir}"
+	else
+		source_dir="$(find "${extract_dir}" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+	fi
+
+	[[ -n "${source_dir:-}" && -f "${source_dir}/package.json" ]] || {
+		print_error "Could not locate app root in tarball."; exit 1
+	}
+
+	mkdir -p "${INSTALL_DIR}"
+	rsync -a \
+		--exclude ".git" \
+		--exclude "node_modules" \
+		--exclude ".next" \
+		"${source_dir}/" "${INSTALL_DIR}/"
+
+	rm -rf "${tmp_dir}"
+	print_status "Release deployed."
+}
+
 clone_or_update_repo() {
-	print_status "Syncing repository (${REPO_BRANCH})..."
+	print_status "Syncing repository..."
+
+	if [[ -n "${HOMEIO_RELEASE_TAG}" ]]; then
+		local tarball_url
+		if [[ "${HOMEIO_RELEASE_TAG}" == "latest" ]]; then
+			print_status "Fetching latest release URL..."
+			tarball_url="$(curl -fsSL \
+				"https://api.github.com/repos/doctor-io/homeio/releases/latest" \
+				| jq -r '.tarball_url')"
+			[[ -n "${tarball_url}" ]] || { print_error "Could not fetch latest release URL."; exit 1; }
+		else
+			tarball_url="https://github.com/doctor-io/homeio/archive/refs/tags/${HOMEIO_RELEASE_TAG}.tar.gz"
+		fi
+		if [[ -d "${INSTALL_DIR}" ]]; then
+			cd /tmp || cd /
+			print_status "Removing existing installation..."
+			rm -rf "${INSTALL_DIR}"
+		fi
+		deploy_from_release_tarball "${tarball_url}"
+		return
+	fi
 
 	# Remove existing installation if present
 	if [[ -d "${INSTALL_DIR}" ]]; then

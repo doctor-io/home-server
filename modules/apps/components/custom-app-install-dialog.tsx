@@ -132,7 +132,7 @@ export function CustomInstallForm({
               className="px-3 py-2 text-sm bg-glass border border-glass-border rounded-md text-foreground outline-none focus:border-primary/50"
             />
             {!isWebUiPortValid ? (
-              <span className="text-[11px] text-status-red">Port must be between 1024 and 65535.</span>
+              <span className="text-2xs text-status-red">Port must be between 1024 and 65535.</span>
             ) : null}
           </label>
 

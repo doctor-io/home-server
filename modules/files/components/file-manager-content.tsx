@@ -15,7 +15,13 @@ import { FolderOpen, Loader2, MonitorSpeaker, Music, Pause, Play, Save, Star, Up
 import { formatBytesCompact } from "@/lib/client/format";
 import { buildAssetUrl } from "@/modules/files/hooks/files-api";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import type { DragEventHandler, MouseEvent, ReactNode, SetStateAction } from "react";
+import type { DragEventHandler, MouseEvent, SetStateAction } from "react";
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 
 const IMAGE_EXTS = new Set(["jpg", "jpeg", "png", "gif", "webp", "bmp"]);
 
@@ -166,35 +172,48 @@ export function FileManagerFileArea({
           openFileViewer={openFileViewer}
         />
       ) : directoryIsLoading ? (
-        <CenteredState
-          icon={<FolderOpen className="size-12 opacity-30" />}
-          label="Loading files..."
-        />
+        <Empty className="border-0 gap-4">
+          <EmptyMedia>
+            <FolderOpen className="size-12 text-muted-foreground/30" />
+          </EmptyMedia>
+          <EmptyHeader>
+            <EmptyTitle className="text-sm font-normal text-muted-foreground">
+              Loading files...
+            </EmptyTitle>
+          </EmptyHeader>
+        </Empty>
       ) : directoryIsError ? (
-        <CenteredState
-          icon={<FolderOpen className="size-12 opacity-50" />}
-          label={directoryErrorMessage}
-          tone="error"
-        />
+        <Empty className="border-0 gap-4">
+          <EmptyMedia>
+            <FolderOpen className="size-12 text-status-red/50" />
+          </EmptyMedia>
+          <EmptyHeader>
+            <EmptyTitle className="text-sm font-normal text-status-red">
+              {directoryErrorMessage}
+            </EmptyTitle>
+          </EmptyHeader>
+        </Empty>
       ) : sortedEntries.length === 0 ? (
-        <CenteredState
-          icon={
-            isGlobalSearchActive && globalSearchIsFetching ? (
-              <Loader2 className="size-10 animate-spin opacity-40" />
+        <Empty className="border-0 gap-4">
+          <EmptyMedia>
+            {isGlobalSearchActive && globalSearchIsFetching ? (
+              <Loader2 className="size-10 animate-spin text-muted-foreground/40" />
             ) : (
-              <FolderOpen className="size-12 opacity-30" />
-            )
-          }
-          label={
-            isGlobalSearchActive
-              ? globalSearchIsFetching
-                ? "Searching..."
-                : "No results found"
-              : searchQuery
-                ? "No matching files found"
-                : "This folder is empty"
-          }
-        />
+              <FolderOpen className="size-12 text-muted-foreground/30" />
+            )}
+          </EmptyMedia>
+          <EmptyHeader>
+            <EmptyTitle className="text-sm font-normal text-muted-foreground">
+              {isGlobalSearchActive
+                ? globalSearchIsFetching
+                  ? "Searching..."
+                  : "No results found"
+                : searchQuery
+                  ? "No matching files found"
+                  : "This folder is empty"}
+            </EmptyTitle>
+          </EmptyHeader>
+        </Empty>
       ) : viewMode === "grid" ? (
         <>
           <FileGrid
@@ -595,7 +614,7 @@ function FileGrid({
                   {entry.name}
                 </span>
                 {entry.size ? (
-                  <span className="text-[11px] text-muted-foreground/80">{entry.size}</span>
+                  <span className="text-2xs text-muted-foreground/80">{entry.size}</span>
                 ) : null}
               </div>
             </button>
@@ -717,25 +736,3 @@ function FileList({
   );
 }
 
-function CenteredState({
-  icon,
-  label,
-  tone = "muted",
-}: {
-  icon: ReactNode;
-  label: string;
-  tone?: "muted" | "error";
-}) {
-  return (
-    <div
-      className={`flex h-full flex-col items-center justify-center gap-3 ${
-        tone === "error" ? "text-status-red" : "text-muted-foreground"
-      }`}
-    >
-      {icon}
-      <span className="text-center text-sm">
-        {label}
-      </span>
-    </div>
-  );
-}

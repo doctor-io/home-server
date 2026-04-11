@@ -73,14 +73,14 @@ export function WeatherPopover({ weather, onClose }: WeatherPopoverProps) {
                   key={day.date}
                   className="flex flex-1 min-w-0 flex-col items-center gap-1 rounded-lg bg-secondary/25 px-1.5 py-2 text-xs text-muted-foreground"
                 >
-                  <span className="text-[11px] font-medium text-foreground">
+                  <span className="text-2xs font-medium text-foreground">
                     {new Date(`${day.date}T00:00:00`).toLocaleDateString(undefined, {
                       weekday: "short",
                     })}
                   </span>
                   <ForecastIcon weatherCode={day.weatherCode} />
-                  <span className="max-w-full truncate text-[10px]">{day.condition}</span>
-                  <span className="font-mono text-[10px] text-foreground">
+                  <span className="max-w-full truncate text-2xs">{day.condition}</span>
+                  <span className="font-mono text-2xs text-foreground">
                     {formatTemperature(day.tempMaxC)}/{formatTemperature(day.tempMinC)}
                   </span>
                 </div>

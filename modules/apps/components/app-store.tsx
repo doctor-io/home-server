@@ -45,15 +45,14 @@ import {
   Wrench,
 } from "@/components/icons/platform-icons";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import {
+  PANEL_SHELL as STORE_PANEL_SHELL,
+  PANEL_INSET as STORE_PANEL_INSET,
+  BADGE_SURFACE as STORE_BADGE_SURFACE,
+} from "@/lib/ui/surface-tokens";
 
 const STORE_PAGE_SIZE = 24;
 const STORE_SECTION_CARD_LIMIT = 6;
-const STORE_PANEL_SHELL =
-  "rounded-[calc(var(--radius)+0.375rem)] border border-glass-border bg-card/78 shadow-sm backdrop-blur-xl";
-const STORE_PANEL_INSET =
-  "rounded-[calc(var(--radius)+0.125rem)] border border-glass-border/80 bg-background/42";
-const STORE_BADGE_SURFACE =
-  "rounded-[var(--radius)] border border-glass-border bg-background/55";
 
 function isOperationBusy(operation: AppOperationState | undefined) {
   return Boolean(operation && isStoreOperationActiveStatus(operation.status));
@@ -124,7 +123,7 @@ function SourceBadge({
 }: Pick<StoreAppSummary, "sourceName" | "sourceKind">) {
   return (
     <span
-      className={`rounded-[var(--radius)] border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.18em] ${
+      className={`rounded-[var(--radius)] border px-1.5 py-0.5 text-2xs uppercase tracking-[0.18em] ${
         sourceKind === "official"
           ? "border-primary/25 text-primary"
           : sourceKind === "custom"
@@ -210,7 +209,7 @@ function UpdateInfoTooltip({
       <TooltipContent
         side="top"
         align="end"
-        className="max-w-[26rem] rounded-[calc(var(--radius)+0.125rem)] border border-glass-border bg-card/96 px-3 py-2 text-left text-[11px] leading-5 text-foreground shadow-xl backdrop-blur-xl"
+        className="max-w-[26rem] rounded-[calc(var(--radius)+0.125rem)] border border-glass-border bg-card/96 px-3 py-2 text-left text-2xs leading-5 text-foreground shadow-xl backdrop-blur-xl"
       >
         <div className="space-y-0.5">
           {lines.map((line) => (
@@ -327,7 +326,7 @@ function AppStoreDetailPanel({
                 {detail.categories.map((category) => (
                   <span
                     key={category}
-                    className={`${STORE_BADGE_SURFACE} px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-muted-foreground`}
+                    className={`${STORE_BADGE_SURFACE} px-2 py-0.5 text-2xs uppercase tracking-[0.18em] text-muted-foreground`}
                   >
                     {category}
                   </span>
@@ -373,10 +372,10 @@ function AppStoreDetailPanel({
           {detail.screenshots.length > 0 ? (
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-3">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                <p className="text-2xs uppercase tracking-wide text-muted-foreground">
                   Screenshots
                 </p>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-2xs text-muted-foreground">
                   Swipe or scroll
                 </p>
               </div>
@@ -402,7 +401,7 @@ function AppStoreDetailPanel({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             <div className={`${STORE_PANEL_INSET} p-3`}>
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+              <p className="text-2xs uppercase tracking-wide text-muted-foreground">
                 Platform
               </p>
               <p className="mt-1 text-xs text-foreground font-medium">
@@ -411,7 +410,7 @@ function AppStoreDetailPanel({
             </div>
             {detail.webUiPort ? (
               <div className={`${STORE_PANEL_INSET} p-3`}>
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                <p className="text-2xs uppercase tracking-wide text-muted-foreground">
                   Web UI Port
                 </p>
                 <p className="mt-1 text-xs text-foreground font-mono font-medium">
@@ -420,7 +419,7 @@ function AppStoreDetailPanel({
               </div>
             ) : null}
             <div className={`${STORE_PANEL_INSET} p-3 md:col-span-2`}>
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+              <p className="text-2xs uppercase tracking-wide text-muted-foreground">
                 Repository URL
               </p>
               {detail.repositoryUrl.startsWith("http://") ||
@@ -511,7 +510,7 @@ function CategorySidebar({
   return (
     <aside className={`m-2 w-56 shrink-0 overflow-y-auto p-4 ${STORE_PANEL_SHELL}`}>
       <div className="mb-4">
-        <p className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">
+        <p className="text-2xs uppercase tracking-[0.24em] text-muted-foreground">
           Categories
         </p>
       </div>
@@ -540,7 +539,7 @@ function CategorySidebar({
             title={category.description}
           >
             <span className="truncate">{category.name}</span>
-            <span className={`${STORE_BADGE_SURFACE} px-1.5 py-0.5 text-[10px]`}>
+            <span className={`${STORE_BADGE_SURFACE} px-1.5 py-0.5 text-2xs`}>
               {category.appCount}
             </span>
           </button>
@@ -638,7 +637,7 @@ function SectionCard({
             {getSectionDescription(variant)}
           </p>
         </div>
-        <div className={`${STORE_BADGE_SURFACE} flex items-center gap-2 self-start px-3 py-1 text-[11px] uppercase tracking-[0.22em] text-muted-foreground`}>
+        <div className={`${STORE_BADGE_SURFACE} flex items-center gap-2 self-start px-3 py-1 text-2xs uppercase tracking-[0.22em] text-muted-foreground`}>
           <span>{visibleApps.length} picks</span>
         </div>
       </div>
@@ -670,7 +669,7 @@ function SectionCard({
               <div className="relative flex h-full flex-col">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-2">
-                    <span className="rounded-[var(--radius)] border border-white/20 bg-background/55 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-foreground/80 backdrop-blur-sm">
+                    <span className="rounded-[var(--radius)] border border-white/20 bg-background/55 px-2 py-1 text-2xs font-medium uppercase tracking-[0.18em] text-foreground/80 backdrop-blur-sm">
                       {index === 0
                         ? "Hero pick"
                         : variant === "featured"
@@ -680,7 +679,7 @@ function SectionCard({
                   </div>
                   {statusPill ? (
                     <span
-                      className={`shrink-0 rounded-[var(--radius)] border px-2.5 py-1 text-[11px] font-medium ${statusPill.className}`}
+                      className={`shrink-0 rounded-[var(--radius)] border px-2.5 py-1 text-2xs font-medium ${statusPill.className}`}
                     >
                       {statusPill.label}
                     </span>
@@ -726,13 +725,13 @@ function SectionCard({
                           .map((category) => (
                             <span
                               key={`${app.id}-${category}`}
-                              className={`${STORE_BADGE_SURFACE} px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-foreground/75`}
+                              className={`${STORE_BADGE_SURFACE} px-2 py-1 text-2xs uppercase tracking-[0.16em] text-foreground/75`}
                             >
                               {category}
                             </span>
                           ))}
                         {app.webUiPort ? (
-                          <span className={`${STORE_BADGE_SURFACE} px-2 py-1 font-mono text-[10px] text-foreground/75`}>
+                          <span className={`${STORE_BADGE_SURFACE} px-2 py-1 font-mono text-2xs text-foreground/75`}>
                             :{app.webUiPort}
                           </span>
                         ) : null}
@@ -747,7 +746,7 @@ function SectionCard({
                         : ""
                     }`}
                   >
-                    <div className="space-y-1 text-[11px] text-muted-foreground">
+                    <div className="space-y-1 text-2xs text-muted-foreground">
                       <p className="uppercase tracking-[0.18em] text-foreground/70">
                         {app.status === "installed"
                           ? app.updateAvailable
@@ -1304,7 +1303,7 @@ export function AppStore({
                               {app.name}
                             </span>
                             {app.webUiPort ? (
-                              <span className={`${STORE_BADGE_SURFACE} shrink-0 px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground`}>
+                              <span className={`${STORE_BADGE_SURFACE} shrink-0 px-1.5 py-0.5 text-2xs font-mono text-muted-foreground`}>
                                 :{app.webUiPort}
                               </span>
                             ) : null}
@@ -1320,7 +1319,7 @@ export function AppStore({
                             {app.categories.slice(0, 2).map((category) => (
                               <span
                                 key={`${app.id}-${category}`}
-                                className={`${STORE_BADGE_SURFACE} px-1.5 py-0.5 text-[10px] text-muted-foreground`}
+                                className={`${STORE_BADGE_SURFACE} px-1.5 py-0.5 text-2xs text-muted-foreground`}
                               >
                                 {category}
                               </span>
@@ -1336,7 +1335,7 @@ export function AppStore({
                                   }}
                                 />
                               </div>
-                              <p className="text-[11px] text-muted-foreground mt-1">
+                              <p className="text-2xs text-muted-foreground mt-1">
                                 {operation.step} • {operation.progressPercent}%
                               </p>
                             </div>

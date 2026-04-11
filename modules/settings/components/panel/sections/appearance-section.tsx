@@ -170,7 +170,7 @@ export function AppearanceSection({
                 }`}
               >
                 <span className="block text-xs font-medium">{preset.name}</span>
-                <span className="block text-[11px] opacity-80">
+                <span className="block text-2xs opacity-80">
                   {preset.description}
                 </span>
               </button>

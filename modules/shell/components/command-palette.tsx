@@ -140,7 +140,7 @@ export function CommandPalette({
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+          <div className="flex items-center gap-1.5 text-2xs text-muted-foreground">
             <span className="rounded-md border border-glass-border bg-background/70 px-2 py-1 font-medium tracking-wide">
               Cmd K
             </span>
@@ -271,7 +271,7 @@ export function CommandPalette({
                     {app.name}
                   </span>
                   {app.updateAvailable ? (
-                    <span className="rounded-md bg-primary/12 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
+                    <span className="rounded-md bg-primary/12 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-[0.16em] text-primary">
                       Update
                     </span>
                   ) : null}

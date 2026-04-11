@@ -28,7 +28,7 @@ export function DatePickerPopover({
       <div className="border border-border/60 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.015))] px-4 py-3 shadow-inner shadow-black/10">
         <div className="mb-3 flex items-start justify-between gap-3 border-b border-border/50 pb-3">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/80">
+            <p className="text-2xs font-semibold uppercase tracking-[0.18em] text-muted-foreground/80">
               Calendar
             </p>
             <p className="mt-1 text-sm font-medium text-foreground">
@@ -39,7 +39,7 @@ export function DatePickerPopover({
               })}
             </p>
           </div>
-          <span className="rounded-full border border-border/60 bg-background/65 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/85">
+          <span className="rounded-full border border-border/60 bg-background/65 px-2.5 py-1 text-2xs font-semibold uppercase tracking-[0.16em] text-muted-foreground/85">
             {isToday ? "Today" : selectedDate.toLocaleDateString("en-US", { year: "numeric" })}
           </span>
         </div>
@@ -71,7 +71,7 @@ export function DatePickerPopover({
             month_grid: "col-span-3 w-full border-separate border-spacing-y-1",
             weekdays: "mb-1 grid grid-cols-7 gap-1",
             weekday:
-              "flex h-7 items-center justify-center text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/75",
+              "flex h-7 items-center justify-center text-2xs font-semibold uppercase tracking-[0.08em] text-muted-foreground/75",
             week: "mt-1 grid grid-cols-7 gap-1",
             day: "aspect-square p-0",
             day_button:

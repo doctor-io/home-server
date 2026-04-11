@@ -446,7 +446,7 @@ export function AppConfiguratorPanel({
       ) : (
         <>
           {context === "installed_edit" && composeQuery.isError ? (
-            <div className="mx-3 mt-2 rounded-lg border border-status-red/40 bg-status-red/10 px-2 py-1 text-[11px] text-status-red">
+            <div className="mx-3 mt-2 rounded-lg border border-status-red/40 bg-status-red/10 px-2 py-1 text-2xs text-status-red">
               {String(composeQuery.error).includes("installed_compose_missing")
                 ? "Installed compose file is unavailable for this app."
                 : "Unable to load compose source for this app."}
@@ -454,7 +454,7 @@ export function AppConfiguratorPanel({
           ) : null}
 
           {context !== "custom_install" && !effectiveTemplate ? (
-            <div className="mx-3 mt-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-200">
+            <div className="mx-3 mt-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-2xs text-amber-200">
               App template metadata is unavailable. You can still edit and
               submit manually.
             </div>
@@ -500,7 +500,7 @@ export function AppConfiguratorPanel({
                     ? "Installation failed"
                     : installingOperation.step || "Installing…"}
               </span>
-              <span className="text-[10px] tabular-nums text-muted-foreground shrink-0">
+              <span className="text-2xs tabular-nums text-muted-foreground shrink-0">
                 {installingOperation.progressPercent}%
               </span>
             </div>
@@ -517,7 +517,7 @@ export function AppConfiguratorPanel({
               />
             </div>
             {installingOperation.status === "success" ? (
-              <span className="text-[11px] text-status-green">
+              <span className="text-2xs text-status-green">
                 Installed successfully — closing window…
               </span>
             ) : null}

@@ -392,7 +392,7 @@ function Field({
           <button
             type="button"
             onClick={onAdd}
-            className="cursor-pointer rounded-[var(--radius)] border border-glass-border bg-secondary/40 px-2.5 py-0.5 text-[11px] font-medium text-foreground transition-colors hover:bg-secondary/60"
+            className="cursor-pointer rounded-[var(--radius)] border border-glass-border bg-secondary/40 px-2.5 py-0.5 text-2xs font-medium text-foreground transition-colors hover:bg-secondary/60"
           >
             + Add
           </button>
@@ -491,7 +491,7 @@ function PortEditor({
         <button
           type="button"
           onClick={onRemove}
-          className="cursor-pointer text-[11px] text-muted-foreground hover:text-status-red"
+          className="cursor-pointer text-2xs text-muted-foreground hover:text-status-red"
         >
           Remove
         </button>
@@ -542,7 +542,7 @@ function VolumeEditor({
         <button
           type="button"
           onClick={onRemove}
-          className="cursor-pointer text-[11px] text-muted-foreground hover:text-status-red"
+          className="cursor-pointer text-2xs text-muted-foreground hover:text-status-red"
         >
           Remove
         </button>
@@ -578,7 +578,7 @@ function EnvEditor({
         <button
           type="button"
           onClick={onRemove}
-          className="cursor-pointer text-[11px] text-muted-foreground hover:text-status-red"
+          className="cursor-pointer text-2xs text-muted-foreground hover:text-status-red"
         >
           Remove
         </button>
@@ -627,7 +627,7 @@ function StringListEditor({
                   values.filter((_, currentIndex) => currentIndex !== index),
                 )
               }
-              className="cursor-pointer text-[11px] text-muted-foreground hover:text-status-red"
+              className="cursor-pointer text-2xs text-muted-foreground hover:text-status-red"
             >
               Remove
             </button>

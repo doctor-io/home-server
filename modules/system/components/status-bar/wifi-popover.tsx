@@ -189,7 +189,7 @@ export function WifiPopover({ metrics, networkStatus, onClose }: WifiPopoverProp
                   void handleConnect(network);
                 }}
                 disabled={isConnecting && pendingSsid === network.ssid}
-                className="text-[11px] px-2 py-1 rounded-md border border-glass-border text-foreground hover:bg-secondary/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="text-2xs px-2 py-1 rounded-md border border-glass-border text-foreground hover:bg-secondary/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isConnecting && pendingSsid === network.ssid
                   ? "Connecting..."

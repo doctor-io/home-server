@@ -227,7 +227,7 @@ export function NetworkStorageDialog({
                 Discovered Servers
               </h3>
               <div className="flex-1" />
-              <span className={`${FILES_BADGE_SURFACE} px-1.5 py-0.5 text-[10px] text-muted-foreground`}>
+              <span className={`${FILES_BADGE_SURFACE} px-1.5 py-0.5 text-2xs text-muted-foreground`}>
                 {discoveredServers.length}
               </span>
             </div>
@@ -288,7 +288,7 @@ export function NetworkStorageDialog({
                         {item.host}/{item.share}
                       </span>
                       <span
-                        className={`${FILES_BADGE_SURFACE} px-1.5 py-0.5 text-[10px] uppercase tracking-wider ${
+                        className={`${FILES_BADGE_SURFACE} px-1.5 py-0.5 text-2xs uppercase tracking-wider ${
                           item.isMounted
                             ? "bg-emerald-500/15 text-emerald-400"
                             : "bg-amber-500/15 text-amber-300"
@@ -297,7 +297,7 @@ export function NetworkStorageDialog({
                         {item.isMounted ? "mounted" : "unmounted"}
                       </span>
                       <div className="flex-1" />
-                      <span className="text-[10px] text-muted-foreground">
+                      <span className="text-2xs text-muted-foreground">
                         /{item.mountPath}
                       </span>
                     </div>
