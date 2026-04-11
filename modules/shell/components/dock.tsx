@@ -113,13 +113,14 @@ export function Dock({
                   {item.name}
                 </TooltipContent>
               </Tooltip>
-              {isRunning && (
-                <span
-                  className={`size-1 rounded-[var(--radius)] ${
-                    isFocused ? "bg-primary" : "bg-foreground/65"
-                  }`}
-                />
-              )}
+              {/* Always rendered to reserve space — invisible when not running */}
+              <span
+                className={`size-1 rounded-[var(--radius)] transition-colors ${
+                  isRunning
+                    ? isFocused ? "bg-primary" : "bg-foreground/65"
+                    : "invisible"
+                }`}
+              />
             </div>
           );
         })}
