@@ -21,7 +21,7 @@ HOMEIO_RELEASE_TAG="${HOMEIO_RELEASE_TAG:-}"
 
 NODE_VERSION="${NODE_VERSION:-22.14.0}"
 YQ_VERSION="${YQ_VERSION:-4.45.4}"
-DOCKER_VERSION="${DOCKER_VERSION:-28.0.1}"
+DOCKER_VERSION="${DOCKER_VERSION:-}"   # empty = always install latest
 DOCKER_INSTALL_SCRIPT_COMMIT="${DOCKER_INSTALL_SCRIPT_COMMIT:-master}"
 
 HOMEIO_INSTALL_YQ="${HOMEIO_INSTALL_YQ:-false}"
@@ -364,12 +364,19 @@ install_docker() {
 		return
 	fi
 
-	print_status "Installing Docker ${DOCKER_VERSION}..."
+	local version_args=()
+	if [[ -n "${DOCKER_VERSION}" && "${DOCKER_VERSION}" != "latest" ]]; then
+		print_status "Installing Docker ${DOCKER_VERSION}..."
+		version_args=(--version "v${DOCKER_VERSION}")
+	else
+		print_status "Installing Docker (latest)..."
+	fi
+
 	curl -fsSL "https://raw.githubusercontent.com/docker/docker-install/${DOCKER_INSTALL_SCRIPT_COMMIT}/install.sh" -o /tmp/install-docker.sh
 	if [[ "${HOMEIO_VERBOSE}" == "true" ]]; then
-		sh /tmp/install-docker.sh --version "v${DOCKER_VERSION}"
+		sh /tmp/install-docker.sh "${version_args[@]}"
 	else
-		sh /tmp/install-docker.sh --version "v${DOCKER_VERSION}" >/dev/null 2>&1
+		sh /tmp/install-docker.sh "${version_args[@]}" >/dev/null 2>&1
 	fi
 	rm -f /tmp/install-docker.sh
 
