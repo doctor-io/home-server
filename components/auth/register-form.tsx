@@ -110,7 +110,7 @@ export function RegisterForm() {
       ) : null}
 
       {/* Register form — same structure as login */}
-      <div className="w-full max-w-sm text-center">
+      <div className={`w-full max-w-sm text-center ${isSubmitting ? "invisible" : ""}`}>
         <div className="mx-auto mb-4 flex size-24 animate-homeio-breathe-glow items-center justify-center rounded-[var(--radius)] border border-white/14 bg-white/10 shadow-2xl shadow-black/45 backdrop-blur-md">
           <Image src="/icon.png" alt="Homeio" width={64} height={64} className="size-16 animate-homeio-breathe blur-[0.25px]" />
         </div>
