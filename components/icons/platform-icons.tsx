@@ -6,6 +6,9 @@ import {
   ArchiveRegular,
   ArrowCircleUpRegular,
   ArrowCounterclockwiseRegular,
+  ArrowRotateClockwiseRegular,
+  ZoomInRegular,
+  ZoomOutRegular,
   ArrowDownloadRegular,
   ArrowDownRegular,
   ArrowExportRegular,
@@ -239,4 +242,7 @@ export {
   CutRegular as Scissors,
   DismissRegular as XIcon,
   DismissRegular as X,
+  ArrowRotateClockwiseRegular as RotateCw,
+  ZoomInRegular as ZoomIn,
+  ZoomOutRegular as ZoomOut,
 };

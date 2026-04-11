@@ -11,7 +11,7 @@ import {
 } from "@/modules/files/components/file-manager-surface";
 import { MonacoEditorPane } from "@/modules/files/components/file-manager-editor-pane";
 import type { FileReadResponse } from "@/lib/shared/contracts/files";
-import { FolderOpen, Loader2, MonitorSpeaker, Music, Pause, Play, Save, Star, Upload, X } from "@/components/icons/platform-icons";
+import { Download, FolderOpen, Loader2, Maximize2, Minimize2, MonitorSpeaker, Music, Pause, Play, RotateCw, Save, Star, Upload, X, ZoomIn, ZoomOut } from "@/components/icons/platform-icons";
 import { formatBytesCompact } from "@/lib/client/format";
 import { buildAssetUrl } from "@/modules/files/hooks/files-api";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -422,6 +422,199 @@ function AudioPlayer({ src, fileName }: { src: string; fileName: string }) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Full-screen preview overlay
+// ---------------------------------------------------------------------------
+
+const ZOOM_STEP = 0.25;
+const ZOOM_MIN = 0.25;
+const ZOOM_MAX = 4;
+
+function FilePreviewFullscreen({
+  openFile,
+  openFileAssetUrl,
+  openFileBadgeLabel,
+  openFileViewer,
+  openFileContent,
+  openFileKey,
+  openFileLanguage,
+  onCollapse,
+}: {
+  openFile: { entry: FileEntry };
+  openFileAssetUrl: string;
+  openFileBadgeLabel: string;
+  openFileViewer: FileReadResponse | null;
+  openFileContent: string;
+  openFileKey: string | null;
+  openFileLanguage: string;
+  onCollapse: () => void;
+}) {
+  const [zoom, setZoom] = useState(1);
+  const [rotation, setRotation] = useState(0);
+  const isImage = openFileViewer?.mode === "image";
+
+  // ESC to collapse
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCollapse();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onCollapse]);
+
+  const handleBackdropClick = useCallback((e: MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget) onCollapse();
+  }, [onCollapse]);
+
+  const zoomIn = () => setZoom((z) => Math.min(z + ZOOM_STEP, ZOOM_MAX));
+  const zoomOut = () => setZoom((z) => Math.max(z - ZOOM_STEP, ZOOM_MIN));
+  const resetZoom = () => setZoom(1);
+  const rotate = () => setRotation((r) => (r + 90) % 360);
+
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex flex-col bg-black/92 backdrop-blur-md"
+      onClick={handleBackdropClick}
+    >
+      {/* Toolbar */}
+      <div className="flex shrink-0 items-center gap-2 border-b border-white/10 bg-black/60 px-4 py-2.5">
+        {/* File info */}
+        <div className="flex min-w-0 items-center gap-2">
+          {getFileIcon(openFile.entry)}
+          <span className="truncate text-sm font-medium text-white/90">
+            {openFile.entry.name}
+          </span>
+          <span className="shrink-0 rounded bg-white/10 px-1.5 py-0.5 text-xs uppercase tracking-wider text-white/50">
+            {openFileBadgeLabel}
+          </span>
+        </div>
+
+        <div className="flex-1" />
+
+        {/* Image controls */}
+        {isImage && (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={zoomOut}
+              disabled={zoom <= ZOOM_MIN}
+              className="rounded p-1.5 text-white/60 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-30"
+              aria-label="Zoom out"
+            >
+              <ZoomOut className="size-4" />
+            </button>
+            <button
+              onClick={resetZoom}
+              className="rounded px-2 py-1 text-xs font-mono text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+            >
+              {Math.round(zoom * 100)}%
+            </button>
+            <button
+              onClick={zoomIn}
+              disabled={zoom >= ZOOM_MAX}
+              className="rounded p-1.5 text-white/60 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-30"
+              aria-label="Zoom in"
+            >
+              <ZoomIn className="size-4" />
+            </button>
+            <div className="mx-1 h-4 w-px bg-white/15" />
+            <button
+              onClick={rotate}
+              className="rounded p-1.5 text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+              aria-label="Rotate 90°"
+            >
+              <RotateCw className="size-4" />
+            </button>
+            <div className="mx-1 h-4 w-px bg-white/15" />
+          </div>
+        )}
+
+        {/* Download */}
+        <a
+          href={openFileAssetUrl}
+          download={openFile.entry.name}
+          className="rounded p-1.5 text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+          aria-label="Download"
+        >
+          <Download className="size-4" />
+        </a>
+
+        {/* Collapse back to panel */}
+        <button
+          onClick={onCollapse}
+          className="rounded p-1.5 text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+          aria-label="Exit full screen"
+        >
+          <Minimize2 className="size-4" />
+        </button>
+
+        {/* Close */}
+        <button
+          onClick={onCollapse}
+          className="ml-1 rounded p-1.5 text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+          aria-label="Close"
+        >
+          <X className="size-4" />
+        </button>
+      </div>
+
+      {/* Content */}
+      <div className="min-h-0 flex-1 overflow-auto" onClick={handleBackdropClick}>
+        {openFileViewer?.mode === "image" ? (
+          <div className="flex h-full items-center justify-center p-6">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={openFileAssetUrl}
+              alt={openFile.entry.name}
+              style={{
+                transform: `scale(${zoom}) rotate(${rotation}deg)`,
+                transition: "transform 0.2s ease",
+                maxWidth: "100%",
+                maxHeight: "100%",
+                objectFit: "contain",
+              }}
+            />
+          </div>
+        ) : openFileViewer?.mode === "video" ? (
+          <div className="flex h-full items-center justify-center p-6">
+            <video
+              key={openFileAssetUrl}
+              src={openFileAssetUrl}
+              controls
+              autoPlay
+              className="max-h-full max-w-full rounded"
+              style={{ outline: "none" }}
+            />
+          </div>
+        ) : openFileViewer?.mode === "audio" ? (
+          <div className="flex h-full items-center justify-center" onClick={(e) => e.stopPropagation()}>
+            <AudioPlayer src={openFileAssetUrl} fileName={openFile.entry.name} />
+          </div>
+        ) : openFileViewer?.mode === "pdf" ? (
+          <iframe
+            title={openFile.entry.name}
+            src={openFileAssetUrl}
+            className="h-full w-full border-0"
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : openFileViewer?.mode === "text" ? (
+          <div className="h-full" onClick={(e) => e.stopPropagation()}>
+            <MonacoEditorPane
+              key={`fs-${openFileKey ?? "editor"}`}
+              language={openFileLanguage}
+              value={openFileContent}
+              onChange={() => {}}
+            />
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Panel viewer (in-window)
+// ---------------------------------------------------------------------------
+
 function OpenFileView({
   canSaveOpenFile,
   editorNotice,
@@ -455,7 +648,23 @@ function OpenFileView({
   openFileLanguage: string;
   openFileViewer: FileReadResponse | null;
 }) {
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const canExpand = openFileViewer?.mode !== "too_large" && openFileViewer?.mode !== "binary_unsupported";
+
   return (
+    <>
+      {isFullscreen && (
+        <FilePreviewFullscreen
+          openFile={openFile}
+          openFileAssetUrl={openFileAssetUrl}
+          openFileBadgeLabel={openFileBadgeLabel}
+          openFileViewer={openFileViewer}
+          openFileContent={openFileContent}
+          openFileKey={openFileKey}
+          openFileLanguage={openFileLanguage}
+          onCollapse={() => setIsFullscreen(false)}
+        />
+      )}
     <div className={`flex h-full flex-col overflow-hidden ${FILES_PANEL_INSET}`}>
       <div className="flex items-center gap-2 border-b border-glass-border/80 bg-background/52 px-3 py-2">
         <button
@@ -482,6 +691,15 @@ function OpenFileView({
         >
           <Save className="size-3" /> Save
         </button>
+        {canExpand && (
+          <button
+            onClick={() => setIsFullscreen(true)}
+            className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground"
+            aria-label="Full screen"
+          >
+            <Maximize2 className="size-3.5" />
+          </button>
+        )}
         <button
           onClick={onClose}
           className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground"
@@ -554,6 +772,7 @@ function OpenFileView({
         </div>
       ) : null}
     </div>
+    </>
   );
 }
 
