@@ -722,12 +722,21 @@ install_homeio() {
 
 	cd "${INSTALL_DIR}" || { print_error "Failed to enter installation directory"; exit 1; }
 
+	local step_log
+	step_log="$(mktemp)"
+
 	# Install dependencies
 	print_status "Installing npm dependencies (this may take a few minutes)..."
 	if [[ "${HOMEIO_VERBOSE}" == "true" ]]; then
 		npm ci || { print_error "npm ci failed"; exit 1; }
 	else
-		npm ci --loglevel=error --no-audit --no-fund || { print_error "npm ci failed"; exit 1; }
+		if ! npm ci --loglevel=error --no-audit --no-fund >"${step_log}" 2>&1; then
+			print_error "npm ci failed."
+			print_error "Last output:"
+			tail -20 "${step_log}" >&2
+			rm -f "${step_log}"
+			exit 1
+		fi
 	fi
 
 	# Initialize database schema
@@ -735,7 +744,13 @@ install_homeio() {
 	if [[ "${HOMEIO_VERBOSE}" == "true" ]]; then
 		(set -a && source "${ENV_FILE}" && set +a && npm run db:init) || { print_error "Database initialization failed"; exit 1; }
 	else
-		(set -a && source "${ENV_FILE}" && set +a && npm run db:init --silent) || { print_error "Database initialization failed"; exit 1; }
+		if ! (set -a && source "${ENV_FILE}" && set +a && npm run db:init) >"${step_log}" 2>&1; then
+			print_error "Database initialization failed."
+			print_error "Last output:"
+			tail -20 "${step_log}" >&2
+			rm -f "${step_log}"
+			exit 1
+		fi
 	fi
 
 	# Build application
@@ -743,9 +758,16 @@ install_homeio() {
 	if [[ "${HOMEIO_VERBOSE}" == "true" ]]; then
 		npm run build || { print_error "Build failed"; exit 1; }
 	else
-		npm run build --silent || { print_error "Build failed"; exit 1; }
+		if ! npm run build >"${step_log}" 2>&1; then
+			print_error "Build failed."
+			print_error "Last output:"
+			tail -20 "${step_log}" >&2
+			rm -f "${step_log}"
+			exit 1
+		fi
 	fi
 
+	rm -f "${step_log}"
 	print_status "Installation completed successfully!"
 }
 
