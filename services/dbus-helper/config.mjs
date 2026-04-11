@@ -10,9 +10,13 @@ const DBUS_SETTINGS_IFACE = "org.freedesktop.NetworkManager.Settings";
 const DBUS_SETTINGS_CONNECTION_IFACE =
   "org.freedesktop.NetworkManager.Settings.Connection";
 
-const DEVICE_TYPE_ETHERNET = 1;
+const DEVICE_TYPE_ETHERNET = 1;   // Physical Ethernet
 const DEVICE_TYPE_WIFI = 2;
+const DEVICE_TYPE_VETH = 20;      // Virtual Ethernet (LXC/container environments)
 const DEVICE_STATE_ACTIVATED = 100;
+
+// Device types that behave like wired connections (no SSID, no signal)
+const WIRED_DEVICE_TYPES = new Set([DEVICE_TYPE_ETHERNET, DEVICE_TYPE_VETH]);
 
 const SOCKET_PATH =
   process.env.DBUS_HELPER_SOCKET_PATH ?? "/run/home-server/dbus-helper.sock";
@@ -37,7 +41,9 @@ export {
   DBUS_WIRELESS_IFACE,
   DEVICE_STATE_ACTIVATED,
   DEVICE_TYPE_ETHERNET,
+  DEVICE_TYPE_VETH,
   DEVICE_TYPE_WIFI,
+  WIRED_DEVICE_TYPES,
   SOCKET_GROUP,
   SOCKET_PATH,
 };

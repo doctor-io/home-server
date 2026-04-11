@@ -13,8 +13,8 @@ import {
   DBUS_SETTINGS_PATH,
   DBUS_WIRELESS_IFACE,
   DEVICE_STATE_ACTIVATED,
-  DEVICE_TYPE_ETHERNET,
   DEVICE_TYPE_WIFI,
+  WIRED_DEVICE_TYPES,
   DBUS_PATH,
 } from "./config.mjs";
 import { HelperServiceError } from "./errors.mjs";
@@ -158,7 +158,8 @@ function createNetworkService({ log }) {
       const deviceObject = await getProxyObject(path);
       const props = deviceObject.getInterface(DBUS_PROPS_IFACE);
       const deviceType = Number(await getProperty(props, DBUS_DEVICE_IFACE, "DeviceType"));
-      if (deviceType !== DEVICE_TYPE_ETHERNET) continue;
+      // Accept physical Ethernet (1) and virtual Ethernet/VETH (20) used in LXC/containers
+      if (!WIRED_DEVICE_TYPES.has(deviceType)) continue;
 
       const iface = String(await getProperty(props, DBUS_DEVICE_IFACE, "Interface"));
       const state = Number(await getProperty(props, DBUS_DEVICE_IFACE, "State"));
