@@ -372,15 +372,35 @@ install_docker() {
 		print_status "Installing Docker (latest)..."
 	fi
 
-	curl -fsSL "https://raw.githubusercontent.com/docker/docker-install/${DOCKER_INSTALL_SCRIPT_COMMIT}/install.sh" -o /tmp/install-docker.sh
-	if [[ "${HOMEIO_VERBOSE}" == "true" ]]; then
-		sh /tmp/install-docker.sh "${version_args[@]}"
-	else
-		sh /tmp/install-docker.sh "${version_args[@]}" >/dev/null 2>&1
+	if ! curl -fsSL "https://raw.githubusercontent.com/docker/docker-install/${DOCKER_INSTALL_SCRIPT_COMMIT}/install.sh" -o /tmp/install-docker.sh; then
+		print_error "Failed to download Docker install script. Check your internet connection."
+		exit 1
 	fi
+
+	local docker_log
+	docker_log=$(mktemp)
+
+	if [[ "${HOMEIO_VERBOSE}" == "true" ]]; then
+		sh /tmp/install-docker.sh "${version_args[@]}" 2>&1 | tee "${docker_log}"
+	else
+		sh /tmp/install-docker.sh "${version_args[@]}" >"${docker_log}" 2>&1
+	fi
+	local docker_exit=$?
 	rm -f /tmp/install-docker.sh
 
-	systemctl enable --now docker >/dev/null 2>&1
+	if [[ ${docker_exit} -ne 0 ]]; then
+		print_error "Docker installation failed (exit ${docker_exit})."
+		print_error "Last output:"
+		tail -20 "${docker_log}" >&2
+		rm -f "${docker_log}"
+		exit 1
+	fi
+	rm -f "${docker_log}"
+
+	if ! systemctl enable --now docker >/dev/null 2>&1; then
+		print_error "Docker installed but failed to start. Run: systemctl status docker"
+		exit 1
+	fi
 }
 
 install_node() {
