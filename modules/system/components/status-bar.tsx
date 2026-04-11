@@ -19,7 +19,7 @@ import {
   formatTime,
 } from "@/modules/system/components/status-bar/utils";
 import { WeatherPopover } from "@/modules/system/components/status-bar/weather-popover";
-import { WifiStatusIcon } from "@/modules/system/components/status-bar/wifi-icons";
+import { EthernetIcon, WifiStatusIcon } from "@/modules/system/components/status-bar/wifi-icons";
 import { WifiPopover } from "@/modules/system/components/status-bar/wifi-popover";
 import { useCurrentWeather } from "@/modules/system/hooks/useCurrentWeather";
 import { useNetworkEventsSse } from "@/modules/system/hooks/useNetworkEventsSse";
@@ -48,6 +48,7 @@ export function StatusBar({
     username,
     batteryText,
     isWifiConnected,
+    isEthernet,
     isMetricsError,
     wifiIconClassName,
     notifications,
@@ -132,15 +133,19 @@ export function StatusBar({
               className="p-1.5 rounded-lg hover:bg-secondary/40 transition-colors cursor-pointer"
               aria-label="WiFi networks"
             >
-              <WifiStatusIcon
-                connected={!isMetricsError && isWifiConnected}
-                quality={
-                  networkStatus?.signalPercent ??
-                  metrics?.wifi.signalPercent ??
-                  null
-                }
-                className={wifiIconClassName}
-              />
+              {isEthernet ? (
+                <EthernetIcon className={wifiIconClassName} />
+              ) : (
+                <WifiStatusIcon
+                  connected={!isMetricsError && isWifiConnected}
+                  quality={
+                    networkStatus?.signalPercent ??
+                    metrics?.wifi.signalPercent ??
+                    null
+                  }
+                  className={wifiIconClassName}
+                />
+              )}
             </button>
             {activePopover === "wifi" && (
               <WifiPopover

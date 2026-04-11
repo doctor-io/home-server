@@ -10,6 +10,8 @@ type NetworkSectionProps = {
 };
 
 export function NetworkSection({ data }: NetworkSectionProps) {
+  const isEthernet = data.connected && data.ssid === "--";
+
   return (
     <div className="flex flex-col gap-1">
       {data.warning ? (
@@ -36,29 +38,48 @@ export function NetworkSection({ data }: NetworkSectionProps) {
               </span>
             </div>
           </div>
-          <span className="text-xs text-muted-foreground font-mono">
-            Signal {data.signalPercent}
-          </span>
+          {isEthernet ? (
+            <span className="text-xs text-muted-foreground font-mono">Wired</span>
+          ) : (
+            <span className="text-xs text-muted-foreground font-mono">
+              Signal {data.signalPercent}
+            </span>
+          )}
         </div>
-        <div className="grid grid-cols-3 gap-4 p-3">
-          <div>
-            <span className="text-xs text-muted-foreground block">IPv4 Address</span>
-            <span className="text-xs text-foreground font-mono">{data.ipv4}</span>
+        {isEthernet ? (
+          <div className="grid grid-cols-2 gap-4 p-3">
+            <div>
+              <span className="text-xs text-muted-foreground block">IPv4 Address</span>
+              <span className="text-xs text-foreground font-mono">{data.ipv4}</span>
+            </div>
+            <div>
+              <span className="text-xs text-muted-foreground block">Connection Type</span>
+              <span className="text-xs text-foreground font-mono">Ethernet</span>
+            </div>
           </div>
-          <div>
-            <span className="text-xs text-muted-foreground block">SSID</span>
-            <span className="text-xs text-foreground font-mono">{data.ssid}</span>
-          </div>
-          <div>
-            <span className="text-xs text-muted-foreground block">Wi-Fi Networks</span>
-            <span className="text-xs text-foreground font-mono">{data.wifiCount}</span>
-          </div>
-        </div>
-        {data.topSsids.length > 0 ? (
-          <div className="px-3 pb-3 text-xs text-muted-foreground">
-            Nearby: {data.topSsids.join(", ")}
-          </div>
-        ) : null}
+        ) : (
+          <>
+            <div className="grid grid-cols-3 gap-4 p-3">
+              <div>
+                <span className="text-xs text-muted-foreground block">IPv4 Address</span>
+                <span className="text-xs text-foreground font-mono">{data.ipv4}</span>
+              </div>
+              <div>
+                <span className="text-xs text-muted-foreground block">SSID</span>
+                <span className="text-xs text-foreground font-mono">{data.ssid}</span>
+              </div>
+              <div>
+                <span className="text-xs text-muted-foreground block">Wi-Fi Networks</span>
+                <span className="text-xs text-foreground font-mono">{data.wifiCount}</span>
+              </div>
+            </div>
+            {data.topSsids.length > 0 ? (
+              <div className="px-3 pb-3 text-xs text-muted-foreground">
+                Nearby: {data.topSsids.join(", ")}
+              </div>
+            ) : null}
+          </>
+        )}
       </div>
 
       <SectionDivider title="Configuration & Advanced" />

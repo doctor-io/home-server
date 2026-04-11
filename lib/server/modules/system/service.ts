@@ -604,6 +604,9 @@ async function collectSnapshot(): Promise<SystemMetricsSnapshot> {
   // Prefer D-Bus helper data for WiFi status (more reliable with NetworkManager)
   const connectedSsid = helperStatus?.ssid?.trim() ?? primaryWifiConnection?.ssid.trim() ?? "";
   const isWifiConnected = connectedSsid.length > 0;
+  // Ethernet: no SSID but a default interface has an IPv4 address
+  const isEthernetConnected =
+    !isWifiConnected && (primaryNetworkInterface?.ip4?.length ?? 0) > 0;
   const preferredIface =
     helperStatus?.iface ?? primaryNetworkInterface?.iface ?? primaryWifiConnection?.iface ?? null;
   const primaryNetworkStats =
@@ -696,7 +699,7 @@ async function collectSnapshot(): Promise<SystemMetricsSnapshot> {
     },
     storage: storageMetrics ?? undefined,
     wifi: {
-      connected: helperStatus?.connected ?? isWifiConnected,
+      connected: helperStatus?.connected ?? (isWifiConnected || isEthernetConnected),
       iface:
         helperStatus?.iface ?? (primaryWifiConnection?.iface || primaryNetworkInterface?.iface || null),
       ssid: helperStatus?.ssid ?? (isWifiConnected ? connectedSsid : null),
