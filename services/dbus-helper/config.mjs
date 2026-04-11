@@ -10,6 +10,7 @@ const DBUS_SETTINGS_IFACE = "org.freedesktop.NetworkManager.Settings";
 const DBUS_SETTINGS_CONNECTION_IFACE =
   "org.freedesktop.NetworkManager.Settings.Connection";
 
+const DEVICE_TYPE_ETHERNET = 1;
 const DEVICE_TYPE_WIFI = 2;
 const DEVICE_STATE_ACTIVATED = 100;
 
@@ -35,6 +36,7 @@ export {
   DBUS_SETTINGS_PATH,
   DBUS_WIRELESS_IFACE,
   DEVICE_STATE_ACTIVATED,
+  DEVICE_TYPE_ETHERNET,
   DEVICE_TYPE_WIFI,
   SOCKET_GROUP,
   SOCKET_PATH,
