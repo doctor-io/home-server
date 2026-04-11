@@ -216,7 +216,16 @@ run_database_migrations() {
 
 build_app() {
 	print_status "Building Next.js application..."
-	cd "${INSTALL_DIR}" && npm run build --silent
+	local build_log
+	build_log="$(mktemp)"
+	if ! (cd "${INSTALL_DIR}" && npm run build >"${build_log}" 2>&1); then
+		print_error "Build failed."
+		print_error "Last output:"
+		tail -20 "${build_log}" >&2
+		rm -f "${build_log}"
+		exit 1
+	fi
+	rm -f "${build_log}"
 }
 
 stop_service() {

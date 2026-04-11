@@ -16,6 +16,11 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_APP_VERSION: pkg.version,
   },
+  experimental: {
+    // Prevent next.config.mjs from being included in the NFT (Node File Tracing)
+    // output, which triggers a "whole project traced" warning from Turbopack.
+    outputFileTracingIgnores: ["**/next.config.mjs", "**/next.config.js"],
+  },
 };
 
 export default nextConfig;
