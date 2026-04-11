@@ -1103,7 +1103,8 @@ redirect_to_update_if_installed() {
 	fi
 
 	chmod +x "${tmp_update}"
-	exec bash "${tmp_update}"
+	# Pass REPO_BRANCH so update.sh stays on the same branch as this installer.
+	HOMEIO_REPO_BRANCH="${REPO_BRANCH}" exec bash "${tmp_update}"
 }
 
 main() {
