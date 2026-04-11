@@ -16,7 +16,9 @@ APP_PORT="${HOMEIO_APP_PORT:-${HOMEIO_PORT:-12026}}"
 PUBLIC_PORT="${HOMEIO_PUBLIC_PORT:-80}"
 NGINX_SITE_NAME="${HOMEIO_NGINX_SITE_NAME:-home-server}"
 REPO_URL="${HOMEIO_REPO_URL:-https://github.com/doctor-io/homeio.git}"
-REPO_BRANCH="${HOMEIO_REPO_BRANCH:-main}"
+# Default branch is "develop" in this branch of the script.
+# Override with: HOMEIO_REPO_BRANCH=main bash <(curl -fsSL ...)
+REPO_BRANCH="${HOMEIO_REPO_BRANCH:-develop}"
 HOMEIO_RELEASE_TAG="${HOMEIO_RELEASE_TAG:-}"
 
 NODE_VERSION="${NODE_VERSION:-22.14.0}"
