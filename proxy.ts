@@ -5,6 +5,9 @@ import {
 } from "@/lib/shared/auth/session";
 import { type NextRequest, NextResponse } from "next/server";
 
+const DEMO_MODE = process.env.DEMO_MODE === "true";
+const DEMO_BLOCKED_METHODS = new Set(["POST", "PUT", "DELETE", "PATCH"]);
+
 const PUBLIC_ROUTES = new Set(["/login", "/register"]);
 const RECOVERY_ROUTES = new Set(["/updating"]);
 const AUTH_STATUS_CACHE_MS = 5_000;
@@ -135,6 +138,17 @@ export async function proxy(request: NextRequest) {
 
   if (isPublicApiRoute(pathname)) {
     return NextResponse.next();
+  }
+
+  if (
+    DEMO_MODE &&
+    DEMO_BLOCKED_METHODS.has(request.method) &&
+    pathname.startsWith("/api/v1/")
+  ) {
+    return NextResponse.json(
+      { error: "This action is not available in demo mode." },
+      { status: 403 },
+    );
   }
 
   const sessionToken = request.cookies.get(AUTH_SESSION_COOKIE_NAME)?.value;

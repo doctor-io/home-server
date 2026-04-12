@@ -172,7 +172,7 @@ export function AppLogsDialog({ target, onClose }: AppLogsDialogProps) {
     <Dialog open={Boolean(target)} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent
         showCloseButton={false}
-        className="flex flex-col gap-0 p-0 max-w-5xl h-[82vh] bg-popover/98 border-glass-border overflow-hidden"
+        className="flex flex-col gap-0 p-0 w-[92vw] sm:w-[92vw] sm:max-w-5xl h-[82vh] bg-popover/98 border-glass-border overflow-hidden"
       >
         {/* Header */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-glass-border shrink-0">
@@ -263,7 +263,7 @@ export function AppLogsDialog({ target, onClose }: AppLogsDialogProps) {
                   className="flex items-start gap-2 font-mono text-xs leading-relaxed group"
                 >
                   {/* Timestamp */}
-                  <span className="shrink-0 text-muted-foreground/60 select-none w-[92px]">
+                  <span className="shrink-0 whitespace-nowrap text-muted-foreground/60 select-none w-[92px]">
                     {formatTimestamp(line.timestamp)}
                   </span>
 

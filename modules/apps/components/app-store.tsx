@@ -35,6 +35,7 @@ import {
   ArrowUpCircle,
   CheckCircle2,
   Download,
+  ExternalLink,
   Loader2,
   Package,
   RefreshCw,
@@ -114,7 +115,7 @@ function StatusBadge({
     );
   }
 
-  return <span className="text-xs text-muted-foreground">Not installed</span>;
+  return null;
 }
 
 function SourceBadge({
@@ -308,35 +309,34 @@ function AppStoreDetailPanel({
           App details are unavailable.
         </div>
       ) : (
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          <div className="flex items-start gap-5">
-            <div className="flex size-20 items-center justify-center overflow-hidden rounded-[calc(var(--radius)+0.75rem)] border border-glass-border bg-card/80 shadow-sm">
+        <div className="flex-1 overflow-y-auto p-6 space-y-5">
+          {/* App header */}
+          <div className="flex items-start gap-4">
+            {/* Icon */}
+            <div className="flex size-[4.5rem] shrink-0 items-center justify-center overflow-hidden rounded-[calc(var(--radius)+0.75rem)] border border-glass-border bg-card/80 shadow-sm">
               <StoreLogo
                 logoUrl={detail.logoUrl}
                 alt={`${detail.name} logo`}
-                className="size-12 object-contain"
+                className="size-11 object-contain"
                 fallbackLabel="app-logo-fallback-detail"
               />
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-lg font-semibold text-foreground">
-                  {detail.name}
-                </h2>
+
+            {/* Name + meta */}
+            <div className="flex-1 min-w-0 pt-0.5">
+              <h2 className="text-base font-semibold leading-tight text-foreground truncate">
+                {detail.name}
+              </h2>
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                <StatusBadge app={detail} operation={operation} />
                 {detail.categories.map((category) => (
                   <span
                     key={category}
-                    className={`${STORE_BADGE_SURFACE} px-2 py-0.5 text-2xs uppercase tracking-[0.18em] text-muted-foreground`}
+                    className={`${STORE_BADGE_SURFACE} px-1.5 py-px text-2xs uppercase tracking-[0.15em] text-muted-foreground`}
                   >
                     {category}
                   </span>
                 ))}
-              </div>
-
-              <div className="mt-3">
-                <StatusBadge app={detail} operation={operation} />
-              </div>
-              <div className="mt-2">
                 <SourceBadge
                   sourceName={detail.sourceName}
                   sourceKind={detail.sourceKind}
@@ -344,24 +344,78 @@ function AppStoreDetailPanel({
               </div>
               {operation ? (
                 <div className="mt-2 space-y-1">
-                  <p className="text-xs text-muted-foreground">
-                    {operation.step} • {operation.progressPercent}%
+                  <p className="text-2xs text-muted-foreground">
+                    {operation.step} — {operation.progressPercent}%
                   </p>
-                  <div className="h-1.5 overflow-hidden rounded-[var(--radius)] bg-muted">
+                  <div className="h-1 overflow-hidden rounded-full bg-muted">
                     <div
-                      className="h-full rounded-[var(--radius)] bg-primary transition-all"
-                      style={{
-                        width: `${Math.max(2, operation.progressPercent)}%`,
-                      }}
+                      className="h-full rounded-full bg-primary transition-all"
+                      style={{ width: `${Math.max(2, operation.progressPercent)}%` }}
                     />
                   </div>
                   {operation.message ? (
-                    <p className="text-xs text-status-red">
-                      {operation.message}
-                    </p>
+                    <p className="text-2xs text-status-red">{operation.message}</p>
                   ) : null}
                 </div>
               ) : null}
+            </div>
+
+            {/* Action buttons — uniform width, stacked */}
+            <div className="shrink-0 flex flex-col gap-1.5 items-stretch w-28">
+              {actionError ? (
+                <p className="text-2xs text-status-red text-center leading-tight">{actionError}</p>
+              ) : null}
+
+              {/* Primary action: Install → Open / Update based on state */}
+              {detail.status === "not_installed" ? (
+                <button
+                  onClick={onInstall}
+                  disabled={isOperationBusy(operation)}
+                  className="flex w-full items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-primary text-primary-foreground rounded-lg hover:brightness-110 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <Download className="size-3.5" /> Install
+                </button>
+              ) : detail.updateAvailable ? (
+                <UpdateInfoTooltip app={detail}>
+                  <button
+                    onClick={onUpdate}
+                    disabled={isOperationBusy(operation)}
+                    title={buildUpdateTitle(detail)}
+                    className="flex w-full items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-primary text-primary-foreground rounded-lg hover:brightness-110 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    <ArrowUpCircle className="size-3.5" /> Update
+                  </button>
+                </UpdateInfoTooltip>
+              ) : detail.webUiPort ? (
+                <a
+                  href={`http://${typeof window !== "undefined" ? window.location.hostname : "localhost"}:${detail.webUiPort}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex w-full items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-primary text-primary-foreground rounded-lg hover:brightness-110 transition-all cursor-pointer"
+                >
+                  <ExternalLink className="size-3.5" /> Open
+                </a>
+              ) : null}
+
+              {/* Secondary: Custom install (always) */}
+              <button
+                onClick={onCustomInstall}
+                disabled={isOperationBusy(operation)}
+                className="flex w-full items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-glass-border text-muted-foreground rounded-lg hover:bg-secondary/40 hover:text-foreground transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <Wrench className="size-3.5" /> Custom
+              </button>
+
+              {/* Danger: Uninstall (only when installed) */}
+              {detail.status !== "not_installed" && (
+                <button
+                  onClick={onUninstall}
+                  disabled={isOperationBusy(operation)}
+                  className="flex w-full items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-status-red/40 text-status-red rounded-lg hover:bg-status-red/10 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <Trash2 className="size-3.5" /> Uninstall
+                </button>
+              )}
             </div>
           </div>
 
@@ -440,58 +494,6 @@ function AppStoreDetailPanel({
             </div>
           </div>
 
-          {actionError ? (
-            <p className="text-xs text-status-red">{actionError}</p>
-          ) : null}
-
-          <div className="flex items-center gap-2 flex-wrap">
-            {detail.status === "not_installed" ? (
-              <button
-                onClick={onInstall}
-                disabled={isOperationBusy(operation)}
-                className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:brightness-110 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                <Download className="size-3.5" /> Install
-              </button>
-            ) : (
-              <>
-                {detail.updateAvailable ? (
-                  <UpdateInfoTooltip app={detail}>
-                    <button
-                      onClick={onUpdate}
-                      disabled={isOperationBusy(operation)}
-                      title={buildUpdateTitle(detail)}
-                      className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:brightness-110 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                      <ArrowUpCircle className="size-3.5" /> Update
-                    </button>
-                  </UpdateInfoTooltip>
-                ) : (
-                  <button
-                    onClick={onRedeploy}
-                    disabled={isOperationBusy(operation)}
-                    className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:brightness-110 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    <RefreshCw className="size-3.5" /> Redeploy
-                  </button>
-                )}
-                <button
-                  onClick={onUninstall}
-                  disabled={isOperationBusy(operation)}
-                  className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium bg-status-red/15 text-status-red rounded-lg hover:bg-status-red/25 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  <Trash2 className="size-3.5" /> Uninstall
-                </button>
-              </>
-            )}
-            <button
-              onClick={onCustomInstall}
-              disabled={isOperationBusy(operation)}
-              className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium border border-glass-border text-foreground rounded-lg hover:bg-secondary/40 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              <Wrench className="size-3.5" /> Custom Install
-            </button>
-          </div>
         </div>
       )}
     </div>

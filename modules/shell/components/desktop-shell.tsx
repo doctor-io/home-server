@@ -393,6 +393,11 @@ export function DesktopShell() {
     )
       return;
 
+    if (id === "terminal" && currentUser?.isDemoMode) {
+      toast.info("Terminal is disabled in demo mode.");
+      return;
+    }
+
     if (typeof window !== "undefined") {
       const metadata = {
         files: { title: "Open Files", subtitle: "Folder and file browser" },
@@ -648,6 +653,14 @@ export function DesktopShell() {
 
       {/* Desktop Content */}
       <div className="relative z-10 flex h-full flex-col">
+        {/* Demo mode banner */}
+        {currentUser?.isDemoMode && (
+          <div className="relative z-50 flex items-center justify-center gap-2 bg-primary/90 px-4 py-1.5 text-xs font-medium text-primary-foreground backdrop-blur-sm shrink-0">
+            <span className="size-1.5 rounded-full bg-primary-foreground/80 animate-pulse" />
+            Demo mode — app installs and system changes are disabled
+          </div>
+        )}
+
         {isSettingsSearchOpen && (
           <CommandPalette
             open={isSettingsSearchOpen}

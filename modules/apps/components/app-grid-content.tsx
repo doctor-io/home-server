@@ -53,7 +53,7 @@ export function AppGridContent({
     <>
       {primaryOperation ? (
         <div
-          className="mx-auto mt-4 flex w-full max-w-xl items-center justify-between gap-3 rounded-2xl border border-status-amber/25 bg-status-amber/10 px-4 py-3 text-xs text-status-amber shadow-lg shadow-black/10 backdrop-blur-xl"
+          className="fixed bottom-[6rem] left-1/2 z-[150] -translate-x-1/2 flex w-full max-w-sm items-center justify-between gap-3 rounded-2xl border border-status-amber/25 bg-status-amber/10 px-4 py-3 text-xs text-status-amber shadow-lg shadow-black/30 backdrop-blur-xl"
           role="status"
           aria-live="polite"
         >

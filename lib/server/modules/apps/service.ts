@@ -15,6 +15,18 @@ import {
 } from "@/lib/server/modules/docker/compose-parser";
 import { getComposeRuntimeInfo } from "@/lib/server/modules/docker/compose-runner";
 import type { InstalledApp } from "@/lib/shared/contracts/apps";
+import { serverEnv } from "@/lib/server/env";
+
+const DEMO_APPS: InstalledApp[] = [
+  { id: "portainer", name: "Portainer", stackName: "portainer", composePath: "", webUiPort: 9000, containerName: "portainer", status: "running", updatedAt: new Date().toISOString() },
+  { id: "jellyfin", name: "Jellyfin", stackName: "jellyfin", composePath: "", webUiPort: 8096, containerName: "jellyfin", status: "running", updatedAt: new Date().toISOString() },
+  { id: "nextcloud", name: "Nextcloud", stackName: "nextcloud", composePath: "", webUiPort: 8080, containerName: "nextcloud", status: "running", updatedAt: new Date().toISOString() },
+  { id: "vaultwarden", name: "Vaultwarden", stackName: "vaultwarden", composePath: "", webUiPort: 8081, containerName: "vaultwarden", status: "running", updatedAt: new Date().toISOString() },
+  { id: "pihole", name: "Pi-hole", stackName: "pihole", composePath: "", webUiPort: 8082, containerName: "pihole", status: "running", updatedAt: new Date().toISOString() },
+  { id: "grafana", name: "Grafana", stackName: "grafana", composePath: "", webUiPort: 3000, containerName: "grafana", status: "running", updatedAt: new Date().toISOString() },
+  { id: "uptime-kuma", name: "Uptime Kuma", stackName: "uptime-kuma", composePath: "", webUiPort: 3001, containerName: "uptime-kuma", status: "running", updatedAt: new Date().toISOString() },
+  { id: "immich", name: "Immich", stackName: "immich", composePath: "", webUiPort: 2283, containerName: "immich", status: "stopped", updatedAt: new Date().toISOString() },
+];
 
 const appsCache = new LruCache<InstalledApp[]>(4, 5_000);
 const DB_UNAVAILABLE_BACKOFF_MS = 60_000;
@@ -137,6 +149,8 @@ function mergeInstalledRuntimeState(input: {
 }
 
 export async function listInstalledApps(options?: { bypassCache?: boolean }) {
+  if (serverEnv.DEMO_MODE) return DEMO_APPS;
+
   return withServerTiming(
     {
       layer: "service",
