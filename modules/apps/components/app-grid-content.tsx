@@ -53,40 +53,30 @@ export function AppGridContent({
     <>
       {primaryOperation ? (
         <div
-          className="fixed bottom-[6rem] left-1/2 z-[150] -translate-x-1/2 flex w-full max-w-sm items-center justify-between gap-3 rounded-2xl border border-status-amber/25 bg-status-amber/10 px-4 py-3 text-xs text-status-amber shadow-lg shadow-black/30 backdrop-blur-xl"
+          className="fixed bottom-[5.75rem] left-1/2 z-[150] -translate-x-1/2 w-[min(92vw,22rem)] overflow-hidden rounded-2xl border border-glass-border bg-popover/95 shadow-xl shadow-black/30 backdrop-blur-2xl animate-in fade-in slide-in-from-bottom-2 duration-200"
           role="status"
           aria-live="polite"
         >
-          <div className="flex min-w-0 items-center gap-3">
-            <span className="flex size-8 items-center justify-center rounded-[var(--radius)] bg-status-amber/15">
-              <Loader2 className="size-4 animate-spin" />
-            </span>
-            <div className="min-w-0">
-              <p className="truncate font-medium text-foreground tracking-tight">
+          <div className="flex items-center gap-3 px-4 py-3">
+            <Loader2 className="size-3.5 shrink-0 animate-spin text-primary" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-medium text-foreground">
                 {getStoreOperationActionLabel(primaryOperation.action)}{" "}
-                {primaryOperation.appName}
-              </p>
-              <p className="truncate text-2xs uppercase tracking-[0.12em] text-muted-foreground font-mono">
-                {activeOperationsCount > 1
-                  ? `${activeOperationsCount} app actions in progress`
-                  : primaryOperation.status === "queued"
-                    ? "Queued"
-                    : "Applying changes"}
+                <span className="text-foreground/70">{primaryOperation.appName}</span>
               </p>
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="hidden h-1.5 w-24 overflow-hidden rounded-[var(--radius)] bg-white/10 sm:block">
-              <div
-                className="h-full rounded-[var(--radius)] bg-status-amber transition-all"
-                style={{
-                  width: `${Math.max(8, primaryOperation.progressPercent)}%`,
-                }}
-              />
-            </div>
-            <span className="tabular-nums text-2xs font-mono font-medium text-foreground">
-              {primaryOperation.progressPercent}%
+            <span className="shrink-0 tabular-nums text-2xs text-muted-foreground">
+              {activeOperationsCount > 1
+                ? `${activeOperationsCount} running`
+                : `${primaryOperation.progressPercent}%`}
             </span>
+          </div>
+          {/* Progress bar flush at bottom */}
+          <div className="h-[2px] w-full bg-border/40">
+            <div
+              className="h-full bg-primary transition-all duration-500"
+              style={{ width: `${Math.max(4, primaryOperation.progressPercent)}%` }}
+            />
           </div>
         </div>
       ) : null}

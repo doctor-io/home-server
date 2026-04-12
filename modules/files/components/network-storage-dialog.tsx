@@ -91,6 +91,7 @@ export function NetworkStorageDialog({
     unmountShare.error,
   ]);
 
+  // Reset all state when dialog closes
   useEffect(() => {
     if (!isOpen) {
       autoDiscoverRanRef.current = false;
@@ -102,21 +103,23 @@ export function NetworkStorageDialog({
       setLocalError(null);
       setDiscoveredServers([]);
       setDiscoveredShares([]);
-      return;
     }
-    if (autoDiscoverRanRef.current) return;
+  }, [isOpen]);
 
+  // Auto-discover servers when dialog opens
+  const discoverServersMutate = discoverServers.mutateAsync;
+  useEffect(() => {
+    if (!isOpen || autoDiscoverRanRef.current) return;
     autoDiscoverRanRef.current = true;
     setLocalError(null);
-    void discoverServers
-      .mutateAsync()
+    void discoverServersMutate()
       .then((result) => {
         setDiscoveredServers(result.servers);
       })
       .catch(() => {
         // Error surfaces through mutation state and apiError.
       });
-  }, [discoverServers, isOpen]);
+  }, [isOpen, discoverServersMutate]);
 
   if (!isOpen) {
     return null;
