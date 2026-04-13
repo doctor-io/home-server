@@ -18,7 +18,7 @@ import {
 import { AppLogsDialog } from "@/modules/apps/components/app-logs-dialog";
 import { AppStore } from "@/modules/apps/components/app-store";
 import { AppConfiguratorPanel } from "@/modules/apps/components/configurator/app-configurator-panel";
-import { useStoreActions } from "@/modules/apps/hooks/useStoreActions";
+import { StoreActionsProvider, useSharedStoreActions } from "@/modules/apps/hooks/StoreActionsContext";
 import { FileManager } from "@/modules/files/components/file-manager";
 import { SettingsPanel } from "@/modules/settings/components/settings";
 import { CommandPalette } from "@/modules/shell/components/command-palette";
@@ -63,6 +63,14 @@ const SETTINGS_SEARCH_SECTIONS = [
 ] as const;
 
 export function DesktopShell() {
+  return (
+    <StoreActionsProvider>
+      <DesktopShellInner />
+    </StoreActionsProvider>
+  );
+}
+
+function DesktopShellInner() {
   const router = useRouter();
   const {
     data: currentUser,
@@ -98,7 +106,7 @@ export function DesktopShell() {
   const [appSettingsTarget, setAppSettingsTarget] =
     useState<AppActionTarget | null>(null);
   const [logsTarget, setLogsTarget] = useState<AppActionTarget | null>(null);
-  const shellStoreActions = useStoreActions();
+  const shellStoreActions = useSharedStoreActions();
   const terminalCommandIdRef = useRef(0);
   const [displayWallpaper, setDisplayWallpaper] = useState("/images/1.jpg");
   const [nextWallpaper, setNextWallpaper] = useState<string | null>(null);
@@ -647,8 +655,10 @@ export function DesktopShell() {
             onTransitionEnd={finalizeWallpaperFade}
           />
         )}
-        {/* Dark overlay for readability */}
-        <div className="absolute inset-0 bg-background/10" />
+        {/* Depth vignette — transparent at center, darker at edges */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_130%_100%_at_50%_0%,transparent_28%,rgba(0,0,0,0.42)_100%)]" />
+        {/* Bottom ambient shadow (dock area) */}
+        <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-black/30 to-transparent" />
       </div>
 
       {/* Desktop Content */}
@@ -684,12 +694,11 @@ export function DesktopShell() {
         />
 
         {/* Main Desktop Area */}
-        <div className="flex flex-1 m-12 overflow-hidden">
+        <div className="m-12 flex min-h-0 flex-1 overflow-hidden">
           {/* App Grid (scrollable center) */}
           <AppGrid
             iconSize={appIconSize}
             animationsEnabled={appearance.animationsEnabled}
-            externalOperationsByApp={shellStoreActions.operationsByApp}
             onViewLogs={(target) => setLogsTarget(target)}
             onOpenTerminal={({ containerName }) =>
               requestTerminalCommand(

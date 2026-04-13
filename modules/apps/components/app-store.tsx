@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useInstalledApps } from "@/modules/apps/hooks/useInstalledApps";
 import type { AppOperationState } from "@/modules/apps/hooks/useStoreActions";
-import { useStoreActions } from "@/modules/apps/hooks/useStoreActions";
+import { useSharedStoreActions } from "@/modules/apps/hooks/StoreActionsContext";
 import { useStoreApp } from "@/modules/apps/hooks/useStoreApp";
 import { useStoreCatalog } from "@/modules/apps/hooks/useStoreCatalog";
 import { useStoreOperation } from "@/modules/apps/hooks/useStoreOperation";
@@ -815,7 +815,7 @@ export function AppStore({
   const refreshAttemptedRef = useRef(false);
 
   const { operationsByApp, installApp, updateApp, redeployApp, uninstallApp } =
-    useStoreActions();
+    useSharedStoreActions();
   const storeSourcesQuery = useStoreSources();
   const { addSource, updateSource, refreshSource, removeSource } =
     useStoreSourceActions();

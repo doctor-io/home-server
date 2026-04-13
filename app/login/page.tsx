@@ -6,7 +6,7 @@ export default function LoginPage() {
   return (
     <FullScreenShell
       center={
-        <div className="w-full max-w-sm">
+        <div className="w-full max-w-md">
           <Suspense fallback={null}>
             <LoginForm />
           </Suspense>

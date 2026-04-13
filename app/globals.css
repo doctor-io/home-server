@@ -10,20 +10,20 @@
   --card-foreground: oklch(0.2 0.02 250);
   --popover: oklch(0.99 0.004 250 / 0.96);
   --popover-foreground: oklch(0.2 0.02 250);
-  --primary: oklch(0.72 0.14 190);
+  --primary: #ff6000;
   --primary-foreground: oklch(0.14 0.015 250);
   --secondary: oklch(0.9 0.01 250 / 0.7);
   --secondary-foreground: oklch(0.28 0.02 250);
   --muted: oklch(0.9 0.008 250 / 0.75);
   --muted-foreground: oklch(0.45 0.02 250);
-  --accent: oklch(0.72 0.14 190);
+  --accent: #ff6000;
   --accent-foreground: oklch(0.14 0.015 250);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.98 0.01 27.325);
   --border: oklch(0.76 0.01 250 / 0.55);
   --input: oklch(0.9 0.01 250 / 0.75);
-  --ring: oklch(0.72 0.14 190);
-  --chart-1: oklch(0.72 0.14 190);
+  --ring: #ff6000;
+  --chart-1: #ff6000;
   --chart-2: oklch(0.65 0.15 160);
   --chart-3: oklch(0.55 0.12 230);
   --chart-4: oklch(0.78 0.12 85);
@@ -31,16 +31,38 @@
   --radius: 0.875rem;
   --sidebar: oklch(0.98 0.004 250 / 0.8);
   --sidebar-foreground: oklch(0.2 0.02 250);
-  --sidebar-primary: oklch(0.72 0.14 190);
+  --sidebar-primary: #ff6000;
   --sidebar-primary-foreground: oklch(0.14 0.015 250);
   --sidebar-accent: oklch(0.9 0.01 250 / 0.7);
   --sidebar-accent-foreground: oklch(0.28 0.02 250);
   --sidebar-border: oklch(0.76 0.01 250 / 0.55);
-  --sidebar-ring: oklch(0.72 0.14 190);
+  --sidebar-ring: #ff6000;
   --glass: oklch(0.98 0.004 250 / 0.9);
   --glass-border: oklch(0.72 0.012 250 / 0.45);
   --glass-highlight: oklch(0.2 0.01 250 / 0.05);
-  --dock: oklch(0.96 0.006 250 / 0.78);
+  --system-tint-amount: 0%;
+  --dock: oklch(0.96 0.006 250 / 0.7);
+  --system-surface: color-mix(
+    in srgb,
+    var(--primary) var(--system-tint-amount),
+    var(--dock)
+  );
+  --system-surface-raised: color-mix(
+    in srgb,
+    var(--primary) calc(var(--system-tint-amount) * 0.5),
+    oklch(0.94 0.006 250 / 0.8)
+  );
+  --system-radius-panel: calc(var(--radius) + 0.9rem);
+  --system-radius-floating: calc(var(--radius) + 0.7rem);
+  --system-radius-control: calc(var(--radius) + 0.125rem);
+  --system-radius-hero: calc(var(--radius) + 0.725rem);
+  --system-radius-icon: calc(var(--radius) - 0.1rem);
+  --system-shadow-surface: 0 16px 36px rgba(0, 0, 0, 0.2);
+  --system-shadow-floating: 0 20px 48px rgba(0, 0, 0, 0.26);
+  --system-shadow-dock: 0 22px 64px rgba(0, 0, 0, 0.28);
+  --system-shadow-soft: 0 18px 42px rgba(0, 0, 0, 0.22);
+  --system-shadow-control: 0 10px 20px rgba(0, 0, 0, 0.18);
+  --system-shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.035);
   --status-green: oklch(0.72 0.18 155);
   --status-amber: oklch(0.78 0.15 80);
   --status-red: oklch(0.65 0.22 25);
@@ -53,36 +75,58 @@
   --card-foreground: oklch(0.97 0.005 250);
   --popover: oklch(0.18 0.015 250 / 0.9);
   --popover-foreground: oklch(0.97 0.005 250);
-  --primary: oklch(0.72 0.14 190);
+  --primary: #ff6000;
   --primary-foreground: oklch(0.13 0.015 250);
   --secondary: oklch(0.22 0.015 250 / 0.6);
   --secondary-foreground: oklch(0.88 0.01 250);
   --muted: oklch(0.22 0.012 250 / 0.5);
   --muted-foreground: oklch(0.65 0.02 250);
-  --accent: oklch(0.72 0.14 190);
+  --accent: #ff6000;
   --accent-foreground: oklch(0.13 0.015 250);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.977 0.025 27.325);
   --border: oklch(0.35 0.02 250 / 0.35);
   --input: oklch(0.22 0.015 250 / 0.5);
-  --ring: oklch(0.72 0.14 190);
-  --chart-1: oklch(0.72 0.14 190);
+  --ring: #ff6000;
+  --chart-1: #ff6000;
   --chart-2: oklch(0.65 0.15 160);
   --chart-3: oklch(0.55 0.12 230);
   --chart-4: oklch(0.78 0.12 85);
   --chart-5: oklch(0.6 0.2 340);
   --sidebar: oklch(0.16 0.015 250 / 0.8);
   --sidebar-foreground: oklch(0.97 0.005 250);
-  --sidebar-primary: oklch(0.72 0.14 190);
+  --sidebar-primary: #ff6000;
   --sidebar-primary-foreground: oklch(0.13 0.015 250);
   --sidebar-accent: oklch(0.25 0.015 250 / 0.6);
   --sidebar-accent-foreground: oklch(0.97 0.005 250);
   --sidebar-border: oklch(0.35 0.02 250 / 0.3);
-  --sidebar-ring: oklch(0.72 0.14 190);
+  --sidebar-ring: #ff6000;
   --glass: oklch(16.034% 0.01173 242.501 / 0.9);
   --glass-border: oklch(0.4 0.02 250 / 0.2);
   --glass-highlight: oklch(0.97 0.005 250 / 0.06);
-  --dock: oklch(0.14 0.015 250 / 0.65);
+  --system-tint-amount: 0%;
+  --dock: oklch(0.14 0.015 250 / 0.55);
+  --system-surface: color-mix(
+    in srgb,
+    var(--primary) var(--system-tint-amount),
+    var(--dock)
+  );
+  --system-surface-raised: color-mix(
+    in srgb,
+    var(--primary) calc(var(--system-tint-amount) * 0.5),
+    oklch(0.16 0.015 250 / 0.62)
+  );
+  --system-radius-panel: calc(var(--radius) + 0.9rem);
+  --system-radius-floating: calc(var(--radius) + 0.7rem);
+  --system-radius-control: calc(var(--radius) + 0.125rem);
+  --system-radius-hero: calc(var(--radius) + 0.725rem);
+  --system-radius-icon: calc(var(--radius) - 0.1rem);
+  --system-shadow-surface: 0 16px 36px rgba(0, 0, 0, 0.2);
+  --system-shadow-floating: 0 20px 48px rgba(0, 0, 0, 0.26);
+  --system-shadow-dock: 0 22px 64px rgba(0, 0, 0, 0.28);
+  --system-shadow-soft: 0 18px 42px rgba(0, 0, 0, 0.22);
+  --system-shadow-control: 0 10px 20px rgba(0, 0, 0, 0.18);
+  --system-shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.035);
   --status-green: oklch(0.72 0.18 155);
   --status-amber: oklch(0.78 0.15 80);
   --status-red: oklch(0.65 0.22 25);
@@ -130,6 +174,8 @@
   --color-glass-border: var(--glass-border);
   --color-glass-highlight: var(--glass-highlight);
   --color-dock: var(--dock);
+  --color-system-surface: var(--system-surface);
+  --color-system-surface-raised: var(--system-surface-raised);
   --color-status-green: var(--status-green);
   --color-status-amber: var(--status-amber);
   --color-status-red: var(--status-red);
@@ -208,6 +254,77 @@
 }
 
 @layer utilities {
+  .system-surface {
+    @apply relative overflow-hidden border border-white/[0.09] bg-[var(--system-surface)] backdrop-blur-2xl;
+    border-radius: var(--system-radius-panel);
+    box-shadow:
+      var(--system-shadow-surface),
+      inset 0 1px 0 rgba(255, 255, 255, 0.09),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.06);
+  }
+
+  .system-floating-surface {
+    @apply relative overflow-hidden border border-white/[0.09] bg-[var(--system-surface)] backdrop-blur-2xl;
+    border-radius: var(--system-radius-floating);
+    box-shadow:
+      var(--system-shadow-floating),
+      inset 0 1px 0 rgba(255, 255, 255, 0.09),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.06);
+  }
+
+  .system-dock-surface {
+    @apply relative overflow-hidden border border-white/[0.09] bg-[var(--system-surface)] backdrop-blur-2xl;
+    border-radius: var(--system-radius-panel);
+    box-shadow:
+      var(--system-shadow-dock),
+      inset 0 1px 0 rgba(255, 255, 255, 0.09),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.07);
+  }
+
+  .system-raised-surface {
+    @apply border border-white/6 bg-[var(--system-surface-raised)];
+    border-radius: var(--system-radius-control);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+  }
+
+  .system-icon-surface {
+    @apply border border-white/8 bg-[var(--system-surface-raised)];
+    border-radius: var(--system-radius-icon);
+    box-shadow: var(--system-shadow-inset);
+  }
+
+  .system-soft-surface {
+    @apply relative overflow-hidden border border-white/8 bg-black/18 backdrop-blur-2xl;
+    border-radius: var(--system-radius-panel);
+    box-shadow: var(--system-shadow-soft);
+  }
+
+  .system-hero-surface {
+    @apply relative border border-white/8 bg-black/18 backdrop-blur-2xl;
+    border-radius: var(--system-radius-hero);
+    box-shadow: var(--system-shadow-soft);
+  }
+
+  .system-pill-surface {
+    @apply rounded-full border border-white/8 bg-black/18 backdrop-blur-2xl;
+  }
+
+  .system-keycap-surface {
+    @apply border border-white/10 bg-black/18;
+    border-radius: var(--radius-sm);
+  }
+
+  .system-error-capsule {
+    @apply inline-flex items-center gap-2 rounded-full border border-status-red/18 bg-black/26 px-3.5 py-2 text-left backdrop-blur-xl;
+    box-shadow: var(--system-shadow-surface);
+  }
+
+  .system-primary-action {
+    @apply bg-primary text-[#22150F];
+    border-radius: var(--system-radius-control);
+    box-shadow: var(--system-shadow-control);
+  }
+
   .animate-homeio-breathe {
     animation: homeio-breathe 3.2s ease-in-out infinite;
     transform-origin: center;

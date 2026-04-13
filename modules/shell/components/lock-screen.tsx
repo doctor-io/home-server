@@ -2,7 +2,13 @@
 
 import Image from "next/image";
 import { FullScreenShell } from "@/modules/shell/components/full-screen-shell";
-import { LockKeyhole, Power } from "@/components/icons/platform-icons";
+import {
+  ArrowRight,
+  Eye,
+  EyeOff,
+  Lock,
+  Power,
+} from "@/components/icons/platform-icons";
 import { type FormEvent, useState } from "react";
 
 type LockScreenProps = {
@@ -18,10 +24,15 @@ export function LockScreen({
   username,
   wallpaper = "/images/1.jpg",
 }: LockScreenProps) {
+  const displayUsername = username.replace(
+    /\b([a-z])/gi,
+    (letter) => letter.toUpperCase(),
+  );
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isUnlocking, setIsUnlocking] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
 
   async function handleUnlock(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -58,7 +69,7 @@ export function LockScreen({
         wallpaper={wallpaper}
         topRight={
           <button
-            className="rounded-lg border border-glass-border bg-glass p-2 text-muted-foreground backdrop-blur-xl transition-colors hover:bg-secondary/50 hover:text-foreground disabled:opacity-60"
+            className="system-dock-surface flex size-10 cursor-pointer items-center justify-center text-foreground/68 transition-colors hover:border-white/10 hover:bg-black/26 hover:text-foreground disabled:opacity-60"
             aria-label="Logout"
             title="Logout"
             onClick={handleLogout}
@@ -68,47 +79,91 @@ export function LockScreen({
           </button>
         }
         center={
-          <div className="w-full max-w-sm text-center">
-            <div className="mx-auto mb-4 flex size-24 animate-homeio-breathe-glow items-center justify-center rounded-[var(--radius)] border border-white/14 bg-white/10 shadow-2xl shadow-black/45 backdrop-blur-md">
-              <Image src="/icon.png" alt="Homeio" width={64} height={64} className="size-16 animate-homeio-breathe blur-[0.25px]" />
+          <div className="w-full max-w-md text-center">
+            <div className="mx-auto mb-5 flex w-fit flex-col items-center">
+              <div className="system-hero-surface flex size-24 items-center justify-center bg-black/22 shadow-[var(--system-shadow-dock)]">
+                <Image
+                  src="/icon.png"
+                  alt="Homeio"
+                  width={64}
+                  height={64}
+                  className="relative z-10 size-[3.65rem] blur-[0.15px]"
+                />
+              </div>
+              <div className="system-pill-surface mt-2.5 px-3 py-1 text-[10px] tracking-[0.24em] text-foreground/58 uppercase">
+                Home server
+              </div>
             </div>
 
-            <p className="text-xl font-medium text-foreground">{username}</p>
-            <p className="mb-5 text-xs text-muted-foreground">Locked session</p>
+            <p className="text-[1.48rem] font-medium tracking-[-0.03em] text-foreground">
+              {displayUsername}
+            </p>
+            <p className="mb-5 mt-1 text-[11px] tracking-[0.18em] text-muted-foreground/78 uppercase">
+              Locked session
+            </p>
 
-            <form
-              className="rounded-[calc(var(--radius)+0.375rem)] border border-glass-border bg-card/85 px-3 py-3 shadow-2xl shadow-black/40 backdrop-blur-2xl"
-              onSubmit={handleUnlock}
-            >
-              <div className="mb-2 flex items-center gap-2 rounded-xl border border-glass-border bg-secondary/35 px-3">
-                <LockKeyhole className="size-4 text-primary" />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  placeholder="Enter your password"
-                  className="h-9 w-full border-0 bg-transparent px-0 text-sm text-foreground outline-none placeholder:text-muted-foreground/60"
-                  autoFocus
-                />
+            <form className="space-y-3" onSubmit={handleUnlock}>
+              <div className="system-soft-surface bg-black/22 px-2.5 py-2 shadow-[var(--system-shadow-dock)]">
+                <div className="flex items-center gap-2">
+                  <div className="system-icon-surface flex size-10 shrink-0 items-center justify-center bg-white/[0.14] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+                    <Lock className="size-[1.1rem]" />
+                  </div>
+
+                  <input
+                    type={isPasswordVisible ? "text" : "password"}
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    placeholder="Enter your password"
+                    className="h-10 w-full border-0 bg-transparent px-1 text-[15px] text-foreground outline-none placeholder:text-muted-foreground/52"
+                    autoFocus
+                  />
+
+                  <button
+                    type="button"
+                    className="flex size-10 shrink-0 items-center justify-center rounded-[var(--system-radius-control)] text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                    aria-label={
+                      isPasswordVisible ? "Hide password" : "Show password"
+                    }
+                    onClick={() =>
+                      setIsPasswordVisible((currentValue) => !currentValue)
+                    }
+                  >
+                    {isPasswordVisible ? (
+                      <EyeOff className="size-4" />
+                    ) : (
+                      <Eye className="size-4" />
+                    )}
+                  </button>
+
+                  <button
+                    type="submit"
+                    className="system-primary-action group flex h-10 shrink-0 items-center gap-2 px-4 text-sm font-medium transition-all hover:translate-x-0.5 hover:brightness-110 disabled:translate-x-0 disabled:cursor-not-allowed disabled:opacity-45"
+                    disabled={isUnlocking || !password.trim()}
+                  >
+                    <span>{isUnlocking ? "Unlocking..." : "Unlock"}</span>
+                    <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+                  </button>
+                </div>
               </div>
 
               {error ? (
-                <p className="mb-2 rounded-lg border border-status-red/30 bg-status-red/10 px-3 py-2 text-xs text-status-red">
-                  {error}
-                </p>
+                <div className="flex justify-center">
+                  <div className="system-error-capsule">
+                    <span className="size-1.5 shrink-0 rounded-full bg-status-red shadow-[0_0_10px_rgba(239,68,68,0.45)]" />
+                    <p className="text-xs tracking-[0.01em] text-status-red/92">
+                      {error}
+                    </p>
+                  </div>
+                </div>
               ) : null}
-
-              <button
-                type="submit"
-                className="pointer-events-auto w-full rounded-xl bg-primary py-2 text-sm font-medium text-primary-foreground transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={isUnlocking || !password.trim()}
-              >
-                {isUnlocking ? "Unlocking..." : "Unlock"}
-              </button>
             </form>
 
-            <p className="mt-3 text-xs text-muted-foreground">
-              Press Command + L anytime to lock
+            <p className="mt-4 text-xs text-muted-foreground">
+              Press{" "}
+              <span className="system-keycap-surface px-1.5 py-0.5 text-[11px] text-foreground/90">
+                Command + L
+              </span>{" "}
+              anytime to lock
             </p>
           </div>
         }

@@ -86,6 +86,11 @@ type ErrorResponsePayload = {
 
 const OPERATION_SNAPSHOT_POLL_MS = 1_500;
 const MISSING_OPERATION_SNAPSHOT_LIMIT = 3;
+// How long to keep a successful operation in state after it completes,
+// so queries have time to refetch before the "Install" button reappears.
+const OPERATION_SUCCESS_LINGER_MS = 2_500;
+// How long to keep a failed operation visible before auto-clearing.
+const OPERATION_ERROR_LINGER_MS = 8_000;
 
 function isTerminalStatus(status: StoreOperation["status"]) {
   return status === "success" || status === "error";
@@ -279,8 +284,13 @@ export function useStoreActions(): StoreActionsHandle {
 
         if (isTerminalStatus(snapshot.status)) {
           stopTracking();
-          clearTrackedOperation(snapshot.appId, snapshot.id);
           invalidateTerminalState(snapshot.appId, snapshot.id);
+          const lingerMs = snapshot.status === "success"
+            ? OPERATION_SUCCESS_LINGER_MS
+            : OPERATION_ERROR_LINGER_MS;
+          setTimeout(() => {
+            clearTrackedOperation(snapshot.appId, snapshot.id);
+          }, lingerMs);
         }
       };
 
@@ -304,12 +314,14 @@ export function useStoreActions(): StoreActionsHandle {
 
             if (missingSnapshotCount >= MISSING_OPERATION_SNAPSHOT_LIMIT) {
               stopTracking();
-              clearTrackedOperation(appId, operationId);
               void Promise.all([
                 queryClient.invalidateQueries({ queryKey: queryKeys.storeCatalog }),
                 queryClient.invalidateQueries({ queryKey: queryKeys.installedApps }),
                 queryClient.invalidateQueries({ queryKey: queryKeys.storeApp(appId) }),
               ]);
+              setTimeout(() => {
+                clearTrackedOperation(appId, operationId);
+              }, OPERATION_SUCCESS_LINGER_MS);
             }
           }
         } catch {
@@ -361,10 +373,13 @@ export function useStoreActions(): StoreActionsHandle {
 
           if (isTerminalStatus(event.status)) {
             stopTracking();
-            if (event.status === "success") {
-              clearTrackedOperation(event.appId, event.operationId);
-            }
             invalidateTerminalState(event.appId, event.operationId);
+            const lingerMs = event.status === "success"
+              ? OPERATION_SUCCESS_LINGER_MS
+              : OPERATION_ERROR_LINGER_MS;
+            setTimeout(() => {
+              clearTrackedOperation(event.appId, event.operationId);
+            }, lingerMs);
           }
         },
         onError: () => {

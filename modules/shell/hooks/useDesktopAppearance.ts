@@ -49,6 +49,7 @@ function applyAppearanceToDom(settings: AppearanceSettings) {
   root.style.setProperty("--ring", settings.accentColor)
   root.style.setProperty("--sidebar-primary", settings.accentColor)
   root.style.setProperty("--chart-1", settings.accentColor)
+  root.style.setProperty("--system-tint-amount", `${settings.tintOpacity ?? 0}%`)
 }
 
 export function useDesktopAppearance() {

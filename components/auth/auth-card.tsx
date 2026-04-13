@@ -9,7 +9,7 @@ type AuthCardProps = {
 
 export function AuthCard({ title, description, children, footer }: AuthCardProps) {
   return (
-    <div className="w-full max-w-md rounded-[calc(var(--radius)+0.375rem)] border border-glass-border bg-card/90 p-6 shadow-2xl shadow-black/30 backdrop-blur-xl">
+    <div className="system-floating-surface w-full max-w-md border-glass-border bg-card/90 p-6 shadow-[var(--system-shadow-floating)]">
       <h1 className="text-2xl font-semibold text-foreground">{title}</h1>
       <p className="mt-1 text-sm text-muted-foreground">{description}</p>
       <div className="mt-6">{children}</div>

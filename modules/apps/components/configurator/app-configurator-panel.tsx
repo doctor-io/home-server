@@ -21,11 +21,11 @@ import {
 import { DockerRunView } from "@/modules/apps/components/configurator/docker-run-view";
 import { useAppCompose } from "@/modules/apps/hooks/useAppCompose";
 import {
-  useStoreActions,
   type InstallAppInput,
   type InstallCustomAppInput,
   type SaveAppSettingsInput,
 } from "@/modules/apps/hooks/useStoreActions";
+import { useSharedStoreActions } from "@/modules/apps/hooks/StoreActionsContext";
 import { useStoreApp } from "@/modules/apps/hooks/useStoreApp";
 import { Loader2 } from "@/components/icons/platform-icons";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -234,7 +234,7 @@ export function AppConfiguratorPanel({
 
   const initialClassicRef = useRef<ClassicConfigState>(initialClassicState);
   const initialComposeRef = useRef(initialComposeDraft);
-  const fallbackActions = useStoreActions();
+  const fallbackActions = useSharedStoreActions();
   const installingOperation = installingAppId
     ? fallbackActions.operationsByApp[installingAppId]
     : null;

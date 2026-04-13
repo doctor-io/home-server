@@ -5,9 +5,9 @@ type ProgressBarProps = {
 
 export function ProgressBar({ value, colorClassName }: ProgressBarProps) {
   return (
-    <div className="w-full h-1.5 rounded-[var(--radius)] bg-secondary/60 overflow-hidden">
+    <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
       <div
-        className={`h-full rounded-[var(--radius)] transition-all duration-700 ease-out ${colorClassName}`}
+        className={`h-full rounded-full transition-all duration-700 ease-out ${colorClassName}`}
         style={{ width: `${value}%` }}
       />
     </div>

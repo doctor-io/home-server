@@ -8,10 +8,9 @@ import {
   type AppActionTarget,
   type AppGridStatus,
   type AppItem,
-  type AppOperationStateLike,
 } from "@/modules/apps/components/app-grid-presenters";
 import { useInstalledApps } from "@/modules/apps/hooks/useInstalledApps";
-import { useStoreActions } from "@/modules/apps/hooks/useStoreActions";
+import { useSharedStoreActions } from "@/modules/apps/hooks/StoreActionsContext";
 import { useStoreCatalog } from "@/modules/apps/hooks/useStoreCatalog";
 import { useEffect, useMemo, useState } from "react";
 import { isStoreOperationActiveStatus } from "@/lib/shared/store-operations";
@@ -30,7 +29,6 @@ type AppGridMenuAction =
   | "remove";
 
 type UseAppGridControllerOptions = {
-  externalOperationsByApp?: Record<string, AppOperationStateLike>;
   onCopyUrl?: (target: AppActionTarget) => void;
   onOpenDashboard?: (target: AppActionTarget) => void;
   onOpenSettings?: (target: AppActionTarget) => void;
@@ -39,7 +37,6 @@ type UseAppGridControllerOptions = {
 };
 
 export function useAppGridController({
-  externalOperationsByApp,
   onCopyUrl,
   onOpenDashboard,
   onOpenSettings,
@@ -57,7 +54,7 @@ export function useAppGridController({
     stopApp,
     restartApp,
     checkAppUpdates,
-  } = useStoreActions();
+  } = useSharedStoreActions();
   const [statusByAppId, setStatusByAppId] = useState<
     Record<string, AppGridStatus>
   >({});
@@ -81,20 +78,15 @@ export function useAppGridController({
     [installedAppsQuery.data],
   );
 
-  const mergedOperationsByApp = useMemo(
-    () => ({ ...externalOperationsByApp, ...operationsByApp }),
-    [externalOperationsByApp, operationsByApp],
-  );
-
   const apps = useMemo(
     () =>
       buildAppItems({
         installedApps,
         installedCatalogApps,
-        operationsByApp: mergedOperationsByApp,
+        operationsByApp,
         statusByAppId,
       }),
-    [installedApps, installedCatalogApps, mergedOperationsByApp, statusByAppId],
+    [installedApps, installedCatalogApps, operationsByApp, statusByAppId],
   );
 
   const activeOperations = useMemo(
@@ -102,9 +94,9 @@ export function useAppGridController({
       buildActiveAppOperations({
         installedApps,
         installedCatalogApps,
-        operationsByApp: mergedOperationsByApp,
+        operationsByApp,
       }),
-    [installedApps, installedCatalogApps, mergedOperationsByApp],
+    [installedApps, installedCatalogApps, operationsByApp],
   );
 
   const isAppsLoading =
@@ -118,7 +110,7 @@ export function useAppGridController({
   const uninstallTarget = uninstallAppId
     ? (apps.find((app) => app.id === uninstallAppId) ?? null)
     : null;
-  const menuOperation = menuApp ? mergedOperationsByApp[menuApp.id] : undefined;
+  const menuOperation = menuApp ? operationsByApp[menuApp.id] : undefined;
   const menuTarget = menuApp ? resolveAppActionTarget(menuApp) : null;
   const menuHasDashboardUrl = Boolean(
     menuTarget && menuTarget.dashboardUrl.trim().length > 0,

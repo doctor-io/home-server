@@ -5,7 +5,7 @@ export default function RegisterPage() {
   return (
     <FullScreenShell
       center={
-        <div className="w-full max-w-sm">
+        <div className="w-full max-w-md">
           <RegisterForm />
         </div>
       }

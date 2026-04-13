@@ -82,7 +82,7 @@ export function StatusBar({
 
   return (
     <header className="fixed top-3 left-1/2 -translate-x-1/2 z-50 min-w-[50%] w-auto max-w-[96vw]">
-      <div className="flex items-center gap-2 px-4 py-2 bg-dock backdrop-blur-2xl border border-glass-border rounded-2xl shadow-2xl shadow-black/30">
+      <div className="flex items-center gap-2 px-4 py-2 bg-dock backdrop-blur-2xl border border-glass-border rounded-2xl shadow-2xl shadow-black/30" style={{ overflow: "visible" }}>
         <div className="flex items-center gap-2 pr-3 border-r border-glass-border/60">
           <div className="flex size-6 items-center justify-center overflow-hidden rounded-md border border-primary/20 bg-white/80 shadow-sm shadow-black/10">
             <Image

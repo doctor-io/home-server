@@ -179,6 +179,50 @@ export function AppearanceSection({
         </div>
       </div>
 
+      <SectionDivider title="Glass Tint" />
+      <div className={`${SETTINGS_PANEL_INSET} p-4`}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-1">
+            <h3 className="text-sm text-foreground">Tint opacity</h3>
+            <p className="text-xs text-muted-foreground">
+              Blends the accent color into all glass surfaces.
+            </p>
+          </div>
+          <span className={`${SETTINGS_BADGE_SURFACE} inline-flex min-w-12 items-center justify-center px-2.5 py-1 text-xs font-medium text-primary`}>
+            {appearance.tintOpacity}%
+          </span>
+        </div>
+        <div className="mt-4 px-1">
+          <Slider
+            aria-label="Glass tint opacity"
+            min={0}
+            max={25}
+            step={1}
+            value={[appearance.tintOpacity]}
+            onValueChange={(values) => {
+              const next = values[0];
+              if (next === undefined) return;
+              onAppearanceChange({ tintOpacity: next });
+            }}
+          />
+        </div>
+        <div className="mt-3 flex items-center gap-2">
+          {/* Uses the real CSS variable so it reflects the current theme (dark/light) */}
+          <div
+            className="h-6 flex-1 rounded-md border border-white/10 bg-[var(--system-surface)] backdrop-blur-sm"
+          />
+          <span className="text-2xs text-muted-foreground">
+            {appearance.tintOpacity === 0
+              ? "No tint"
+              : appearance.tintOpacity <= 8
+                ? "Subtle"
+                : appearance.tintOpacity <= 16
+                  ? "Moderate"
+                  : "Strong"}
+          </span>
+        </div>
+      </div>
+
       <SectionDivider title="Wallpaper" />
       <div
         data-testid="wallpaper-scroller"

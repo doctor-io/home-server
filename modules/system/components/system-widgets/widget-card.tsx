@@ -18,7 +18,7 @@ export function WidgetCard({
   return (
     <section
       className={cn(
-        "rounded-2xl bg-glass border border-glass-border backdrop-blur-xl p-4",
+        "shrink-0 rounded-2xl bg-glass border border-glass-border backdrop-blur-xl p-4",
         className,
       )}
     >

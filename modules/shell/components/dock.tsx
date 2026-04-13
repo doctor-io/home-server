@@ -71,11 +71,12 @@ export function Dock({
     <div className={`${dockPositionClass} z-50`}>
       <nav
         ref={dockRef}
-        className={`flex gap-3 bg-dock backdrop-blur-2xl border border-glass-border rounded-[calc(var(--radius)+0.375rem)] shadow-2xl shadow-black/40 ${
+        className={`flex gap-3 border border-glass-border rounded-[calc(var(--radius)+0.375rem)] shadow-2xl shadow-black/40 ${
           isVertical
             ? "flex-col items-center px-2.5 py-3"
             : "items-end px-3 py-2.5"
         }`}
+        style={{ backdropFilter: "blur(24px) saturate(140%)" }}
         onMouseLeave={() => setHoveredIndex(null)}
         aria-label="Quick launch dock"
       >
