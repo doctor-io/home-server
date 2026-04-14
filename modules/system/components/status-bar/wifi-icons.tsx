@@ -27,7 +27,7 @@ export function EthernetIcon({ className }: { className?: string }) {
 }
 
 function getSignalLevel(quality: number | null) {
-  if (quality === null) return 1;
+  if (quality === null) return 3;
   if (quality >= 70) return 3;
   if (quality >= 40) return 2;
   return 1;

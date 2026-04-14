@@ -49,7 +49,26 @@ function applyAppearanceToDom(settings: AppearanceSettings) {
   root.style.setProperty("--ring", settings.accentColor)
   root.style.setProperty("--sidebar-primary", settings.accentColor)
   root.style.setProperty("--chart-1", settings.accentColor)
-  root.style.setProperty("--system-tint-amount", `${settings.tintOpacity ?? 0}%`)
+  // Always disable accent-color tinting — tinted = dark smoked glass, not accent-colored
+  root.style.setProperty("--system-tint-amount", "0%")
+  // Override --dock based on glass style:
+  // clear  → very transparent (you see the wallpaper through)
+  // tinted → dark smoked glass (like tinted car windows — darker, more opaque)
+  if (resolvedTheme === "dark") {
+    root.style.setProperty(
+      "--dock",
+      settings.glassStyle === "tinted"
+        ? "oklch(0.04 0.006 250 / 0.75)"
+        : "oklch(0.14 0.015 250 / 0.18)",
+    )
+  } else {
+    root.style.setProperty(
+      "--dock",
+      settings.glassStyle === "tinted"
+        ? "oklch(0.55 0.008 250 / 0.78)"
+        : "oklch(0.96 0.006 250 / 0.70)",
+    )
+  }
 }
 
 export function useDesktopAppearance() {

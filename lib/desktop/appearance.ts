@@ -2,6 +2,7 @@ export type DesktopTheme = "dark" | "light" | "system"
 export type DesktopIconSize = "small" | "medium" | "large"
 export type DesktopFontSize = "compact" | "default" | "large" | "extra-large"
 export type DockPosition = "bottom" | "left" | "right"
+export type DesktopGlassStyle = "clear" | "tinted"
 
 export type WallpaperOption = {
   id: string
@@ -25,7 +26,7 @@ export type AppearanceSettings = {
   accentColor: string
   wallpaper: string
   radius: number
-  tintOpacity: number
+  glassStyle: DesktopGlassStyle
   iconSize: DesktopIconSize
   fontSize: DesktopFontSize
   animationsEnabled: boolean
@@ -71,7 +72,7 @@ export const DEFAULT_APPEARANCE_SETTINGS: AppearanceSettings = {
   accentColor: ACCENT_COLORS[0].value,
   wallpaper: WALLPAPER_OPTIONS[0].src,
   radius: DEFAULT_APPEARANCE_RADIUS,
-  tintOpacity: 0,
+  glassStyle: "clear",
   iconSize: "medium",
   fontSize: "default",
   animationsEnabled: true,
@@ -132,10 +133,10 @@ export function sanitizeAppearanceSettings(input: unknown): AppearanceSettings {
         ? value.wallpaper
         : DEFAULT_APPEARANCE_SETTINGS.wallpaper,
     radius: sanitizeRadius(value.radius),
-    tintOpacity:
-      typeof value.tintOpacity === "number" && Number.isFinite(value.tintOpacity)
-        ? Math.min(100, Math.max(0, Math.round(value.tintOpacity)))
-        : DEFAULT_APPEARANCE_SETTINGS.tintOpacity,
+    glassStyle:
+      value.glassStyle === "clear" || value.glassStyle === "tinted"
+        ? value.glassStyle
+        : DEFAULT_APPEARANCE_SETTINGS.glassStyle,
     iconSize: isIconSize(value.iconSize) ? value.iconSize : DEFAULT_APPEARANCE_SETTINGS.iconSize,
     fontSize: isFontSize(value.fontSize) ? value.fontSize : DEFAULT_APPEARANCE_SETTINGS.fontSize,
     animationsEnabled:

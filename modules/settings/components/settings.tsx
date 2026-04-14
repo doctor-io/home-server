@@ -74,9 +74,9 @@ export function SettingsPanel({
 
   return (
     <div className="flex h-full">
-      <aside className={`m-2 flex w-52 shrink-0 flex-col overflow-y-auto ${SETTINGS_PANEL_SHELL}`}>
+      <aside className={`m-2 flex w-56 shrink-0 flex-col ${SETTINGS_PANEL_SHELL}`}>
         <div className="p-3 pt-4">
-          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest px-2">
+          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest px-3">
             Settings
           </span>
           <div className="flex flex-col gap-0.5 mt-2">
@@ -87,20 +87,20 @@ export function SettingsPanel({
                 <button
                   key={section.id}
                   onClick={() => setActiveSection(section.id)}
-                  className={`flex items-center gap-2.5 px-2.5 py-2 rounded-md text-xs transition-colors cursor-pointer ${
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer ${
                     isActive
                       ? "bg-primary/15 text-foreground"
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary/40"
                   }`}
                 >
                   <section.icon
-                    className={`size-4 ${isActive ? "text-primary" : ""}`}
+                    className={`size-[18px] shrink-0 ${isActive ? "text-primary" : ""}`}
                   />
-                  <span className="flex-1 text-left truncate">
+                  <span className="flex-1 text-left truncate font-medium">
                     {section.label}
                   </span>
                   {section.badge ? (
-                    <span className={`${SETTINGS_BADGE_SURFACE} flex size-4.5 items-center justify-center text-xs font-bold text-primary`}>
+                    <span className={`${SETTINGS_BADGE_SURFACE} flex size-5 items-center justify-center text-xs font-bold text-primary`}>
                       {section.badge}
                     </span>
                   ) : null}
@@ -110,16 +110,15 @@ export function SettingsPanel({
           </div>
         </div>
 
-        <div className="mt-auto border-t border-glass-border/80 p-3">
+        <div className="mt-auto border-t border-glass-border/80 p-3 px-4">
           <div className="flex items-center gap-2">
-            <div className="size-2 rounded-[var(--radius)] bg-status-green" />
-            <span className="text-xs text-muted-foreground">
+            <div className="size-2 rounded-full bg-status-green" />
+            <span className="text-xs text-muted-foreground font-medium">
               {settingsBackend.general.hostname}
             </span>
           </div>
-          <span className="text-xs text-muted-foreground mt-1 block">
-            {settingsBackend.general.appVersion} |{" "}
-            {settingsBackend.general.platform}
+          <span className="text-xs text-muted-foreground/70 mt-1 block">
+            {settingsBackend.general.appVersion} · {settingsBackend.general.platform}
           </span>
         </div>
       </aside>

@@ -11,7 +11,7 @@
   --popover: oklch(0.99 0.004 250 / 0.96);
   --popover-foreground: oklch(0.2 0.02 250);
   --primary: #ff6000;
-  --primary-foreground: oklch(0.14 0.015 250);
+  --primary-foreground: #22150F;
   --secondary: oklch(0.9 0.01 250 / 0.7);
   --secondary-foreground: oklch(0.28 0.02 250);
   --muted: oklch(0.9 0.008 250 / 0.75);
@@ -76,7 +76,7 @@
   --popover: oklch(0.18 0.015 250 / 0.9);
   --popover-foreground: oklch(0.97 0.005 250);
   --primary: #ff6000;
-  --primary-foreground: oklch(0.13 0.015 250);
+  --primary-foreground: #22150F;
   --secondary: oklch(0.22 0.015 250 / 0.6);
   --secondary-foreground: oklch(0.88 0.01 250);
   --muted: oklch(0.22 0.012 250 / 0.5);
@@ -105,7 +105,7 @@
   --glass-border: oklch(0.4 0.02 250 / 0.2);
   --glass-highlight: oklch(0.97 0.005 250 / 0.06);
   --system-tint-amount: 0%;
-  --dock: oklch(0.14 0.015 250 / 0.55);
+  --dock: oklch(0.14 0.015 250 / 0.18);
   --system-surface: color-mix(
     in srgb,
     var(--primary) var(--system-tint-amount),
@@ -114,7 +114,7 @@
   --system-surface-raised: color-mix(
     in srgb,
     var(--primary) calc(var(--system-tint-amount) * 0.5),
-    oklch(0.16 0.015 250 / 0.62)
+    oklch(0.16 0.015 250 / 0.25)
   );
   --system-radius-panel: calc(var(--radius) + 0.9rem);
   --system-radius-floating: calc(var(--radius) + 0.7rem);
@@ -173,9 +173,6 @@
   --color-glass: var(--glass);
   --color-glass-border: var(--glass-border);
   --color-glass-highlight: var(--glass-highlight);
-  --color-dock: var(--dock);
-  --color-system-surface: var(--system-surface);
-  --color-system-surface-raised: var(--system-surface-raised);
   --color-status-green: var(--status-green);
   --color-status-amber: var(--status-amber);
   --color-status-red: var(--status-red);
@@ -255,40 +252,45 @@
 
 @layer utilities {
   .system-surface {
-    @apply relative overflow-hidden border border-white/[0.09] bg-[var(--system-surface)] backdrop-blur-2xl;
+    @apply relative overflow-hidden border border-white/[0.09] bg-[var(--system-surface)];
+    backdrop-filter: blur(40px) saturate(160%);
     border-radius: var(--system-radius-panel);
     box-shadow:
       var(--system-shadow-surface),
-      inset 0 1px 0 rgba(255, 255, 255, 0.09),
+      inset 0 1px 0 rgba(255, 255, 255, 0.12),
       inset 0 -1px 0 rgba(0, 0, 0, 0.06);
   }
 
   .system-floating-surface {
-    @apply relative overflow-hidden border border-white/[0.09] bg-[var(--system-surface)] backdrop-blur-2xl;
+    @apply relative overflow-hidden border border-white/[0.09] bg-[var(--system-surface)];
+    backdrop-filter: blur(40px) saturate(160%);
     border-radius: var(--system-radius-floating);
     box-shadow:
       var(--system-shadow-floating),
-      inset 0 1px 0 rgba(255, 255, 255, 0.09),
+      inset 0 1px 0 rgba(255, 255, 255, 0.12),
       inset 0 -1px 0 rgba(0, 0, 0, 0.06);
   }
 
   .system-dock-surface {
-    @apply relative overflow-hidden border border-white/[0.09] bg-[var(--system-surface)] backdrop-blur-2xl;
+    @apply relative overflow-hidden border border-white/[0.09] bg-[var(--system-surface)];
+    backdrop-filter: blur(40px) saturate(160%);
     border-radius: var(--system-radius-panel);
     box-shadow:
       var(--system-shadow-dock),
-      inset 0 1px 0 rgba(255, 255, 255, 0.09),
+      inset 0 1px 0 rgba(255, 255, 255, 0.12),
       inset 0 -1px 0 rgba(0, 0, 0, 0.07);
   }
 
   .system-raised-surface {
     @apply border border-white/6 bg-[var(--system-surface-raised)];
+    backdrop-filter: blur(20px) saturate(140%);
     border-radius: var(--system-radius-control);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   }
 
   .system-icon-surface {
     @apply border border-white/8 bg-[var(--system-surface-raised)];
+    backdrop-filter: blur(20px) saturate(140%);
     border-radius: var(--system-radius-icon);
     box-shadow: var(--system-shadow-inset);
   }
@@ -320,7 +322,7 @@
   }
 
   .system-primary-action {
-    @apply bg-primary text-[#22150F];
+    @apply bg-primary text-primary-foreground;
     border-radius: var(--system-radius-control);
     box-shadow: var(--system-shadow-control);
   }

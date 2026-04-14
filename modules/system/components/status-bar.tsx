@@ -1,10 +1,6 @@
 "use client";
 
-import {
-  BatteryFull,
-  Bell,
-  CloudSun
-} from "@/components/icons/platform-icons";
+import { BatteryFull, Bell, CloudSun } from "@/components/icons/platform-icons";
 import { BatteryPopover } from "@/modules/system/components/status-bar/battery-popover";
 import { DatePickerPopover } from "@/modules/system/components/status-bar/date-picker-popover";
 import { NotificationPopover } from "@/modules/system/components/status-bar/notification-popover";
@@ -19,7 +15,10 @@ import {
   formatTime,
 } from "@/modules/system/components/status-bar/utils";
 import { WeatherPopover } from "@/modules/system/components/status-bar/weather-popover";
-import { EthernetIcon, WifiStatusIcon } from "@/modules/system/components/status-bar/wifi-icons";
+import {
+  EthernetIcon,
+  WifiStatusIcon,
+} from "@/modules/system/components/status-bar/wifi-icons";
 import { WifiPopover } from "@/modules/system/components/status-bar/wifi-popover";
 import { useCurrentWeather } from "@/modules/system/hooks/useCurrentWeather";
 import { useNetworkEventsSse } from "@/modules/system/hooks/useNetworkEventsSse";
@@ -82,9 +81,17 @@ export function StatusBar({
 
   return (
     <header className="fixed top-3 left-1/2 -translate-x-1/2 z-50 min-w-[50%] w-auto max-w-[96vw]">
-      <div className="flex items-center gap-2 px-4 py-2 bg-dock backdrop-blur-2xl border border-glass-border rounded-2xl shadow-2xl shadow-black/30" style={{ overflow: "visible" }}>
+      <div
+        className="flex items-center gap-2 px-4 py-2 border border-white/[0.09] rounded-2xl"
+        style={{
+          background: "var(--system-surface)",
+          backdropFilter: "blur(40px) saturate(160%)",
+          boxShadow: "var(--system-shadow-floating), inset 0 1px 0 rgba(255,255,255,0.12)",
+          overflow: "visible",
+        }}
+      >
         <div className="flex items-center gap-2 pr-3 border-r border-glass-border/60">
-          <div className="flex size-6 items-center justify-center overflow-hidden rounded-md border border-primary/20 bg-white/80 shadow-sm shadow-black/10">
+          <div className="flex size-6 items-center justify-center overflow-hidden rounded-[8px] border border-primary/20 bg-white/80 shadow-sm shadow-black/10">
             <Image
               src="/icon.png"
               alt="Homeio"
