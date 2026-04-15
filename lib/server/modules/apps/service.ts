@@ -1,8 +1,7 @@
 import "server-only";
 
-import path from "node:path";
-import { readFile } from "node:fs/promises";
 import { LruCache } from "@/lib/server/cache/lru";
+import { serverEnv } from "@/lib/server/env";
 import { logServerAction, withServerTiming } from "@/lib/server/logging/logger";
 import { resolveInstalledComposePath } from "@/lib/server/modules/apps/installed-compose-path";
 import {
@@ -15,17 +14,100 @@ import {
 } from "@/lib/server/modules/docker/compose-parser";
 import { getComposeRuntimeInfo } from "@/lib/server/modules/docker/compose-runner";
 import type { InstalledApp } from "@/lib/shared/contracts/apps";
-import { serverEnv } from "@/lib/server/env";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+
+const CDN = "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png";
 
 const DEMO_APPS: InstalledApp[] = [
-  { id: "portainer", name: "Portainer", stackName: "portainer", composePath: "", webUiPort: 9000, containerName: "portainer", status: "running", updatedAt: new Date().toISOString() },
-  { id: "jellyfin", name: "Jellyfin", stackName: "jellyfin", composePath: "", webUiPort: 8096, containerName: "jellyfin", status: "running", updatedAt: new Date().toISOString() },
-  { id: "nextcloud", name: "Nextcloud", stackName: "nextcloud", composePath: "", webUiPort: 8080, containerName: "nextcloud", status: "running", updatedAt: new Date().toISOString() },
-  { id: "vaultwarden", name: "Vaultwarden", stackName: "vaultwarden", composePath: "", webUiPort: 8081, containerName: "vaultwarden", status: "running", updatedAt: new Date().toISOString() },
-  { id: "pihole", name: "Pi-hole", stackName: "pihole", composePath: "", webUiPort: 8082, containerName: "pihole", status: "running", updatedAt: new Date().toISOString() },
-  { id: "grafana", name: "Grafana", stackName: "grafana", composePath: "", webUiPort: 3000, containerName: "grafana", status: "running", updatedAt: new Date().toISOString() },
-  { id: "uptime-kuma", name: "Uptime Kuma", stackName: "uptime-kuma", composePath: "", webUiPort: 3001, containerName: "uptime-kuma", status: "running", updatedAt: new Date().toISOString() },
-  { id: "immich", name: "Immich", stackName: "immich", composePath: "", webUiPort: 2283, containerName: "immich", status: "stopped", updatedAt: new Date().toISOString() },
+  {
+    id: "portainer",
+    name: "Portainer",
+    stackName: "portainer",
+    composePath: "",
+    webUiPort: 9000,
+    containerName: "portainer",
+    logoUrl: `${CDN}/portainer.png`,
+    status: "running",
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: "jellyfin",
+    name: "Jellyfin",
+    stackName: "jellyfin",
+    composePath: "",
+    webUiPort: 8096,
+    containerName: "jellyfin",
+    logoUrl: `${CDN}/jellyfin.png`,
+    status: "running",
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: "nextcloud",
+    name: "Nextcloud",
+    stackName: "nextcloud",
+    composePath: "",
+    webUiPort: 8080,
+    containerName: "nextcloud",
+    logoUrl: `${CDN}/nextcloud.png`,
+    status: "running",
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: "vaultwarden",
+    name: "Vaultwarden",
+    stackName: "vaultwarden",
+    composePath: "",
+    webUiPort: 8081,
+    containerName: "vaultwarden",
+    logoUrl: `${CDN}/vaultwarden.png`,
+    status: "running",
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: "pihole",
+    name: "Pi-hole",
+    stackName: "pihole",
+    composePath: "",
+    webUiPort: 8082,
+    containerName: "pihole",
+    logoUrl: `${CDN}/pi-hole.png`,
+    status: "running",
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: "grafana",
+    name: "Grafana",
+    stackName: "grafana",
+    composePath: "",
+    webUiPort: 3000,
+    containerName: "grafana",
+    logoUrl: `${CDN}/grafana.png`,
+    status: "running",
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: "uptime-kuma",
+    name: "Uptime Kuma",
+    stackName: "uptime-kuma",
+    composePath: "",
+    webUiPort: 3001,
+    containerName: "uptime-kuma",
+    logoUrl: `${CDN}/uptime-kuma.png`,
+    status: "running",
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: "immich",
+    name: "Immich",
+    stackName: "immich",
+    composePath: "",
+    webUiPort: 2283,
+    containerName: "immich",
+    logoUrl: `${CDN}/immich.png`,
+    status: "running",
+    updatedAt: new Date().toISOString(),
+  },
 ];
 
 const appsCache = new LruCache<InstalledApp[]>(4, 5_000);
@@ -69,9 +151,8 @@ function parseHostPortFromMapping(value: string): number | null {
   const segments = mappingPart.split(":").filter(Boolean);
   if (segments.length === 0) return null;
 
-  const hostSegment = segments.length >= 2
-    ? segments[segments.length - 2]
-    : segments[0];
+  const hostSegment =
+    segments.length >= 2 ? segments[segments.length - 2] : segments[0];
   const port = Number.parseInt(hostSegment ?? "", 10);
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     return null;
@@ -119,7 +200,9 @@ async function inferComposePrimaryInfo(
       (entry) => typeof entry === "string" && entry.trim().length > 0,
     );
     return {
-      webUiPort: firstPortMapping ? parseHostPortFromMapping(firstPortMapping) : null,
+      webUiPort: firstPortMapping
+        ? parseHostPortFromMapping(firstPortMapping)
+        : null,
       containerName: primary.service.containerName ?? null,
     };
   } catch {
@@ -188,9 +271,15 @@ export async function listInstalledApps(options?: { bypassCache?: boolean }) {
               composePath: app.composePath,
               stackName: app.stackName,
             });
-            const composeInfo = await inferComposePrimaryInfo(app.id, resolvedComposePath);
+            const composeInfo = await inferComposePrimaryInfo(
+              app.id,
+              resolvedComposePath,
+            );
             const inferredWebUiPort = app.webUiPort ?? composeInfo.webUiPort;
-            const envPath = path.join(path.dirname(resolvedComposePath), ".env");
+            const envPath = path.join(
+              path.dirname(resolvedComposePath),
+              ".env",
+            );
             try {
               const runtime = await getComposeRuntimeInfo({
                 composePath: resolvedComposePath,
@@ -202,7 +291,8 @@ export async function listInstalledApps(options?: { bypassCache?: boolean }) {
                 composePath: resolvedComposePath,
                 inferredWebUiPort,
                 runtimeStatus: runtime.status,
-                containerName: runtime.primaryContainerName ?? composeInfo.containerName,
+                containerName:
+                  runtime.primaryContainerName ?? composeInfo.containerName,
                 activeOperation: activeOperationsByAppId[app.id] ?? null,
               });
             } catch {

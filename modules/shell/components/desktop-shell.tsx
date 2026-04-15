@@ -663,11 +663,12 @@ function DesktopShellInner() {
 
       {/* Desktop Content */}
       <div className="relative z-10 flex h-full flex-col">
-        {/* Demo mode banner */}
+        {/* Demo mode floating badge — overlays the top of the widget column */}
         {currentUser?.isDemoMode && (
-          <div className="relative z-50 flex items-center justify-center gap-2 bg-primary/90 px-4 py-1.5 text-xs font-medium text-primary-foreground backdrop-blur-sm shrink-0">
-            <span className="size-1.5 rounded-full bg-primary-foreground/80 animate-pulse" />
-            Demo mode — app installs and system changes are disabled
+          <div className="fixed top-14 right-5 z-50 hidden xl:flex items-center gap-2 rounded-full border border-primary/35 bg-primary/10 px-3 py-1.5 backdrop-blur-md shadow-lg shadow-black/20">
+            <span className="size-1.5 rounded-full bg-primary animate-pulse" />
+            <span className="text-xs font-semibold text-primary tracking-tight">Demo</span>
+            <span className="text-xs text-foreground/50">· read-only</span>
           </div>
         )}
 

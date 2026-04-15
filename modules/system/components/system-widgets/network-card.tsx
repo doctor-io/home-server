@@ -34,7 +34,9 @@ export function NetworkCard({ network }: NetworkCardProps) {
 
         <DetailRow label="SSID" value={network.ssid} />
         <DetailRow label="Interface" value={network.interfaceName} />
-        <DetailRow label="Local IP" value={network.ipAddress} />
+        {!network.isDemoMode && (
+          <DetailRow label="Local IP" value={network.ipAddress} />
+        )}
         <DetailRow label="Hostname" value={network.hostname} />
       </div>
     </WidgetCard>

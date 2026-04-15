@@ -28,7 +28,7 @@ function WifiStrengthIcon({ quality }: { quality: number | null }) {
   return <WifiSignalIcon quality={quality} className="size-4 text-status-red" />;
 }
 
-export function WifiPopover({ metrics, networkStatus, onClose }: WifiPopoverProps) {
+export function WifiPopover({ metrics, networkStatus, isDemoMode = false, onClose }: WifiPopoverProps) {
   const { data: networksFromApi } = useWifiNetworks();
   const {
     connectNetwork,
@@ -144,7 +144,7 @@ export function WifiPopover({ metrics, networkStatus, onClose }: WifiPopoverProp
               )}
             </div>
             <div className="grid grid-cols-2 gap-2 mt-3 text-xs text-muted-foreground">
-              <span className="truncate">IPv4: {status.ipv4 ?? "--"}</span>
+              {!isDemoMode && <span className="truncate">IPv4: {status.ipv4 ?? "--"}</span>}
               {!isEthernet && (
                 <span className="truncate">
                   Signal: {status.signalPercent ?? "--"}%

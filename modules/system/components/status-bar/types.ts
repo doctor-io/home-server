@@ -23,6 +23,7 @@ export type StatusPopover = "weather" | "wifi" | "battery" | "notifications" | "
 export type WifiPopoverProps = {
   metrics: SystemMetricsSnapshot | undefined;
   networkStatus: NetworkStatus | undefined;
+  isDemoMode?: boolean;
   onClose: () => void;
 };
 

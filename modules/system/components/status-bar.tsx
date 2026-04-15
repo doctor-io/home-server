@@ -45,6 +45,7 @@ export function StatusBar({
     metrics,
     networkStatus,
     username,
+    isDemoMode,
     batteryText,
     isWifiConnected,
     isEthernet,
@@ -158,6 +159,7 @@ export function StatusBar({
               <WifiPopover
                 metrics={metrics}
                 networkStatus={networkStatus}
+                isDemoMode={isDemoMode}
                 onClose={closePopovers}
               />
             )}

@@ -35,6 +35,7 @@ export type InstalledApp = {
   composePath: string;
   webUiPort?: number | null;
   containerName?: string | null;
+  logoUrl?: string | null;
   status: "running" | "partial" | "paused" | "stopped" | "unknown";
   activeOperation?: InstalledAppActiveOperation | null;
   updatedAt: string;
