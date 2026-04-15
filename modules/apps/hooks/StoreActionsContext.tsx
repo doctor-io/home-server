@@ -30,11 +30,6 @@ export function StoreActionsProvider({ children }: { children: ReactNode }) {
 
 export function useSharedStoreActions(): StoreActionsHandle {
   const ctx = useContext(StoreActionsContext);
-  if (!ctx) {
-    throw new Error(
-      "useSharedStoreActions must be used within a <StoreActionsProvider>. " +
-      "Make sure DesktopShell wraps its content with StoreActionsProvider.",
-    );
-  }
-  return ctx;
+  const fallbackActions = useStoreActions();
+  return ctx ?? fallbackActions;
 }

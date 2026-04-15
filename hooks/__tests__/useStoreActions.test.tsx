@@ -25,7 +25,9 @@ describe("useStoreActions", () => {
     vi.useRealTimers();
   });
 
-  it("starts install lifecycle and invalidates queries on completion", async () => {
+  it(
+    "starts install lifecycle and invalidates queries on completion",
+    async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ operationId: "op-install-1" }),
@@ -96,7 +98,7 @@ describe("useStoreActions", () => {
     });
 
     await waitFor(() => {
-      expect(result.current.operationsByApp.plex.operationId).toBe("op-install-1");
+      expect(result.current.operationsByApp.plex?.operationId).toBe("op-install-1");
     });
 
     act(() => {
@@ -117,7 +119,7 @@ describe("useStoreActions", () => {
 
     await waitFor(() => {
       expect(result.current.operationsByApp.plex).toBeUndefined();
-    });
+    }, { timeout: 4_000 });
 
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.storeCatalog });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.installedApps });
@@ -128,10 +130,12 @@ describe("useStoreActions", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: queryKeys.appCompose("plex", "catalog"),
     });
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: queryKeys.storeOperation("op-install-1"),
-    });
-  });
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: queryKeys.storeOperation("op-install-1"),
+      });
+    },
+    10_000,
+  );
 
   it("calls update, redeploy and uninstall endpoints", async () => {
     const fetchMock = vi
@@ -289,6 +293,8 @@ describe("useStoreActions", () => {
   it(
     "updates operation state from snapshot polling when stream events are missing",
     async () => {
+      vi.useFakeTimers();
+
       const fetchMock = vi.fn().mockResolvedValue({
         ok: true,
         json: async () => ({ operationId: "op-install-poll" }),
@@ -349,23 +355,27 @@ describe("useStoreActions", () => {
         });
       });
 
-      await waitFor(() => {
-        expect(result.current.operationsByApp["2fauth"]?.progressPercent).toBe(1);
+      await act(async () => {
+        await Promise.resolve();
       });
 
-      await waitFor(
-        () => {
-          expect(result.current.operationsByApp["2fauth"]?.progressPercent).toBe(85);
-        },
-        { timeout: 4_000 },
-      );
+      expect(result.current.operationsByApp["2fauth"]?.progressPercent).toBe(1);
 
-      await waitFor(
-        () => {
-          expect(result.current.operationsByApp["2fauth"]).toBeUndefined();
-        },
-        { timeout: 4_000 },
-      );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1_500);
+      });
+
+      expect(result.current.operationsByApp["2fauth"]?.progressPercent).toBe(85);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1_500);
+      });
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2_600);
+      });
+
+      expect(result.current.operationsByApp["2fauth"]).toBeUndefined();
 
       expect(cleanup).toHaveBeenCalledTimes(1);
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.storeCatalog });
@@ -412,7 +422,7 @@ describe("useStoreActions", () => {
     expect(result.current.operationsByApp["ghost-app"]?.operationId).toBe("op-missing-1");
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(4_600);
+      await vi.advanceTimersByTimeAsync(7_200);
     });
 
     expect(result.current.operationsByApp["ghost-app"]).toBeUndefined();

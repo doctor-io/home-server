@@ -9,6 +9,7 @@ import {
   FileText,
   FileVideo,
   Folder,
+  Music,
 } from "@/components/icons/platform-icons";
 
 export type FileEntry = {
@@ -72,86 +73,41 @@ export function toUiFileEntry(entry: FileListEntry): FileEntry {
   };
 }
 
-export function getFileIcon(entry: FileEntry) {
+function getFileIconForSize(entry: FileEntry, sizeClass: string) {
   if (entry.type === "folder") {
-    return <Folder className="size-4 text-sky-400" />;
+    return <Folder className={`${sizeClass} text-sky-400`} />;
   }
-  const ext = entry.ext?.toLowerCase();
-  if (["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp"].includes(ext ?? "")) {
-    return <FileImage className="size-4 text-pink-400" />;
+  const ext = (entry.ext ?? entry.name.split(".").pop() ?? "").toLowerCase();
+  if (["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp"].includes(ext)) {
+    return <FileImage className={`${sizeClass} text-pink-400`} />;
   }
-  if (["mp4", "mkv", "avi", "mov", "webm"].includes(ext ?? "")) {
-    return <FileVideo className="size-4 text-amber-400" />;
+  if (["mp3", "wav", "ogg", "m4a", "flac", "aac", "opus"].includes(ext)) {
+    return <Music className={`${sizeClass} text-orange-400`} />;
   }
-  if (["gz", "tar", "zip", "rar", "7z", "deb", "iso"].includes(ext ?? "")) {
-    return <FileArchive className="size-4 text-orange-400" />;
+  if (["mp4", "mkv", "avi", "mov", "webm"].includes(ext)) {
+    return <FileVideo className={`${sizeClass} text-amber-400`} />;
   }
-  if (
-    [
-      "js",
-      "ts",
-      "py",
-      "sh",
-      "json",
-      "yml",
-      "yaml",
-      "conf",
-      "env",
-      "md",
-      "css",
-      "html",
-    ].includes(ext ?? "")
-  ) {
-    return <FileCode className="size-4 text-emerald-400" />;
+  if (["gz", "tar", "zip", "rar", "7z", "deb", "iso"].includes(ext)) {
+    return <FileArchive className={`${sizeClass} text-orange-400`} />;
   }
-  if (["log", "csv"].includes(ext ?? "")) {
-    return <FileCog className="size-4 text-muted-foreground" />;
+  if (["js", "ts", "py", "sh", "json", "yml", "yaml", "conf", "env", "md", "css", "html"].includes(ext)) {
+    return <FileCode className={`${sizeClass} text-emerald-400`} />;
   }
-  if (["txt", "doc", "pdf"].includes(ext ?? "")) {
-    return <FileText className="size-4 text-blue-300" />;
+  if (["log", "csv"].includes(ext)) {
+    return <FileCog className={`${sizeClass} text-muted-foreground`} />;
   }
-  return <File className="size-4 text-muted-foreground" />;
+  if (["txt", "doc", "pdf"].includes(ext)) {
+    return <FileText className={`${sizeClass} text-blue-300`} />;
+  }
+  return <File className={`${sizeClass} text-muted-foreground`} />;
+}
+
+export function getFileIcon(entry: FileEntry) {
+  return getFileIconForSize(entry, "size-4");
 }
 
 export function getLargeFileIcon(entry: FileEntry) {
-  if (entry.type === "folder") {
-    return <Folder className="size-10 text-sky-400" />;
-  }
-  const ext = entry.ext?.toLowerCase();
-  if (["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp"].includes(ext ?? "")) {
-    return <FileImage className="size-10 text-pink-400" />;
-  }
-  if (["mp4", "mkv", "avi", "mov", "webm"].includes(ext ?? "")) {
-    return <FileVideo className="size-10 text-amber-400" />;
-  }
-  if (["gz", "tar", "zip", "rar", "7z", "deb", "iso"].includes(ext ?? "")) {
-    return <FileArchive className="size-10 text-orange-400" />;
-  }
-  if (
-    [
-      "js",
-      "ts",
-      "py",
-      "sh",
-      "json",
-      "yml",
-      "yaml",
-      "conf",
-      "env",
-      "md",
-      "css",
-      "html",
-    ].includes(ext ?? "")
-  ) {
-    return <FileCode className="size-10 text-emerald-400" />;
-  }
-  if (["log", "csv"].includes(ext ?? "")) {
-    return <FileCog className="size-10 text-muted-foreground" />;
-  }
-  if (["txt", "doc", "pdf"].includes(ext ?? "")) {
-    return <FileText className="size-10 text-blue-300" />;
-  }
-  return <File className="size-10 text-muted-foreground" />;
+  return getFileIconForSize(entry, "size-10");
 }
 
 export function getEditorLanguage(entry: FileEntry): string {

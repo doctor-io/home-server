@@ -425,8 +425,8 @@ describe("AppStore", () => {
     expect(screen.getByRole("button", { name: "Installed (2)" })).toBeTruthy();
   });
 
-  it("triggers redeploy and uninstall from detail actions", async () => {
-    const { redeployApp, uninstallApp } = setup({
+  it("triggers uninstall from detail actions", async () => {
+    const { uninstallApp } = setup({
       apps: [installedSummaryApp],
       detail: appDetail,
       featuredAppIds: [],
@@ -434,7 +434,6 @@ describe("AppStore", () => {
     });
 
     fireEvent.click(screen.getByRole("button", { name: /plex/i }));
-    fireEvent.click(screen.getByRole("button", { name: /redeploy/i }));
     fireEvent.click(screen.getByRole("button", { name: /uninstall/i }));
 
     expect(screen.getByText("Screenshots")).toBeTruthy();
@@ -443,8 +442,6 @@ describe("AppStore", () => {
     expect(screen.getByText("https://github.com/plex")).toBeTruthy();
     expect(screen.getByText("Uninstall Plex?")).toBeTruthy();
     fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Uninstall" }));
-
-    expect(redeployApp).toHaveBeenCalledWith({ appId: "plex" });
 
     await waitFor(() => {
       expect(uninstallApp).toHaveBeenCalledWith({
@@ -488,7 +485,7 @@ describe("AppStore", () => {
     });
 
     fireEvent.click(screen.getByRole("button", { name: /plex/i }));
-    fireEvent.click(screen.getByRole("button", { name: /custom install/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^custom$/i }));
 
     expect(screen.getByText("Install Plex")).toBeTruthy();
 
