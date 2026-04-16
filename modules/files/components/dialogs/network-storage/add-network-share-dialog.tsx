@@ -1,13 +1,15 @@
 "use client";
 
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Loader2, PlugZap, RefreshCw, Search } from "@/components/icons/platform-icons";
+import { ArrowLeft, Loader2, Plus, RefreshCw, Search, XIcon } from "@/components/icons/platform-icons";
 
 export type AddNetworkShareDraft = {
   host: string;
@@ -31,6 +33,14 @@ type AddNetworkShareDialogProps = {
   onSubmit: () => void;
 };
 
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+      {children}
+    </div>
+  );
+}
+
 export function AddNetworkShareDialog({
   createPending,
   discoverSharesPending,
@@ -51,106 +61,122 @@ export function AddNetworkShareDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-lg border-glass-border/80 bg-background/95">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-sm">
-            <PlugZap className="size-4 text-primary" />
-            Add Network Storage
-          </DialogTitle>
-          <DialogDescription>Configure an SMB share and mount it into the Files module.</DialogDescription>
+      <DialogContent showCloseButton={false} className="max-w-[34rem] gap-0 border-glass-border bg-card/98 p-0 shadow-2xl">
+        <DialogHeader className="border-b border-glass-border px-5 py-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="inline-flex size-9 items-center justify-center rounded-lg border border-glass-border bg-background/80 text-muted-foreground transition-colors hover:bg-secondary/40 hover:text-foreground"
+                aria-label="Back"
+              >
+                <ArrowLeft className="size-4" />
+              </button>
+              <div>
+                <DialogTitle className="text-sm">Add Network Share</DialogTitle>
+                <DialogDescription className="mt-0.5">
+                  Connect to an SMB share
+                </DialogDescription>
+              </div>
+            </div>
+            <DialogClose className="inline-flex size-9 items-center justify-center rounded-lg border border-glass-border bg-background/80 text-muted-foreground transition-colors hover:bg-secondary/40 hover:text-foreground">
+              <XIcon className="size-4" />
+              <span className="sr-only">Close</span>
+            </DialogClose>
+          </div>
         </DialogHeader>
 
-        <div className="space-y-2">
-          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-            Host
+        <div className="space-y-5 px-5 py-5">
+          {/* Server */}
+          <div>
+            <FieldLabel>Server</FieldLabel>
             <div className="flex gap-2">
-              <input
+              <Input
                 value={draft.host}
                 onChange={(event) => update("host", event.target.value)}
-                placeholder="nas.local"
-                className="h-8 flex-1 rounded-md border border-glass-border bg-background/55 px-2 text-xs text-foreground outline-none focus:border-primary/40"
+                placeholder="Host or IP (e.g. nas.local, 192.168.1.100)"
+                className="h-8 rounded-lg border-glass-border bg-background/55 px-3 text-xs text-foreground placeholder:text-muted-foreground/60 focus-visible:border-primary/40 focus-visible:ring-0"
               />
               <button
                 type="button"
                 onClick={onDiscoverServers}
                 disabled={isBusy}
-                className="inline-flex h-8 items-center gap-1 rounded-md border border-glass-border px-2 text-xs text-muted-foreground transition-colors hover:bg-secondary/40 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-glass-border bg-background/55 px-3 text-xs text-muted-foreground transition-colors hover:bg-secondary/40 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <RefreshCw className="size-3" />
-                Servers
+                Scan
               </button>
             </div>
-          </label>
+          </div>
 
-          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-            Username
-            <input
-              value={draft.username}
-              onChange={(event) => update("username", event.target.value)}
-              placeholder="user"
-              className="h-8 rounded-md border border-glass-border bg-background/55 px-2 text-xs text-foreground outline-none focus:border-primary/40"
-            />
-          </label>
+          {/* Credentials */}
+          <div>
+            <FieldLabel>Credentials</FieldLabel>
+            <div className="grid grid-cols-2 gap-2">
+              <Input
+                value={draft.username}
+                onChange={(event) => update("username", event.target.value)}
+                placeholder="Username"
+                className="h-8 rounded-lg border-glass-border bg-background/55 px-3 text-xs text-foreground placeholder:text-muted-foreground/60 focus-visible:border-primary/40 focus-visible:ring-0"
+              />
+              <Input
+                type="password"
+                value={draft.password}
+                onChange={(event) => update("password", event.target.value)}
+                placeholder="Password"
+                className="h-8 rounded-lg border-glass-border bg-background/55 px-3 text-xs text-foreground placeholder:text-muted-foreground/60 focus-visible:border-primary/40 focus-visible:ring-0"
+              />
+            </div>
+          </div>
 
-          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-            Password
-            <input
-              type="password"
-              value={draft.password}
-              onChange={(event) => update("password", event.target.value)}
-              placeholder="••••••••"
-              className="h-8 rounded-md border border-glass-border bg-background/55 px-2 text-xs text-foreground outline-none focus:border-primary/40"
-            />
-          </label>
-
-          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-            Share
+          {/* Share */}
+          <div>
+            <FieldLabel>Share</FieldLabel>
             <div className="flex gap-2">
-              <input
+              <Input
                 value={draft.share}
                 onChange={(event) => update("share", event.target.value)}
-                placeholder="Media"
-                className="h-8 flex-1 rounded-md border border-glass-border bg-background/55 px-2 text-xs text-foreground outline-none focus:border-primary/40"
+                placeholder="Share name (e.g. Media, Documents)"
+                className="h-8 rounded-lg border-glass-border bg-background/55 px-3 text-xs text-foreground placeholder:text-muted-foreground/60 focus-visible:border-primary/40 focus-visible:ring-0"
               />
               <button
                 type="button"
                 onClick={onDiscoverShares}
                 disabled={isBusy}
-                className="inline-flex h-8 items-center gap-1 rounded-md border border-glass-border px-2 text-xs text-muted-foreground transition-colors hover:bg-secondary/40 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-glass-border bg-background/55 px-3 text-xs text-muted-foreground transition-colors hover:bg-secondary/40 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {discoverSharesPending ? (
                   <Loader2 className="size-3 animate-spin" />
                 ) : (
                   <Search className="size-3" />
                 )}
-                Shares
+                Find
               </button>
             </div>
-          </label>
 
-          {discoveredShares.length > 0 ? (
-            <div className="max-h-20 overflow-y-auto rounded-md border border-glass-border bg-background/42 p-1.5">
-              <div className="flex flex-wrap gap-1.5">
+            {discoveredShares.length > 0 ? (
+              <div className="mt-2.5 flex flex-wrap gap-1.5">
                 {discoveredShares.map((shareName) => (
                   <button
                     key={shareName}
                     type="button"
                     onClick={() => onSelectShare(shareName)}
-                    className="rounded-md border border-glass-border bg-background/55 px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-background/72 hover:text-foreground"
+                    className="rounded-lg border border-glass-border bg-background/55 px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-background/75 hover:text-foreground"
                   >
                     {shareName}
                   </button>
                 ))}
               </div>
-            </div>
-          ) : null}
+            ) : null}
+          </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex items-center justify-end gap-2 border-t border-glass-border px-5 py-4">
           <button
             type="button"
             onClick={onClose}
-            className="h-8 rounded-md border border-glass-border px-3 text-xs text-muted-foreground transition-colors hover:bg-secondary/40 hover:text-foreground"
+            className="h-8 rounded-lg border border-glass-border bg-background/55 px-3 text-xs text-muted-foreground transition-colors hover:bg-secondary/40 hover:text-foreground"
           >
             Cancel
           </button>
@@ -158,9 +184,9 @@ export function AddNetworkShareDialog({
             type="button"
             onClick={onSubmit}
             disabled={isBusy}
-            className="inline-flex h-8 items-center gap-1 rounded-md bg-primary/20 px-3 text-xs font-medium text-primary transition-colors hover:bg-primary/30 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary/20 px-3 text-xs font-medium text-primary transition-colors hover:bg-primary/30 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {createPending ? <Loader2 className="size-3 animate-spin" /> : <PlugZap className="size-3" />}
+            {createPending ? <Loader2 className="size-3 animate-spin" /> : <Plus className="size-3" />}
             Add Share
           </button>
         </div>

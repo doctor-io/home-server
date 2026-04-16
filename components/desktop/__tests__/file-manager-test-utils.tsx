@@ -23,6 +23,7 @@ export const mockUseLocalFolderShares = vi.fn();
 export const mockUseCreateLocalFolderShare = vi.fn();
 export const mockUseDeleteLocalFolderShare = vi.fn();
 export const mockUseSystemMetrics = vi.fn();
+export const mockUseCurrentUser = vi.fn();
 
 vi.mock("@/modules/files/hooks/useFiles", () => ({
   buildAssetUrl: (filePath: string) => `/api/v1/files/asset?path=${encodeURIComponent(filePath)}`,
@@ -56,6 +57,10 @@ vi.mock("@/modules/files/hooks/useNetworkShares", () => ({
 
 vi.mock("@/modules/system/hooks/useSystemMetrics", () => ({
   useSystemMetrics: (...args: unknown[]) => mockUseSystemMetrics(...args),
+}));
+
+vi.mock("@/hooks/useCurrentUser", () => ({
+  useCurrentUser: (...args: unknown[]) => mockUseCurrentUser(...args),
 }));
 
 vi.mock("@/modules/files/hooks/useLocalFolderShares", () => ({
@@ -115,6 +120,7 @@ export function resetFileManagerMocks() {
   mockUseCreateLocalFolderShare.mockReset();
   mockUseDeleteLocalFolderShare.mockReset();
   mockUseSystemMetrics.mockReset();
+  mockUseCurrentUser.mockReset();
 
   mockUseFilesDirectory.mockReturnValue(mockDirectory([]));
   mockUseFilesRoot.mockReturnValue({
@@ -158,6 +164,16 @@ export function resetFileManagerMocks() {
         usedBytes: 1.8 * 1024 ** 4,
         usedPercent: 45,
       },
+    },
+    isLoading: false,
+    isError: false,
+    error: null,
+  });
+  mockUseCurrentUser.mockReturnValue({
+    data: {
+      id: "user-1",
+      username: "admin",
+      isDemoMode: false,
     },
     isLoading: false,
     isError: false,

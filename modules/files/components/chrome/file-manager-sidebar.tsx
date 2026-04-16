@@ -1,6 +1,7 @@
 "use client";
 
 import { Plus } from "@/components/icons/platform-icons";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { normalizePathForBackend } from "@/modules/files/components/file-manager-presenters";
 import { PeopleRegular, DeleteRegular } from "@fluentui/react-icons";
 import { FILES_PANEL_SHELL } from "@/modules/files/components/file-manager-surface";
@@ -40,6 +41,9 @@ export function FileManagerSidebar({
   onNavigateToPath,
   onOpenNetworkDialog,
 }: SidebarProps) {
+  const currentUserQuery = useCurrentUser();
+  const isDemoMode = currentUserQuery.data?.isDemoMode ?? false;
+
   return (
     <aside className={`m-2 flex w-48 shrink-0 flex-col overflow-y-auto ${FILES_PANEL_SHELL}`}>
       <div className="flex flex-col gap-4 p-3 pt-4">
@@ -49,7 +53,7 @@ export function FileManagerSidebar({
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
                 {section.title}
               </span>
-              {section.title === "Locations" ? (
+              {section.title === "Locations" && !isDemoMode ? (
                 <button
                   onClick={onOpenNetworkDialog}
                   className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-secondary/40 hover:text-foreground"

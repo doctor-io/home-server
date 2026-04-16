@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import {
+  ArrowRight,
   Eye,
   EyeOff,
   Lock,
@@ -11,6 +12,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 
 const RESTORE_BANNER_KEY = "homeio:restore-banner";
+const DEFAULT_RETRY_DELAY_SECONDS = 3;
 
 export function LoginForm() {
   const router = useRouter();
@@ -28,6 +30,7 @@ export function LoginForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showRestoreBanner, setShowRestoreBanner] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const [retryCountdown, setRetryCountdown] = useState(0);
 
   // Check if the user was redirected here after a restore completed and their
   // session was invalidated. Show a one-shot banner so they know why their
@@ -42,6 +45,16 @@ export function LoginForm() {
       // Best-effort only.
     }
   }, []);
+
+  useEffect(() => {
+    if (retryCountdown <= 0) return;
+
+    const timeoutId = window.setTimeout(() => {
+      setRetryCountdown((currentValue) => Math.max(0, currentValue - 1));
+    }, 1_000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [retryCountdown]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -63,7 +76,21 @@ export function LoginForm() {
       if (!response.ok) {
         const json = (await response.json().catch(() => ({}))) as {
           error?: string;
+          retryAfterSeconds?: number;
         };
+        const retryAfterHeader = response.headers.get("retry-after");
+        const parsedRetryAfter = retryAfterHeader ? Number.parseInt(retryAfterHeader, 10) : NaN;
+        const retryAfterSeconds = Number.isFinite(parsedRetryAfter) && parsedRetryAfter > 0
+          ? parsedRetryAfter
+          : json.retryAfterSeconds && json.retryAfterSeconds > 0
+            ? json.retryAfterSeconds
+            : response.status === 401
+              ? DEFAULT_RETRY_DELAY_SECONDS
+              : 0;
+
+        if (retryAfterSeconds > 0) {
+          setRetryCountdown(retryAfterSeconds);
+        }
 
         throw new Error(json.error ?? "Login failed");
       }
@@ -155,6 +182,8 @@ export function LoginForm() {
                 type="button"
                 className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-[var(--system-radius-icon)] text-muted-foreground transition-colors hover:bg-white/[0.08] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                 aria-label={isPasswordVisible ? "Hide password" : "Show password"}
+                aria-pressed={isPasswordVisible}
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={() =>
                   setIsPasswordVisible((currentValue) => !currentValue)
                 }
@@ -182,10 +211,22 @@ export function LoginForm() {
 
         <button
           type="submit"
-          disabled={isSubmitting || !username.trim() || !password.trim()}
-          className="system-primary-action w-full cursor-pointer rounded-full py-2.5 text-sm font-medium transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={
+            isSubmitting ||
+            retryCountdown > 0 ||
+            !username.trim() ||
+            !password.trim()
+          }
+          className="system-primary-action group flex w-full items-center justify-center gap-2 rounded-full py-2.5 text-sm font-medium transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isSubmitting ? "Signing in..." : "Sign in"}
+          <span>
+            {isSubmitting
+              ? "Signing in..."
+              : retryCountdown > 0
+                ? `Try again in ${retryCountdown}s`
+                : "Sign in"}
+          </span>
+          <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
         </button>
       </form>
     </div>

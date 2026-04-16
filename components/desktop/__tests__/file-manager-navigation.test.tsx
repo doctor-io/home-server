@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   mockDirectory,
   mockUseFilesDirectory,
+  mockUseCurrentUser,
   mockUseNetworkShares,
   renderFileManager,
   resetFileManagerMocks,
@@ -42,6 +43,39 @@ describe("FileManager navigation", () => {
 
     return renderFileManager().then(() => {
       expect(screen.getByRole("button", { name: "nastabib.local" })).toBeTruthy();
+    });
+  });
+
+  it("hides network storage in demo mode", () => {
+    mockUseCurrentUser.mockReturnValue({
+      data: {
+        id: "demo-user",
+        username: "homeio",
+        isDemoMode: true,
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+    mockUseNetworkShares.mockReturnValue({
+      data: [
+        {
+          id: "share-1",
+          host: "nastabib.local",
+          share: "Media",
+          username: "user",
+          mountPath: "Network/nastabib.local/Media",
+          isMounted: true,
+        },
+      ],
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    return renderFileManager().then(() => {
+      expect(screen.queryByRole("button", { name: "nastabib.local" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Add network storage" })).toBeNull();
     });
   });
 

@@ -10,18 +10,41 @@ import type {
   SettingsBackend,
 } from "@/modules/settings/components/panel/types";
 import type { SystemSecurityPolicy } from "@/lib/shared/contracts/system";
+import { LockClosedRegular } from "@fluentui/react-icons";
 
 type SecuritySectionProps = {
   data: SettingsBackend["security"];
   draft: SecuritySettingsDraft;
+  isDemoMode?: boolean;
   onChange: (patch: Partial<SecuritySettingsDraft>) => void;
 };
 
 export function SecuritySection({
   data,
   draft,
+  isDemoMode = false,
   onChange,
 }: SecuritySectionProps) {
+  const isDisabled = isDemoMode || data.isLoading || data.isSaving;
+
+  if (isDemoMode) {
+    return (
+      <div className="flex flex-col gap-1">
+        <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-white/8 bg-white/[0.03] px-6 py-10 text-center">
+          <span className="flex size-10 items-center justify-center rounded-full border border-white/10 bg-white/5">
+            <LockClosedRegular className="size-5 text-muted-foreground" />
+          </span>
+          <div>
+            <p className="text-sm font-medium text-foreground">Security settings are locked</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Firewall and intrusion prevention controls are disabled in demo mode.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-1">
       {data.error ? (
@@ -40,7 +63,7 @@ export function SecuritySection({
             firewallEnabled: !draft.firewallEnabled,
           })
         }
-        disabled={data.isLoading || data.isSaving}
+        disabled={isDisabled}
       />
       <SettingsSelect
         label="Default incoming policy"
@@ -51,7 +74,7 @@ export function SecuritySection({
             firewallIncomingPolicy: value as SystemSecurityPolicy,
           })
         }
-        disabled={data.isLoading || data.isSaving}
+        disabled={isDisabled}
       />
       <SettingsSelect
         label="Default outgoing policy"
@@ -62,7 +85,7 @@ export function SecuritySection({
             firewallOutgoingPolicy: value as SystemSecurityPolicy,
           })
         }
-        disabled={data.isLoading || data.isSaving}
+        disabled={isDisabled}
       />
 
       <SectionDivider title="Intrusion Prevention" />
@@ -75,7 +98,7 @@ export function SecuritySection({
             fail2banEnabled: !draft.fail2banEnabled,
           })
         }
-        disabled={data.isLoading || data.isSaving}
+        disabled={isDisabled}
       />
       <SettingsInput
         label="Max retries"
@@ -86,7 +109,7 @@ export function SecuritySection({
             fail2banMaxRetries: value,
           })
         }
-        disabled={data.isLoading || data.isSaving}
+        disabled={isDisabled}
       />
       <SettingsInput
         label="Ban duration"
@@ -97,7 +120,7 @@ export function SecuritySection({
             fail2banBanDurationSeconds: value,
           })
         }
-        disabled={data.isLoading || data.isSaving}
+        disabled={isDisabled}
       />
     </div>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useEffect, useMemo, useReducer, useRef, type MouseEvent } from "react";
 import {
   getEditorLanguage,
@@ -61,6 +62,7 @@ export function FileManager() {
   const statusNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const [state, dispatch] = useReducer(fileManagerReducer, initialState);
+  const currentUserQuery = useCurrentUser();
 
   const filesRootQuery = useFilesRoot();
   const viewFlags = getViewFlags(state.currentPath);
@@ -156,8 +158,12 @@ export function FileManager() {
   const currentPathForDisplay = getCurrentPathForDisplay(state.currentPath);
   const filesRootPath = filesRootQuery.data?.rootPath ?? "";
   const rootLabel = filesRootPath || "/DATA";
+  const isDemoMode = currentUserQuery.data?.isDemoMode ?? false;
   const localSharesByPath = useMemo(() => getLocalSharesByPath(localSharesQuery.data), [localSharesQuery.data]);
-  const locationItems = useMemo(() => getLocationItems(networkSharesQuery.data), [networkSharesQuery.data]);
+  const locationItems = useMemo(
+    () => (isDemoMode ? [] : getLocationItems(networkSharesQuery.data)),
+    [isDemoMode, networkSharesQuery.data],
+  );
   const counts = useMemo(() => getBrowserCounts(sortedEntries), [sortedEntries]);
   const clipboardDisplayName = getClipboardDisplayName(state.clipboardState);
   const contextShare =
@@ -368,7 +374,7 @@ export function FileManager() {
       showBackgroundContextMenu={state.showBackgroundContextMenu}
       showContextMenu={state.showContextMenu}
       showEmptyTrashConfirm={state.showEmptyTrashConfirm}
-      showNetworkDialog={state.showNetworkDialog}
+      showNetworkDialog={state.showNetworkDialog && !isDemoMode}
       sidebarSections={sidebarSections}
       sortedEntries={visibleEntries}
       storageUsagePercent={storageSummary.percent}
