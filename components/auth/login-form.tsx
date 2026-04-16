@@ -14,7 +14,10 @@ import { type FormEvent, useEffect, useMemo, useState } from "react";
 const RESTORE_BANNER_KEY = "homeio:restore-banner";
 const DEFAULT_RETRY_DELAY_SECONDS = 3;
 
-export function LoginForm() {
+const DEMO_USERNAME = "homeio";
+const DEMO_PASSWORD = "homeio26";
+
+export function LoginForm({ isDemoMode = false }: { isDemoMode?: boolean }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextPath = useMemo(() => {
@@ -23,9 +26,11 @@ export function LoginForm() {
   }, [searchParams]);
 
   const [username, setUsername] = useState(
-    () => searchParams.get("username")?.trim().toLowerCase() ?? "",
+    () => isDemoMode ? DEMO_USERNAME : (searchParams.get("username")?.trim().toLowerCase() ?? ""),
   );
-  const [password, setPassword] = useState("");
+  const [password, setPassword] = useState(
+    () => isDemoMode ? DEMO_PASSWORD : "",
+  );
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showRestoreBanner, setShowRestoreBanner] = useState(false);
@@ -129,6 +134,16 @@ export function LoginForm() {
       <p className="mb-5 mt-1 text-[11px] tracking-[0.18em] text-muted-foreground/78 uppercase">
         Sign in to continue
       </p>
+
+      {isDemoMode ? (
+        <div className="mb-3 rounded-[var(--system-radius-control)] border border-white/10 bg-black/22 px-4 py-3 text-left text-xs text-foreground/70 shadow-[var(--system-shadow-surface)] backdrop-blur-2xl">
+          <p className="font-medium tracking-[0.02em] text-foreground/90">Demo mode</p>
+          <p className="mt-0.5 leading-5">
+            Username: <span className="font-mono text-foreground/90">{DEMO_USERNAME}</span>
+            {" · "}Password: <span className="font-mono text-foreground/90">{DEMO_PASSWORD}</span>
+          </p>
+        </div>
+      ) : null}
 
       {showRestoreBanner ? (
         <div className="mb-3 rounded-[var(--system-radius-control)] border border-yellow-500/18 bg-black/22 px-4 py-3 text-left text-xs text-yellow-300 shadow-[var(--system-shadow-surface)] backdrop-blur-2xl">
