@@ -170,9 +170,78 @@ export function AppearanceSection({
                 }`}
               >
                 <span className="block text-xs font-medium">{preset.name}</span>
-                <span className="block text-[11px] opacity-80">
+                <span className="block text-2xs opacity-80">
                   {preset.description}
                 </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <SectionDivider title="Liquid Glass" />
+      <div className={`${SETTINGS_PANEL_INSET} p-4`}>
+        <p className="mb-4 text-xs text-muted-foreground">
+          Choose the look of glass surfaces across the interface.
+        </p>
+        <div className="flex gap-3">
+          {(["clear", "tinted"] as const).map((style) => {
+            const isActive = appearance.glassStyle === style;
+            return (
+              <button
+                key={style}
+                type="button"
+                onClick={() => onAppearanceChange({ glassStyle: style })}
+                className={`group flex flex-1 cursor-pointer flex-col gap-2 rounded-[calc(var(--radius)+0.375rem)] border p-3 text-left transition-all ${
+                  isActive
+                    ? "border-primary bg-primary/10 shadow-[0_0_0_1px_color-mix(in_oklab,var(--primary)_28%,transparent)]"
+                    : "border-glass-border bg-background/46 hover:border-foreground/20 hover:bg-background/68"
+                }`}
+              >
+                {/* Preview swatch */}
+                <div
+                  className="h-14 w-full overflow-hidden rounded-[calc(var(--radius)+0.125rem)] border border-white/[0.09]"
+                  style={{
+                    background:
+                      style === "clear"
+                        ? "oklch(0.14 0.015 250 / 0.18)"
+                        : "oklch(0.04 0.006 250 / 0.75)",
+                    backdropFilter: "blur(12px) saturate(160%)",
+                  }}
+                >
+                  <div className="flex flex-col gap-1.5 p-2">
+                    <div className="flex gap-1">
+                      <div className="h-2 w-7 rounded-full bg-white/25" />
+                      <div className="h-2 w-4 rounded-full bg-white/15" />
+                    </div>
+                    <div className="flex gap-1">
+                      <div className="h-2 w-4 rounded-full bg-white/15" />
+                      <div className="h-2 w-6 rounded-full bg-white/10" />
+                    </div>
+                    <div className="mt-0.5 flex gap-1">
+                      {[...Array(4)].map((_, i) => (
+                        <div key={i} className="size-3 rounded-md bg-white/12" />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                {/* Label */}
+                <div className="flex items-center justify-between gap-2">
+                  <span
+                    className={`text-xs ${
+                      isActive
+                        ? "font-medium text-primary"
+                        : "text-muted-foreground group-hover:text-foreground"
+                    }`}
+                  >
+                    {style === "clear" ? "Clear" : "Tinted"}
+                  </span>
+                  {isActive && (
+                    <span className="inline-flex size-5 items-center justify-center rounded-[var(--radius)] bg-primary text-primary-foreground">
+                      <Check className="size-3" />
+                    </span>
+                  )}
+                </div>
               </button>
             );
           })}

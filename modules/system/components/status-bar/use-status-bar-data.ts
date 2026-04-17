@@ -35,6 +35,10 @@ export function useStatusBarData() {
   const isWifiConnected = Boolean(
     networkStatus?.connected ?? metrics?.wifi.connected,
   );
+  const isEthernet = Boolean(
+    (networkStatus?.connected ?? metrics?.wifi.connected) &&
+      !(networkStatus?.ssid ?? metrics?.wifi.ssid),
+  );
   const showWifiError = (isMetricsError && isNetworkError) || !isWifiConnected;
   const wifiIconClassName = showWifiError
     ? "size-4 text-status-red"
@@ -63,9 +67,11 @@ export function useStatusBarData() {
       metrics,
       networkStatus,
       serverName,
-      username: currentUser?.username ?? null,
+      isDemoMode: currentUser?.isDemoMode ?? false,
+      username: currentUser?.isDemoMode ? "homeio" : (currentUser?.username ?? null),
       batteryText,
       isWifiConnected,
+      isEthernet,
       isMetricsError,
       wifiIconClassName,
       notifications,
@@ -78,12 +84,14 @@ export function useStatusBarData() {
       isMetricsError,
       networkStatus,
       isWifiConnected,
+      isEthernet,
       markAllRead,
       clearAll,
       metrics,
       notifications,
       serverName,
       currentUser?.username,
+      currentUser?.isDemoMode,
       unreadCount,
       wifiIconClassName,
     ],

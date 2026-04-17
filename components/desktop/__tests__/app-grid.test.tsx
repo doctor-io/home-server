@@ -360,7 +360,7 @@ describe("AppGrid context menu", () => {
 
     render(<AppGrid animationsEnabled={false} />);
 
-    expect(screen.getByText("Redeploying Plex")).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toContain("Redeploying Plex");
     expect(screen.getByText("45%")).toBeTruthy();
   });
 

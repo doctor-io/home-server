@@ -16,11 +16,12 @@ APP_PORT="${HOMEIO_APP_PORT:-${HOMEIO_PORT:-12026}}"
 PUBLIC_PORT="${HOMEIO_PUBLIC_PORT:-80}"
 NGINX_SITE_NAME="${HOMEIO_NGINX_SITE_NAME:-home-server}"
 REPO_URL="${HOMEIO_REPO_URL:-https://github.com/doctor-io/homeio.git}"
-REPO_BRANCH="${HOMEIO_REPO_BRANCH:-main}"
+REPO_BRANCH="develop"
+HOMEIO_RELEASE_TAG="${HOMEIO_RELEASE_TAG:-}"
 
 NODE_VERSION="${NODE_VERSION:-22.14.0}"
 YQ_VERSION="${YQ_VERSION:-4.45.4}"
-DOCKER_VERSION="${DOCKER_VERSION:-28.0.1}"
+DOCKER_VERSION="${DOCKER_VERSION:-}"   # empty = always install latest
 DOCKER_INSTALL_SCRIPT_COMMIT="${DOCKER_INSTALL_SCRIPT_COMMIT:-master}"
 
 HOMEIO_INSTALL_YQ="${HOMEIO_INSTALL_YQ:-false}"
@@ -363,16 +364,43 @@ install_docker() {
 		return
 	fi
 
-	print_status "Installing Docker ${DOCKER_VERSION}..."
-	curl -fsSL "https://raw.githubusercontent.com/docker/docker-install/${DOCKER_INSTALL_SCRIPT_COMMIT}/install.sh" -o /tmp/install-docker.sh
-	if [[ "${HOMEIO_VERBOSE}" == "true" ]]; then
-		sh /tmp/install-docker.sh --version "v${DOCKER_VERSION}"
+	local version_args=()
+	if [[ -n "${DOCKER_VERSION}" && "${DOCKER_VERSION}" != "latest" ]]; then
+		print_status "Installing Docker ${DOCKER_VERSION}..."
+		version_args=(--version "v${DOCKER_VERSION}")
 	else
-		sh /tmp/install-docker.sh --version "v${DOCKER_VERSION}" >/dev/null 2>&1
+		print_status "Installing Docker (latest)..."
 	fi
+
+	if ! curl -fsSL "https://raw.githubusercontent.com/docker/docker-install/${DOCKER_INSTALL_SCRIPT_COMMIT}/install.sh" -o /tmp/install-docker.sh; then
+		print_error "Failed to download Docker install script. Check your internet connection."
+		exit 1
+	fi
+
+	local docker_log
+	docker_log=$(mktemp)
+
+	if [[ "${HOMEIO_VERBOSE}" == "true" ]]; then
+		sh /tmp/install-docker.sh "${version_args[@]}" 2>&1 | tee "${docker_log}"
+	else
+		sh /tmp/install-docker.sh "${version_args[@]}" >"${docker_log}" 2>&1
+	fi
+	local docker_exit=$?
 	rm -f /tmp/install-docker.sh
 
-	systemctl enable --now docker >/dev/null 2>&1
+	if [[ ${docker_exit} -ne 0 ]]; then
+		print_error "Docker installation failed (exit ${docker_exit})."
+		print_error "Last output:"
+		tail -20 "${docker_log}" >&2
+		rm -f "${docker_log}"
+		exit 1
+	fi
+	rm -f "${docker_log}"
+
+	if ! systemctl enable --now docker >/dev/null 2>&1; then
+		print_error "Docker installed but failed to start. Run: systemctl status docker"
+		exit 1
+	fi
 }
 
 install_node() {
@@ -462,8 +490,60 @@ ensure_directories() {
 	mkdir -p "${INSTALL_DIR}/logs"
 }
 
+deploy_from_release_tarball() {
+	local url="${1}"
+	local tmp_dir extract_dir source_dir
+	tmp_dir="$(mktemp -d)"
+	extract_dir="${tmp_dir}/extract"
+	mkdir -p "${extract_dir}"
+
+	print_status "Downloading release from ${url}..."
+	curl -fsSL "${url}" -o "${tmp_dir}/release.tar.gz"
+	tar -xzf "${tmp_dir}/release.tar.gz" -C "${extract_dir}"
+
+	if [[ -f "${extract_dir}/package.json" ]]; then
+		source_dir="${extract_dir}"
+	else
+		source_dir="$(find "${extract_dir}" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+	fi
+
+	[[ -n "${source_dir:-}" && -f "${source_dir}/package.json" ]] || {
+		print_error "Could not locate app root in tarball."; exit 1
+	}
+
+	mkdir -p "${INSTALL_DIR}"
+	rsync -a \
+		--exclude ".git" \
+		--exclude "node_modules" \
+		--exclude ".next" \
+		"${source_dir}/" "${INSTALL_DIR}/"
+
+	rm -rf "${tmp_dir}"
+	print_status "Release deployed."
+}
+
 clone_or_update_repo() {
-	print_status "Syncing repository (${REPO_BRANCH})..."
+	print_status "Syncing repository..."
+
+	if [[ -n "${HOMEIO_RELEASE_TAG}" ]]; then
+		local tarball_url
+		if [[ "${HOMEIO_RELEASE_TAG}" == "latest" ]]; then
+			print_status "Fetching latest release URL..."
+			tarball_url="$(curl -fsSL \
+				"https://api.github.com/repos/doctor-io/homeio/releases/latest" \
+				| jq -r '.tarball_url')"
+			[[ -n "${tarball_url}" ]] || { print_error "Could not fetch latest release URL."; exit 1; }
+		else
+			tarball_url="https://github.com/doctor-io/homeio/archive/refs/tags/${HOMEIO_RELEASE_TAG}.tar.gz"
+		fi
+		if [[ -d "${INSTALL_DIR}" ]]; then
+			cd /tmp || cd /
+			print_status "Removing existing installation..."
+			rm -rf "${INSTALL_DIR}"
+		fi
+		deploy_from_release_tarball "${tarball_url}"
+		return
+	fi
 
 	# Remove existing installation if present
 	if [[ -d "${INSTALL_DIR}" ]]; then
@@ -642,12 +722,21 @@ install_homeio() {
 
 	cd "${INSTALL_DIR}" || { print_error "Failed to enter installation directory"; exit 1; }
 
+	local step_log
+	step_log="$(mktemp)"
+
 	# Install dependencies
 	print_status "Installing npm dependencies (this may take a few minutes)..."
 	if [[ "${HOMEIO_VERBOSE}" == "true" ]]; then
 		npm ci || { print_error "npm ci failed"; exit 1; }
 	else
-		npm ci --loglevel=error --no-audit --no-fund || { print_error "npm ci failed"; exit 1; }
+		if ! npm ci --loglevel=error --no-audit --no-fund >"${step_log}" 2>&1; then
+			print_error "npm ci failed."
+			print_error "Last output:"
+			tail -20 "${step_log}" >&2
+			rm -f "${step_log}"
+			exit 1
+		fi
 	fi
 
 	# Initialize database schema
@@ -655,7 +744,13 @@ install_homeio() {
 	if [[ "${HOMEIO_VERBOSE}" == "true" ]]; then
 		(set -a && source "${ENV_FILE}" && set +a && npm run db:init) || { print_error "Database initialization failed"; exit 1; }
 	else
-		(set -a && source "${ENV_FILE}" && set +a && npm run db:init --silent) || { print_error "Database initialization failed"; exit 1; }
+		if ! (set -a && source "${ENV_FILE}" && set +a && npm run db:init) >"${step_log}" 2>&1; then
+			print_error "Database initialization failed."
+			print_error "Last output:"
+			tail -20 "${step_log}" >&2
+			rm -f "${step_log}"
+			exit 1
+		fi
 	fi
 
 	# Build application
@@ -663,9 +758,16 @@ install_homeio() {
 	if [[ "${HOMEIO_VERBOSE}" == "true" ]]; then
 		npm run build || { print_error "Build failed"; exit 1; }
 	else
-		npm run build --silent || { print_error "Build failed"; exit 1; }
+		if ! npm run build >"${step_log}" 2>&1; then
+			print_error "Build failed."
+			print_error "Last output:"
+			tail -20 "${step_log}" >&2
+			rm -f "${step_log}"
+			exit 1
+		fi
 	fi
 
+	rm -f "${step_log}"
 	print_status "Installation completed successfully!"
 }
 
@@ -999,7 +1101,8 @@ redirect_to_update_if_installed() {
 	fi
 
 	chmod +x "${tmp_update}"
-	exec bash "${tmp_update}"
+	# Pass REPO_BRANCH so update.sh stays on the same branch as this installer.
+	HOMEIO_REPO_BRANCH="${REPO_BRANCH}" exec bash "${tmp_update}"
 }
 
 main() {

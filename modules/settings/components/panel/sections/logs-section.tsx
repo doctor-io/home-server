@@ -94,29 +94,29 @@ function HomeioLogRow({ entry }: { entry: RawLogEntry }) {
     >
       <div className="flex items-center gap-2 min-w-0">
         {ts ? (
-          <span className="shrink-0 text-[10px] font-mono text-muted-foreground/60 w-16">
+          <span className="shrink-0 text-2xs font-mono text-muted-foreground/60 w-16">
             {ts}
           </span>
         ) : null}
         {entry.level ? (
           <span
-            className={`shrink-0 text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded ${levelBadgeColor(entry.level)}`}
+            className={`shrink-0 text-2xs font-bold uppercase tracking-widest px-1.5 py-0.5 rounded ${levelBadgeColor(entry.level)}`}
           >
             {entry.level}
           </span>
         ) : null}
         {entry.layer ? (
-          <span className="shrink-0 text-[10px] font-mono text-muted-foreground/70">
+          <span className="shrink-0 text-2xs font-mono text-muted-foreground/70">
             {entry.layer}
           </span>
         ) : null}
         <span
-          className={`truncate text-[11px] font-mono ${levelColor(entry.level)}`}
+          className={`truncate text-2xs font-mono ${levelColor(entry.level)}`}
         >
           {entry.action || entry.raw}
         </span>
         {entry.status ? (
-          <span className="shrink-0 text-[10px] text-muted-foreground/50 ml-auto">
+          <span className="shrink-0 text-2xs text-muted-foreground/50 ml-auto">
             {entry.status}
           </span>
         ) : null}
@@ -124,12 +124,12 @@ function HomeioLogRow({ entry }: { entry: RawLogEntry }) {
       {expanded && hasDetail ? (
         <div className={`mt-1.5 ml-18 rounded-lg p-2 ${SETTINGS_PANEL_INSET}`}>
           {entry.message ? (
-            <p className="text-[11px] text-foreground/80 font-mono break-all">
+            <p className="text-2xs text-foreground/80 font-mono break-all">
               {entry.message}
             </p>
           ) : null}
           {entry.error ? (
-            <p className="text-[11px] text-status-red font-mono break-all mt-0.5">
+            <p className="text-2xs text-status-red font-mono break-all mt-0.5">
               {entry.error.message}
             </p>
           ) : null}
@@ -156,7 +156,7 @@ function RawLogRow({ entry }: { entry: RawLogEntry }) {
   return (
     <div className="border-b border-glass-border/40 last:border-0 px-3 py-1">
       <span
-        className={`text-[10.5px] font-mono leading-relaxed break-all ${color}`}
+        className={`text-2xs font-mono leading-relaxed break-all ${color}`}
       >
         {entry.raw}
       </span>
@@ -237,7 +237,7 @@ export function LogsSection() {
 
         <div className="ml-auto flex items-center gap-2">
           {lastUpdated ? (
-            <span className="text-[10px] text-muted-foreground/60">
+            <span className="text-2xs text-muted-foreground/60">
               {isFetching ? "Refreshing…" : `Updated ${lastUpdated}`}
             </span>
           ) : null}
@@ -265,7 +265,7 @@ export function LogsSection() {
       >
         {/* Header bar */}
         <div className="flex items-center justify-between px-3 py-1.5 border-b border-glass-border/50 shrink-0">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+          <span className="text-2xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             {activeSource === "homeio"
               ? "Homeio Application Logs"
               : activeSource === "system"
@@ -274,17 +274,17 @@ export function LogsSection() {
           </span>
           <div className="flex items-center gap-2">
             {data?.truncated ? (
-              <span className="text-[10px] text-status-amber">
+              <span className="text-2xs text-status-amber">
                 Showing last 500 lines
               </span>
             ) : data?.entries?.length ? (
-              <span className="text-[10px] text-muted-foreground/50">
+              <span className="text-2xs text-muted-foreground/50">
                 {data.entries.length} entries
               </span>
             ) : null}
             <button
               onClick={() => setAutoScroll((p) => !p)}
-              className={`text-[10px] px-1.5 py-0.5 rounded transition-colors cursor-pointer ${
+              className={`text-2xs px-1.5 py-0.5 rounded transition-colors cursor-pointer ${
                 autoScroll
                   ? "text-primary bg-primary/10"
                   : "text-muted-foreground hover:text-foreground"

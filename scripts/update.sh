@@ -16,8 +16,9 @@ APP_PORT="${HOMEIO_APP_PORT:-${HOMEIO_PORT:-12026}}"
 PUBLIC_PORT="${HOMEIO_PUBLIC_PORT:-80}"
 NGINX_SITE_NAME="${HOMEIO_NGINX_SITE_NAME:-home-server}"
 REPO_URL="${HOMEIO_REPO_URL:-https://github.com/doctor-io/homeio.git}"
-REPO_BRANCH="${HOMEIO_REPO_BRANCH:-main}"
+REPO_BRANCH="develop"
 
+HOMEIO_RELEASE_TAG="${HOMEIO_RELEASE_TAG:-}"
 HOMEIO_RELEASE_TARBALL_URL="${HOMEIO_RELEASE_TARBALL_URL:-}"
 HOMEIO_CREATE_BACKUP="${HOMEIO_CREATE_BACKUP:-true}"
 HOMEIO_BACKUP_ROOT="${HOMEIO_BACKUP_ROOT:-/var/backups/home-server/releases}"
@@ -124,7 +125,8 @@ deploy_from_git() {
 		print_warn "No git repository at ${INSTALL_DIR}. Cloning fresh copy from ${REPO_URL}..."
 		local tmp_dir
 		tmp_dir="$(mktemp -d)"
-		git clone --depth=1 --branch "${REPO_BRANCH}" --quiet "${REPO_URL}" "${tmp_dir}/repo"
+		local clone_branch="${REPO_BRANCH:-main}"
+		git clone --depth=1 --branch "${clone_branch}" --quiet "${REPO_URL}" "${tmp_dir}/repo"
 
 		rsync -a \
 			--delete \
@@ -204,7 +206,16 @@ run_database_migrations() {
 
 build_app() {
 	print_status "Building Next.js application..."
-	cd "${INSTALL_DIR}" && npm run build --silent
+	local build_log
+	build_log="$(mktemp)"
+	if ! (cd "${INSTALL_DIR}" && npm run build >"${build_log}" 2>&1); then
+		print_error "Build failed."
+		print_error "Last output:"
+		tail -20 "${build_log}" >&2
+		rm -f "${build_log}"
+		exit 1
+	fi
+	rm -f "${build_log}"
 }
 
 stop_service() {
@@ -563,7 +574,20 @@ main() {
 	ensure_service_shutdown_behavior
 	stop_service
 
-	if [[ -n "${HOMEIO_RELEASE_TARBALL_URL}" ]]; then
+	if [[ -n "${HOMEIO_RELEASE_TAG}" ]]; then
+		if [[ "${HOMEIO_RELEASE_TAG}" == "latest" ]]; then
+			print_status "Fetching latest release URL..."
+			HOMEIO_RELEASE_TARBALL_URL="$(curl -fsSL \
+				"https://api.github.com/repos/doctor-io/homeio/releases/latest" \
+				| jq -r '.tarball_url')"
+			[[ -n "${HOMEIO_RELEASE_TARBALL_URL}" ]] || {
+				print_error "Could not fetch latest release URL."; false
+			}
+		else
+			HOMEIO_RELEASE_TARBALL_URL="https://github.com/doctor-io/homeio/archive/refs/tags/${HOMEIO_RELEASE_TAG}.tar.gz"
+		fi
+		deploy_from_tarball
+	elif [[ -n "${HOMEIO_RELEASE_TARBALL_URL}" ]]; then
 		deploy_from_tarball
 	else
 		deploy_from_git

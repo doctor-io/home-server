@@ -28,6 +28,7 @@ const appearance: AppearanceSettings = {
   wallpaper: "wallpaper-1.jpg",
   accentColor: "oklch(0.72 0.14 190)",
   radius: 14,
+  glassStyle: "clear",
   iconSize: "medium",
   dockPosition: "bottom",
   fontSize: "default",

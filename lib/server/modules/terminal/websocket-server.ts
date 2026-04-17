@@ -370,6 +370,11 @@ export function initializeWebSocketServer(server: Server): void {
 
     if (pathname !== "/api/terminal") return;
 
+    if (serverEnv.DEMO_MODE) {
+      closeUpgradeSocket(socket, 403, "Terminal is disabled in demo mode");
+      return;
+    }
+
     void (async () => {
       let terminalSession: AuthenticatedSession | null = null;
 

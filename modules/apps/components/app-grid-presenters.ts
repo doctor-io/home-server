@@ -335,7 +335,7 @@ export function buildAppItems(params: {
         id: appId,
         name,
         icon: visual.icon,
-        logoUrl: catalog?.logoUrl ?? null,
+        logoUrl: catalog?.logoUrl ?? installed?.logoUrl ?? null,
         color: visual.color,
         bgColor: visual.bgColor,
         status: derivedStatus,

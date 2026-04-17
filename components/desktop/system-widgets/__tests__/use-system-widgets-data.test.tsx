@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mockUseSystemMetrics = vi.fn();
 const mockUseInstalledApps = vi.fn();
 const mockUseCurrentWeather = vi.fn();
+const mockUseCurrentUser = vi.fn();
 
 vi.mock("@/modules/system/hooks/useSystemMetrics", () => ({
   useSystemMetrics: () => mockUseSystemMetrics(),
@@ -17,6 +18,10 @@ vi.mock("@/modules/apps/hooks/useInstalledApps", () => ({
 
 vi.mock("@/modules/system/hooks/useCurrentWeather", () => ({
   useCurrentWeather: () => mockUseCurrentWeather(),
+}));
+
+vi.mock("@/hooks/useCurrentUser", () => ({
+  useCurrentUser: () => mockUseCurrentUser(),
 }));
 
 import { useSystemWidgetsData } from "@/modules/system/components/system-widgets/use-system-widgets-data";
@@ -93,6 +98,7 @@ function buildMetrics() {
 describe("useSystemWidgetsData", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseCurrentUser.mockReturnValue({ data: { isDemoMode: false } });
   });
 
   it("maps backend hooks into widget model", () => {
@@ -138,6 +144,7 @@ describe("useSystemWidgetsData", () => {
       hostname: "pi4-home",
       interfaceName: "wlan0",
       ssid: "HomeNet",
+      isDemoMode: false,
     });
     expect(result.current.quickStats).toEqual([
       { label: "Running", value: "2", sub: "apps" },
@@ -163,6 +170,7 @@ describe("useSystemWidgetsData", () => {
       hostname: "--",
       interfaceName: "--",
       ssid: "offline",
+      isDemoMode: false,
     });
     expect(result.current.quickStats[0]?.value).toBe("0");
     expect(result.current.quickStats[3]).toEqual({

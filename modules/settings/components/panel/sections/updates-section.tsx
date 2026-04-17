@@ -79,7 +79,7 @@ export function UpdatesSection({
             </div>
           </div>
           <div
-            className={`${SETTINGS_BADGE_SURFACE} px-2.5 py-1 text-[11px] font-medium ${
+            className={`${SETTINGS_BADGE_SURFACE} px-2.5 py-1 text-2xs font-medium ${
               data.updateAvailable
                 ? "bg-status-amber/15 text-status-amber"
                 : "bg-primary/12 text-primary"
@@ -90,7 +90,7 @@ export function UpdatesSection({
         </div>
         <div className="mt-3 grid gap-2 sm:grid-cols-3">
           <div className={`${SETTINGS_PANEL_INSET} px-3 py-2`}>
-            <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+            <div className="text-2xs uppercase tracking-[0.16em] text-muted-foreground">
               Current
             </div>
             <div className="mt-1 text-sm font-medium text-foreground">
@@ -98,7 +98,7 @@ export function UpdatesSection({
             </div>
           </div>
           <div className={`${SETTINGS_PANEL_INSET} px-3 py-2`}>
-            <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+            <div className="text-2xs uppercase tracking-[0.16em] text-muted-foreground">
               Latest
             </div>
             <div className="mt-1 text-sm font-medium text-foreground">
@@ -106,7 +106,7 @@ export function UpdatesSection({
             </div>
           </div>
           <div className={`${SETTINGS_PANEL_INSET} px-3 py-2`}>
-            <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+            <div className="text-2xs uppercase tracking-[0.16em] text-muted-foreground">
               Last Checked
             </div>
             <div className="mt-1 text-sm font-medium text-foreground">

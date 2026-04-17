@@ -71,11 +71,16 @@ export function Dock({
     <div className={`${dockPositionClass} z-50`}>
       <nav
         ref={dockRef}
-        className={`flex gap-3 bg-dock backdrop-blur-2xl border border-glass-border rounded-[calc(var(--radius)+0.375rem)] shadow-2xl shadow-black/40 ${
+        className={`flex gap-3 border border-white/[0.09] rounded-[calc(var(--radius)+0.375rem)] shadow-2xl shadow-black/40 ${
           isVertical
             ? "flex-col items-center px-2.5 py-3"
             : "items-end px-3 py-2.5"
         }`}
+        style={{
+          background: "var(--system-surface)",
+          backdropFilter: "blur(40px) saturate(160%)",
+          boxShadow: "var(--system-shadow-dock), inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.07)",
+        }}
         onMouseLeave={() => setHoveredIndex(null)}
         aria-label="Quick launch dock"
       >
@@ -113,13 +118,14 @@ export function Dock({
                   {item.name}
                 </TooltipContent>
               </Tooltip>
-              {isRunning && (
-                <span
-                  className={`size-1 rounded-[var(--radius)] ${
-                    isFocused ? "bg-primary" : "bg-foreground/65"
-                  }`}
-                />
-              )}
+              {/* Always rendered to reserve space — invisible when not running */}
+              <span
+                className={`h-[3px] w-4 rounded-full transition-colors ${
+                  isRunning
+                    ? isFocused ? "bg-primary" : "bg-foreground/50"
+                    : "invisible"
+                }`}
+              />
             </div>
           );
         })}

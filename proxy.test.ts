@@ -75,6 +75,14 @@ describe("middleware auth guard", () => {
 
   it("allows authenticated users to root path", async () => {
     process.env.AUTH_SESSION_SECRET = secret;
+    vi.spyOn(global, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ data: { hasUsers: true } }), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }),
+    );
 
     const token = createToken(
       "session-1",
@@ -91,6 +99,36 @@ describe("middleware auth guard", () => {
     const response = await proxy(request);
 
     expect(response.status).toBe(200);
+  });
+
+  it("redirects stale authenticated users to register when no users exist", async () => {
+    process.env.AUTH_SESSION_SECRET = secret;
+    vi.spyOn(global, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ data: { hasUsers: false } }), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }),
+    );
+
+    const token = createToken(
+      "session-1",
+      Math.floor(Date.now() / 1000) + 3600,
+      secret,
+    );
+
+    const request = new NextRequest("http://localhost/", {
+      headers: {
+        cookie: `homeio_session=${token}`,
+      },
+    });
+
+    const response = await proxy(request);
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toContain("/register");
+    expect(response.cookies.get("homeio_session")?.value).toBe("");
   });
 
   it("allows recovery route access without redirecting authenticated users", async () => {

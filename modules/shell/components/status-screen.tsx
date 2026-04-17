@@ -23,7 +23,7 @@ export function StatusScreen({
       center={
         <div className="flex items-center justify-center">
           <div
-            className={`flex size-32 items-center justify-center rounded-[2rem] border shadow-2xl shadow-black/45 backdrop-blur-md sm:size-36 ${
+            className={`flex size-24 items-center justify-center rounded-[var(--radius)] border shadow-2xl shadow-black/45 backdrop-blur-md ${
               failed
                 ? "border-status-red/35 bg-status-red/10"
                 : "animate-homeio-breathe-glow border-white/14 bg-white/10"
@@ -32,9 +32,9 @@ export function StatusScreen({
             <Image
               src="/icon.png"
               alt="Homeio"
-              width={96}
-              height={96}
-              className={`size-20 sm:size-24 ${failed ? "" : "animate-homeio-breathe blur-[0.25px]"}`}
+              width={64}
+              height={64}
+              className={`size-16 ${failed ? "" : "animate-homeio-breathe blur-[0.25px]"}`}
             />
           </div>
         </div>

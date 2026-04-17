@@ -8,9 +8,9 @@ import {
   PaintBrushRegular,
   PeopleRegular,
   PowerRegular,
+  RouterRegular,
   ServerRegular,
   ShieldRegular,
-  Wifi4Regular,
 } from "@fluentui/react-icons";
 import {
   AppearanceSection,
@@ -35,7 +35,7 @@ import type {
 
 export const SETTINGS_SECTIONS: SettingsSection[] = [
   { id: "general", label: "General", icon: ServerRegular },
-  { id: "network", label: "Network", icon: Wifi4Regular },
+  { id: "network", label: "Network", icon: RouterRegular },
   { id: "storage", label: "Storage", icon: HardDriveRegular },
   { id: "docker", label: "Docker", icon: BoxRegular },
   { id: "users", label: "Users & Access", icon: PeopleRegular },

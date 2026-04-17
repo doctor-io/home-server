@@ -2,6 +2,7 @@ export type DesktopTheme = "dark" | "light" | "system"
 export type DesktopIconSize = "small" | "medium" | "large"
 export type DesktopFontSize = "compact" | "default" | "large" | "extra-large"
 export type DockPosition = "bottom" | "left" | "right"
+export type DesktopGlassStyle = "clear" | "tinted"
 
 export type WallpaperOption = {
   id: string
@@ -25,6 +26,7 @@ export type AppearanceSettings = {
   accentColor: string
   wallpaper: string
   radius: number
+  glassStyle: DesktopGlassStyle
   iconSize: DesktopIconSize
   fontSize: DesktopFontSize
   animationsEnabled: boolean
@@ -33,11 +35,12 @@ export type AppearanceSettings = {
 
 export const APPEARANCE_STORAGE_KEY = "desktop.appearance.v1"
 export const APPEARANCE_CHANGED_EVENT = "desktop.appearance.changed"
-export const APPEARANCE_RADIUS_MIN = 6
+export const APPEARANCE_RADIUS_MIN = 2
 export const APPEARANCE_RADIUS_MAX = 24
-export const DEFAULT_APPEARANCE_RADIUS = 14
+export const DEFAULT_APPEARANCE_RADIUS = 12
 
 export const ACCENT_COLORS: AccentColorOption[] = [
+  { name: "Orange", value: "#FF6000" },
   { name: "Teal", value: "oklch(0.72 0.14 190)" },
   { name: "Blue", value: "oklch(0.65 0.2 250)" },
   { name: "Green", value: "oklch(0.72 0.18 155)" },
@@ -59,7 +62,7 @@ export const WALLPAPER_OPTIONS: WallpaperOption[] = [
 ]
 
 export const RADIUS_PRESETS: RadiusPreset[] = [
-  { name: "Sharp", value: 8, description: "Tighter corners" },
+  { name: "Sharp", value: 4, description: "Squared corners" },
   { name: "Default", value: DEFAULT_APPEARANCE_RADIUS, description: "Balanced corners" },
   { name: "Soft", value: 20, description: "Rounder panels" },
 ]
@@ -69,6 +72,7 @@ export const DEFAULT_APPEARANCE_SETTINGS: AppearanceSettings = {
   accentColor: ACCENT_COLORS[0].value,
   wallpaper: WALLPAPER_OPTIONS[0].src,
   radius: DEFAULT_APPEARANCE_RADIUS,
+  glassStyle: "clear",
   iconSize: "medium",
   fontSize: "default",
   animationsEnabled: true,
@@ -129,6 +133,10 @@ export function sanitizeAppearanceSettings(input: unknown): AppearanceSettings {
         ? value.wallpaper
         : DEFAULT_APPEARANCE_SETTINGS.wallpaper,
     radius: sanitizeRadius(value.radius),
+    glassStyle:
+      value.glassStyle === "clear" || value.glassStyle === "tinted"
+        ? value.glassStyle
+        : DEFAULT_APPEARANCE_SETTINGS.glassStyle,
     iconSize: isIconSize(value.iconSize) ? value.iconSize : DEFAULT_APPEARANCE_SETTINGS.iconSize,
     fontSize: isFontSize(value.fontSize) ? value.fontSize : DEFAULT_APPEARANCE_SETTINGS.fontSize,
     animationsEnabled:

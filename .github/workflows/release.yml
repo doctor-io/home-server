@@ -63,10 +63,105 @@ jobs:
       - name: Build
         run: NODE_ENV=production npm run build
 
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: verify
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.read.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Read version from package.json
+        id: read
+        run: echo "version=$(jq -r '.version' package.json)" >> $GITHUB_OUTPUT
+
+      - name: Check if tag already exists
+        id: tag_check
+        run: |
+          git fetch --tags
+          if git rev-parse "v${{ steps.read.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true"  >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup Node.js
+        if: steps.tag_check.outputs.exists == 'false'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        if: steps.tag_check.outputs.exists == 'false'
+        run: npm ci --ignore-scripts
+
+      - name: Generate Drizzle migrations
+        if: steps.tag_check.outputs.exists == 'false'
+        run: npx drizzle-kit generate
+
+      - name: Commit migration files (if any were generated)
+        if: steps.tag_check.outputs.exists == 'false'
+        run: |
+          if [[ -n "$(git status --porcelain drizzle/)" ]]; then
+            git add drizzle/
+            git commit -m "chore: generate drizzle migrations for v${{ steps.read.outputs.version }} [skip ci]"
+            git push origin main
+          fi
+
+      - name: Create and push tag
+        if: steps.tag_check.outputs.exists == 'false'
+        run: |
+          git tag -a "v${{ steps.read.outputs.version }}" \
+            -m "Release v${{ steps.read.outputs.version }}"
+          git push origin "v${{ steps.read.outputs.version }}"
+
+      - name: Get merged PR info
+        id: pr
+        if: steps.tag_check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR=$(gh api "/repos/${{ github.repository }}/commits/${{ github.sha }}/pulls" \
+            -H "Accept: application/vnd.github+json" | jq -c '.[0] // null')
+          if [[ "$PR" != "null" && "$PR" != "" ]]; then
+            echo "title=$(echo "$PR" | jq -r '.title')" >> $GITHUB_OUTPUT
+            { echo "body<<EOF"; echo "$PR" | jq -r '.body // ""'; echo "EOF"; } >> $GITHUB_OUTPUT
+          else
+            echo "title=$(git log -1 --pretty=format:'%s' ${{ github.sha }})" >> $GITHUB_OUTPUT
+            echo "body=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create GitHub Release
+        if: steps.tag_check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_NOTES: ${{ steps.pr.outputs.body }}
+        run: |
+          printf '%s' "$RELEASE_NOTES" > /tmp/release-notes.md
+          gh release create "v${{ steps.read.outputs.version }}" \
+            --title "Homeio v${{ steps.read.outputs.version }}" \
+            --notes-file /tmp/release-notes.md \
+            --latest
+
   docker:
     name: Build & Push Docker Image
     runs-on: ubuntu-latest
-    needs: verify
+    needs: [verify, release]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     steps:
@@ -80,10 +175,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract version from package.json
-        id: version
-        run: echo "version=$(jq -r '.version' package.json)" >> $GITHUB_OUTPUT
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -94,6 +185,6 @@ jobs:
           push: true
           tags: |
             ghcr.io/doctor-io/homeio:latest
-            ghcr.io/doctor-io/homeio:${{ steps.version.outputs.version }}
+            ghcr.io/doctor-io/homeio:${{ needs.release.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

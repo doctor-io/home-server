@@ -7,12 +7,12 @@ type ComposeEditorViewProps = {
 export function ComposeEditorView({ composeDraft, onChange, parseError }: ComposeEditorViewProps) {
   return (
     <section className="flex-1 overflow-hidden px-4 py-3">
-      <div className="mb-2 rounded-lg border border-glass-border bg-secondary/25 px-2.5 py-1.5 text-[11px] text-muted-foreground">
+      <div className="mb-2 rounded-lg border border-glass-border bg-secondary/25 px-2.5 py-1.5 text-2xs text-muted-foreground">
         Docker Compose is the source of truth. Classic fields are derived from this draft.
       </div>
 
       {parseError ? (
-        <div className="mb-2 rounded-lg border border-status-red/40 bg-status-red/10 px-2.5 py-1.5 text-[11px] text-status-red">
+        <div className="mb-2 rounded-lg border border-status-red/40 bg-status-red/10 px-2.5 py-1.5 text-2xs text-status-red">
           Unable to parse compose: {parseError}
         </div>
       ) : null}

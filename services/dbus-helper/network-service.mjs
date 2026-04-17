@@ -14,6 +14,7 @@ import {
   DBUS_WIRELESS_IFACE,
   DEVICE_STATE_ACTIVATED,
   DEVICE_TYPE_WIFI,
+  WIRED_DEVICE_TYPES,
   DBUS_PATH,
 } from "./config.mjs";
 import { HelperServiceError } from "./errors.mjs";
@@ -147,6 +148,28 @@ function createNetworkService({ log }) {
     return devices;
   }
 
+  async function getEthernetDevices() {
+    const { nm } = await getNmRoot();
+    const devicePaths = await withTimeout(nm.GetDevices());
+
+    const devices = [];
+
+    for (const path of devicePaths) {
+      const deviceObject = await getProxyObject(path);
+      const props = deviceObject.getInterface(DBUS_PROPS_IFACE);
+      const deviceType = Number(await getProperty(props, DBUS_DEVICE_IFACE, "DeviceType"));
+      // Accept physical Ethernet (1) and virtual Ethernet/VETH (20) used in LXC/containers
+      if (!WIRED_DEVICE_TYPES.has(deviceType)) continue;
+
+      const iface = String(await getProperty(props, DBUS_DEVICE_IFACE, "Interface"));
+      const state = Number(await getProperty(props, DBUS_DEVICE_IFACE, "State"));
+
+      devices.push({ path, iface, state });
+    }
+
+    return devices;
+  }
+
   async function getAccessPointSnapshot(apPath) {
     if (!apPath || apPath === "/") return null;
 
@@ -176,34 +199,51 @@ function createNetworkService({ log }) {
 
   async function getNetworkStatus() {
     const wifiDevices = await getWifiDevices();
-    const connectedDevice =
+    const connectedWifi =
       wifiDevices.find((device) => device.state === DEVICE_STATE_ACTIVATED) ??
       wifiDevices[0] ??
       null;
 
-    if (!connectedDevice) {
+    // Wi-Fi device present — report its status
+    if (connectedWifi) {
+      const activeAccessPointPath = await getProperty(
+        connectedWifi.props,
+        DBUS_WIRELESS_IFACE,
+        "ActiveAccessPoint",
+      );
+      const activeAccessPoint = await getAccessPointSnapshot(activeAccessPointPath);
+
       return {
-        connected: false,
-        iface: null,
+        connected: connectedWifi.state === DEVICE_STATE_ACTIVATED,
+        iface: connectedWifi.iface,
+        ssid: activeAccessPoint?.ssid ?? null,
+        ipv4: resolveInterfaceIpv4(connectedWifi.iface),
+        signalPercent: activeAccessPoint?.signalPercent ?? null,
+      };
+    }
+
+    // No Wi-Fi — check for an active Ethernet connection (e.g. LXC/Proxmox)
+    const ethernetDevices = await getEthernetDevices();
+    const connectedEthernet =
+      ethernetDevices.find((device) => device.state === DEVICE_STATE_ACTIVATED) ??
+      null;
+
+    if (connectedEthernet) {
+      return {
+        connected: true,
+        iface: connectedEthernet.iface,
         ssid: null,
-        ipv4: null,
+        ipv4: resolveInterfaceIpv4(connectedEthernet.iface),
         signalPercent: null,
       };
     }
 
-    const activeAccessPointPath = await getProperty(
-      connectedDevice.props,
-      DBUS_WIRELESS_IFACE,
-      "ActiveAccessPoint",
-    );
-    const activeAccessPoint = await getAccessPointSnapshot(activeAccessPointPath);
-
     return {
-      connected: connectedDevice.state === DEVICE_STATE_ACTIVATED,
-      iface: connectedDevice.iface,
-      ssid: activeAccessPoint?.ssid ?? null,
-      ipv4: resolveInterfaceIpv4(connectedDevice.iface),
-      signalPercent: activeAccessPoint?.signalPercent ?? null,
+      connected: false,
+      iface: null,
+      ssid: null,
+      ipv4: null,
+      signalPercent: null,
     };
   }
 

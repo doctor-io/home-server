@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import { useCurrentWeather } from "@/modules/system/hooks/useCurrentWeather";
 import { useInstalledApps } from "@/modules/apps/hooks/useInstalledApps";
 import { useSystemMetrics } from "@/modules/system/hooks/useSystemMetrics";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import type {
   QuickStatItem,
   ResourceWidgetItem,
@@ -39,6 +40,8 @@ export function useSystemWidgetsData(): SystemWidgetsViewModel {
   const { data: metrics } = useSystemMetrics();
   const { data: installedApps } = useInstalledApps();
   const { data: weather } = useCurrentWeather();
+  const { data: currentUser } = useCurrentUser();
+  const isDemoMode = currentUser?.isDemoMode ?? false;
 
   return useMemo(() => {
     const cpuPercent = clampPercent(metrics?.cpu.normalizedPercent);
@@ -104,11 +107,12 @@ export function useSystemWidgetsData(): SystemWidgetsViewModel {
         downloadText: formatRateMbps(metrics?.wifi.downloadMbps),
         uploadText: formatRateMbps(metrics?.wifi.uploadMbps),
         ipAddress: metrics?.wifi.ipv4 ?? "--",
-        hostname: metrics?.hostname ?? "--",
+        hostname: isDemoMode ? "homeio.app" : (metrics?.hostname ?? "--"),
         interfaceName: metrics?.wifi.iface ?? "--",
         ssid: metrics?.wifi.ssid ?? "offline",
+        isDemoMode,
       },
       quickStats,
     };
-  }, [installedApps, metrics, weather]);
+  }, [installedApps, isDemoMode, metrics, weather]);
 }

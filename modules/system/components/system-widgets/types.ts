@@ -21,6 +21,7 @@ export type NetworkWidgetData = {
   hostname: string;
   interfaceName: string;
   ssid: string;
+  isDemoMode?: boolean;
 };
 
 export type QuickStatItem = {

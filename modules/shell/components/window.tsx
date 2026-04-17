@@ -275,7 +275,7 @@ export function Window({
       </div>
 
       {/* Window content */}
-      <div className="flex-1 bg-card/90 backdrop-blur-2xl overflow-hidden">
+      <div className="flex-1 overflow-hidden bg-card/90 backdrop-blur-2xl">
         {children}
       </div>
 

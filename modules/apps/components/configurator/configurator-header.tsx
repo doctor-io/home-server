@@ -33,7 +33,7 @@ export function ConfiguratorHeader({
               key={view}
               type="button"
               onClick={() => onViewChange(view)}
-              className={`cursor-pointer rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+              className={`cursor-pointer rounded-md border px-2.5 py-1 text-2xs font-medium transition-colors ${
                 activeView === view
                   ? "border-primary/50 bg-primary/15 text-primary"
                   : "border-glass-border text-muted-foreground hover:bg-secondary/45 hover:text-foreground"

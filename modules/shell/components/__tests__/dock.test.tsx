@@ -24,8 +24,10 @@ describe("Dock", () => {
 
     const runningDots = Array.from(container.querySelectorAll("span")).filter(
       (element) =>
-        element.className.includes("size-1") &&
-        element.className.includes("rounded-[var(--radius)]"),
+        element.className.includes("h-[3px]") &&
+        element.className.includes("w-4") &&
+        element.className.includes("transition-colors") &&
+        !element.className.includes("invisible"),
     );
     expect(runningDots).toHaveLength(2);
   });

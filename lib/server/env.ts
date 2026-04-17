@@ -90,6 +90,10 @@ const envSchema = z.object({
   DBUS_HELPER_SOCKET_PATH: z
     .string()
     .default("/run/home-server/dbus-helper.sock"),
+  DEMO_MODE: z
+    .string()
+    .optional()
+    .transform((value) => value === "true"),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

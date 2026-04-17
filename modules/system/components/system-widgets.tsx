@@ -10,7 +10,7 @@ export function SystemWidgets() {
   const model = useSystemWidgetsData();
 
   return (
-    <aside className="hidden xl:flex flex-col gap-3 w-72 pr-6 pt-4 pb-6 flex-shrink-0">
+    <aside className="hidden min-h-0 w-72 shrink-0 flex-col gap-3 overflow-y-auto pr-6 pt-4 pb-6 xl:flex">
       <UptimeCard uptime={model.uptime} />
       <ResourcesCard items={model.resources} />
       <NetworkCard network={model.network} />

@@ -21,7 +21,7 @@ export function UsersSection({ username }: { username: string }) {
         className="self-start mt-1 inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg bg-secondary/50 text-muted-foreground cursor-not-allowed opacity-80"
       >
         <span>Add User</span>
-        <span className="rounded-[var(--radius)] bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+        <span className="rounded-[var(--radius)] bg-primary/15 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-primary">
           Soon
         </span>
       </button>

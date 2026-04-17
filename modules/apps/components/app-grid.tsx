@@ -3,7 +3,7 @@
 import { AppGridContent } from "@/modules/apps/components/app-grid-content";
 import { useAppGridController } from "@/modules/apps/components/app-grid-controller";
 import { AppGridContextMenu } from "@/modules/apps/components/app-grid-menu";
-import type { AppActionTarget, AppOperationStateLike } from "@/modules/apps/components/app-grid-presenters";
+import type { AppActionTarget } from "@/modules/apps/components/app-grid-presenters";
 import { UninstallAppDialog } from "@/modules/apps/components/uninstall-app-dialog";
 import { X } from "@/components/icons/platform-icons";
 export type { AppActionTarget } from "@/modules/apps/components/app-grid-presenters";
@@ -11,7 +11,6 @@ export type { AppActionTarget } from "@/modules/apps/components/app-grid-present
 type AppGridProps = {
   iconSize?: "small" | "medium" | "large";
   animationsEnabled?: boolean;
-  externalOperationsByApp?: Record<string, AppOperationStateLike>;
   onOpenDashboard?: (target: AppActionTarget) => void;
   onViewLogs?: (target: AppActionTarget) => void;
   onOpenTerminal?: (target: AppActionTarget) => void;
@@ -22,7 +21,6 @@ type AppGridProps = {
 export function AppGrid({
   iconSize = "medium",
   animationsEnabled = true,
-  externalOperationsByApp,
   onOpenDashboard,
   onViewLogs,
   onOpenTerminal,
@@ -30,7 +28,6 @@ export function AppGrid({
   onCopyUrl,
 }: AppGridProps) {
   const controller = useAppGridController({
-    externalOperationsByApp,
     onCopyUrl,
     onOpenDashboard,
     onOpenSettings,

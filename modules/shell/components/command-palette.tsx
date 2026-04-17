@@ -124,13 +124,13 @@ export function CommandPalette({
       onOpenChange={onOpenChange}
       title="Search Homeio"
       description="Jump to settings, apps, and desktop tools."
-      className="max-w-[min(92vw,48rem)] overflow-hidden rounded-[calc(var(--radius)+0.75rem)] border border-glass-border bg-popover/96 p-0 shadow-2xl shadow-black/50"
+      className="system-floating-surface max-w-[min(92vw,48rem)] bg-popover/96 p-0 shadow-[var(--system-shadow-floating)]"
       showCloseButton={false}
     >
       <div className="border-b border-glass-border/80 bg-card/55 px-4 py-3">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <div className="flex size-9 items-center justify-center rounded-xl border border-primary/20 bg-primary/12 text-primary">
+            <div className="flex size-9 items-center justify-center rounded-[var(--system-radius-icon)] border border-primary/20 bg-primary/12 text-primary">
               <Search className="size-4" />
             </div>
             <div>
@@ -140,7 +140,7 @@ export function CommandPalette({
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+          <div className="flex items-center gap-1.5 text-2xs text-muted-foreground">
             <span className="rounded-md border border-glass-border bg-background/70 px-2 py-1 font-medium tracking-wide">
               Cmd K
             </span>
@@ -271,7 +271,7 @@ export function CommandPalette({
                     {app.name}
                   </span>
                   {app.updateAvailable ? (
-                    <span className="rounded-md bg-primary/12 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
+                    <span className="rounded-md bg-primary/12 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-[0.16em] text-primary">
                       Update
                     </span>
                   ) : null}

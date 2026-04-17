@@ -177,7 +177,7 @@ export function UpdateRecoveryScreen({
           <button
             type="button"
             onClick={() => router.replace("/")}
-            className="mt-6 inline-flex items-center rounded-[var(--radius)] bg-white px-5 py-2.5 text-sm font-medium text-slate-950 transition hover:bg-slate-100"
+            className="mt-6 inline-flex items-center rounded-[var(--radius)] bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition hover:brightness-110"
           >
             Return to Homeio
           </button>

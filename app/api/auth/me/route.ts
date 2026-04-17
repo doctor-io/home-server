@@ -6,6 +6,7 @@ import {
 import { getAuthCookieName } from "@/lib/server/modules/auth/cookies";
 import { hasAnyUsers } from "@/lib/server/modules/auth/repository";
 import { authenticateSession } from "@/lib/server/modules/auth/service";
+import { serverEnv } from "@/lib/server/env";
 
 export const runtime = "nodejs";
 
@@ -37,6 +38,7 @@ export async function GET(request: NextRequest) {
     data: {
       id: session.userId,
       username: session.username,
+      isDemoMode: serverEnv.DEMO_MODE,
     },
   });
 }

@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 type CurrentUser = {
   id: string;
   username: string;
+  isDemoMode?: boolean;
 };
 
 type CurrentUserResponse = {

@@ -5,6 +5,9 @@ import {
 } from "@/lib/shared/auth/session";
 import { type NextRequest, NextResponse } from "next/server";
 
+const DEMO_MODE = process.env.DEMO_MODE === "true";
+const DEMO_BLOCKED_METHODS = new Set(["POST", "PUT", "DELETE", "PATCH"]);
+
 const PUBLIC_ROUTES = new Set(["/login", "/register"]);
 const RECOVERY_ROUTES = new Set(["/updating"]);
 const AUTH_STATUS_CACHE_MS = 5_000;
@@ -126,6 +129,16 @@ function getAuthEntryPath(hasUsers: boolean) {
   return hasUsers ? "/login" : "/register";
 }
 
+function clearSessionCookie(response: NextResponse) {
+  response.cookies.set({
+    name: AUTH_SESSION_COOKIE_NAME,
+    value: "",
+    path: "/",
+    expires: new Date(0),
+  });
+  return response;
+}
+
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
@@ -137,6 +150,17 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  if (
+    DEMO_MODE &&
+    DEMO_BLOCKED_METHODS.has(request.method) &&
+    pathname.startsWith("/api/v1/")
+  ) {
+    return NextResponse.json(
+      { error: "This action is not available in demo mode." },
+      { status: 403 },
+    );
+  }
+
   const sessionToken = request.cookies.get(AUTH_SESSION_COOKIE_NAME)?.value;
   const isAuthenticated = await verifySessionTokenInMiddleware(sessionToken);
 
@@ -145,6 +169,16 @@ export async function proxy(request: NextRequest) {
     const expectedPublicPath = getAuthEntryPath(hasUsers);
 
     if (isAuthenticated) {
+      if (!hasUsers) {
+        if (pathname === "/register") {
+          return clearSessionCookie(NextResponse.next());
+        }
+
+        return clearSessionCookie(
+          NextResponse.redirect(new URL("/register", request.url)),
+        );
+      }
+
       return NextResponse.redirect(new URL("/", request.url));
     }
 
@@ -157,6 +191,34 @@ export async function proxy(request: NextRequest) {
 
   if (RECOVERY_ROUTES.has(pathname)) {
     return NextResponse.next();
+  }
+
+  if (isAuthenticated) {
+    const hasUsers = await hasUsersInDb(request);
+
+    if (!hasUsers) {
+      if (pathname.startsWith("/api/")) {
+        if (pathname === "/api/auth/me") {
+          const response = NextResponse.json(
+            {
+              error: "Unauthorized",
+              redirectTo: "/register",
+            },
+            { status: 401 },
+          );
+          response.headers.set("x-auth-entry", "/register");
+          return clearSessionCookie(response);
+        }
+
+        return clearSessionCookie(
+          NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+        );
+      }
+
+      return clearSessionCookie(
+        NextResponse.redirect(new URL("/register", request.url)),
+      );
+    }
   }
 
   if (!isAuthenticated) {

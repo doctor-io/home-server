@@ -7,6 +7,7 @@ import {
   type AppItem,
 } from "@/modules/apps/components/app-grid-presenters";
 import { Loader2 } from "@/components/icons/platform-icons";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useState, type MouseEvent } from "react";
 
 type AppGridContentProps = {
@@ -52,40 +53,30 @@ export function AppGridContent({
     <>
       {primaryOperation ? (
         <div
-          className="mx-auto mt-4 flex w-full max-w-xl items-center justify-between gap-3 rounded-2xl border border-status-amber/25 bg-status-amber/10 px-4 py-3 text-xs text-status-amber shadow-lg shadow-black/10 backdrop-blur-xl"
+          className="fixed bottom-[5.75rem] left-1/2 z-[150] -translate-x-1/2 w-[min(92vw,22rem)] overflow-hidden rounded-2xl border border-glass-border bg-popover/95 shadow-xl shadow-black/30 backdrop-blur-2xl animate-in fade-in slide-in-from-bottom-2 duration-200"
           role="status"
           aria-live="polite"
         >
-          <div className="flex min-w-0 items-center gap-3">
-            <span className="flex size-8 items-center justify-center rounded-[var(--radius)] bg-status-amber/15">
-              <Loader2 className="size-4 animate-spin" />
-            </span>
-            <div className="min-w-0">
-              <p className="truncate font-medium text-foreground tracking-tight">
+          <div className="flex items-center gap-3 px-4 py-3">
+            <Loader2 className="size-3.5 shrink-0 animate-spin text-primary" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-medium text-foreground">
                 {getStoreOperationActionLabel(primaryOperation.action)}{" "}
-                {primaryOperation.appName}
-              </p>
-              <p className="truncate text-[10px] uppercase tracking-[0.12em] text-muted-foreground font-mono">
-                {activeOperationsCount > 1
-                  ? `${activeOperationsCount} app actions in progress`
-                  : primaryOperation.status === "queued"
-                    ? "Queued"
-                    : "Applying changes"}
+                <span className="text-foreground/70">{primaryOperation.appName}</span>
               </p>
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="hidden h-1.5 w-24 overflow-hidden rounded-[var(--radius)] bg-white/10 sm:block">
-              <div
-                className="h-full rounded-[var(--radius)] bg-status-amber transition-all"
-                style={{
-                  width: `${Math.max(8, primaryOperation.progressPercent)}%`,
-                }}
-              />
-            </div>
-            <span className="tabular-nums text-[11px] font-mono font-medium text-foreground">
-              {primaryOperation.progressPercent}%
+            <span className="shrink-0 tabular-nums text-2xs text-muted-foreground">
+              {activeOperationsCount > 1
+                ? `${activeOperationsCount} running`
+                : `${primaryOperation.progressPercent}%`}
             </span>
+          </div>
+          {/* Progress bar flush at bottom */}
+          <div className="h-[2px] w-full bg-border/40">
+            <div
+              className="h-full bg-primary transition-all duration-500"
+              style={{ width: `${Math.max(4, primaryOperation.progressPercent)}%` }}
+            />
           </div>
         </div>
       ) : null}
@@ -96,14 +87,26 @@ export function AppGridContent({
             <div className="relative h-1 w-48 overflow-hidden rounded-full bg-glass-border/30">
               <div className="absolute inset-0 animate-grid-scan rounded-full bg-gradient-to-r from-transparent via-primary/60 to-transparent" />
             </div>
-            <p className="mt-4 text-[10px] uppercase tracking-[0.2em] font-mono text-muted-foreground">
+            <p className="mt-4 text-2xs uppercase tracking-[0.2em] font-mono text-muted-foreground">
               Syncing containers
             </p>
+          </div>
+          {/* Skeleton placeholder icons that match the real grid layout */}
+          <div
+            aria-hidden="true"
+            className="mt-8 grid grid-cols-[repeat(4,minmax(0,5.5rem))] justify-center gap-x-1 gap-y-6 opacity-40 sm:grid-cols-[repeat(5,minmax(0,5.5rem))] md:grid-cols-[repeat(6,minmax(0,5.5rem))] lg:grid-cols-[repeat(8,minmax(0,5.5rem))] xl:grid-cols-[repeat(10,minmax(0,5.5rem))]"
+          >
+            {Array.from({ length: 20 }).map((_, i) => (
+              <div key={i} className="flex flex-col items-center gap-2 p-2">
+                <Skeleton className={`${iconContainerClass} shrink-0`} />
+                <Skeleton className="h-2.5 w-12 rounded" />
+              </div>
+            ))}
           </div>
         </div>
       ) : isAppsError && apps.length === 0 ? (
         <div className="mt-24 text-center">
-          <p className="text-[10px] uppercase tracking-[0.2em] font-mono text-status-red">
+          <p className="text-2xs uppercase tracking-[0.2em] font-mono text-status-red">
             Connection failed
           </p>
         </div>
@@ -220,7 +223,7 @@ export function AppGridContent({
                 </div>
 
                 <span
-                  className={`max-w-[4.5rem] truncate text-center text-[11px] font-medium leading-tight tracking-tight text-foreground/80 ${
+                  className={`max-w-[4.5rem] truncate text-center text-2xs font-medium leading-tight tracking-tight text-foreground/80 ${
                     animationsEnabled
                       ? "transition-colors group-hover:text-foreground"
                       : ""

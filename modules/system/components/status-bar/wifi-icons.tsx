@@ -2,8 +2,32 @@
 
 import { cn } from "@/lib/utils";
 
+export function EthernetIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      fill="none"
+      aria-hidden="true"
+      className={cn("size-4", className)}
+    >
+      {/* Horizontal bus */}
+      <path d="M3 10h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      {/* Center drop */}
+      <path d="M10 10v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      {/* Left drop */}
+      <path d="M5.5 10v3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      {/* Right drop */}
+      <path d="M14.5 10v3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      {/* Top stem */}
+      <path d="M10 6v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      {/* Top connector */}
+      <rect x="7.5" y="4" width="5" height="2.5" rx="1" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
 function getSignalLevel(quality: number | null) {
-  if (quality === null) return 1;
+  if (quality === null) return 3;
   if (quality >= 70) return 3;
   if (quality >= 40) return 2;
   return 1;

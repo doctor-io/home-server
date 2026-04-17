@@ -17,10 +17,10 @@ export function QuickStatsCard({ stats }: QuickStatsCardProps) {
             <span className="text-base leading-tight font-bold text-foreground font-mono">
               {item.value}
             </span>
-            <span className="text-[10px] leading-tight text-muted-foreground uppercase tracking-wider">
+            <span className="text-2xs leading-tight text-muted-foreground uppercase tracking-wider">
               {item.label}
             </span>
-            <span className="text-[10px] leading-tight text-muted-foreground/70 text-center px-1.5 w-full truncate">
+            <span className="text-2xs leading-tight text-muted-foreground/70 text-center px-1.5 w-full truncate">
               {item.sub}
             </span>
           </div>
