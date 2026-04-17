@@ -18,6 +18,11 @@ NGINX_SITE_NAME="${HOMEIO_NGINX_SITE_NAME:-home-server}"
 REPO_URL="${HOMEIO_REPO_URL:-https://github.com/doctor-io/homeio.git}"
 REPO_BRANCH="${HOMEIO_REPO_BRANCH:-main}"
 
+# SHA-256 of drizzle/0000_slippery_black_queen.sql — used to seed the migration journal
+# for legacy installs that were bootstrapped with drizzle push (no __drizzle_migrations table).
+BASELINE_MIGRATION_HASH="e10db77d840d8dc1f42a13ee9de57615a2fb7c46d9525e0d1e7a7f42dee72eaf"
+BASELINE_MIGRATION_TS="1776413023965"
+
 HOMEIO_RELEASE_TAG="${HOMEIO_RELEASE_TAG:-}"
 HOMEIO_RELEASE_TARBALL_URL="${HOMEIO_RELEASE_TARBALL_URL:-}"
 HOMEIO_CREATE_BACKUP="${HOMEIO_CREATE_BACKUP:-true}"
