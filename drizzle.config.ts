@@ -1,6 +1,6 @@
+import type { Config } from "drizzle-kit";
 import fs from "node:fs";
 import path from "node:path";
-import type { Config } from "drizzle-kit";
 
 const DEFAULT_DATABASE_URL =
   "postgresql://postgres:postgres@127.0.0.1:5432/home_server";
@@ -56,6 +56,7 @@ export default {
   schema: "./lib/server/db/schema-definitions.ts",
   out: "./drizzle",
   dialect: "postgresql",
+  schemaFilter: ["public"],
   dbCredentials: {
     url: resolveDatabaseUrl(),
   },
