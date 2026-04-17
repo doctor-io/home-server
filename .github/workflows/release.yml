@@ -5,9 +5,6 @@ on:
     branches:
       - main
       - develop
-  pull_request:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:
@@ -97,30 +94,6 @@ jobs:
             echo "exists=true"  >> $GITHUB_OUTPUT
           else
             echo "exists=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Setup Node.js
-        if: steps.tag_check.outputs.exists == 'false'
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: "npm"
-
-      - name: Install dependencies
-        if: steps.tag_check.outputs.exists == 'false'
-        run: npm ci --ignore-scripts
-
-      - name: Generate Drizzle migrations
-        if: steps.tag_check.outputs.exists == 'false'
-        run: npx drizzle-kit generate
-
-      - name: Commit migration files (if any were generated)
-        if: steps.tag_check.outputs.exists == 'false'
-        run: |
-          if [[ -n "$(git status --porcelain drizzle/)" ]]; then
-            git add drizzle/
-            git commit -m "chore: generate drizzle migrations for v${{ steps.read.outputs.version }} [skip ci]"
-            git push origin main
           fi
 
       - name: Create and push tag
