@@ -198,7 +198,7 @@ run_database_migrations() {
 		return
 	fi
 
-	(set -a && source "${ENV_FILE}" && set +a && cd "${INSTALL_DIR}" && npm run db:migrate --silent) \
+	(set -a && source "${ENV_FILE}" && set +a && cd "${INSTALL_DIR}" && npm run db:migrate) \
 		|| { print_error "Database migration failed. Rolling back."; exit 1; }
 
 	print_status "Database migrations applied successfully."
@@ -491,8 +491,8 @@ rollback_release() {
 	fi
 
 	print_status "Rebuilding application after rollback..."
-	cd "${INSTALL_DIR}" && npm ci --silent
-	cd "${INSTALL_DIR}" && npm run build --silent
+	cd "${INSTALL_DIR}" && npm ci --no-audit --no-fund
+	cd "${INSTALL_DIR}" && npm run build
 	start_service
 
 	if healthcheck; then
