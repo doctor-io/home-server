@@ -190,35 +190,17 @@ install_dependencies_if_needed() {
 }
 
 run_database_migrations() {
-	print_status "Running database migrations..."
+	print_status "Syncing database schema..."
 
 	if [[ ! -f "${ENV_FILE}" ]]; then
-		print_error "Environment file not found: ${ENV_FILE}. Cannot run migrations."
+		print_error "Environment file not found: ${ENV_FILE}. Cannot sync schema."
 		exit 1
 	fi
 
-	# For installs bootstrapped with drizzle push (no __drizzle_migrations journal),
-	# seed the journal so db:migrate sees the baseline as already applied
-	# and only applies new migrations going forward.
-	(set -a && source "${ENV_FILE}" && set +a && node -e "
-const { Pool } = require('pg');
-const p = new Pool({ connectionString: process.env.DATABASE_URL });
-p.query(\`
-  CREATE TABLE IF NOT EXISTS __drizzle_migrations (
-    id SERIAL PRIMARY KEY,
-    hash TEXT NOT NULL,
-    created_at BIGINT
-  );
-  INSERT INTO __drizzle_migrations (hash, created_at)
-  SELECT '${BASELINE_MIGRATION_HASH}', ${BASELINE_MIGRATION_TS}
-  WHERE NOT EXISTS (SELECT 1 FROM __drizzle_migrations WHERE hash = '${BASELINE_MIGRATION_HASH}');
-\`).then(() => p.end()).catch(e => { console.error(e.message); process.exit(1); });
-") || { print_error "Failed to seed migration journal. Rolling back."; exit 1; }
+	(set -a && source "${ENV_FILE}" && set +a && cd "${INSTALL_DIR}" && npm run db:init) \
+		|| { print_error "Database schema sync failed. Rolling back."; exit 1; }
 
-	(set -a && source "${ENV_FILE}" && set +a && cd "${INSTALL_DIR}" && npm run db:migrate) \
-		|| { print_error "Database migration failed. Rolling back."; exit 1; }
-
-	print_status "Database migrations applied successfully."
+	print_status "Database schema synced successfully."
 }
 
 build_app() {
