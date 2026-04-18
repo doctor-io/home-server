@@ -1,19 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-} from "@/components/ui/dialog";
 import {
   ArrowDown,
   Download,
-  Pause,
-  Play,
-  Search,
+  RefreshCw,
   ScrollText,
+  Search,
+  X,
 } from "@/components/icons/platform-icons";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { BADGE_SURFACE, PANEL_INSET } from "@/lib/ui/surface-tokens";
+import { cn } from "@/lib/utils";
 import type { AppActionTarget } from "@/modules/apps/components/app-grid-presenters";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type LogLevel = "ERROR" | "WARN" | "INFO" | "DEBUG";
 
@@ -31,10 +30,17 @@ type AppLogsDialogProps = {
 };
 
 const LEVEL_CLASSES: Record<LogLevel, string> = {
-  ERROR: "bg-status-red/20 text-status-red border-status-red/30",
-  WARN:  "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  INFO:  "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  DEBUG: "bg-muted/40 text-muted-foreground border-muted/30",
+  ERROR: "bg-status-red/15 text-status-red border-status-red/25",
+  WARN: "bg-yellow-500/15 text-yellow-400 border-yellow-500/25",
+  INFO: "bg-blue-500/15 text-blue-400 border-blue-500/25",
+  DEBUG: "bg-muted/30 text-muted-foreground border-muted/40",
+};
+
+const LEVEL_TEXT: Record<LogLevel, string> = {
+  ERROR: "text-status-red",
+  WARN: "text-yellow-300",
+  INFO: "text-blue-300",
+  DEBUG: "text-muted-foreground",
 };
 
 function formatTimestamp(iso: string): string {
@@ -59,31 +65,27 @@ export function AppLogsDialog({ target, onClose }: AppLogsDialogProps) {
   const [autoScroll, setAutoScroll] = useState(true);
   const [streamError, setStreamError] = useState<string | null>(null);
   const [streamEnded, setStreamEnded] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
   const logContainerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const esRef = useRef<EventSource | null>(null);
 
-  // Open / close the SSE stream when target changes
-  useEffect(() => {
-    if (!target) {
-      setLines([]);
-      setSearch("");
-      setAutoScroll(true);
-      setStreamError(null);
-      setStreamEnded(false);
-      return;
-    }
-
-    lineIdCounter = 0;
-    setLines([]);
+  const openStream = useCallback((appId: string, append = false) => {
+    esRef.current?.close();
     setStreamError(null);
     setStreamEnded(false);
-    setAutoScroll(true);
+    setIsConnected(false);
+    if (!append) {
+      lineIdCounter = 0;
+      setLines([]);
+      setAutoScroll(true);
+    }
 
-    const es = new EventSource(`/api/v1/apps/${target.appId}/logs/stream`);
+    const es = new EventSource(`/api/v1/apps/${appId}/logs/stream`);
     esRef.current = es;
 
     es.addEventListener("log.line", (event) => {
+      setIsConnected(true);
       try {
         const data = JSON.parse(event.data) as {
           timestamp: string;
@@ -106,6 +108,8 @@ export function AppLogsDialog({ target, onClose }: AppLogsDialogProps) {
 
     es.addEventListener("log.end", () => {
       setStreamEnded(true);
+      setIsConnected(false);
+      es.close();
     });
 
     es.addEventListener("log.error", (event) => {
@@ -115,28 +119,40 @@ export function AppLogsDialog({ target, onClose }: AppLogsDialogProps) {
       } catch {
         setStreamError("Log stream error");
       }
+      setIsConnected(false);
       es.close();
     });
 
     es.onerror = () => {
       setStreamError("Connection to log stream lost");
+      setIsConnected(false);
       es.close();
     };
+  }, []);
 
+  useEffect(() => {
+    if (!target) {
+      setLines([]);
+      setSearch("");
+      setAutoScroll(true);
+      setStreamError(null);
+      setStreamEnded(false);
+      setIsConnected(false);
+      return;
+    }
+    openStream(target.appId);
     return () => {
-      es.close();
+      esRef.current?.close();
       esRef.current = null;
     };
-  }, [target]);
+  }, [target, openStream]);
 
-  // Auto-scroll to bottom when new lines arrive
   useEffect(() => {
     if (autoScroll && bottomRef.current) {
       bottomRef.current.scrollIntoView({ behavior: "instant" });
     }
   }, [lines, autoScroll]);
 
-  // Detect manual scroll-up → pause auto-scroll
   const handleScroll = useCallback(() => {
     const el = logContainerRef.current;
     if (!el) return;
@@ -148,6 +164,11 @@ export function AppLogsDialog({ target, onClose }: AppLogsDialogProps) {
     setAutoScroll(true);
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
+
+  const handleReconnect = useCallback(() => {
+    if (!target) return;
+    openStream(target.appId, true);
+  }, [target, openStream]);
 
   const downloadLogs = useCallback(() => {
     const text = lines
@@ -169,13 +190,18 @@ export function AppLogsDialog({ target, onClose }: AppLogsDialogProps) {
     : lines;
 
   return (
-    <Dialog open={Boolean(target)} onOpenChange={(open) => { if (!open) onClose(); }}>
+    <Dialog
+      open={Boolean(target)}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
       <DialogContent
         showCloseButton={false}
-        className="flex flex-col gap-0 p-0 w-[92vw] sm:w-[92vw] sm:max-w-5xl h-[82vh] bg-popover/98 border-glass-border overflow-hidden"
+        className="flex flex-col gap-0 p-0 w-[92vw] sm:w-[92vw] sm:max-w-5xl h-[82vh] bg-popover/96 border-glass-border backdrop-blur-2xl overflow-hidden shadow-2xl shadow-black/45"
       >
         {/* Header */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-glass-border shrink-0">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-glass-border/60 shrink-0">
           <ScrollText className="size-4 text-muted-foreground shrink-0" />
           <div className="flex-1 min-w-0">
             <span className="text-sm font-semibold text-foreground truncate">
@@ -184,25 +210,30 @@ export function AppLogsDialog({ target, onClose }: AppLogsDialogProps) {
           </div>
 
           {/* Search */}
-          <div className="relative flex items-center">
-            <Search className="absolute left-2.5 size-3 text-muted-foreground pointer-events-none" />
+          <div
+            className={cn(PANEL_INSET, "relative flex items-center px-2.5 h-7")}
+          >
+            <Search className="size-3 text-muted-foreground pointer-events-none shrink-0" />
             <input
               type="text"
               placeholder="Filter logs…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="h-7 pl-7 pr-3 text-xs rounded-md bg-secondary/60 border border-glass-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring w-48"
+              className="bg-transparent pl-2 pr-1 text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none w-40"
             />
           </div>
 
-          {/* Auto-scroll resume button */}
+          {/* Auto-scroll resume */}
           {!autoScroll && (
             <button
               onClick={resumeScroll}
-              className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md bg-secondary/60 border border-glass-border text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              className={cn(
+                BADGE_SURFACE,
+                "flex items-center gap-1.5 px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer",
+              )}
             >
               <ArrowDown className="size-3" />
-              Resume scroll
+              Resume
             </button>
           )}
 
@@ -211,37 +242,58 @@ export function AppLogsDialog({ target, onClose }: AppLogsDialogProps) {
             onClick={downloadLogs}
             disabled={lines.length === 0}
             title="Download logs"
-            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
           >
-            <Download className="size-4" />
+            <Download className="size-3.5" />
           </button>
 
-          {/* Stream status indicator */}
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            {streamEnded || streamError ? (
-              <Pause className="size-3 text-muted-foreground" />
-            ) : (
-              <Play className="size-3 text-status-green animate-pulse" />
+          {/* Stream status */}
+          <div
+            className={cn(
+              BADGE_SURFACE,
+              "flex items-center gap-1.5 px-2.5 py-1 text-xs text-muted-foreground",
             )}
-            <span>{lines.length} lines</span>
+          >
+            <span
+              className={cn(
+                "size-1.5 rounded-full",
+                isConnected
+                  ? "bg-status-green animate-pulse"
+                  : streamEnded
+                    ? "bg-muted-foreground"
+                    : streamError
+                      ? "bg-status-red"
+                      : "bg-muted-foreground/40",
+              )}
+            />
+            <span className="tabular-nums">{lines.length} lines</span>
           </div>
 
           {/* Close */}
           <button
             onClick={onClose}
-            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors cursor-pointer"
+            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors cursor-pointer"
             aria-label="Close"
           >
-            <svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-              <path d="M18 6 6 18M6 6l12 12" strokeLinecap="round" />
-            </svg>
+            <X className="size-4" />
           </button>
         </div>
 
         {/* Error banner */}
         {streamError && (
-          <div className="px-4 py-2 text-xs text-status-red bg-status-red/10 border-b border-status-red/20 shrink-0">
-            {streamError}
+          <div className="flex items-center gap-3 px-4 py-2.5 text-xs bg-status-red/8 border-b border-status-red/20 shrink-0">
+            <span className="size-1.5 rounded-full bg-status-red shrink-0" />
+            <span className="text-status-red flex-1">{streamError}</span>
+            <button
+              onClick={handleReconnect}
+              className={cn(
+                BADGE_SURFACE,
+                "flex items-center gap-1.5 px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer",
+              )}
+            >
+              <RefreshCw className="size-3" />
+              Reconnect
+            </button>
           </div>
         )}
 
@@ -249,10 +301,10 @@ export function AppLogsDialog({ target, onClose }: AppLogsDialogProps) {
         <div
           ref={logContainerRef}
           onScroll={handleScroll}
-          className="flex-1 overflow-y-auto bg-black/80 px-4 py-3"
+          className="flex-1 overflow-y-auto px-4 py-3 bg-black/60"
         >
           {filteredLines.length === 0 && !streamError ? (
-            <p className="text-xs text-muted-foreground mt-4 text-center">
+            <p className="text-xs text-muted-foreground/50 mt-4 text-center">
               {search.trim() ? "No matching log lines." : "Waiting for logs…"}
             </p>
           ) : (
@@ -260,42 +312,41 @@ export function AppLogsDialog({ target, onClose }: AppLogsDialogProps) {
               {filteredLines.map((line) => (
                 <div
                   key={line.id}
-                  className="flex items-start gap-2 font-mono text-xs leading-relaxed group"
+                  className="flex items-start gap-2 font-mono text-xs leading-relaxed"
                 >
                   {/* Timestamp */}
-                  <span className="shrink-0 whitespace-nowrap text-muted-foreground/60 select-none w-[92px]">
+                  <span className="shrink-0 whitespace-nowrap text-muted-foreground/40 select-none w-28">
                     {formatTimestamp(line.timestamp)}
                   </span>
 
                   {/* Level badge */}
                   {line.level ? (
                     <span
-                      className={`shrink-0 px-1 py-px text-2xs font-semibold rounded border leading-none ${LEVEL_CLASSES[line.level]}`}
+                      className={cn(
+                        "shrink-0 px-1 py-px text-[10px] font-semibold rounded border leading-none",
+                        LEVEL_CLASSES[line.level],
+                      )}
                     >
                       {line.level}
                     </span>
-                  ) : (
-                    <span className="shrink-0 w-[39px]" />
-                  )}
-
-                  {/* stderr indicator */}
-                  {line.stream === "stderr" && !line.level && (
-                    <span className="shrink-0 px-1 py-px text-2xs font-semibold rounded border leading-none bg-status-red/20 text-status-red border-status-red/30">
+                  ) : line.stream === "stderr" ? (
+                    <span className="shrink-0 px-1 py-px text-[10px] font-semibold rounded border leading-none bg-status-red/15 text-status-red border-status-red/25">
                       ERR
                     </span>
+                  ) : (
+                    <span className="shrink-0 w-9.75" />
                   )}
 
                   {/* Message */}
                   <span
-                    className={`break-all ${
-                      line.stream === "stderr" && !line.level
-                        ? "text-status-red/80"
-                        : line.level === "ERROR"
-                          ? "text-status-red"
-                          : line.level === "WARN"
-                            ? "text-yellow-300"
-                            : "text-green-100/90"
-                    }`}
+                    className={cn(
+                      "break-all",
+                      line.level
+                        ? LEVEL_TEXT[line.level]
+                        : line.stream === "stderr"
+                          ? "text-status-red/80"
+                          : "text-green-100/80",
+                    )}
                   >
                     {line.message}
                   </span>
@@ -308,8 +359,20 @@ export function AppLogsDialog({ target, onClose }: AppLogsDialogProps) {
 
         {/* Footer */}
         {streamEnded && (
-          <div className="px-4 py-2 text-xs text-muted-foreground border-t border-glass-border bg-glass shrink-0">
-            Stream ended — container stopped or log tail reached.
+          <div className="flex items-center gap-3 px-4 py-2 border-t border-glass-border/60 shrink-0">
+            <span className="text-xs text-muted-foreground/60 flex-1">
+              Stream ended — container stopped or log tail reached.
+            </span>
+            <button
+              onClick={handleReconnect}
+              className={cn(
+                BADGE_SURFACE,
+                "flex items-center gap-1.5 px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer",
+              )}
+            >
+              <RefreshCw className="size-3" />
+              Reconnect
+            </button>
           </div>
         )}
       </DialogContent>
