@@ -124,40 +124,34 @@ export function CommandPalette({
       onOpenChange={onOpenChange}
       title="Search Homeio"
       description="Jump to settings, apps, and desktop tools."
-      className="system-floating-surface max-w-[min(92vw,48rem)] bg-popover/96 p-0 shadow-[var(--system-shadow-floating)]"
+      className="overflow-hidden border border-white/[0.09] bg-black/60 p-0 shadow-[var(--system-shadow-floating)] [backdrop-filter:blur(40px)_saturate(160%)] [border-radius:var(--system-radius-floating)] max-w-[min(92vw,44rem)]"
       showCloseButton={false}
     >
-      <div className="border-b border-glass-border/80 bg-card/55 px-4 py-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <div className="flex size-9 items-center justify-center rounded-[var(--system-radius-icon)] border border-primary/20 bg-primary/12 text-primary">
-              <Search className="size-4" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-foreground">Search Homeio</p>
-              <p className="text-xs text-muted-foreground">
-                Settings, apps, and desktop actions in one place.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5 text-2xs text-muted-foreground">
-            <span className="rounded-md border border-glass-border bg-background/70 px-2 py-1 font-medium tracking-wide">
-              Cmd K
-            </span>
-            <span className="rounded-md border border-glass-border bg-background/70 px-2 py-1 font-medium tracking-wide">
-              Esc
-            </span>
+      {/* Hero header — matches lock screen / login design language */}
+      <div className="flex flex-col items-center border-b border-white/8 bg-black/22 px-6 py-5">
+        <div className="system-hero-surface flex size-[3.25rem] items-center justify-center bg-black/22 shadow-[var(--system-shadow-dock)]">
+          <Search className="size-6 text-foreground/72" />
+        </div>
+        <div className="system-pill-surface mt-3 px-3 py-1 text-[10px] tracking-[0.22em] text-foreground/55 uppercase">
+          Command Palette
+        </div>
+        <div className="mt-3 w-full [&_[data-slot=command-input-wrapper]]:h-10 [&_[data-slot=command-input-wrapper]]:border-0 [&_[data-slot=command-input-wrapper]]:px-0">
+          <div className="system-soft-surface bg-black/22 px-3 shadow-[var(--system-shadow-dock)]">
+            <CommandInput
+              autoFocus
+              value={query}
+              onValueChange={onQueryChange}
+              placeholder="Search settings, apps, and tools…"
+              className="text-[15px] text-foreground placeholder:text-muted-foreground/50"
+            />
           </div>
         </div>
+        <div className="mt-2.5 flex items-center gap-3 text-[10px] text-muted-foreground/40 tracking-widest uppercase">
+          <span className="system-keycap-surface px-1.5 py-0.5 font-mono">⌘K</span>
+          <span className="opacity-50">·</span>
+          <span className="system-keycap-surface px-1.5 py-0.5 font-mono">Esc</span>
+        </div>
       </div>
-
-      <CommandInput
-        autoFocus
-        value={query}
-        onValueChange={onQueryChange}
-        placeholder="Search settings, apps, and tools..."
-        className="text-sm"
-      />
 
       <CommandList className="max-h-[26rem]">
         <CommandEmpty>

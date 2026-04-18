@@ -1,16 +1,25 @@
 "use client";
 
-import { CurrentUserError, useCurrentUser } from "@/hooks/useCurrentUser";
 import {
-  pushRecentCommandAction,
-  readRecentCommandActions,
-  type RecentCommandAction,
-} from "@/lib/desktop/recent-actions";
+  Activity,
+  FolderOpen,
+  Package,
+  Search,
+  Settings,
+  ShoppingBag,
+  TerminalSquare,
+} from "@/components/icons/platform-icons";
+import { CurrentUserError, useCurrentUser } from "@/hooks/useCurrentUser";
 import { readLockState, writeLockState } from "@/lib/desktop/lock-state";
 import {
   clearPersistedPowerActionCompletion,
   readPersistedPowerActionCompletion,
 } from "@/lib/desktop/reboot-state";
+import {
+  pushRecentCommandAction,
+  readRecentCommandActions,
+  type RecentCommandAction,
+} from "@/lib/desktop/recent-actions";
 import {
   AppGrid,
   type AppActionTarget,
@@ -18,7 +27,10 @@ import {
 import { AppLogsDialog } from "@/modules/apps/components/app-logs-dialog";
 import { AppStore } from "@/modules/apps/components/app-store";
 import { AppConfiguratorPanel } from "@/modules/apps/components/configurator/app-configurator-panel";
-import { StoreActionsProvider, useSharedStoreActions } from "@/modules/apps/hooks/StoreActionsContext";
+import {
+  StoreActionsProvider,
+  useSharedStoreActions,
+} from "@/modules/apps/hooks/StoreActionsContext";
 import { FileManager } from "@/modules/files/components/file-manager";
 import { SettingsPanel } from "@/modules/settings/components/settings";
 import { CommandPalette } from "@/modules/shell/components/command-palette";
@@ -27,23 +39,15 @@ import { useRebootRecovery } from "@/modules/shell/hooks/useRebootRecovery";
 import { Monitor } from "@/modules/system/components/monitor";
 import { StatusBar } from "@/modules/system/components/status-bar";
 import { SystemWidgets } from "@/modules/system/components/system-widgets";
-import {
-  Activity,
-  FolderOpen,
-  Package,
-  Settings,
-  ShoppingBag,
-  TerminalSquare,
-} from "@/components/icons/platform-icons";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Dock } from "./dock";
 import { LockScreen } from "./lock-screen";
 import { RebootOverlay } from "./reboot-overlay";
-import { UpdateRecoveryScreen } from "./update-recovery-screen";
 import { SessionLoadingScreen } from "./session-loading-screen";
 import { Terminal } from "./terminal";
+import { UpdateRecoveryScreen } from "./update-recovery-screen";
 import { Window } from "./window";
 
 const WINDOW_CLOSE_ANIMATION_MS = 180;
@@ -356,7 +360,9 @@ function DesktopShellInner() {
       setSettingsSectionRequest(sectionId);
       setIsSettingsSearchOpen(false);
       setSettingsSearchQuery("");
-      const section = SETTINGS_SEARCH_SECTIONS.find((entry) => entry.id === sectionId);
+      const section = SETTINGS_SEARCH_SECTIONS.find(
+        (entry) => entry.id === sectionId,
+      );
       if (typeof window !== "undefined" && section) {
         setRecentActions(
           pushRecentCommandAction(window.localStorage, {
@@ -377,7 +383,9 @@ function DesktopShellInner() {
     if (id === "apps") {
       // "Show Desktop" — minimize all visible windows.
       // If every open window is already minimized, restore them all.
-      const visibleWindows = openWindows.filter((w) => !minimizedWindows.includes(w));
+      const visibleWindows = openWindows.filter(
+        (w) => !minimizedWindows.includes(w),
+      );
       if (visibleWindows.length > 0) {
         setMinimizedWindows((prev) => [
           ...prev,
@@ -410,7 +418,10 @@ function DesktopShellInner() {
       const metadata = {
         files: { title: "Open Files", subtitle: "Folder and file browser" },
         settings: { title: "Open Settings", subtitle: "System preferences" },
-        "app-store": { title: "Open App Store", subtitle: "Browse and install apps" },
+        "app-store": {
+          title: "Open App Store",
+          subtitle: "Browse and install apps",
+        },
         terminal: { title: "Open Terminal", subtitle: "Shell and logs" },
       }[id];
 
@@ -466,7 +477,10 @@ function DesktopShellInner() {
         const metadata = {
           files: { title: "Open Files", subtitle: "Folder and file browser" },
           settings: { title: "Open Settings", subtitle: "System preferences" },
-          "app-store": { title: "Open App Store", subtitle: "Browse and install apps" },
+          "app-store": {
+            title: "Open App Store",
+            subtitle: "Browse and install apps",
+          },
           terminal: { title: "Open Terminal", subtitle: "Shell and logs" },
         }[windowId];
 
@@ -667,7 +681,9 @@ function DesktopShellInner() {
         {currentUser?.isDemoMode && (
           <div className="fixed top-14 right-5 z-50 hidden xl:flex items-center gap-2 rounded-full border border-primary/35 bg-primary/10 px-3 py-1.5 backdrop-blur-md shadow-lg shadow-black/20">
             <span className="size-1.5 rounded-full bg-primary animate-pulse" />
-            <span className="text-xs font-semibold text-primary tracking-tight">Demo</span>
+            <span className="text-xs font-semibold text-primary tracking-tight">
+              Demo
+            </span>
             <span className="text-xs text-foreground/50">· read-only</span>
           </div>
         )}
@@ -876,6 +892,18 @@ function DesktopShellInner() {
           </Window>
         )}
 
+        {/* Command Palette Badge — floats above the dock */}
+        <div className="fixed bottom-[5.75rem] left-1/2 z-40 -translate-x-1/2">
+          <button
+            onClick={() => { setIsSettingsSearchOpen(true); setSettingsSearchQuery(""); }}
+            className="system-pill-surface flex cursor-pointer items-center gap-1.5 px-2.5 py-1 text-foreground/30 transition-colors hover:text-foreground/55"
+            aria-label="Open command palette"
+          >
+            <Search className="size-2.5 shrink-0" />
+            <span className="font-mono text-[9px] tracking-widest">⌘K</span>
+          </button>
+        </div>
+
         {/* Dock */}
         <Dock
           activeWindows={openWindows}
@@ -895,10 +923,7 @@ function DesktopShellInner() {
         )}
       </div>
 
-      <AppLogsDialog
-        target={logsTarget}
-        onClose={() => setLogsTarget(null)}
-      />
+      <AppLogsDialog target={logsTarget} onClose={() => setLogsTarget(null)} />
     </div>
   );
 }
