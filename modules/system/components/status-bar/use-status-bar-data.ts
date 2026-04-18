@@ -7,8 +7,9 @@ import { useInstalledApps } from "@/modules/apps/hooks/useInstalledApps";
 import { useNetworkStatus } from "@/modules/system/hooks/useNetworkStatus";
 import { useSystemUpdateStatus } from "@/modules/system/hooks/useSystemUpdateStatus";
 import { useSystemMetrics } from "@/modules/system/hooks/useSystemMetrics";
-import { safePercent } from "@/modules/system/components/status-bar/utils";
+import { formatRelativeTime, safePercent } from "@/modules/system/components/status-bar/utils";
 import { useStatusNotifications } from "@/modules/system/components/status-bar/use-status-notifications";
+import { useNotifications } from "@/modules/system/hooks/useNotifications";
 
 export function useStatusBarData() {
   const { data: metrics, isError: isMetricsError } = useSystemMetrics();
@@ -44,7 +45,9 @@ export function useStatusBarData() {
     ? "size-4 text-status-red"
     : "size-4 text-status-green";
 
-  const { notifications, unreadCount, markAllRead, clearAll } = useStatusNotifications({
+  const { notifications: persistentNotifications, unreadCount: persistentUnreadCount, markAllRead: markPersistentAllRead, clearAll: clearPersistentAll } = useNotifications();
+
+  const { notifications: ephemeralNotifications, unreadCount: ephemeralUnreadCount, markAllRead: markEphemeralAllRead, clearAll: clearEphemeralAll } = useStatusNotifications({
     metricsTimestamp: metrics?.timestamp ?? null,
     cpuPercent,
     memoryPercent,
@@ -62,6 +65,31 @@ export function useStatusBarData() {
     preferences: notificationPreferences,
   });
 
+  const mergedNotifications = useMemo(() => {
+    const persistentIds = new Set(persistentNotifications.map((n) => n.id));
+    const persistentMapped = persistentNotifications.map((n) => ({
+      id: n.id,
+      title: n.title,
+      message: n.body,
+      time: formatRelativeTime(n.createdAt),
+      read: n.read,
+    }));
+    const ephemeralOnly = ephemeralNotifications.filter((n) => !persistentIds.has(n.id));
+    return [...persistentMapped, ...ephemeralOnly].slice(0, 20);
+  }, [persistentNotifications, ephemeralNotifications]);
+
+  const mergedUnreadCount = persistentUnreadCount + ephemeralUnreadCount;
+
+  function markAllRead() {
+    markPersistentAllRead();
+    markEphemeralAllRead();
+  }
+
+  function clearAll() {
+    clearPersistentAll();
+    clearEphemeralAll();
+  }
+
   return useMemo(
     () => ({
       metrics,
@@ -74,25 +102,24 @@ export function useStatusBarData() {
       isEthernet,
       isMetricsError,
       wifiIconClassName,
-      notifications,
-      unreadCount,
+      notifications: mergedNotifications,
+      unreadCount: mergedUnreadCount,
       markAllRead,
       clearNotifications: clearAll,
     }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       batteryText,
       isMetricsError,
       networkStatus,
       isWifiConnected,
       isEthernet,
-      markAllRead,
-      clearAll,
       metrics,
-      notifications,
+      mergedNotifications,
+      mergedUnreadCount,
       serverName,
       currentUser?.username,
       currentUser?.isDemoMode,
-      unreadCount,
       wifiIconClassName,
     ],
   );

@@ -47,6 +47,7 @@ import type {
   StoreOperationStatus,
 } from "@/lib/shared/contracts/apps";
 import { isTagUpdateAvailable } from "@/lib/server/modules/store/update-check";
+import { createNotification } from "@/lib/server/modules/notifications/service";
 import yaml from "js-yaml";
 
 type OperationParams = {
@@ -1169,6 +1170,17 @@ async function executeStoreOperation(operationId: string, params: OperationParam
       message: "Operation completed",
       errorMessage: null,
     });
+
+    const appLabel = params.displayName ?? params.appId;
+    if (params.action === "install") {
+      void createNotification({ title: "App Installed", body: `${appLabel} installed successfully`, kind: "success" }).catch(() => undefined);
+    } else if (params.action === "update") {
+      void createNotification({ title: "App Updated", body: `${appLabel} updated successfully`, kind: "success" }).catch(() => undefined);
+    } else if (params.action === "uninstall") {
+      void createNotification({ title: "App Uninstalled", body: `${appLabel} was uninstalled`, kind: "info" }).catch(() => undefined);
+    } else if (params.action === "redeploy") {
+      void createNotification({ title: "App Redeployed", body: `${appLabel} redeployed successfully`, kind: "success" }).catch(() => undefined);
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Operation failed";
 
@@ -1184,6 +1196,11 @@ async function executeStoreOperation(operationId: string, params: OperationParam
       message,
       errorMessage: message,
     });
+
+    const appLabel = params.displayName ?? params.appId;
+    if (params.action === "install" || params.action === "update" || params.action === "uninstall" || params.action === "redeploy") {
+      void createNotification({ title: "Operation Failed", body: `Failed to ${params.action} ${appLabel}: ${message}`, kind: "error" }).catch(() => undefined);
+    }
   } finally {
     // Always release the guard so future operations on this app can proceed.
     activeOperationsByApp.delete(params.appId);
