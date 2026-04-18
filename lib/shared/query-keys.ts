@@ -32,4 +32,5 @@ export const queryKeys = {
   powerCapabilities: ["system", "power", "capabilities"] as const,
   logs: (source: "homeio" | "system" | "docker") =>
     ["logs", source] as const,
+  notifications: ["notifications"] as const,
 };

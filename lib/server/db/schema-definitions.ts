@@ -148,6 +148,19 @@ export const filesLocalShares = pgTable(
   ],
 );
 
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: text("id").primaryKey(),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    kind: text("kind").notNull().default("info"),
+    read: boolean("read").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("notifications_created_at_idx").on(table.createdAt.desc())],
+);
+
 export const filesTrashEntries = pgTable(
   "files_trash_entries",
   {
