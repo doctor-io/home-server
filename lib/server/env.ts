@@ -94,11 +94,6 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((value) => value === "true"),
-  POSTHOG_API_KEY: z.string().optional(),
-  HOMEIO_TELEMETRY: z
-    .string()
-    .optional()
-    .transform((value) => value !== "false"),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);
