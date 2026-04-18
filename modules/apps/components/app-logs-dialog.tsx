@@ -8,7 +8,8 @@ import {
   Search,
   X,
 } from "@/components/icons/platform-icons";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { BADGE_SURFACE, PANEL_INSET } from "@/lib/ui/surface-tokens";
 import { cn } from "@/lib/utils";
 import type { AppActionTarget } from "@/modules/apps/components/app-grid-presenters";
@@ -200,6 +201,9 @@ export function AppLogsDialog({ target, onClose }: AppLogsDialogProps) {
         showCloseButton={false}
         className="flex flex-col gap-0 p-0 w-[92vw] sm:w-[92vw] sm:max-w-5xl h-[82vh] bg-popover/96 border-glass-border backdrop-blur-2xl overflow-hidden shadow-2xl shadow-black/45"
       >
+        <VisuallyHidden>
+          <DialogTitle>{target?.appName ?? "App"} — Logs</DialogTitle>
+        </VisuallyHidden>
         {/* Header */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-glass-border/60 shrink-0">
           <ScrollText className="size-4 text-muted-foreground shrink-0" />
