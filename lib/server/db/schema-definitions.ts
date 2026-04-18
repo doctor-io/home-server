@@ -180,13 +180,6 @@ export const scheduledTasks = pgTable(
   (table) => [index("scheduled_tasks_next_run_at_idx").on(table.nextRunAt)],
 );
 
-export const instanceConfig = pgTable("instance_config", {
-  id: text("id").primaryKey().default("singleton"),
-  instanceId: text("instance_id").notNull(),
-  telemetryEnabled: boolean("telemetry_enabled").notNull().default(true),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
-
 export const filesTrashEntries = pgTable(
   "files_trash_entries",
   {
