@@ -21,6 +21,7 @@ type MonacoSubscription = { dispose: () => void };
 type MonacoModel = { dispose: () => void };
 type MonacoEditorInstance = {
   onDidChangeModelContent: (listener: () => void) => MonacoSubscription;
+  addCommand: (keybinding: number, handler: () => void) => string | null;
   getValue: () => string;
   layout: () => void;
   getModel: () => MonacoModel | null;
@@ -105,18 +106,25 @@ export function MonacoEditorPane({
   language,
   value,
   onChange,
+  onSave,
 }: {
   language: string;
   value: string;
   onChange: (value: string) => void;
+  onSave?: () => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const onChangeRef = useRef(onChange);
+  const onSaveRef = useRef(onSave);
   const [fallbackMode, setFallbackMode] = useState(false);
 
   useEffect(() => {
     onChangeRef.current = onChange;
   }, [onChange]);
+
+  useEffect(() => {
+    onSaveRef.current = onSave;
+  }, [onSave]);
 
   useEffect(() => {
     let mounted = true;
@@ -142,6 +150,11 @@ export function MonacoEditorPane({
 
         const changeSub = editor.onDidChangeModelContent(() => {
           onChangeRef.current(editor.getValue());
+        });
+
+        // KeyMod.CtrlCmd | KeyCode.KeyS = 2048 | 49 = 2097 (platform-aware Cmd/Ctrl+S)
+        editor.addCommand(2097, () => {
+          onSaveRef.current?.();
         });
 
         if (typeof ResizeObserver !== "undefined" && containerRef.current) {

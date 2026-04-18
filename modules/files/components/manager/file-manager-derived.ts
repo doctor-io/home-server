@@ -154,7 +154,12 @@ export function getOpenFileDetails({
       ? language
       : viewer.mode.replaceAll("_", " ")
     : language;
-  return { badgeLabel, content };
+  const hasUnsavedChanges =
+    filePath !== null &&
+    viewer?.mode === "text" &&
+    fileDrafts[filePath] !== undefined &&
+    fileDrafts[filePath] !== (viewer.content ?? "");
+  return { badgeLabel, content, hasUnsavedChanges };
 }
 
 export function getStorageSummary(

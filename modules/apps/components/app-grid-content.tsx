@@ -53,29 +53,28 @@ export function AppGridContent({
     <>
       {primaryOperation ? (
         <div
-          className="fixed bottom-[5.75rem] left-1/2 z-[150] -translate-x-1/2 w-[min(92vw,22rem)] overflow-hidden rounded-2xl border border-glass-border bg-popover/95 shadow-xl shadow-black/30 backdrop-blur-2xl animate-in fade-in slide-in-from-bottom-2 duration-200"
+          className="fixed bottom-[5.75rem] left-1/2 z-[150] -translate-x-1/2 w-[min(92vw,22rem)] overflow-hidden rounded-[var(--system-radius-control)] border border-glass-border/50 bg-popover/90 shadow-[0_8px_32px_rgba(0,0,0,0.28)] backdrop-blur-2xl animate-in fade-in slide-in-from-bottom-2 duration-200"
           role="status"
           aria-live="polite"
         >
           <div className="flex items-center gap-3 px-4 py-3">
-            <Loader2 className="size-3.5 shrink-0 animate-spin text-primary" />
+            <span className="size-1.5 shrink-0 rounded-full bg-primary shadow-[0_0_8px_rgba(var(--primary),0.6)] animate-pulse" />
             <div className="min-w-0 flex-1">
               <p className="truncate text-xs font-medium text-foreground">
                 {getStoreOperationActionLabel(primaryOperation.action)}{" "}
-                <span className="text-foreground/70">{primaryOperation.appName}</span>
+                <span className="text-foreground/60">{primaryOperation.appName}</span>
               </p>
             </div>
-            <span className="shrink-0 tabular-nums text-2xs text-muted-foreground">
+            <span className="shrink-0 tabular-nums text-2xs text-muted-foreground/60">
               {activeOperationsCount > 1
-                ? `${activeOperationsCount} running`
+                ? `+${activeOperationsCount - 1} more`
                 : `${primaryOperation.progressPercent}%`}
             </span>
           </div>
-          {/* Progress bar flush at bottom */}
-          <div className="h-[2px] w-full bg-border/40">
+          <div className="h-px w-full bg-glass-border/30">
             <div
-              className="h-full bg-primary transition-all duration-500"
-              style={{ width: `${Math.max(4, primaryOperation.progressPercent)}%` }}
+              className="h-full bg-primary/60 transition-all duration-500"
+              style={{ width: `${Math.max(2, primaryOperation.progressPercent)}%` }}
             />
           </div>
         </div>

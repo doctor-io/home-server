@@ -28,6 +28,7 @@ type FileManagerFileAreaProps = {
   fileContentIsLoading: boolean;
   globalSearchIsFetching: boolean;
   hasMoreSearchResults: boolean;
+  hasUnsavedChanges: boolean;
   isDragOver: boolean;
   isGlobalSearchActive: boolean;
   isStarredView: boolean;
@@ -70,6 +71,7 @@ export function FileManagerFileArea({
   fileContentIsLoading,
   globalSearchIsFetching,
   hasMoreSearchResults,
+  hasUnsavedChanges,
   isDragOver,
   isGlobalSearchActive,
   isStarredView,
@@ -142,6 +144,7 @@ export function FileManagerFileArea({
           fileContentErrorMessage={fileContentErrorMessage}
           fileContentIsError={fileContentIsError}
           fileContentIsLoading={fileContentIsLoading}
+          hasUnsavedChanges={hasUnsavedChanges}
           onChangeOpenFileDraft={onChangeOpenFileDraft}
           onClose={onCloseOpenFile}
           onSave={onSaveOpenFile}
@@ -184,6 +187,7 @@ function renderBrowserState({
   | "fileContentErrorMessage"
   | "fileContentIsError"
   | "fileContentIsLoading"
+  | "hasUnsavedChanges"
   | "isDragOver"
   | "isStarredView"
   | "openFile"

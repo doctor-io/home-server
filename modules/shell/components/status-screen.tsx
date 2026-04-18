@@ -21,30 +21,30 @@ export function StatusScreen({
     <FullScreenShell
       showClock={false}
       center={
-        <div className="flex items-center justify-center">
-          <div
-            className={`flex size-24 items-center justify-center rounded-[var(--radius)] border shadow-2xl shadow-black/45 backdrop-blur-md ${
-              failed
-                ? "border-status-red/35 bg-status-red/10"
-                : "animate-homeio-breathe-glow border-white/14 bg-white/10"
-            }`}
-          >
-            <Image
-              src="/icon.png"
-              alt="Homeio"
-              width={64}
-              height={64}
-              className={`size-16 ${failed ? "" : "animate-homeio-breathe blur-[0.25px]"}`}
-            />
+        <div className="w-full max-w-md text-center">
+          <div className="mx-auto mb-5 flex w-fit flex-col items-center">
+            <div
+              className={`system-hero-surface flex size-24 items-center justify-center ${
+                failed ? "border-status-red/35 bg-status-red/10" : "animate-homeio-breathe-glow"
+              }`}
+            >
+              <Image
+                src="/icon.png"
+                alt="Homeio"
+                width={64}
+                height={64}
+                className={`relative z-10 size-[3.65rem] blur-[0.15px] ${failed ? "" : "animate-homeio-breathe"}`}
+              />
+            </div>
+            <div className="system-pill-surface mt-2.5 px-3 py-1 text-[10px] tracking-[0.24em] text-foreground/58 uppercase">
+              {failed ? "Error" : "Home server"}
+            </div>
           </div>
-        </div>
-      }
-      bottom={
-        <div className="mx-auto max-w-2xl text-center">
-          <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+
+          <p className="text-[1.48rem] font-medium tracking-[-0.03em] text-foreground">
             {title}
-          </h1>
-          <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-white/78 sm:text-base">
+          </p>
+          <p className="mb-5 mt-1 text-sm leading-6 text-muted-foreground/78">
             {body}
           </p>
           {action}

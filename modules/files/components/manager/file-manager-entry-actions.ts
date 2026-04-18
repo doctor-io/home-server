@@ -317,7 +317,18 @@ export function useFileManagerEntryActions({
 
     async function handleSaveOpenFile() {
       if (!openFileKey || openFileViewer?.mode !== "text") return;
-      const nextContent = fileDrafts[openFileKey] ?? openFileViewer.content ?? "";
+      let nextContent = fileDrafts[openFileKey] ?? openFileViewer.content ?? "";
+
+      const ext = openFileKey.split(".").pop()?.toLowerCase();
+      if (ext === "json") {
+        try {
+          nextContent = JSON.stringify(JSON.parse(nextContent), null, 2);
+          dispatch({ type: "SET_FILE_DRAFT", key: openFileKey, value: nextContent });
+        } catch {
+          // malformed JSON — save as-is
+        }
+      }
+
       try {
         await saveFileContentMutation.mutateAsync({
           path: openFileKey,
