@@ -1,6 +1,6 @@
 "use client";
 
-import { FileManagerSidebar, FileManagerStatusBar, FileManagerToolbar, type FileManagerSidebarItem, type FileManagerSidebarSection } from "@/modules/files/components/file-manager-chrome";
+import { FileManagerSidebar, FileManagerStatusBar, FileManagerToolbar, type FileManagerSidebarItem, type FileManagerSidebarSection, type RemovableSidebarItem } from "@/modules/files/components/file-manager-chrome";
 import { FileManagerFileArea } from "@/modules/files/components/content/file-manager-content";
 import { FILES_PANEL_SHELL } from "@/modules/files/components/file-manager-surface";
 import { FileManagerDialogLayer } from "@/modules/files/components/manager/file-manager-dialog-layer";
@@ -67,6 +67,9 @@ type FileManagerViewProps = {
   isStarredView: boolean;
   isTrashView: boolean;
   locationItems: FileManagerSidebarItem[];
+  removableItems: RemovableSidebarItem[];
+  onMountDrive: (driveId: string) => void;
+  onEjectDrive: (driveId: string) => void;
   navigateTo: (entry: FileEntry) => void;
   navigateToPath: (pathSegments: string[]) => void;
   onEntryClick: (event: MouseEvent, entry: FileEntry) => void;
@@ -142,6 +145,9 @@ export function FileManagerView({
   isStarredView,
   isTrashView,
   locationItems,
+  removableItems,
+  onMountDrive,
+  onEjectDrive,
   navigateTo,
   navigateToPath,
   onEntryClick,
@@ -193,11 +199,14 @@ export function FileManagerView({
         isSharedView={isSharedView}
         isTrashView={isTrashView}
         locationItems={locationItems}
+        removableItems={removableItems}
         sidebarSections={sidebarSections}
         storageUsagePercent={storageUsagePercent}
         storageUsageText={storageUsageText}
         onNavigateToPath={navigateToPath}
         onOpenNetworkDialog={() => dispatch({ type: "SHOW_NETWORK_DIALOG" })}
+        onMountDrive={onMountDrive}
+        onEjectDrive={onEjectDrive}
       />
       <div className={`m-2 flex min-w-0 flex-1 flex-col ${FILES_PANEL_SHELL}`}>
         <FileManagerToolbar

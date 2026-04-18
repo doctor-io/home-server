@@ -6,10 +6,12 @@ import {
   HardDriveRegular,
   HomeRegular,
   StarFilled,
+  UsbRegular,
   VideoRegular,
 } from "@fluentui/react-icons";
 import type { FileReadResponse } from "@/lib/shared/contracts/files";
-import type { FileManagerSidebarSection } from "@/modules/files/components/chrome/file-manager-sidebar";
+import type { FileManagerSidebarSection, RemovableSidebarItem } from "@/modules/files/components/chrome/file-manager-sidebar";
+import type { UsbDrive } from "@/lib/shared/contracts/usb";
 import {
   normalizePathForDisplay,
   toUiFileEntry,
@@ -201,6 +203,20 @@ export function getLocationItems(
       icon: createElement(HardDriveRegular, { className: "size-4 text-cyan-400" }),
       path: hostPath,
     }));
+}
+
+function usbPathSegment(label: string, id: string): string {
+  return label.replace(/[^a-zA-Z0-9\-_]/g, "_").replace(/_+/g, "_").slice(0, 32) || id.slice(0, 8);
+}
+
+export function getRemovableItems(drives: UsbDrive[]): RemovableSidebarItem[] {
+  return drives.map((drive) => ({
+    name: drive.label,
+    icon: createElement(UsbRegular, { className: "size-4 text-amber-400" }),
+    path: ["Removable", usbPathSegment(drive.label, drive.id)],
+    driveId: drive.id,
+    isMounted: drive.isMounted,
+  }));
 }
 
 export function getLocalSharesByPath(

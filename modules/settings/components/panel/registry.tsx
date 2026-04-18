@@ -2,6 +2,7 @@ import {
   AlertRegular,
   ArrowSyncRegular,
   BoxRegular,
+  CalendarClockRegular,
   DatabaseRegular,
   DocumentRegular,
   HardDriveRegular,
@@ -21,6 +22,7 @@ import {
   NetworkSection,
   NotificationsSection,
   PowerSection,
+  ScheduledTasksSection,
   SecuritySection,
   StorageSection,
   UpdatesSection,
@@ -46,6 +48,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   { id: "appearance", label: "Appearance", icon: PaintBrushRegular },
   { id: "power", label: "Power", icon: PowerRegular },
   { id: "logs", label: "Logs", icon: DocumentRegular },
+  { id: "scheduled-tasks", label: "Scheduled Tasks", icon: CalendarClockRegular },
 ];
 
 type SettingsRegistryContext = {
@@ -266,6 +269,10 @@ export function buildSettingsSectionDefinitions(
     {
       ...SETTINGS_SECTIONS[11],
       render: () => <LogsSection />,
+    },
+    {
+      ...SETTINGS_SECTIONS[12],
+      render: () => <ScheduledTasksSection />,
     },
   ];
 }
