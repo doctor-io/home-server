@@ -72,6 +72,7 @@ type FileManagerViewProps = {
   onEntryClick: (event: MouseEvent, entry: FileEntry) => void;
   onPositionBackgroundContextMenu: (event: MouseEvent) => void;
   onPositionEntryContextMenu: (event: MouseEvent, entry: FileEntry) => void;
+  hasUnsavedChanges: boolean;
   openFile: OpenFileState | null;
   openFileBadgeLabel: string;
   openFileContent: string;
@@ -132,6 +133,7 @@ export function FileManagerView({
   globalSearch,
   globalSearchIsFetching,
   hasMoreSearchResults,
+  hasUnsavedChanges,
   includeHidden,
   isDragOver,
   isEmptyingTrash,
@@ -245,6 +247,7 @@ export function FileManagerView({
           fileContentIsLoading={fileContentIsLoading}
           globalSearchIsFetching={globalSearchIsFetching}
           hasMoreSearchResults={hasMoreSearchResults}
+          hasUnsavedChanges={hasUnsavedChanges}
           isDragOver={isDragOver}
           isGlobalSearchActive={isGlobalSearchActive}
           isStarredView={isStarredView}

@@ -151,7 +151,8 @@ export function FileManager() {
     openFilePath &&
       openFileViewer?.mode === "text" &&
       !fileContentQuery.isLoading &&
-      !saveFileContentMutation.isPending,
+      !saveFileContentMutation.isPending &&
+      openFileState.hasUnsavedChanges,
   );
 
   const storageSummary = getStorageSummary(systemMetricsQuery.data?.storage);
@@ -358,6 +359,7 @@ export function FileManager() {
         dispatch({ type: "SELECT_FILE", name: entry.name });
       }}
       openFile={state.openFile}
+      hasUnsavedChanges={openFileState.hasUnsavedChanges}
       openFileBadgeLabel={openFileState.badgeLabel}
       openFileContent={openFileState.content}
       openFileKey={openFilePath}
