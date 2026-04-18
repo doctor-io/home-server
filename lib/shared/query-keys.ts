@@ -33,4 +33,6 @@ export const queryKeys = {
   logs: (source: "homeio" | "system" | "docker") =>
     ["logs", source] as const,
   notifications: ["notifications"] as const,
+  scheduledTasks: ["scheduled-tasks"] as const,
+  usbDrives: ["files", "usb"] as const,
 };

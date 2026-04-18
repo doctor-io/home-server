@@ -161,6 +161,25 @@ export const notifications = pgTable(
   (table) => [index("notifications_created_at_idx").on(table.createdAt.desc())],
 );
 
+export const scheduledTasks = pgTable(
+  "scheduled_tasks",
+  {
+    id: text("id").primaryKey(),
+    label: text("label").notNull(),
+    taskType: text("task_type").notNull(),
+    taskConfig: jsonb("task_config").notNull().default({}),
+    cronExpression: text("cron_expression").notNull(),
+    enabled: boolean("enabled").notNull().default(true),
+    lastRunAt: timestamp("last_run_at", { withTimezone: true }),
+    lastRunStatus: text("last_run_status"),
+    lastRunOutput: text("last_run_output"),
+    nextRunAt: timestamp("next_run_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("scheduled_tasks_next_run_at_idx").on(table.nextRunAt)],
+);
+
 export const filesTrashEntries = pgTable(
   "files_trash_entries",
   {

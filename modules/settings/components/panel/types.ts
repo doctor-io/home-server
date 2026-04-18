@@ -23,7 +23,8 @@ export type SettingsSectionId =
   | "updates"
   | "appearance"
   | "power"
-  | "logs";
+  | "logs"
+  | "scheduled-tasks";
 
 export type SettingsSection = {
   id: SettingsSectionId;

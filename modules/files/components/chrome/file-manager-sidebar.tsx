@@ -3,7 +3,7 @@
 import { Plus } from "@/components/icons/platform-icons";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { normalizePathForBackend } from "@/modules/files/components/file-manager-presenters";
-import { PeopleRegular, DeleteRegular } from "@fluentui/react-icons";
+import { PeopleRegular, DeleteRegular, ArrowEjectRegular } from "@fluentui/react-icons";
 import { FILES_PANEL_SHELL } from "@/modules/files/components/file-manager-surface";
 import type { ReactNode } from "react";
 
@@ -11,6 +11,11 @@ export type FileManagerSidebarItem = {
   name: string;
   icon: ReactNode;
   path: string[];
+};
+
+export type RemovableSidebarItem = FileManagerSidebarItem & {
+  driveId: string;
+  isMounted: boolean;
 };
 
 export type FileManagerSidebarSection = {
@@ -23,11 +28,14 @@ type SidebarProps = {
   isSharedView: boolean;
   isTrashView: boolean;
   locationItems: FileManagerSidebarItem[];
+  removableItems: RemovableSidebarItem[];
   sidebarSections: FileManagerSidebarSection[];
   storageUsagePercent: number;
   storageUsageText: string;
   onNavigateToPath: (path: string[]) => void;
   onOpenNetworkDialog: () => void;
+  onMountDrive: (driveId: string) => void;
+  onEjectDrive: (driveId: string) => void;
 };
 
 export function FileManagerSidebar({
@@ -35,11 +43,14 @@ export function FileManagerSidebar({
   isSharedView,
   isTrashView,
   locationItems,
+  removableItems,
   sidebarSections,
   storageUsagePercent,
   storageUsageText,
   onNavigateToPath,
   onOpenNetworkDialog,
+  onMountDrive,
+  onEjectDrive,
 }: SidebarProps) {
   const currentUserQuery = useCurrentUser();
   const isDemoMode = currentUserQuery.data?.isDemoMode ?? false;
@@ -84,6 +95,57 @@ export function FileManagerSidebar({
                   </button>
                 );
               })}
+
+            {section.title === "Locations" && removableItems.length > 0 && (
+              <>
+                <div className="mt-2 flex items-center justify-between px-2">
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                    Removable
+                  </span>
+                </div>
+                {removableItems.map((item) => {
+                  const isActive =
+                    item.isMounted &&
+                    JSON.stringify(normalizePathForBackend(item.path)) ===
+                      JSON.stringify(currentPath);
+                  return (
+                    <div key={item.driveId} className="flex items-center gap-0.5">
+                      <button
+                        onClick={() =>
+                          item.isMounted
+                            ? onNavigateToPath(item.path)
+                            : onMountDrive(item.driveId)
+                        }
+                        className={`flex flex-1 items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm transition-colors ${
+                          isActive
+                            ? "bg-primary/15 text-foreground"
+                            : item.isMounted
+                              ? "cursor-pointer text-foreground/60 hover:bg-secondary/40 hover:text-foreground"
+                              : "cursor-pointer text-muted-foreground/40 hover:text-muted-foreground"
+                        }`}
+                      >
+                        {item.icon}
+                        <span className="truncate">{item.name}</span>
+                        {!item.isMounted && (
+                          <span className="ml-auto shrink-0 rounded px-1 text-[9px] text-muted-foreground/40">
+                            tap to mount
+                          </span>
+                        )}
+                      </button>
+                      {item.isMounted && (
+                        <button
+                          onClick={() => onEjectDrive(item.driveId)}
+                          title="Eject"
+                          className="rounded-md p-1 text-muted-foreground/40 transition-colors hover:bg-secondary/40 hover:text-foreground"
+                        >
+                          <ArrowEjectRegular className="size-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </>
+            )}
             </div>
           </div>
         ))}
