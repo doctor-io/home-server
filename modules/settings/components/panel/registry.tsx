@@ -4,7 +4,6 @@ import {
   BoxRegular,
   CalendarClockRegular,
   DatabaseRegular,
-  DocumentRegular,
   HardDriveRegular,
   PaintBrushRegular,
   PeopleRegular,
@@ -12,13 +11,14 @@ import {
   RouterRegular,
   ServerRegular,
   ShieldRegular,
+  WrenchRegular,
 } from "@fluentui/react-icons";
 import {
+  AdvancedSection,
   AppearanceSection,
   BackupSection,
   DockerSection,
   GeneralSection,
-  LogsSection,
   NetworkSection,
   NotificationsSection,
   PowerSection,
@@ -47,8 +47,8 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   { id: "updates", label: "Updates", icon: ArrowSyncRegular },
   { id: "appearance", label: "Appearance", icon: PaintBrushRegular },
   { id: "power", label: "Power", icon: PowerRegular },
-  { id: "logs", label: "Logs", icon: DocumentRegular },
   { id: "scheduled-tasks", label: "Scheduled Tasks", icon: CalendarClockRegular },
+  { id: "advanced", label: "Advanced", icon: WrenchRegular },
 ];
 
 type SettingsRegistryContext = {
@@ -268,11 +268,11 @@ export function buildSettingsSectionDefinitions(
     },
     {
       ...SETTINGS_SECTIONS[11],
-      render: () => <LogsSection />,
+      render: () => <ScheduledTasksSection />,
     },
     {
       ...SETTINGS_SECTIONS[12],
-      render: () => <ScheduledTasksSection />,
+      render: () => <AdvancedSection />,
     },
   ];
 }
