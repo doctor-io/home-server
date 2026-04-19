@@ -1,4 +1,4 @@
-CREATE TABLE "instance_config" (
+CREATE TABLE IF NOT EXISTS "instance_config" (
   "id" text PRIMARY KEY DEFAULT 'singleton',
   "instance_id" text NOT NULL,
   "telemetry_enabled" boolean NOT NULL DEFAULT true,
