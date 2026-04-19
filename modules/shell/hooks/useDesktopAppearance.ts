@@ -8,10 +8,8 @@ import {
   type DesktopFontSize,
   type DesktopIconSize,
   type DesktopTheme,
-  readStoredAppearanceSettings,
   sanitizeAppearanceSettings,
   WALLPAPER_OPTIONS,
-  writeStoredAppearanceSettings,
 } from "@/lib/desktop/appearance"
 
 const fontSizeScaleMap: Record<DesktopFontSize, number> = {
@@ -49,11 +47,7 @@ function applyAppearanceToDom(settings: AppearanceSettings) {
   root.style.setProperty("--ring", settings.accentColor)
   root.style.setProperty("--sidebar-primary", settings.accentColor)
   root.style.setProperty("--chart-1", settings.accentColor)
-  // Always disable accent-color tinting — tinted = dark smoked glass, not accent-colored
   root.style.setProperty("--system-tint-amount", "0%")
-  // Override --dock based on glass style:
-  // clear  → very transparent (you see the wallpaper through)
-  // tinted → dark smoked glass (like tinted car windows — darker, more opaque)
   if (resolvedTheme === "dark") {
     root.style.setProperty(
       "--dock",
@@ -71,13 +65,30 @@ function applyAppearanceToDom(settings: AppearanceSettings) {
   }
 }
 
+async function fetchAppearance(): Promise<AppearanceSettings> {
+  const res = await fetch("/api/v1/settings/appearance", { cache: "no-store" });
+  if (!res.ok) return DEFAULT_APPEARANCE_SETTINGS;
+  const json = await res.json() as { data: AppearanceSettings };
+  return sanitizeAppearanceSettings(json.data);
+}
+
+async function saveAppearance(appearance: AppearanceSettings): Promise<void> {
+  await fetch("/api/v1/settings/appearance", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(appearance),
+  });
+}
+
 export function useDesktopAppearance() {
   const [appearance, setAppearance] = useState<AppearanceSettings>(DEFAULT_APPEARANCE_SETTINGS)
   const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
-    setAppearance(readStoredAppearanceSettings(window.localStorage))
-    setLoaded(true)
+    fetchAppearance().then((saved) => {
+      setAppearance(saved)
+      setLoaded(true)
+    });
   }, [])
 
   useEffect(() => {
@@ -86,7 +97,7 @@ export function useDesktopAppearance() {
 
   useEffect(() => {
     if (!loaded) return
-    writeStoredAppearanceSettings(window.localStorage, appearance)
+    saveAppearance(appearance);
   }, [appearance, loaded])
 
   useEffect(() => {

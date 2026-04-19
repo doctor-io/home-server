@@ -33,7 +33,6 @@ export type AppearanceSettings = {
   dockPosition: DockPosition
 }
 
-export const APPEARANCE_STORAGE_KEY = "desktop.appearance.v1"
 export const APPEARANCE_CHANGED_EVENT = "desktop.appearance.changed"
 export const APPEARANCE_RADIUS_MIN = 2
 export const APPEARANCE_RADIUS_MAX = 24
@@ -149,31 +148,7 @@ export function sanitizeAppearanceSettings(input: unknown): AppearanceSettings {
   }
 }
 
-export function readStoredAppearanceSettings(storage: Storage | undefined) {
-  if (!storage) return DEFAULT_APPEARANCE_SETTINGS
-
-  try {
-    return sanitizeAppearanceSettings(
-      JSON.parse(storage.getItem(APPEARANCE_STORAGE_KEY) ?? "null"),
-    )
-  } catch {
-    return DEFAULT_APPEARANCE_SETTINGS
-  }
-}
-
 export function dispatchAppearanceChangedEvent() {
   if (typeof window === "undefined") return
   window.dispatchEvent(new Event(APPEARANCE_CHANGED_EVENT))
-}
-
-export function writeStoredAppearanceSettings(
-  storage: Storage | undefined,
-  appearance: AppearanceSettings,
-) {
-  if (!storage) return
-
-  try {
-    storage.setItem(APPEARANCE_STORAGE_KEY, JSON.stringify(appearance))
-    dispatchAppearanceChangedEvent()
-  } catch {}
 }

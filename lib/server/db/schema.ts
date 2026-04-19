@@ -180,6 +180,12 @@ export const scheduledTasks = pgTable(
   (table) => [index("scheduled_tasks_next_run_at_idx").on(table.nextRunAt)],
 );
 
+export const settings = pgTable("settings", {
+  id: text("id").primaryKey().default("singleton"),
+  appearanceJson: jsonb("appearance_json").notNull().default({}),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const filesTrashEntries = pgTable(
   "files_trash_entries",
   {
