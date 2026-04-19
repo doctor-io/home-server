@@ -93,7 +93,10 @@ CREATE TABLE IF NOT EXISTS "users" (
 	CONSTRAINT "users_username_unique" UNIQUE("username")
 );
 --> statement-breakpoint
-ALTER TABLE "sessions" ADD CONSTRAINT "sessions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+DO $$ BEGIN
+  ALTER TABLE "sessions" ADD CONSTRAINT "sessions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "app_operations_app_id_idx" ON "app_operations" USING btree ("app_id");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "app_operations_status_idx" ON "app_operations" USING btree ("status");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "app_operations_updated_at_idx" ON "app_operations" USING btree ("updated_at" DESC NULLS LAST);--> statement-breakpoint
