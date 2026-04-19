@@ -1,23 +1,18 @@
 /* @vitest-environment jsdom */
 
-import { act, renderHook, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
-import {
-  APPEARANCE_CHANGED_EVENT,
-  APPEARANCE_STORAGE_KEY,
-  DEFAULT_APPEARANCE_SETTINGS,
-} from "@/lib/desktop/appearance";
+import { renderHook, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { DEFAULT_APPEARANCE_SETTINGS } from "@/lib/desktop/appearance";
 import { useResolvedWallpaper } from "@/modules/shell/hooks/useResolvedWallpaper";
 
 describe("useResolvedWallpaper", () => {
   beforeEach(() => {
-    localStorage.clear();
+    vi.restoreAllMocks();
   });
 
-  it("reads wallpaper from localStorage", async () => {
-    localStorage.setItem(
-      APPEARANCE_STORAGE_KEY,
-      JSON.stringify({ wallpaper: "/images/7.jpg" }),
+  it("reads wallpaper from API", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ data: { wallpaper: "/images/7.jpg" } }), { status: 200 }),
     );
 
     const { result } = renderHook(() => useResolvedWallpaper());
@@ -29,8 +24,8 @@ describe("useResolvedWallpaper", () => {
     expect(result.current.wallpaper).toBe("/images/7.jpg");
   });
 
-  it("falls back to default wallpaper", async () => {
-    localStorage.setItem(APPEARANCE_STORAGE_KEY, "{not-valid-json");
+  it("falls back to default wallpaper when API fails", async () => {
+    vi.spyOn(globalThis, "fetch").mockRejectedValueOnce(new Error("Network error"));
 
     const { result } = renderHook(() => useResolvedWallpaper());
 
@@ -38,33 +33,20 @@ describe("useResolvedWallpaper", () => {
       expect(result.current.isHydrated).toBe(true);
     });
 
-    expect(result.current.wallpaper).toBe(
-      DEFAULT_APPEARANCE_SETTINGS.wallpaper,
-    );
+    expect(result.current.wallpaper).toBe(DEFAULT_APPEARANCE_SETTINGS.wallpaper);
   });
 
-  it("updates when the same-tab appearance event fires", async () => {
-    localStorage.setItem(
-      APPEARANCE_STORAGE_KEY,
-      JSON.stringify({ wallpaper: "/images/2.jpg" }),
+  it("falls back to default on invalid API response", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ data: { wallpaper: "/invalid/path.jpg" } }), { status: 200 }),
     );
 
     const { result } = renderHook(() => useResolvedWallpaper());
 
     await waitFor(() => {
-      expect(result.current.wallpaper).toBe("/images/2.jpg");
+      expect(result.current.isHydrated).toBe(true);
     });
 
-    await act(async () => {
-      localStorage.setItem(
-        APPEARANCE_STORAGE_KEY,
-        JSON.stringify({ wallpaper: "/images/9.jpg" }),
-      );
-      window.dispatchEvent(new Event(APPEARANCE_CHANGED_EVENT));
-    });
-
-    await waitFor(() => {
-      expect(result.current.wallpaper).toBe("/images/9.jpg");
-    });
+    expect(result.current.wallpaper).toBe(DEFAULT_APPEARANCE_SETTINGS.wallpaper);
   });
 });
