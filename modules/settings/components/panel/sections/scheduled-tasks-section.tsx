@@ -21,6 +21,7 @@ type TaskFormState = {
   label: string;
   taskType: ScheduledTaskType;
   shellCommand: string;
+  script: string;
   appId: string;
   appName: string;
   cronPreset: string;
@@ -29,6 +30,7 @@ type TaskFormState = {
 
 const TASK_TYPE_LABELS: Record<ScheduledTaskType, string> = {
   shell: "Shell Command",
+  script: "Custom Script",
   "restart-app": "Restart App",
   backup: "Run Backup",
   "pull-images": "Pull Docker Images",
@@ -38,6 +40,7 @@ const DEFAULT_FORM: TaskFormState = {
   label: "",
   taskType: "shell",
   shellCommand: SHELL_COMMAND_ALLOWLIST[0],
+  script: "",
   appId: "",
   appName: "",
   cronPreset: CRON_PRESETS[1].value,
@@ -59,6 +62,7 @@ function formatRelative(iso: string | null, future = false): string {
 
 function buildConfig(form: TaskFormState): ScheduledTaskConfig {
   if (form.taskType === "shell") return { type: "shell", command: form.shellCommand };
+  if (form.taskType === "script") return { type: "script", script: form.script };
   if (form.taskType === "restart-app") return { type: "restart-app", appId: form.appId, appName: form.appName };
   if (form.taskType === "backup") return { type: "backup" };
   return { type: "pull-images" };
@@ -196,6 +200,7 @@ function CreateTaskForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.label.trim()) return;
+    if (form.taskType === "script" && !form.script.trim()) return;
     if (form.taskType === "restart-app" && !form.appId) return;
     setSubmitting(true);
     try {
@@ -254,6 +259,23 @@ function CreateTaskForm({
               <option key={cmd} value={cmd}>{cmd}</option>
             ))}
           </select>
+        </div>
+      )}
+
+      {/* Custom script editor */}
+      {form.taskType === "script" && (
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-medium text-muted-foreground">Bash script</label>
+          <textarea
+            required
+            rows={6}
+            value={form.script}
+            onChange={(e) => patch({ script: e.target.value })}
+            placeholder={"#!/bin/bash\n# your commands here"}
+            spellCheck={false}
+            className="resize-y rounded-md border border-glass-border/80 bg-background/42 px-3 py-2 font-mono text-xs text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
+          />
+          <p className="text-[11px] text-muted-foreground/60">Runs via <code className="font-mono">bash -c</code> with a 2-minute timeout.</p>
         </div>
       )}
 

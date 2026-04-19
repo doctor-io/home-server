@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { exec } from "node:child_process";
+import { exec, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import path from "node:path";
 import { db } from "@/lib/server/db/drizzle";
@@ -117,6 +117,60 @@ export async function getDueTasks(): Promise<ScheduledTaskRecord[]> {
   return rows.map(toRecord);
 }
 
+const MAX_OUTPUT_BYTES = 1024 * 1024; // 1 MB stream cap
+
+function runScript(script: string, timeoutMs: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = spawn("bash", ["-c", script], {
+      detached: true,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    let output = "";
+    let bytesSeen = 0;
+    let capped = false;
+
+    const onData = (chunk: Buffer) => {
+      if (capped) return;
+      bytesSeen += chunk.length;
+      if (bytesSeen > MAX_OUTPUT_BYTES) {
+        capped = true;
+        output += "\n[output truncated]";
+        return;
+      }
+      output += chunk.toString();
+    };
+
+    child.stdout.on("data", onData);
+    child.stderr.on("data", onData);
+
+    const timer = setTimeout(() => {
+      try {
+        // Kill the entire process group
+        process.kill(-(child.pid!), "SIGKILL");
+      } catch {
+        child.kill("SIGKILL");
+      }
+      reject(new Error(`Script timed out after ${timeoutMs / 1000}s`));
+    }, timeoutMs);
+
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      const result = output.trim().slice(0, 2000);
+      if (code === 0) {
+        resolve(result);
+      } else {
+        reject(new Error(result || `Script exited with code ${code}`));
+      }
+    });
+
+    child.on("error", (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+  });
+}
+
 export async function runScheduledTask(id: string): Promise<void> {
   const task = await getScheduledTask(id);
   if (!task) return;
@@ -129,8 +183,10 @@ export async function runScheduledTask(id: string): Promise<void> {
       const command = task.taskConfig.command;
       const allowed = (SHELL_COMMAND_ALLOWLIST as readonly string[]).includes(command);
       if (!allowed) throw new Error(`Command not allowed: ${command}`);
-      const result = await execAsync(command, { timeout: 30_000 });
+      const result = await execAsync(command, { timeout: 30_000, maxBuffer: 1024 * 1024 });
       output = (result.stdout + result.stderr).trim().slice(0, 2000);
+    } else if (task.taskConfig.type === "script") {
+      output = await runScript(task.taskConfig.script, 120_000);
     } else if (task.taskConfig.type === "restart-app") {
       const stack = await findInstalledStackByAppId(task.taskConfig.appId);
       if (!stack) throw new Error(`App not found: ${task.taskConfig.appId}`);
@@ -157,7 +213,9 @@ export async function runScheduledTask(id: string): Promise<void> {
     }
   } catch (err) {
     status = "error";
-    output = err instanceof Error ? err.message : String(err);
+    const rawMessage = err instanceof Error ? err.message : String(err);
+    // Strip any embedded command text from exec errors to avoid leaking script content
+    output = rawMessage.replace(/Command failed:[^\n]*\n?/, "").trim().slice(0, 500) || "Task failed";
 
     createNotification({
       title: `Scheduled task failed: ${task.label}`,
