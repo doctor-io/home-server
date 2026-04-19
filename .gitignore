@@ -18,6 +18,8 @@ next-env.d.ts
 logs/
 !app/api/v1/logs/
 !app/api/v1/logs/**
+!app/api/v1/apps/**/logs/
+!app/api/v1/apps/**/logs/**
 !lib/server/modules/logs/
 !lib/server/modules/logs/**
 
