@@ -1,7 +1,10 @@
-export type ScheduledTaskType = "shell" | "restart-app" | "backup" | "pull-images";
+import { z } from "zod";
+
+export type ScheduledTaskType = "shell" | "script" | "restart-app" | "backup" | "pull-images";
 
 export type ScheduledTaskConfig =
   | { type: "shell"; command: string }
+  | { type: "script"; script: string }
   | { type: "restart-app"; appId: string; appName: string }
   | { type: "backup" }
   | { type: "pull-images" };
@@ -59,3 +62,31 @@ export const SHELL_COMMAND_ALLOWLIST = [
   "journalctl --vacuum-size=500M",
   "sync && echo 3 > /proc/sys/vm/drop_caches",
 ] as const;
+
+// 5-field cron: basic validation (digits, *, commas, hyphens, slashes)
+const cronField = /^(\*|[0-9,\-*/]+)$/;
+export const CRON_EXPRESSION_REGEX = /^(\*|[0-9,\-*/]+)\s+(\*|[0-9,\-*/]+)\s+(\*|[0-9,\-*/]+)\s+(\*|[0-9,\-*/]+)\s+(\*|[0-9,\-*/]+)$/;
+
+const taskConfigSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("shell"), command: z.enum(SHELL_COMMAND_ALLOWLIST) }),
+  z.object({ type: z.literal("script"), script: z.string().min(1).max(32_768) }),
+  z.object({ type: z.literal("restart-app"), appId: z.string().min(1), appName: z.string().min(1) }),
+  z.object({ type: z.literal("backup") }),
+  z.object({ type: z.literal("pull-images") }),
+]);
+
+export const createScheduledTaskSchema = z.object({
+  label: z.string().min(1).max(200),
+  taskType: z.enum(["shell", "script", "restart-app", "backup", "pull-images"]),
+  taskConfig: taskConfigSchema,
+  cronExpression: z.string().regex(CRON_EXPRESSION_REGEX, "Invalid cron expression"),
+  enabled: z.boolean().optional(),
+});
+
+export const updateScheduledTaskSchema = z.object({
+  label: z.string().min(1).max(200).optional(),
+  taskType: z.enum(["shell", "script", "restart-app", "backup", "pull-images"]).optional(),
+  taskConfig: taskConfigSchema.optional(),
+  cronExpression: z.string().regex(CRON_EXPRESSION_REGEX, "Invalid cron expression").optional(),
+  enabled: z.boolean().optional(),
+});
