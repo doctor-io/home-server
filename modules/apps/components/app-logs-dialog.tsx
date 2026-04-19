@@ -71,7 +71,7 @@ export function AppLogsDialog({ target, onClose }: AppLogsDialogProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const esRef = useRef<EventSource | null>(null);
 
-  const openStream = useCallback((appId: string, append = false) => {
+  const openStream = useCallback((appId: string, containerName: string, append = false) => {
     esRef.current?.close();
     setStreamError(null);
     setStreamEnded(false);
@@ -82,7 +82,8 @@ export function AppLogsDialog({ target, onClose }: AppLogsDialogProps) {
       setAutoScroll(true);
     }
 
-    const es = new EventSource(`/api/v1/apps/${appId}/logs/stream`);
+    const url = `/api/v1/apps/${appId}/logs/stream?container=${encodeURIComponent(containerName)}`;
+    const es = new EventSource(url);
     esRef.current = es;
 
     es.addEventListener("log.line", (event) => {
@@ -141,7 +142,7 @@ export function AppLogsDialog({ target, onClose }: AppLogsDialogProps) {
       setIsConnected(false);
       return;
     }
-    openStream(target.appId);
+    openStream(target.appId, target.containerName);
     return () => {
       esRef.current?.close();
       esRef.current = null;
@@ -168,7 +169,7 @@ export function AppLogsDialog({ target, onClose }: AppLogsDialogProps) {
 
   const handleReconnect = useCallback(() => {
     if (!target) return;
-    openStream(target.appId, true);
+    openStream(target.appId, target.containerName, true);
   }, [target, openStream]);
 
   const downloadLogs = useCallback(() => {
