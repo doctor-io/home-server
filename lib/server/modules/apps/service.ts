@@ -111,7 +111,7 @@ const DEMO_APPS: InstalledApp[] = [
 ];
 
 const appsCache = new LruCache<InstalledApp[]>(4, 5_000);
-const DB_UNAVAILABLE_BACKOFF_MS = 60_000;
+const DB_UNAVAILABLE_BACKOFF_MS = 5_000;
 let dbUnavailableUntil = 0;
 
 export function invalidateInstalledAppsCache() {
