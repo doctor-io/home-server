@@ -31,6 +31,12 @@ async function run() {
   const pool = new Pool({ connectionString: getDatabaseUrl() });
   const db = drizzle(pool);
 
+  // Reset migration tracking so every migration reruns from scratch.
+  // All SQL files use IF NOT EXISTS / DO $$ EXCEPTION blocks, so rerunning
+  // is always safe — existing tables and data are never touched.
+  await pool.query(`CREATE SCHEMA IF NOT EXISTS drizzle`);
+  await pool.query(`DROP TABLE IF EXISTS drizzle.__drizzle_migrations`);
+
   await migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
 
   await pool.end();

@@ -22,13 +22,6 @@
       "when": 1776500000000,
       "tag": "0002_notifications_scheduled_tasks",
       "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1776600000000,
-      "tag": "0003_ensure_notifications_scheduled_tasks",
-      "breakpoints": true
     }
   ]
 }
