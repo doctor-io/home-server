@@ -8,6 +8,20 @@
       "when": 1776413023965,
       "tag": "0000_slippery_black_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1776413100000,
+      "tag": "0001_instance_config",
+      "breakpoints": false
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1776500000000,
+      "tag": "0002_notifications_scheduled_tasks",
+      "breakpoints": true
     }
   ]
 }

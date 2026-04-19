@@ -1,6 +1,6 @@
 {
   "name": "homeio",
-  "version": "1.5.10",
+  "version": "1.5.11",
   "description": "Self-hosted home server dashboard — desktop-style UI for managing Docker apps, files, terminal, and system resources.",
   "author": "doctor-io",
   "license": "MIT",
@@ -24,8 +24,9 @@
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "prepare": "husky",
-    "db:init": "drizzle-kit push --force",
+    "db:init": "tsx ./scripts/db-migrate.ts",
     "db:reset": "tsx ./scripts/db-reset.ts",
+    "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate"
   },
   "lint-staged": {

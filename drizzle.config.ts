@@ -53,7 +53,7 @@ function resolveDatabaseUrl() {
 }
 
 export default {
-  schema: "./lib/server/db/schema-definitions.ts",
+  schema: "./lib/server/db/schema.ts",
   out: "./drizzle",
   dialect: "postgresql",
   schemaFilter: ["public"],
