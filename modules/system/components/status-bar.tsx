@@ -87,7 +87,8 @@ export function StatusBar({
         style={{
           background: "var(--system-surface)",
           backdropFilter: "blur(40px) saturate(160%)",
-          boxShadow: "var(--system-shadow-floating), inset 0 1px 0 rgba(255,255,255,0.12)",
+          boxShadow:
+            "var(--system-shadow-floating), inset 0 1px 0 rgba(255,255,255,0.12)",
           overflow: "visible",
         }}
       >
@@ -104,13 +105,6 @@ export function StatusBar({
           <span className="text-xs font-semibold tracking-tight text-foreground">
             <span className="xl:hidden">{`Hi, ${toTitleCaseUsername(username)}`}</span>
             <span className="hidden xl:inline">{`Welcome back, ${toTitleCaseUsername(username)}`}</span>
-          </span>
-          <span
-            className="text-sm leading-none text-status-amber"
-            role="img"
-            aria-label="waving hand"
-          >
-            👋
           </span>
         </div>
 

@@ -61,14 +61,14 @@ export function AddNetworkShareDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent showCloseButton={false} className="max-w-[34rem] gap-0 border-glass-border bg-card/98 p-0 shadow-2xl">
-        <DialogHeader className="border-b border-glass-border px-5 py-4">
+      <DialogContent showCloseButton={false} className="max-w-[34rem] gap-0 border-glass-border bg-popover/96 p-0 shadow-2xl shadow-black/45 backdrop-blur-2xl">
+        <DialogHeader className="border-b border-glass-border/60 px-5 py-4">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-start gap-3">
               <button
                 type="button"
                 onClick={onClose}
-                className="inline-flex size-9 items-center justify-center rounded-lg border border-glass-border bg-background/80 text-muted-foreground transition-colors hover:bg-secondary/40 hover:text-foreground"
+                className="inline-flex size-9 items-center justify-center rounded-lg border border-glass-border bg-background/80 text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground"
                 aria-label="Back"
               >
                 <ArrowLeft className="size-4" />
@@ -80,7 +80,7 @@ export function AddNetworkShareDialog({
                 </DialogDescription>
               </div>
             </div>
-            <DialogClose className="inline-flex size-9 items-center justify-center rounded-lg border border-glass-border bg-background/80 text-muted-foreground transition-colors hover:bg-secondary/40 hover:text-foreground">
+            <DialogClose className="inline-flex size-9 items-center justify-center rounded-lg border border-glass-border bg-background/80 text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground">
               <XIcon className="size-4" />
               <span className="sr-only">Close</span>
             </DialogClose>
@@ -102,7 +102,7 @@ export function AddNetworkShareDialog({
                 type="button"
                 onClick={onDiscoverServers}
                 disabled={isBusy}
-                className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-glass-border bg-background/55 px-3 text-xs text-muted-foreground transition-colors hover:bg-secondary/40 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-glass-border bg-background/55 px-3 text-xs text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <RefreshCw className="size-3" />
                 Scan
@@ -144,7 +144,7 @@ export function AddNetworkShareDialog({
                 type="button"
                 onClick={onDiscoverShares}
                 disabled={isBusy}
-                className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-glass-border bg-background/55 px-3 text-xs text-muted-foreground transition-colors hover:bg-secondary/40 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-glass-border bg-background/55 px-3 text-xs text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {discoverSharesPending ? (
                   <Loader2 className="size-3 animate-spin" />
@@ -172,11 +172,11 @@ export function AddNetworkShareDialog({
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-t border-glass-border px-5 py-4">
+        <div className="flex items-center justify-end gap-2 border-t border-glass-border/60 px-5 py-4">
           <button
             type="button"
             onClick={onClose}
-            className="h-8 rounded-lg border border-glass-border bg-background/55 px-3 text-xs text-muted-foreground transition-colors hover:bg-secondary/40 hover:text-foreground"
+            className="h-8 rounded-lg border border-glass-border bg-background/55 px-3 text-xs text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground"
           >
             Cancel
           </button>

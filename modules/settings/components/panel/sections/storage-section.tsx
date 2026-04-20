@@ -1,266 +1,228 @@
+"use client";
+
 import {
-    InfoBanner,
-    SectionDivider,
-    StorageBar,
-    formatStorageSize,
+  InfoBanner,
+  SectionDivider,
+  formatStorageSize,
 } from "@/modules/settings/components/panel/controls";
-import {
-  SETTINGS_BADGE_SURFACE,
-  SETTINGS_PANEL_INSET,
-} from "@/modules/settings/components/panel/surface";
+import { SETTINGS_PANEL_INSET } from "@/modules/settings/components/panel/surface";
 import type { SettingsBackend } from "@/modules/settings/components/panel/types";
 import { HardDrive, Thermometer } from "@/components/icons/platform-icons";
+import { cn } from "@/lib/utils";
 
 type StorageSectionProps = {
   data: SettingsBackend["storage"];
 };
 
+const DISK_COLORS = [
+  "oklch(0.72 0.14 190)",
+  "oklch(0.65 0.15 160)",
+  "oklch(0.78 0.12 85)",
+  "oklch(0.6 0.2 340)",
+];
+
+function UsageBar({ pct, color }: { pct: number; color: string }) {
+  const safe = Math.max(0, Math.min(pct, 100));
+  return (
+    <div className="h-1.5 overflow-hidden rounded-full bg-background/65">
+      <div className="h-full rounded-full transition-all" style={{ width: `${safe}%`, backgroundColor: color }} />
+    </div>
+  );
+}
+
+function StatusDot({ status }: { status: string }) {
+  return (
+    <div className={cn(
+      "size-2 shrink-0 rounded-full",
+      status === "healthy" ? "bg-status-green" : status === "degraded" ? "bg-status-amber" : "bg-muted-foreground/40",
+    )} />
+  );
+}
+
 export function StorageSection({ data }: StorageSectionProps) {
-  const rootUsedPercent =
-    data.usedPercent !== null && data.usedPercent !== undefined
-      ? Number(data.usedPercent.toFixed(1))
-      : 0;
-  const diskColors = [
-    "oklch(0.72 0.14 190)",
-    "oklch(0.65 0.15 160)",
-    "oklch(0.78 0.12 85)",
-    "oklch(0.6 0.2 340)",
-  ];
-  const smartCheckedLabel = data.smart?.checkedAt
-    ? new Date(data.smart.checkedAt).toLocaleString()
-    : null;
+  const rootUsedPct = data.usedPercent != null ? Number(data.usedPercent.toFixed(1)) : 0;
   const smartData = data.smart;
+  const smartCheckedLabel = smartData?.checkedAt
+    ? new Date(smartData.checkedAt).toLocaleString()
+    : null;
 
   return (
     <div className="flex flex-col gap-1">
-      {data.warning ? (
-        <InfoBanner
-          text={data.warning}
-          variant={data.unavailable ? "warning" : "info"}
-        />
-      ) : null}
-      <SectionDivider title="Files Root Usage" />
-      <StorageBar
-        label={`${data.mountPath} (FILES_ROOT)`}
-        detail={
-          data.summary !== "--"
-            ? `${data.summary} (${Math.round(rootUsedPercent)}%)`
-            : "Usage unavailable"
-        }
-        pct={rootUsedPercent}
-        color="oklch(0.72 0.14 190)"
-      />
-      <div className="grid grid-cols-3 gap-4 text-xs py-2">
-        <div>
-          <span className="text-xs text-muted-foreground block">Used</span>
-          <span className="text-foreground">
-            {formatStorageSize(data.usedBytes)}
+      {data.warning && (
+        <InfoBanner text={data.warning} variant={data.unavailable ? "warning" : "info"} />
+      )}
+
+      {/* ── Files root ── */}
+      <SectionDivider title="Files Root" />
+      <div className={cn(SETTINGS_PANEL_INSET, "px-4 py-3")}>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <span className="font-mono text-xs text-muted-foreground">{data.mountPath}</span>
+          <span className="text-xs font-medium text-foreground">
+            {data.summary !== "--" ? `${data.summary} · ${Math.round(rootUsedPct)}%` : "Unavailable"}
           </span>
         </div>
-        <div>
-          <span className="text-xs text-muted-foreground block">Available</span>
-          <span className="text-foreground">
-            {formatStorageSize(data.availableBytes)}
-          </span>
-        </div>
-        <div>
-          <span className="text-xs text-muted-foreground block">Total</span>
-          <span className="text-foreground">
-            {formatStorageSize(data.totalBytes)}
-          </span>
+        <UsageBar pct={rootUsedPct} color={DISK_COLORS[0]!} />
+        <div className="mt-3 flex gap-6">
+          {[
+            { label: "Used", value: formatStorageSize(data.usedBytes) },
+            { label: "Available", value: formatStorageSize(data.availableBytes) },
+            { label: "Total", value: formatStorageSize(data.totalBytes) },
+          ].map(({ label, value }) => (
+            <div key={label}>
+              <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground/60">{label}</div>
+              <div className="mt-0.5 text-xs font-medium text-foreground">{value}</div>
+            </div>
+          ))}
         </div>
       </div>
 
+      {/* ── Disks ── */}
       <SectionDivider title="Disks" />
       {data.disks.length === 0 ? (
-        <div className="py-2 text-xs text-muted-foreground">
+        <div className={cn(SETTINGS_PANEL_INSET, "px-4 py-3 text-xs text-muted-foreground")}>
           No disk metrics available.
         </div>
       ) : (
-        data.disks.map((disk, index) => (
-          <StorageBar
-            key={disk.id}
-            label={disk.label}
-            detail={`${formatStorageSize(disk.usedBytes)} / ${formatStorageSize(disk.totalBytes)} (${Math.round(disk.usedPercent)}%)`}
-            pct={disk.usedPercent}
-            color={diskColors[index % diskColors.length]}
-          />
-        ))
+        <div className={cn(SETTINGS_PANEL_INSET, "divide-y divide-glass-border/50 px-4")}>
+          {data.disks.map((disk, i) => (
+            <div key={disk.id} className="py-3">
+              <div className="mb-1.5 flex items-center justify-between gap-2">
+                <span className="text-xs font-medium text-foreground">{disk.label}</span>
+                <span className="text-xs text-muted-foreground">
+                  {formatStorageSize(disk.usedBytes)} / {formatStorageSize(disk.totalBytes)} · {Math.round(disk.usedPercent)}%
+                </span>
+              </div>
+              <UsageBar pct={disk.usedPercent} color={DISK_COLORS[i % DISK_COLORS.length]!} />
+            </div>
+          ))}
+        </div>
       )}
 
-      <SectionDivider title="RAID Configuration" />
+      {/* ── RAID ── */}
+      <SectionDivider title="RAID" />
       {data.raid ? (
-        <div className={`${SETTINGS_PANEL_INSET} p-3`}>
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-sm font-medium text-foreground">
-              Pool: {data.raid.name}
-            </span>
-            <span
-              className={`${SETTINGS_BADGE_SURFACE} px-2 py-0.5 text-xs font-medium ${
-                data.raid.status === "healthy"
-                  ? "bg-status-green/15 text-status-green"
-                  : data.raid.status === "degraded"
-                    ? "bg-status-amber/15 text-status-amber"
-                    : "bg-secondary text-muted-foreground"
-              }`}
-            >
-              {data.raid.status}
-            </span>
+        <div className={cn(SETTINGS_PANEL_INSET, "overflow-hidden")}>
+          <div className="flex items-center justify-between px-4 py-3">
+            <div className="flex items-center gap-2.5">
+              <StatusDot status={data.raid.status} />
+              <span className="text-sm font-medium text-foreground">{data.raid.name}</span>
+            </div>
+            <span className="text-xs text-muted-foreground">{data.raid.type}</span>
           </div>
-          <div className="grid grid-cols-3 gap-4 text-xs">
-            <div>
-              <span className="block text-xs text-muted-foreground">Type</span>
-              <span className="text-foreground">{data.raid.type}</span>
-            </div>
-            <div>
-              <span className="block text-xs text-muted-foreground">
-                Total Size
-              </span>
-              <span className="text-foreground">
-                {formatStorageSize(data.raid.totalBytes)}
+          <div className="divide-y divide-glass-border/50 border-t border-glass-border/50 px-4">
+            <div className="flex items-center justify-between py-2.5">
+              <span className="text-xs text-muted-foreground">Status</span>
+              <span className={cn(
+                "text-xs font-medium",
+                data.raid.status === "healthy" ? "text-status-green" : data.raid.status === "degraded" ? "text-status-amber" : "text-muted-foreground",
+              )}>
+                {data.raid.status}
               </span>
             </div>
-            <div>
-              <span className="block text-xs text-muted-foreground">
-                Redundancy
-              </span>
-              <span className="text-foreground">
-                {data.raid.redundancy ?? "Not reported"}
-              </span>
+            <div className="flex items-center justify-between py-2.5">
+              <span className="text-xs text-muted-foreground">Total size</span>
+              <span className="text-xs font-medium text-foreground">{formatStorageSize(data.raid.totalBytes)}</span>
+            </div>
+            <div className="flex items-center justify-between py-2.5">
+              <span className="text-xs text-muted-foreground">Redundancy</span>
+              <span className="text-xs font-medium text-foreground">{data.raid.redundancy ?? "Not reported"}</span>
             </div>
           </div>
         </div>
       ) : (
-        <div className={`${SETTINGS_PANEL_INSET} px-3 py-3 text-xs text-muted-foreground`}>
+        <div className={cn(SETTINGS_PANEL_INSET, "px-4 py-3 text-xs text-muted-foreground")}>
           No RAID pool detected on this host.
         </div>
       )}
 
+      {/* ── Shared Folders ── */}
       <SectionDivider title="Shared Folders" />
-      <div className="flex items-center justify-between text-xs text-muted-foreground py-1">
-        <span>Local shares: {data.localShareCount}</span>
-        <span>Network shares: {data.networkShareCount}</span>
-      </div>
-      <div className={`${SETTINGS_PANEL_INSET} overflow-hidden`}>
+      <div className={cn(SETTINGS_PANEL_INSET, "overflow-hidden")}>
         {data.shares.length === 0 ? (
-          <div className="px-3 py-3 text-xs text-muted-foreground">
-            No shared folders configured.
-          </div>
+          <div className="px-4 py-3 text-xs text-muted-foreground">No shared folders configured.</div>
         ) : (
-          data.shares.map((share, index) => (
-            <div
-              key={share.id}
-              className={`flex items-center justify-between px-3 py-2.5 text-xs ${
-                index < data.shares.length - 1
-                  ? "border-b border-glass-border"
-                  : ""
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <HardDrive className="size-3.5 text-primary" />
-                <div className="flex flex-col">
-                  <span className="text-foreground font-medium">
-                    {share.name}
-                  </span>
-                  <span className="text-muted-foreground font-mono">
-                    {share.path}
-                  </span>
+          <div className="divide-y divide-glass-border/50">
+            {data.shares.map((share) => (
+              <div key={share.id} className="flex items-center gap-3 px-4 py-2.5">
+                <div className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-glass-border bg-background/55">
+                  <HardDrive className="size-3.5 text-primary" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-medium text-foreground">{share.name}</div>
+                  <div className="font-mono text-[11px] text-muted-foreground/70">{share.path}</div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className="text-[11px] text-muted-foreground">{share.protocol}</span>
+                  <div className={cn(
+                    "size-1.5 rounded-full",
+                    share.status === "Mounted" ? "bg-status-green" : share.status === "Partially configured" ? "bg-status-amber" : "bg-muted-foreground/40",
+                  )} />
                 </div>
               </div>
-              <div className="flex items-center gap-4">
-                <span className="text-muted-foreground">{share.protocol}</span>
-                <span
-                  className={
-                    share.status === "Mounted"
-                      ? "text-status-green"
-                      : share.status === "Partially configured"
-                        ? "text-status-amber"
-                        : "text-muted-foreground"
-                  }
-                >
-                  {share.status}
-                </span>
-              </div>
-            </div>
-          ))
+            ))}
+          </div>
         )}
+        <div className="flex items-center justify-between border-t border-glass-border/50 px-4 py-2">
+          <span className="text-[11px] text-muted-foreground/60">{data.localShareCount} local · {data.networkShareCount} network</span>
+        </div>
       </div>
 
+      {/* ── S.M.A.R.T. ── */}
       <SectionDivider title="S.M.A.R.T. Health" />
-      <InfoBanner
-        text={
-          smartData
-            ? `${smartData.message}${smartCheckedLabel ? ` Last checked: ${smartCheckedLabel}.` : ""}`
-            : "S.M.A.R.T. status unavailable on this host."
-        }
-        variant={smartData?.status === "degraded" ? "warning" : "info"}
-      />
-      {smartData && smartData.disks.length > 0 ? (
-        <div className={`${SETTINGS_PANEL_INSET} overflow-hidden`}>
-          {smartData.disks.map((disk, index) => (
-            <div
-              key={disk.device}
-              className={`flex items-center justify-between px-3 py-2.5 ${
-                index < smartData.disks.length - 1
-                  ? "border-b border-glass-border"
-                  : ""
-              }`}
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <HardDrive className="size-3.5 shrink-0 text-primary" />
-                <div className="flex flex-col min-w-0">
-                  <span className="text-xs font-medium text-foreground font-mono truncate">
-                    {disk.device}
-                  </span>
-                  {disk.name ? (
-                    <span className="text-xs text-muted-foreground truncate">
-                      {disk.name}
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-              <div className="flex items-center gap-3 shrink-0 ml-3">
-                {disk.type ? (
-                  <span className="text-xs text-muted-foreground">
-                    {disk.type}
-                  </span>
-                ) : null}
-                {disk.sizeBytes !== null ? (
-                  <span className="text-xs text-muted-foreground">
-                    {formatStorageSize(disk.sizeBytes)}
-                  </span>
-                ) : null}
-                {disk.temperatureCelsius !== null ? (
-                  <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
-                    <Thermometer className="size-3" />
-                    {disk.temperatureCelsius}°C
-                  </span>
-                ) : null}
-                {disk.powerOnHours !== null ? (
-                  <span className="text-xs text-muted-foreground">
-                    {disk.powerOnHours >= 8_760
-                      ? `${(disk.powerOnHours / 8_760).toFixed(1)}yr`
-                      : disk.powerOnHours >= 24
-                        ? `${Math.floor(disk.powerOnHours / 24)}d`
-                        : `${disk.powerOnHours}h`}
-                  </span>
-                ) : null}
-                <span
-                  className={`${SETTINGS_BADGE_SURFACE} px-2 py-0.5 text-xs font-medium ${
-                    disk.status === "healthy"
-                      ? "bg-status-green/15 text-status-green"
-                      : disk.status === "degraded"
-                        ? "bg-status-red/15 text-status-red"
-                        : "bg-secondary text-muted-foreground"
-                  }`}
-                >
-                  {disk.smartStatus}
-                </span>
-              </div>
-            </div>
-          ))}
+      {!smartData ? (
+        <div className={cn(SETTINGS_PANEL_INSET, "px-4 py-3 text-xs text-muted-foreground")}>
+          S.M.A.R.T. status unavailable on this host.
         </div>
-      ) : null}
+      ) : (
+        <div className={cn(SETTINGS_PANEL_INSET, "overflow-hidden")}>
+          <div className="flex items-center justify-between px-4 py-3">
+            <div className="flex items-center gap-2.5">
+              <StatusDot status={smartData.status} />
+              <span className="text-sm font-medium text-foreground">{smartData.message}</span>
+            </div>
+            {smartCheckedLabel && (
+              <span className="text-[11px] text-muted-foreground/60">{smartCheckedLabel}</span>
+            )}
+          </div>
+          {smartData.disks.length > 0 && (
+            <div className="divide-y divide-glass-border/50 border-t border-glass-border/50">
+              {smartData.disks.map((disk) => (
+                <div key={disk.device} className="flex items-center gap-3 px-4 py-2.5">
+                  <div className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-glass-border bg-background/55">
+                    <HardDrive className="size-3.5 text-primary" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-mono text-xs font-medium text-foreground">{disk.device}</div>
+                    {disk.name && <div className="text-[11px] text-muted-foreground/70">{disk.name}</div>}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2 text-[11px] text-muted-foreground">
+                    {disk.type && <span>{disk.type}</span>}
+                    {disk.sizeBytes != null && <span>{formatStorageSize(disk.sizeBytes)}</span>}
+                    {disk.temperatureCelsius != null && (
+                      <span className="flex items-center gap-0.5">
+                        <Thermometer className="size-3" />{disk.temperatureCelsius}°C
+                      </span>
+                    )}
+                    {disk.powerOnHours != null && (
+                      <span>
+                        {disk.powerOnHours >= 8_760
+                          ? `${(disk.powerOnHours / 8_760).toFixed(1)}yr`
+                          : disk.powerOnHours >= 24
+                            ? `${Math.floor(disk.powerOnHours / 24)}d`
+                            : `${disk.powerOnHours}h`}
+                      </span>
+                    )}
+                    <div className={cn(
+                      "size-1.5 rounded-full",
+                      disk.status === "healthy" ? "bg-status-green" : disk.status === "degraded" ? "bg-status-red" : "bg-muted-foreground/40",
+                    )} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

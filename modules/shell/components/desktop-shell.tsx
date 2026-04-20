@@ -126,6 +126,7 @@ function DesktopShellInner() {
     wallpapers,
     accentColors,
     appIconSize,
+    wallpaperAccentColor,
   } = useDesktopAppearance();
   const rebootRecovery = useRebootRecovery();
 
@@ -772,6 +773,7 @@ function DesktopShellInner() {
               wallpaperOptions={wallpapers}
               accentOptions={accentColors}
               onAppearanceChange={updateAppearance}
+              wallpaperAccentColor={wallpaperAccentColor}
               selectedSection={settingsSectionRequest}
             />
           </Window>

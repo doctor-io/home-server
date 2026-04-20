@@ -1,7 +1,8 @@
 "use client";
 
-import { DeleteRegular } from "@fluentui/react-icons";
+import { cn } from "@/lib/utils";
 import { FILES_BADGE_SURFACE } from "@/modules/files/components/file-manager-surface";
+import { DeleteRegular } from "@fluentui/react-icons";
 
 type StatusBarProps = {
   clipboardName: string | null;
@@ -31,40 +32,43 @@ export function FileManagerStatusBar({
   onTrashSelected,
 }: StatusBarProps) {
   return (
-    <div className="flex items-center justify-between border-t border-glass-border/80 bg-background/48 px-3 py-1.5 text-xs text-muted-foreground">
+    <div className="flex items-center justify-between border-t border-glass-border/60 bg-background/50 px-3 py-1.5 text-xs text-muted-foreground">
       <span className="flex items-center gap-3">
         <span>
           {folderCount > 0 && `${folderCount} folder${folderCount > 1 ? "s" : ""}`}
           {folderCount > 0 && fileCount > 0 ? ", " : ""}
           {fileCount > 0 && `${fileCount} file${fileCount > 1 ? "s" : ""}`}
         </span>
-        {selectedFilesCount > 1 ? (
+        {selectedFilesCount > 1 && (
           <span className="flex items-center gap-1.5 text-primary">
             <span>{selectedFilesCount} selected</span>
-            {!isTrashView && !isStarredView ? (
+            {!isTrashView && !isStarredView && (
               <button
                 onClick={onTrashSelected}
-                className={`flex items-center gap-1 px-1.5 py-0.5 text-status-red transition-colors hover:bg-status-red/20 cursor-pointer ${FILES_BADGE_SURFACE}`}
                 title="Move selected to Trash"
+                className={cn(
+                  "flex items-center gap-1 px-1.5 py-0.5 text-status-red transition-colors hover:bg-status-red/15",
+                  FILES_BADGE_SURFACE,
+                )}
               >
                 <DeleteRegular className="size-3" />
                 <span>Trash selected</span>
               </button>
-            ) : null}
+            )}
           </span>
-        ) : null}
+        )}
       </span>
 
       <div className="flex items-center gap-3">
-        {statusNotice ? (
+        {statusNotice && (
           <span className="max-w-72 truncate text-status-amber">{statusNotice}</span>
-        ) : null}
-        {clipboardName && clipboardOperation ? (
-          <span className="max-w-56 truncate text-muted-foreground">
+        )}
+        {clipboardName && clipboardOperation && (
+          <span className="max-w-56 truncate text-muted-foreground/60">
             {clipboardOperation === "copy" ? "Clipboard" : "Cut"}: {clipboardName}
           </span>
-        ) : null}
-        <span className="font-mono">
+        )}
+        <span className="font-mono text-muted-foreground/50">
           {rootLabel}
           {currentPathForDisplay.length > 0 ? `/${currentPathForDisplay.join("/")}` : ""}
         </span>

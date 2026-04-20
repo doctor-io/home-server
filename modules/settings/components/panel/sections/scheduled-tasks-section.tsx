@@ -12,9 +12,16 @@ import {
 import { useScheduledTasks } from "@/modules/settings/hooks/useScheduledTasks";
 import { useInstalledApps } from "@/modules/apps/hooks/useInstalledApps";
 import { SectionDivider } from "@/modules/settings/components/panel/controls";
-import { SETTINGS_PANEL_INSET, SETTINGS_BADGE_SURFACE } from "@/modules/settings/components/panel/surface";
-import { Check, AlertTriangle, Clock, Play, Trash2, Plus, ChevronDownIcon as ChevronDown } from "@/components/icons/platform-icons";
-import { Button } from "@/components/ui/button";
+import { SETTINGS_PANEL_INSET } from "@/modules/settings/components/panel/surface";
+import {
+  AlertTriangle,
+  Check,
+  ChevronDownIcon as ChevronDown,
+  Clock,
+  Play,
+  Plus,
+  Trash2,
+} from "@/components/icons/platform-icons";
 import { cn } from "@/lib/utils";
 
 type TaskFormState = {
@@ -72,107 +79,133 @@ function buildCron(form: TaskFormState): string {
   return form.cronPreset === "custom" ? form.customCron : form.cronPreset;
 }
 
+// ── Field helpers ────────────────────────────────────────────────────────────
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground/70">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+const inputCls = "h-8 w-full rounded-lg border border-glass-border bg-background/55 px-3 text-xs text-foreground placeholder:text-muted-foreground/50 focus:border-primary/40 focus:outline-none";
+const selectCls = "h-8 w-full cursor-pointer appearance-none rounded-lg border border-glass-border bg-background/55 px-3 text-xs text-foreground focus:border-primary/40 focus:outline-none";
+
+// ── Task row ─────────────────────────────────────────────────────────────────
+
 function TaskRow({
   task,
   onToggle,
   onRunNow,
   onDelete,
-  runningId,
+  isRunning,
 }: {
   task: ScheduledTaskRecord;
   onToggle: () => void;
   onRunNow: () => void;
   onDelete: () => void;
-  runningId: string | null;
+  isRunning: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const isRunning = runningId === task.id;
 
   return (
-    <div className={cn(SETTINGS_PANEL_INSET, "flex flex-col gap-0 overflow-hidden")}>
+    <div className={cn(SETTINGS_PANEL_INSET, "overflow-hidden")}>
+      {/* Header */}
       <button
+        type="button"
         className="flex w-full items-center gap-3 px-4 py-3 text-left"
         onClick={() => setExpanded((v) => !v)}
       >
-        <div
-          className={cn(
-            "flex size-7 shrink-0 items-center justify-center rounded-full",
-            task.enabled ? "bg-status-green/15 text-status-green" : "bg-muted/40 text-muted-foreground",
-          )}
-        >
+        <div className={cn(
+          "flex size-7 shrink-0 items-center justify-center rounded-lg border border-glass-border bg-background/55",
+          task.enabled ? "text-primary" : "text-muted-foreground/40",
+        )}>
           <Clock className="size-3.5" />
         </div>
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-medium text-foreground">{task.label}</div>
-          <div className="truncate text-xs text-muted-foreground">
-            {TASK_TYPE_LABELS[task.taskType]} · {task.cronExpression}
+          <div className="truncate text-[11px] text-muted-foreground/70">
+            {TASK_TYPE_LABELS[task.taskType]} · <span className="font-mono">{task.cronExpression}</span>
           </div>
         </div>
-        {task.lastRunStatus === "error" && (
-          <AlertTriangle className="size-3.5 shrink-0 text-status-red" />
-        )}
-        {task.lastRunStatus === "success" && (
-          <Check className="size-3.5 shrink-0 text-status-green" />
-        )}
-        <ChevronDown
-          className={cn("size-4 shrink-0 text-muted-foreground transition-transform", expanded && "rotate-180")}
-        />
+        <div className="flex shrink-0 items-center gap-2">
+          {task.lastRunStatus === "error" && <AlertTriangle className="size-3.5 text-status-red" />}
+          {task.lastRunStatus === "success" && <Check className="size-3.5 text-status-green" />}
+          <ChevronDown className={cn("size-4 text-muted-foreground/50 transition-transform", expanded && "rotate-180")} />
+        </div>
       </button>
 
+      {/* Expanded detail */}
       {expanded && (
-        <div className="border-t border-glass-border/60 px-4 py-3 flex flex-col gap-3">
-          <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
-            <span className="text-muted-foreground">Last run</span>
-            <span className="text-foreground">{formatRelative(task.lastRunAt)}</span>
-            <span className="text-muted-foreground">Next run</span>
-            <span className="text-foreground">{task.nextRunAt ? formatRelative(task.nextRunAt, true) : "—"}</span>
+        <div className="border-t border-glass-border/50 px-4 py-3">
+          {/* Info rows */}
+          <div className="mb-3 divide-y divide-glass-border/40">
+            <div className="flex items-center justify-between py-1.5">
+              <span className="text-[11px] text-muted-foreground">Last run</span>
+              <span className={cn("text-[11px] font-medium", task.lastRunStatus === "error" ? "text-status-red" : "text-foreground")}>
+                {formatRelative(task.lastRunAt)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between py-1.5">
+              <span className="text-[11px] text-muted-foreground">Next run</span>
+              <span className="text-[11px] font-medium text-foreground">
+                {task.nextRunAt ? formatRelative(task.nextRunAt, true) : "—"}
+              </span>
+            </div>
             {task.lastRunOutput && (
-              <>
-                <span className="text-muted-foreground">Output</span>
-                <span className={cn("font-mono text-[11px] truncate", task.lastRunStatus === "error" ? "text-status-red" : "text-foreground")}>
+              <div className="py-1.5">
+                <span className="text-[11px] text-muted-foreground">Output</span>
+                <div className={cn(
+                  "mt-1 rounded-md border border-glass-border/50 bg-background/40 px-2.5 py-2 font-mono text-[11px] break-all",
+                  task.lastRunStatus === "error" ? "text-status-red" : "text-foreground/80",
+                )}>
                   {task.lastRunOutput}
-                </span>
-              </>
+                </div>
+              </div>
             )}
           </div>
+
+          {/* Actions */}
           <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={onToggle}
               className={cn(
-                SETTINGS_BADGE_SURFACE,
-                "px-2.5 py-1 text-xs font-medium transition-colors",
-                task.enabled
-                  ? "text-status-green hover:text-foreground"
-                  : "text-muted-foreground hover:text-foreground",
+                "rounded-lg border border-glass-border px-2.5 py-1 text-[11px] font-medium transition-colors",
+                task.enabled ? "bg-status-green/10 text-status-green" : "bg-background/55 text-muted-foreground hover:text-foreground",
               )}
             >
               {task.enabled ? "Enabled" : "Disabled"}
             </button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 gap-1.5 text-xs"
+            <button
+              type="button"
               onClick={onRunNow}
               disabled={isRunning}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-glass-border bg-background/55 px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Play className="size-3" />
               {isRunning ? "Running…" : "Run now"}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="ml-auto h-7 gap-1.5 text-xs text-muted-foreground hover:text-status-red"
+            </button>
+            <button
+              type="button"
               onClick={onDelete}
+              className="ml-auto inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] text-muted-foreground/50 transition-colors hover:bg-status-red/10 hover:text-status-red"
             >
               <Trash2 className="size-3" />
               Delete
-            </Button>
+            </button>
           </div>
         </div>
       )}
     </div>
   );
 }
+
+// ── Create form ──────────────────────────────────────────────────────────────
 
 function CreateTaskForm({
   onSubmit,
@@ -184,18 +217,8 @@ function CreateTaskForm({
   const [form, setForm] = useState<TaskFormState>(DEFAULT_FORM);
   const [submitting, setSubmitting] = useState(false);
   const { data: installedApps = [] } = useInstalledApps();
-
-  const patch = (update: Partial<TaskFormState>) => setForm((f) => ({ ...f, ...update }));
-
+  const patch = (u: Partial<TaskFormState>) => setForm((f) => ({ ...f, ...u }));
   const cronExpression = buildCron(form);
-  const labelPlaceholder =
-    form.taskType === "shell"
-      ? "e.g. Clean Docker images"
-      : form.taskType === "restart-app"
-        ? "e.g. Restart Jellyfin nightly"
-        : form.taskType === "backup"
-          ? "e.g. Daily backup"
-          : "e.g. Pull latest images";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -218,94 +241,84 @@ function CreateTaskForm({
 
   return (
     <form onSubmit={handleSubmit} className={cn(SETTINGS_PANEL_INSET, "flex flex-col gap-4 p-4")}>
-      <div className="text-sm font-semibold text-foreground">New Scheduled Task</div>
+      <div className="text-sm font-semibold text-foreground">New Task</div>
 
-      {/* Label */}
-      <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-muted-foreground">Label</label>
+      <Field label="Label">
         <input
           required
           value={form.label}
           onChange={(e) => patch({ label: e.target.value })}
-          placeholder={labelPlaceholder}
-          className="rounded-md border border-glass-border/80 bg-background/42 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/50"
+          placeholder="e.g. Clean Docker images"
+          className={inputCls}
         />
-      </div>
+      </Field>
 
-      {/* Task type */}
-      <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-muted-foreground">Task type</label>
+      <Field label="Type">
         <select
           value={form.taskType}
           onChange={(e) => patch({ taskType: e.target.value as ScheduledTaskType })}
-          className="rounded-md border border-glass-border/80 bg-background/42 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+          className={selectCls}
         >
           {(Object.keys(TASK_TYPE_LABELS) as ScheduledTaskType[]).map((t) => (
             <option key={t} value={t}>{TASK_TYPE_LABELS[t]}</option>
           ))}
         </select>
-      </div>
+      </Field>
 
-      {/* Shell command picker */}
       {form.taskType === "shell" && (
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-muted-foreground">Command</label>
+        <Field label="Command">
           <select
             value={form.shellCommand}
             onChange={(e) => patch({ shellCommand: e.target.value })}
-            className="rounded-md border border-glass-border/80 bg-background/42 px-3 py-2 font-mono text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+            className={cn(selectCls, "font-mono")}
           >
             {SHELL_COMMAND_ALLOWLIST.map((cmd) => (
               <option key={cmd} value={cmd}>{cmd}</option>
             ))}
           </select>
-        </div>
+        </Field>
       )}
 
-      {/* Custom script editor */}
       {form.taskType === "script" && (
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-muted-foreground">Bash script</label>
+        <Field label="Bash script">
           <textarea
             required
-            rows={6}
+            rows={5}
             value={form.script}
             onChange={(e) => patch({ script: e.target.value })}
             placeholder={"#!/bin/bash\n# your commands here"}
             spellCheck={false}
-            className="resize-y rounded-md border border-glass-border/80 bg-background/42 px-3 py-2 font-mono text-xs text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
+            className="w-full resize-y rounded-lg border border-glass-border bg-background/55 px-3 py-2 font-mono text-xs text-foreground placeholder:text-muted-foreground/40 focus:border-primary/40 focus:outline-none"
           />
-          <p className="text-[11px] text-muted-foreground/60">Runs via <code className="font-mono">bash -c</code> with a 2-minute timeout.</p>
-        </div>
+          <p className="text-[11px] text-muted-foreground/60">
+            Runs via <code className="font-mono">bash -c</code> · 2-minute timeout
+          </p>
+        </Field>
       )}
 
-      {/* App picker for restart-app */}
       {form.taskType === "restart-app" && (
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-muted-foreground">App to restart</label>
+        <Field label="App">
           <select
             value={form.appId}
             onChange={(e) => {
               const app = installedApps.find((a) => a.id === e.target.value);
               patch({ appId: e.target.value, appName: app?.name ?? "" });
             }}
-            className="rounded-md border border-glass-border/80 bg-background/42 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+            className={selectCls}
           >
             <option value="">Select app…</option>
             {installedApps.map((app) => (
               <option key={app.id} value={app.id}>{app.name}</option>
             ))}
           </select>
-        </div>
+        </Field>
       )}
 
-      {/* Schedule */}
-      <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-muted-foreground">Schedule</label>
+      <Field label="Schedule">
         <select
           value={form.cronPreset}
           onChange={(e) => patch({ cronPreset: e.target.value })}
-          className="rounded-md border border-glass-border/80 bg-background/42 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+          className={selectCls}
         >
           {CRON_PRESETS.map((p) => (
             <option key={p.value} value={p.value}>{p.label}</option>
@@ -316,23 +329,33 @@ function CreateTaskForm({
             value={form.customCron}
             onChange={(e) => patch({ customCron: e.target.value })}
             placeholder="* * * * *"
-            className="rounded-md border border-glass-border/80 bg-background/42 px-3 py-2 font-mono text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/50"
+            className={cn(inputCls, "font-mono mt-1.5")}
           />
         )}
-        <p className="text-[11px] text-muted-foreground/70 font-mono">{cronExpression}</p>
-      </div>
+        <span className="font-mono text-[11px] text-muted-foreground/60">{cronExpression}</span>
+      </Field>
 
-      <div className="flex items-center justify-end gap-2 pt-1">
-        <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
+      <div className="flex items-center justify-end gap-2 border-t border-glass-border/50 pt-3">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-lg px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+        >
           Cancel
-        </Button>
-        <Button type="submit" size="sm" disabled={submitting}>
+        </button>
+        <button
+          type="submit"
+          disabled={submitting}
+          className="rounded-lg bg-primary/15 px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/25 disabled:cursor-not-allowed disabled:opacity-50"
+        >
           {submitting ? "Creating…" : "Create task"}
-        </Button>
+        </button>
       </div>
     </form>
   );
 }
+
+// ── Section ──────────────────────────────────────────────────────────────────
 
 export function ScheduledTasksSection() {
   const { tasks, createTask, updateTask, deleteTask, runNow } = useScheduledTasks();
@@ -341,11 +364,7 @@ export function ScheduledTasksSection() {
 
   async function handleRunNow(id: string) {
     setRunningId(id);
-    try {
-      await runNow(id);
-    } finally {
-      setRunningId(null);
-    }
+    try { await runNow(id); } finally { setRunningId(null); }
   }
 
   async function handleCreate(input: CreateScheduledTaskInput) {
@@ -355,23 +374,23 @@ export function ScheduledTasksSection() {
 
   return (
     <div className="flex flex-col gap-1">
-      <SectionDivider title="Scheduled Tasks" />
+      <SectionDivider title="Tasks" />
 
       {tasks.length === 0 && !showForm && (
-        <div className="px-2 py-6 text-center text-sm text-muted-foreground">
-          No scheduled tasks yet. Create one to automate maintenance.
+        <div className={cn(SETTINGS_PANEL_INSET, "px-4 py-6 text-center text-xs text-muted-foreground")}>
+          No scheduled tasks yet.
         </div>
       )}
 
-      <div className="flex flex-col gap-2 pb-1">
+      <div className="flex flex-col gap-1.5">
         {tasks.map((task) => (
           <TaskRow
             key={task.id}
             task={task}
-            runningId={runningId}
-            onToggle={() => updateTask(task.id, { enabled: !task.enabled })}
-            onRunNow={() => handleRunNow(task.id)}
-            onDelete={() => deleteTask(task.id)}
+            isRunning={runningId === task.id}
+            onToggle={() => void updateTask(task.id, { enabled: !task.enabled })}
+            onRunNow={() => void handleRunNow(task.id)}
+            onDelete={() => void deleteTask(task.id)}
           />
         ))}
 
@@ -382,11 +401,12 @@ export function ScheduledTasksSection() {
 
       {!showForm && (
         <button
+          type="button"
           onClick={() => setShowForm(true)}
-          className="mt-1 flex items-center gap-1.5 rounded-md px-2 py-2 text-xs text-muted-foreground/60 transition-colors hover:text-foreground/80"
+          className="mt-1 flex items-center gap-1.5 rounded-lg px-2 py-2 text-xs text-muted-foreground/60 transition-colors hover:text-foreground/80"
         >
           <Plus className="size-3.5" />
-          Add scheduled task
+          Add task
         </button>
       )}
     </div>

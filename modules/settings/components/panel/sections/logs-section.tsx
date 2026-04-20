@@ -2,15 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { SectionDivider } from "@/modules/settings/components/panel/controls";
-import {
-  SETTINGS_PANEL_INSET,
-  SETTINGS_PANEL_SHELL,
-} from "@/modules/settings/components/panel/surface";
+import { SETTINGS_PANEL_INSET, SETTINGS_PANEL_SHELL } from "@/modules/settings/components/panel/surface";
 import { queryKeys } from "@/lib/shared/query-keys";
 import type { RawLogEntry, LogSource } from "@/lib/server/modules/logs/service";
-
-// ─── Types ───────────────────────────────────────────────────────────────────
+import { cn } from "@/lib/utils";
 
 type LogsApiResponse = {
   data: {
@@ -21,16 +16,12 @@ type LogsApiResponse = {
   };
 };
 
-// ─── Fetch ───────────────────────────────────────────────────────────────────
-
 async function fetchLogs(source: LogSource): Promise<LogsApiResponse["data"]> {
   const res = await fetch(`/api/v1/logs?source=${source}`);
   if (!res.ok) throw new Error(`Failed to load ${source} logs`);
   const json = (await res.json()) as LogsApiResponse;
   return json.data;
 }
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const TABS: { id: LogSource; label: string }[] = [
   { id: "homeio", label: "Homeio" },
@@ -40,45 +31,30 @@ const TABS: { id: LogSource; label: string }[] = [
 
 function levelColor(level?: string) {
   switch (level) {
-    case "error":
-      return "text-status-red";
-    case "warn":
-      return "text-status-amber";
-    case "debug":
-      return "text-muted-foreground/60";
-    default:
-      return "text-foreground/80";
+    case "error": return "text-status-red";
+    case "warn": return "text-status-amber";
+    case "debug": return "text-muted-foreground/60";
+    default: return "text-foreground/80";
   }
 }
 
 function levelBadgeColor(level?: string) {
   switch (level) {
-    case "error":
-      return "bg-status-red/15 text-status-red";
-    case "warn":
-      return "bg-status-amber/15 text-status-amber";
-    case "debug":
-      return "bg-secondary text-muted-foreground";
-    default:
-      return "bg-primary/10 text-primary";
+    case "error": return "bg-status-red/15 text-status-red";
+    case "warn": return "bg-status-amber/15 text-status-amber";
+    case "debug": return "bg-secondary text-muted-foreground";
+    default: return "bg-primary/10 text-primary";
   }
 }
 
 function formatTimestamp(ts?: string) {
   if (!ts) return null;
   try {
-    return new Date(ts).toLocaleTimeString("en-US", {
-      hour12: false,
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
+    return new Date(ts).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
   } catch {
     return ts.slice(11, 19) || null;
   }
 }
-
-// ─── Log row (structured homeio entry) ───────────────────────────────────────
 
 function HomeioLogRow({ entry }: { entry: RawLogEntry }) {
   const [expanded, setExpanded] = useState(false);
@@ -87,84 +63,43 @@ function HomeioLogRow({ entry }: { entry: RawLogEntry }) {
 
   return (
     <div
-      className={`border-b border-glass-border/40 last:border-0 px-3 py-1.5 hover:bg-background/30 transition-colors ${
-        hasDetail ? "cursor-pointer" : ""
-      }`}
+      className={cn("border-b border-glass-border/40 px-3 py-1.5 transition-colors last:border-0", hasDetail && "cursor-pointer hover:bg-background/30")}
       onClick={() => hasDetail && setExpanded((p) => !p)}
     >
-      <div className="flex items-center gap-2 min-w-0">
-        {ts ? (
-          <span className="shrink-0 text-2xs font-mono text-muted-foreground/60 w-16">
-            {ts}
-          </span>
-        ) : null}
-        {entry.level ? (
-          <span
-            className={`shrink-0 text-2xs font-bold uppercase tracking-widest px-1.5 py-0.5 rounded ${levelBadgeColor(entry.level)}`}
-          >
+      <div className="flex min-w-0 items-center gap-2">
+        {ts && <span className="w-16 shrink-0 font-mono text-2xs text-muted-foreground/60">{ts}</span>}
+        {entry.level && (
+          <span className={cn("shrink-0 rounded px-1.5 py-0.5 text-2xs font-bold uppercase tracking-widest", levelBadgeColor(entry.level))}>
             {entry.level}
           </span>
-        ) : null}
-        {entry.layer ? (
-          <span className="shrink-0 text-2xs font-mono text-muted-foreground/70">
-            {entry.layer}
-          </span>
-        ) : null}
-        <span
-          className={`truncate text-2xs font-mono ${levelColor(entry.level)}`}
-        >
-          {entry.action || entry.raw}
+        )}
+        {entry.layer && <span className="shrink-0 font-mono text-2xs text-muted-foreground/70">{entry.layer}</span>}
+        <span className={cn("truncate font-mono text-2xs", levelColor(entry.level))}>
+          {entry.action ?? entry.raw}
         </span>
-        {entry.status ? (
-          <span className="shrink-0 text-2xs text-muted-foreground/50 ml-auto">
-            {entry.status}
-          </span>
-        ) : null}
+        {entry.status && <span className="ml-auto shrink-0 text-2xs text-muted-foreground/50">{entry.status}</span>}
       </div>
-      {expanded && hasDetail ? (
-        <div className={`mt-1.5 ml-18 rounded-lg p-2 ${SETTINGS_PANEL_INSET}`}>
-          {entry.message ? (
-            <p className="text-2xs text-foreground/80 font-mono break-all">
-              {entry.message}
-            </p>
-          ) : null}
-          {entry.error ? (
-            <p className="text-2xs text-status-red font-mono break-all mt-0.5">
-              {entry.error.message}
-            </p>
-          ) : null}
+      {expanded && hasDetail && (
+        <div className={cn("ml-18 mt-1.5 rounded-lg p-2", SETTINGS_PANEL_INSET)}>
+          {entry.message && <p className="break-all font-mono text-2xs text-foreground/80">{entry.message}</p>}
+          {entry.error && <p className="mt-0.5 break-all font-mono text-2xs text-status-red">{entry.error.message}</p>}
         </div>
-      ) : null}
+      )}
     </div>
   );
 }
 
-// ─── Raw log row (system / docker) ───────────────────────────────────────────
-
 function RawLogRow({ entry }: { entry: RawLogEntry }) {
-  // Rough colorisation based on keywords
-  const isError =
-    /\b(error|failed|failure|crit|emerg|alert)\b/i.test(entry.raw);
+  const isError = /\b(error|failed|failure|crit|emerg|alert)\b/i.test(entry.raw);
   const isWarn = /\b(warn|warning)\b/i.test(entry.raw);
-
-  const color = isError
-    ? "text-status-red"
-    : isWarn
-      ? "text-status-amber"
-      : "text-foreground/75";
-
   return (
-    <div className="border-b border-glass-border/40 last:border-0 px-3 py-1">
-      <span
-        className={`text-2xs font-mono leading-relaxed break-all ${color}`}
-      >
+    <div className="border-b border-glass-border/40 px-3 py-1 last:border-0">
+      <span className={cn("break-all font-mono text-2xs leading-relaxed", isError ? "text-status-red" : isWarn ? "text-status-amber" : "text-foreground/75")}>
         {entry.raw}
       </span>
     </div>
   );
 }
-
-// ─── Main section ─────────────────────────────────────────────────────────────
 
 const REFETCH_INTERVAL = 8_000;
 
@@ -180,7 +115,6 @@ export function LogsSection() {
     staleTime: REFETCH_INTERVAL / 2,
   });
 
-  // Auto-scroll to bottom when new data arrives
   useEffect(() => {
     if (autoScroll && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -190,8 +124,7 @@ export function LogsSection() {
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
-    setAutoScroll(atBottom);
+    setAutoScroll(el.scrollHeight - el.scrollTop - el.clientHeight < 40);
   }, []);
 
   function handleDownload() {
@@ -207,51 +140,47 @@ export function LogsSection() {
   }
 
   const lastUpdated = dataUpdatedAt
-    ? new Date(dataUpdatedAt).toLocaleTimeString("en-US", {
-        hour12: false,
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      })
+    ? new Date(dataUpdatedAt).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" })
     : null;
 
-  return (
-    <div className="flex flex-col gap-1">
-      <SectionDivider title="Advanced" />
+  const sourceLabel =
+    activeSource === "homeio" ? "Homeio Application Logs" :
+    activeSource === "system" ? "System Journal" :
+    "Docker Daemon Journal";
 
-      {/* Source tabs */}
-      <div className="flex items-center gap-1 mt-1">
+  return (
+    <div className="flex flex-col gap-1.5">
+      {/* Tab bar */}
+      <div className={cn(SETTINGS_PANEL_INSET, "flex items-center gap-1 px-2 py-2")}>
         {TABS.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveSource(tab.id)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors cursor-pointer ${
-              activeSource === tab.id
-                ? "bg-primary/15 text-primary"
-                : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
-            }`}
+            className={cn(
+              "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+              activeSource === tab.id ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-background/60 hover:text-foreground",
+            )}
           >
             {tab.label}
           </button>
         ))}
-
         <div className="ml-auto flex items-center gap-2">
-          {lastUpdated ? (
+          {lastUpdated && (
             <span className="text-2xs text-muted-foreground/60">
               {isFetching ? "Refreshing…" : `Updated ${lastUpdated}`}
             </span>
-          ) : null}
+          )}
           <button
             onClick={() => void refetch()}
             disabled={isFetching}
-            className="px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-lg transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-background/60 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
           >
             Refresh
           </button>
           <button
             onClick={handleDownload}
             disabled={!data?.entries?.length}
-            className="px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-lg transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-background/60 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
           >
             Download
           </button>
@@ -259,36 +188,22 @@ export function LogsSection() {
       </div>
 
       {/* Log output */}
-      <div
-        className={`${SETTINGS_PANEL_SHELL} mt-1 overflow-hidden flex flex-col`}
-        style={{ height: "360px" }}
-      >
-        {/* Header bar */}
-        <div className="flex items-center justify-between px-3 py-1.5 border-b border-glass-border/50 shrink-0">
-          <span className="text-2xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            {activeSource === "homeio"
-              ? "Homeio Application Logs"
-              : activeSource === "system"
-                ? "System Journal"
-                : "Docker Daemon Journal"}
-          </span>
+      <div className={cn(SETTINGS_PANEL_SHELL, "flex flex-col overflow-hidden")} style={{ height: "360px" }}>
+        {/* Header */}
+        <div className="flex shrink-0 items-center justify-between border-b border-glass-border/50 px-3 py-1.5">
+          <span className="text-2xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{sourceLabel}</span>
           <div className="flex items-center gap-2">
             {data?.truncated ? (
-              <span className="text-2xs text-status-amber">
-                Showing last 500 lines
-              </span>
+              <span className="text-2xs text-status-amber">Showing last 500 lines</span>
             ) : data?.entries?.length ? (
-              <span className="text-2xs text-muted-foreground/50">
-                {data.entries.length} entries
-              </span>
+              <span className="text-2xs text-muted-foreground/50">{data.entries.length} entries</span>
             ) : null}
             <button
               onClick={() => setAutoScroll((p) => !p)}
-              className={`text-2xs px-1.5 py-0.5 rounded transition-colors cursor-pointer ${
-                autoScroll
-                  ? "text-primary bg-primary/10"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+              className={cn(
+                "rounded px-1.5 py-0.5 text-2xs transition-colors",
+                autoScroll ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground",
+              )}
             >
               {autoScroll ? "Auto-scroll on" : "Auto-scroll off"}
             </button>
@@ -296,31 +211,19 @@ export function LogsSection() {
         </div>
 
         {/* Scroll area */}
-        <div
-          ref={scrollRef}
-          onScroll={handleScroll}
-          className="flex-1 overflow-y-auto"
-        >
+        <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto">
           {data?.error ? (
-            <div className="flex items-center justify-center h-full">
-              <span className="text-xs text-status-amber text-center px-6">
-                {data.error}
-              </span>
+            <div className="flex h-full items-center justify-center">
+              <span className="px-6 text-center text-xs text-status-amber">{data.error}</span>
             </div>
           ) : !data || data.entries.length === 0 ? (
-            <div className="flex items-center justify-center h-full">
-              <span className="text-xs text-muted-foreground">
-                {isFetching ? "Loading logs…" : "No log entries found"}
-              </span>
+            <div className="flex h-full items-center justify-center">
+              <span className="text-xs text-muted-foreground">{isFetching ? "Loading logs…" : "No log entries found"}</span>
             </div>
           ) : activeSource === "homeio" ? (
-            data.entries.map((entry, i) => (
-              <HomeioLogRow key={i} entry={entry} />
-            ))
+            data.entries.map((entry, i) => <HomeioLogRow key={i} entry={entry} />)
           ) : (
-            data.entries.map((entry, i) => (
-              <RawLogRow key={i} entry={entry} />
-            ))
+            data.entries.map((entry, i) => <RawLogRow key={i} entry={entry} />)
           )}
         </div>
       </div>

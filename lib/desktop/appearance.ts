@@ -85,6 +85,8 @@ const dockPositions: DockPosition[] = ["bottom", "left", "right"]
 const accentValues = new Set(ACCENT_COLORS.map((c) => c.value))
 const wallpaperValues = new Set(WALLPAPER_OPTIONS.map((w) => w.src))
 
+export const AUTO_ACCENT_VALUE = "auto"
+
 function isDesktopTheme(value: unknown): value is DesktopTheme {
   return typeof value === "string" && desktopThemes.includes(value as DesktopTheme)
 }
@@ -124,7 +126,8 @@ export function sanitizeAppearanceSettings(input: unknown): AppearanceSettings {
   return {
     theme: sanitizedTheme,
     accentColor:
-      typeof value.accentColor === "string" && accentValues.has(value.accentColor)
+      value.accentColor === AUTO_ACCENT_VALUE ||
+      (typeof value.accentColor === "string" && accentValues.has(value.accentColor))
         ? value.accentColor
         : DEFAULT_APPEARANCE_SETTINGS.accentColor,
     wallpaper:

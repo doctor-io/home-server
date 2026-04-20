@@ -5,8 +5,6 @@ import {
   ChevronRight,
   Eye,
   EyeOff,
-  File,
-  Folder,
   Globe,
   HardDrive,
   LayoutGrid,
@@ -16,16 +14,14 @@ import {
   SortAsc,
   SortDesc,
   Upload,
-  Plus,
 } from "@/components/icons/platform-icons";
-import type { RefObject } from "react";
-import { DeleteRegular } from "@fluentui/react-icons";
+import { cn } from "@/lib/utils";
 import { FILES_PANEL_SHELL } from "@/modules/files/components/file-manager-surface";
+import { DeleteRegular } from "@fluentui/react-icons";
+import type { RefObject } from "react";
 
 type ToolbarProps = {
   canNavigateUp: boolean;
-  createFilePending: boolean;
-  createFolderPending: boolean;
   currentEntriesCount: number;
   currentPath: string[];
   currentPathForDisplay: string[];
@@ -48,7 +44,6 @@ type ToolbarProps = {
   onEmptyTrash: () => void;
   onNavigateToPath: (path: string[]) => void;
   onNavigateUp: () => void;
-  onOpenCreateEntryDialog: (kind: "file" | "folder") => void;
   onSearchQueryChange: (value: string) => void;
   onSetViewMode: (mode: "grid" | "list") => void;
   onToggleGlobalSearch: () => void;
@@ -57,10 +52,11 @@ type ToolbarProps = {
   onUploadInputChange: (files: File[]) => void;
 };
 
+const iconBtn = "inline-flex size-7 items-center justify-center rounded-lg transition-colors";
+const iconBtnIdle = "text-muted-foreground hover:bg-background/50 hover:text-foreground";
+
 export function FileManagerToolbar({
   canNavigateUp,
-  createFilePending,
-  createFolderPending,
   currentEntriesCount,
   currentPath,
   currentPathForDisplay,
@@ -83,7 +79,6 @@ export function FileManagerToolbar({
   onEmptyTrash,
   onNavigateToPath,
   onNavigateUp,
-  onOpenCreateEntryDialog,
   onSearchQueryChange,
   onSetViewMode,
   onToggleGlobalSearch,
@@ -92,34 +87,33 @@ export function FileManagerToolbar({
   onUploadInputChange,
 }: ToolbarProps) {
   return (
-    <div className={`flex flex-nowrap items-center gap-2 overflow-x-auto border-b border-glass-border/80 px-3 py-2 ${FILES_PANEL_SHELL}`}>
-      <div className="flex shrink-0 items-center gap-1">
-        <button
-          onClick={onNavigateUp}
-          disabled={!canNavigateUp}
-          className="p-1.5 rounded-lg hover:bg-secondary/50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
-          aria-label="Go up one level"
-        >
-          <ArrowUp className="size-3.5 text-muted-foreground" />
-        </button>
-      </div>
+    <div className={cn("flex flex-nowrap items-center gap-2 overflow-x-auto border-b border-glass-border/60 px-3 py-2", FILES_PANEL_SHELL)}>
 
-      <nav className="flex min-w-0 flex-1 items-center gap-1" aria-label="File path">
+      {/* Back / up */}
+      <button
+        onClick={onNavigateUp}
+        disabled={!canNavigateUp}
+        aria-label="Go up one level"
+        className={cn(iconBtn, iconBtnIdle, "disabled:cursor-not-allowed disabled:opacity-30")}
+      >
+        <ArrowUp className="size-3.5" />
+      </button>
+
+      {/* Breadcrumb */}
+      <nav className="flex min-w-0 flex-1 items-center gap-0.5" aria-label="File path">
         <button
           onClick={() => onNavigateToPath([])}
-          className="text-xs text-muted-foreground hover:text-foreground transition-colors px-1.5 py-1 rounded-md hover:bg-secondary/40 cursor-pointer shrink-0"
+          className="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground"
         >
-          <span className="inline-flex items-center gap-1">
-            <HardDrive className="size-3.5" />
-            <span className="hidden 2xl:inline">{rootLabel}</span>
-          </span>
+          <HardDrive className="size-3.5" />
+          <span className="hidden 2xl:inline">{rootLabel}</span>
         </button>
         {currentPath.map((segment, index) => (
-          <div key={segment + index} className="flex min-w-0 items-center gap-1">
-            <ChevronRight className="size-3 shrink-0 text-muted-foreground/50" />
+          <div key={segment + index} className="flex min-w-0 items-center gap-0.5">
+            <ChevronRight className="size-3 shrink-0 text-muted-foreground/40" />
             <button
               onClick={() => onNavigateToPath(currentPath.slice(0, index + 1))}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors px-1.5 py-1 rounded-md hover:bg-secondary/40 truncate max-w-24 sm:max-w-28 md:max-w-32 cursor-pointer"
+              className="max-w-24 truncate rounded-md px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground sm:max-w-28 md:max-w-32"
             >
               {currentPathForDisplay[index] ?? segment}
             </button>
@@ -127,152 +121,134 @@ export function FileManagerToolbar({
         ))}
       </nav>
 
-      <div className="flex shrink-0 items-center gap-1">
-        {!isTrashView && !isStarredView ? (
-          <>
-            <button
-              onClick={() => onOpenCreateEntryDialog("folder")}
-              disabled={createFolderPending}
-              className="relative inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-              aria-label="New folder"
-              title="New folder"
+      {/* Upload */}
+      {!isTrashView && !isStarredView && (
+        <div className="relative">
+          <button
+            onClick={() => uploadInputRef.current?.click()}
+            disabled={uploadFilesPending}
+            aria-label="Upload files"
+            title="Upload files"
+            className={cn(iconBtn, iconBtnIdle, "disabled:cursor-not-allowed disabled:opacity-50")}
+          >
+            {uploadFilesPending && uploadProgress ? (
+              <Loader2 className="size-3.5 animate-spin text-primary" />
+            ) : (
+              <Upload className="size-3.5" />
+            )}
+          </button>
+          {uploadProgress && uploadProgress.total > 0 && (
+            <div
+              className="absolute -bottom-1 left-0 right-0 h-0.5 overflow-hidden rounded-full bg-white/10"
+              title={`${Math.round((uploadProgress.loaded / uploadProgress.total) * 100)}%`}
             >
-              <Folder className="size-3.5" />
-              <Plus className="absolute -right-0.5 -top-0.5 size-2.5" />
-            </button>
-            <button
-              onClick={() => onOpenCreateEntryDialog("file")}
-              disabled={createFilePending}
-              className="relative inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-              aria-label="New file"
-              title="New file"
-            >
-              <File className="size-3.5" />
-              <Plus className="absolute -right-0.5 -top-0.5 size-2.5" />
-            </button>
-            <div className="relative inline-flex items-center">
-              <button
-                onClick={() => uploadInputRef.current?.click()}
-                disabled={uploadFilesPending}
-                className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                aria-label="Upload files"
-                title="Upload files"
-              >
-                {uploadFilesPending && uploadProgress ? (
-                  <Loader2 className="size-3.5 animate-spin text-primary" />
-                ) : (
-                  <Upload className="size-3.5" />
-                )}
-              </button>
-              {uploadProgress && uploadProgress.total > 0 ? (
-                <div
-                  className="absolute -bottom-1 left-0 right-0 h-0.5 overflow-hidden rounded-full bg-white/10"
-                  title={`${Math.round((uploadProgress.loaded / uploadProgress.total) * 100)}%`}
-                >
-                  <div
-                    className="h-full bg-primary transition-all duration-150"
-                    style={{ width: `${Math.min(100, Math.round((uploadProgress.loaded / uploadProgress.total) * 100))}%` }}
-                  />
-                </div>
-              ) : null}
+              <div
+                className="h-full bg-primary transition-all duration-150"
+                style={{ width: `${Math.min(100, Math.round((uploadProgress.loaded / uploadProgress.total) * 100))}%` }}
+              />
             </div>
-            <input
-              ref={uploadInputRef}
-              type="file"
-              multiple
-              className="hidden"
-              onChange={(event) => {
-                onUploadInputChange(Array.from(event.target.files ?? []));
-                event.target.value = "";
-              }}
-            />
-          </>
-        ) : null}
-      </div>
+          )}
+          <input
+            ref={uploadInputRef}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              onUploadInputChange(Array.from(e.target.files ?? []));
+              e.target.value = "";
+            }}
+          />
+        </div>
+      )}
 
+      {/* Search */}
       <div className="flex shrink-0 items-center gap-1">
         <div className="relative w-36">
           {globalSearchIsFetching ? (
             <Loader2 className="absolute left-2 top-1/2 size-3 -translate-y-1/2 animate-spin text-primary" />
           ) : (
-            <Search className="absolute left-2 top-1/2 size-3 -translate-y-1/2 text-muted-foreground" />
+            <Search className="absolute left-2 top-1/2 size-3 -translate-y-1/2 text-muted-foreground/60" />
           )}
           <input
             type="text"
             value={searchQuery}
-            onChange={(event) => onSearchQueryChange(event.target.value)}
-            placeholder={globalSearch ? "Search everywhere..." : "Search..."}
-            className={`h-7 w-full rounded-lg border pl-7 pr-2 text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:bg-secondary/60 transition-all ${
+            onChange={(e) => onSearchQueryChange(e.target.value)}
+            placeholder={globalSearch ? "Search everywhere…" : "Search…"}
+            className={cn(
+              "h-7 w-full rounded-lg border pl-7 pr-2 text-xs text-foreground placeholder:text-muted-foreground/50 outline-none transition-all",
               globalSearch
                 ? "border-primary/40 bg-background/60 focus:border-primary/60"
-                : "border-glass-border bg-background/55 focus:border-primary/40"
-            }`}
+                : "border-glass-border bg-background/55 focus:border-primary/40",
+            )}
           />
         </div>
         <button
           onClick={onToggleGlobalSearch}
-          className={`inline-flex size-7 items-center justify-center rounded-lg text-xs transition-colors cursor-pointer ${
-            globalSearch
-              ? "bg-primary/20 text-primary hover:bg-primary/30"
-              : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
-          }`}
-          title={globalSearch ? "Switch to local search" : "Search everywhere (recursive)"}
+          title={globalSearch ? "Switch to local search" : "Search everywhere"}
+          className={cn(
+            iconBtn,
+            globalSearch ? "bg-primary/15 text-primary hover:bg-primary/20" : iconBtnIdle,
+          )}
         >
           <Globe className="size-3.5" />
         </button>
       </div>
 
+      {/* Sort + visibility */}
       <div className="flex shrink-0 items-center gap-1">
-        {isTrashView ? (
+        {isTrashView && (
           <button
             onClick={onEmptyTrash}
             disabled={isEmptyingTrash || emptyTrashPending || currentEntriesCount === 0}
-            className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-status-red/10 text-xs text-status-red transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
             title="Permanently delete all items in Trash"
+            className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-status-red transition-colors hover:bg-status-red/10 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <DeleteRegular className="size-3.5" />
             <span className="hidden xl:inline">Empty Trash</span>
           </button>
-        ) : null}
+        )}
         <button
           onClick={onToggleIncludeHidden}
-          className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-secondary/50 text-xs text-muted-foreground transition-colors cursor-pointer"
           title={includeHidden ? "Hide hidden files" : "Show hidden files"}
+          className={cn(iconBtn, iconBtnIdle)}
         >
           {includeHidden ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
         </button>
         <button
           onClick={onCycleSortBy}
-          className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-secondary/50 text-xs text-muted-foreground transition-colors cursor-pointer"
-          title={`Sort by: ${sortBy} (click to change field)`}
+          title={`Sort by: ${sortBy} (click to change)`}
+          className="rounded-lg px-2 py-1 text-xs capitalize text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground"
         >
-          <span className="hidden xl:inline capitalize">{sortBy}</span>
+          <span className="hidden xl:inline">{sortBy}</span>
         </button>
         <button
           onClick={onToggleSortDir}
-          className="flex items-center rounded-lg p-1 text-muted-foreground transition-colors hover:bg-secondary/50 cursor-pointer"
-          title={sortDir === "asc" ? "Ascending - click to reverse" : "Descending - click to reverse"}
+          title={sortDir === "asc" ? "Ascending — click to reverse" : "Descending — click to reverse"}
+          className={cn(iconBtn, iconBtnIdle)}
         >
-          {sortDir === "asc" ? <SortAsc className="size-3" /> : <SortDesc className="size-3" />}
+          {sortDir === "asc" ? <SortAsc className="size-3.5" /> : <SortDesc className="size-3.5" />}
         </button>
       </div>
 
-      <div className="flex shrink-0 items-center rounded-lg bg-background/55 p-0.5">
+      {/* View mode toggle */}
+      <div className="flex shrink-0 items-center rounded-lg border border-glass-border/60 bg-background/40 p-0.5">
         <button
           onClick={() => onSetViewMode("grid")}
-          className={`p-1 rounded-md transition-colors cursor-pointer ${
-            viewMode === "grid" ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground"
-          }`}
           aria-label="Grid view"
+          className={cn(
+            "rounded-md p-1 transition-colors",
+            viewMode === "grid" ? "bg-primary/15 text-primary" : iconBtnIdle,
+          )}
         >
           <LayoutGrid className="size-3.5" />
         </button>
         <button
           onClick={() => onSetViewMode("list")}
-          className={`p-1 rounded-md transition-colors cursor-pointer ${
-            viewMode === "list" ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground"
-          }`}
           aria-label="List view"
+          className={cn(
+            "rounded-md p-1 transition-colors",
+            viewMode === "list" ? "bg-primary/15 text-primary" : iconBtnIdle,
+          )}
         >
           <List className="size-3.5" />
         </button>

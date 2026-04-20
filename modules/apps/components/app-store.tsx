@@ -2,43 +2,28 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import type {
-  StoreAppDetail,
-  StoreAppSummary,
-} from "@/lib/shared/contracts/apps";
+import type { StoreAppDetail, StoreAppSummary } from "@/lib/shared/contracts/apps";
 import { queryKeys } from "@/lib/shared/query-keys";
-import {
-  getStoreOperationLabel,
-  isStoreOperationActiveStatus,
-} from "@/lib/shared/store-operations";
+import { getStoreOperationLabel, isStoreOperationActiveStatus } from "@/lib/shared/store-operations";
 import { AppStoreInstallMenu } from "@/modules/apps/components/app-store-install-menu";
 import { AppStoreSourcesDialog } from "@/modules/apps/components/app-store-sources-dialog";
 import { AppConfiguratorPanel } from "@/modules/apps/components/configurator/app-configurator-panel";
 import { UninstallAppDialog } from "@/modules/apps/components/uninstall-app-dialog";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useInstalledApps } from "@/modules/apps/hooks/useInstalledApps";
 import type { AppOperationState } from "@/modules/apps/hooks/useStoreActions";
 import { useSharedStoreActions } from "@/modules/apps/hooks/StoreActionsContext";
 import { useStoreApp } from "@/modules/apps/hooks/useStoreApp";
 import { useStoreCatalog } from "@/modules/apps/hooks/useStoreCatalog";
 import { useStoreOperation } from "@/modules/apps/hooks/useStoreOperation";
+import { useStoreSourceActions, useStoreSources } from "@/modules/apps/hooks/useStoreSources";
 import {
-  useStoreSourceActions,
-  useStoreSources,
-} from "@/modules/apps/hooks/useStoreSources";
-import {
-  AlertCircle,
   ArrowUpCircle,
-  CheckCircle2,
+  ChevronLeftIcon as ChevronLeft,
   Download,
   ExternalLink,
   Loader2,
   Package,
-  RefreshCw,
   Search,
   Sparkles,
   Star,
@@ -51,94 +36,17 @@ import {
   PANEL_INSET as STORE_PANEL_INSET,
   BADGE_SURFACE as STORE_BADGE_SURFACE,
 } from "@/lib/ui/surface-tokens";
+import { cn } from "@/lib/utils";
 
 const STORE_PAGE_SIZE = 24;
-const STORE_SECTION_CARD_LIMIT = 6;
+const STORE_SECTION_LIMIT = 8;
 
-function isOperationBusy(operation: AppOperationState | undefined) {
-  return Boolean(operation && isStoreOperationActiveStatus(operation.status));
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function isOperationBusy(op: AppOperationState | undefined) {
+  return Boolean(op && isStoreOperationActiveStatus(op.status));
 }
 
-function StatusBadge({
-  app,
-  operation,
-}: {
-  app: StoreAppSummary;
-  operation?: AppOperationState;
-}) {
-  if (operation) {
-    if (operation.status === "error") {
-      return (
-        <span className="flex items-center gap-1 text-xs font-medium text-status-red">
-          <AlertCircle className="size-3" /> Failed
-        </span>
-      );
-    }
-
-    if (operation.status === "success") {
-      return (
-        <span className="flex items-center gap-1 text-xs font-medium text-status-green">
-          <CheckCircle2 className="size-3" /> Completed
-        </span>
-      );
-    }
-
-    return (
-      <span className="flex items-center gap-1 text-xs font-medium text-primary animate-pulse">
-        <Loader2 className="size-3 animate-spin" />{" "}
-        {getStoreOperationLabel(operation)}...
-      </span>
-    );
-  }
-
-  if (app.status === "installed") {
-    if (app.updateAvailable) {
-      return (
-        <span className="flex items-center gap-1 text-xs font-medium text-primary">
-          <ArrowUpCircle className="size-3" /> Update available
-        </span>
-      );
-    }
-
-    return (
-      <span className="flex items-center gap-1 text-xs font-medium text-status-green">
-        <CheckCircle2 className="size-3" /> Installed
-      </span>
-    );
-  }
-
-  if (app.status === "error") {
-    return (
-      <span className="flex items-center gap-1 text-xs font-medium text-status-red">
-        <AlertCircle className="size-3" /> Error
-      </span>
-    );
-  }
-
-  return null;
-}
-
-function SourceBadge({
-  sourceName,
-  sourceKind,
-}: Pick<StoreAppSummary, "sourceName" | "sourceKind">) {
-  return (
-    <span
-      className={`rounded-[var(--radius)] border px-1.5 py-0.5 text-2xs uppercase tracking-[0.18em] ${
-        sourceKind === "official"
-          ? "border-primary/25 text-primary"
-          : sourceKind === "custom"
-            ? "border-status-yellow/25 text-status-yellow"
-            : "border-glass-border text-muted-foreground"
-      }`}
-    >
-      {sourceName}
-    </span>
-  );
-}
-
-
-/** Compare two image tags as dot-separated numeric versions. Returns >0 if a > b. */
 function compareImageTags(a: string, b: string): number {
   const pa = a.split(".").map((s) => parseInt(s, 10) || 0);
   const pb = b.split(".").map((s) => parseInt(s, 10) || 0);
@@ -158,52 +66,50 @@ function extractImageTag(image: string | null | undefined): string | null {
   return null;
 }
 
-function buildUpdateTitle(app: StoreAppSummary) {
-  if (!app.updateAvailable) {
-    return undefined;
-  }
-
+function buildUpdateTooltipLines(app: StoreAppSummary): string[] {
+  if (!app.updateAvailable) return [];
   const currentTag = extractImageTag(app.installedImage);
   const availableTag = extractImageTag(app.image);
-
-  // Only show the Available image/tag when the catalog tag is strictly newer.
   const catalogIsNewer =
-    currentTag !== null &&
-    availableTag !== null &&
-    compareImageTags(availableTag, currentTag) > 0;
-
-  if (!catalogIsNewer) {
-    return undefined;
-  }
-
+    currentTag !== null && availableTag !== null && compareImageTags(availableTag, currentTag) > 0;
+  if (!catalogIsNewer) return [];
   const lines: string[] = [];
-
   if (app.installedImage) lines.push(`Current image: ${app.installedImage}`);
   if (currentTag) lines.push(`Current tag: ${currentTag}`);
   if (app.image) lines.push(`Available image: ${app.image}`);
   if (availableTag) lines.push(`Available tag: ${availableTag}`);
-
-  return lines.length > 0 ? lines.join("\n") : undefined;
+  return lines;
 }
 
-function buildUpdateTooltipLines(app: StoreAppSummary) {
-  const title = buildUpdateTitle(app);
-  return title ? title.split("\n") : [];
-}
+// ── Small reusables ───────────────────────────────────────────────────────────
 
-function UpdateInfoTooltip({
-  app,
-  children,
-}: {
-  app: StoreAppSummary;
-  children: ReactNode;
-}) {
-  const lines = buildUpdateTooltipLines(app);
-
-  if (lines.length === 0) {
-    return children;
+function StoreLogo({ logoUrl, alt, className }: { logoUrl: string | null; alt: string; className: string }) {
+  const [failed, setFailed] = useState(false);
+  if (logoUrl && !failed) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={logoUrl} alt={alt} className={className} onError={() => setFailed(true)} />
+    );
   }
+  return <Package className={cn(className, "text-muted-foreground/50")} aria-label={alt} />;
+}
 
+function AppStatusDot({ app, operation }: { app: StoreAppSummary; operation?: AppOperationState }) {
+  if (operation) {
+    if (operation.status === "error") return <span className="size-2 rounded-full bg-status-red shrink-0" />;
+    if (operation.status === "success") return <span className="size-2 rounded-full bg-status-green shrink-0" />;
+    return <span className="size-2 rounded-full bg-primary animate-pulse shrink-0" />;
+  }
+  if (app.status === "installed") {
+    return <span className={cn("size-2 rounded-full shrink-0", app.updateAvailable ? "bg-primary" : "bg-status-green")} />;
+  }
+  if (app.status === "error") return <span className="size-2 rounded-full bg-status-red shrink-0" />;
+  return null;
+}
+
+function UpdateInfoTooltip({ app, children }: { app: StoreAppSummary; children: ReactNode }) {
+  const lines = buildUpdateTooltipLines(app);
+  if (lines.length === 0) return <>{children}</>;
   return (
     <Tooltip delayDuration={120}>
       <TooltipTrigger asChild>{children}</TooltipTrigger>
@@ -213,68 +119,233 @@ function UpdateInfoTooltip({
         className="max-w-[26rem] rounded-[calc(var(--radius)+0.125rem)] border border-glass-border bg-card/96 px-3 py-2 text-left text-2xs leading-5 text-foreground shadow-xl backdrop-blur-xl"
       >
         <div className="space-y-0.5">
-          {lines.map((line) => (
-            <div key={line}>{line}</div>
-          ))}
+          {lines.map((line) => <div key={line}>{line}</div>)}
         </div>
       </TooltipContent>
     </Tooltip>
   );
 }
 
-function StoreLogo({
-  logoUrl,
-  alt,
-  className,
-  fallbackLabel,
-}: {
-  logoUrl: string | null;
-  alt: string;
-  className: string;
-  fallbackLabel: string;
-}) {
-  const [failed, setFailed] = useState(false);
-
-  if (logoUrl && !failed) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element -- dynamic external URL from app catalog; remotePatterns cannot enumerate all sources
-      <img
-        src={logoUrl}
-        alt={alt}
-        className={className}
-        onError={() => setFailed(true)}
-      />
-    );
-  }
-
+function SourceBadge({ sourceName, sourceKind }: Pick<StoreAppSummary, "sourceName" | "sourceKind">) {
   return (
-    <Package
-      className={`${className} text-muted-foreground`}
-      aria-label={fallbackLabel}
-    />
+    <span className={cn(
+      "rounded border px-1.5 py-0.5 text-2xs uppercase tracking-[0.14em]",
+      sourceKind === "official" ? "border-primary/25 text-primary" :
+      sourceKind === "custom" ? "border-status-amber/30 text-status-amber" :
+      "border-glass-border text-muted-foreground/70",
+    )}>
+      {sourceName}
+    </span>
   );
 }
 
-type CatalogCategory = {
-  id: string;
-  name: string;
-  description: string;
-  appCount: number;
-};
+// ── Category sidebar ──────────────────────────────────────────────────────────
 
-type AppStoreDetailPanelProps = {
-  app: StoreAppSummary | null;
-  detail: StoreAppDetail | null | undefined;
-  isLoading: boolean;
+type CatalogCategory = { id: string; name: string; description: string; appCount: number };
+
+function CategorySidebar({
+  categories,
+  selectedCategory,
+  onSelect,
+}: {
+  categories: CatalogCategory[];
+  selectedCategory: string | null;
+  onSelect: (category: string | null) => void;
+}) {
+  return (
+    <aside className={cn("m-2 flex w-48 shrink-0 flex-col overflow-y-auto px-2 py-3", STORE_PANEL_SHELL)}>
+      <div className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/50">
+        Categories
+      </div>
+      <div className="flex flex-col gap-0.5">
+        <button
+          type="button"
+          onClick={() => onSelect(null)}
+          className={cn(
+            "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-[13px] font-medium transition-colors",
+            selectedCategory === null ? "bg-primary/15 text-foreground" : "text-muted-foreground hover:bg-background/50 hover:text-foreground",
+          )}
+        >
+          <span>All Apps</span>
+        </button>
+        {categories.map((cat) => (
+          <button
+            key={cat.id}
+            type="button"
+            onClick={() => onSelect(cat.name)}
+            title={cat.description}
+            className={cn(
+              "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-[13px] font-medium transition-colors",
+              selectedCategory === cat.name ? "bg-primary/15 text-foreground" : "text-muted-foreground hover:bg-background/50 hover:text-foreground",
+            )}
+          >
+            <span className="truncate">{cat.name}</span>
+            <span className={cn(STORE_BADGE_SURFACE, "ml-1.5 shrink-0 px-1.5 py-0.5 text-2xs text-muted-foreground")}>
+              {cat.appCount}
+            </span>
+          </button>
+        ))}
+      </div>
+    </aside>
+  );
+}
+
+// ── Featured strip ────────────────────────────────────────────────────────────
+
+function FeaturedStrip({
+  title,
+  icon,
+  apps,
+  onSelect,
+}: {
+  title: string;
+  icon: ReactNode;
+  apps: StoreAppSummary[];
+  onSelect: (id: string) => void;
+}) {
+  if (apps.length === 0) return null;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 px-0.5">
+        {icon}
+        <span className="text-sm font-semibold text-foreground">{title}</span>
+        <span className={cn(STORE_BADGE_SURFACE, "ml-auto px-2 py-0.5 text-2xs text-muted-foreground")}>
+          {apps.length}
+        </span>
+      </div>
+      <div className="flex gap-2.5 overflow-x-auto pb-1">
+        {apps.slice(0, STORE_SECTION_LIMIT).map((app) => (
+          <button
+            key={app.id}
+            type="button"
+            onClick={() => onSelect(app.id)}
+            className={cn(
+              STORE_PANEL_INSET,
+              "group flex w-48 shrink-0 flex-col gap-2.5 p-3 text-left transition-all hover:-translate-y-0.5 hover:border-primary/30",
+            )}
+          >
+            <div className="flex items-center gap-2.5">
+              <div className={cn(STORE_PANEL_INSET, "flex size-9 shrink-0 items-center justify-center overflow-hidden")}>
+                <StoreLogo logoUrl={app.logoUrl} alt={app.name} className="size-5 object-contain" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="truncate text-xs font-semibold text-foreground">{app.name}</span>
+                  <AppStatusDot app={app} />
+                </div>
+                {app.webUiPort && (
+                  <span className="font-mono text-2xs text-muted-foreground/60">:{app.webUiPort}</span>
+                )}
+              </div>
+            </div>
+            <p className="line-clamp-2 text-2xs leading-4 text-muted-foreground/80">{app.description}</p>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Catalog row ───────────────────────────────────────────────────────────────
+
+function CatalogRow({
+  app,
+  operation,
+  onClick,
+}: {
+  app: StoreAppSummary;
   operation?: AppOperationState;
-  actionError: string | null;
-  onBack: () => void;
-  onInstall: () => void;
-  onUpdate: () => void;
-  onRedeploy: () => void;
-  onUninstall: () => void;
-  onCustomInstall: () => void;
-};
+  onClick: () => void;
+}) {
+  const busy = isOperationBusy(operation);
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        STORE_PANEL_INSET,
+        "group flex w-full items-center gap-3 p-3 text-left transition-all hover:border-primary/25 hover:bg-background/60",
+      )}
+      style={{ contentVisibility: "auto", containIntrinsicSize: "72px" }}
+    >
+      {/* Logo */}
+      <div className={cn(STORE_PANEL_INSET, "flex size-11 shrink-0 items-center justify-center overflow-hidden")}>
+        <StoreLogo logoUrl={app.logoUrl} alt={app.name} className="size-6 object-contain" />
+      </div>
+
+      {/* Info */}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="truncate text-sm font-medium text-foreground">{app.name}</span>
+          <AppStatusDot app={app} operation={operation} />
+          {operation && !["error", "success"].includes(operation.status) && (
+            <span className="text-2xs text-muted-foreground">
+              {getStoreOperationLabel(operation)}… {operation.progressPercent}%
+            </span>
+          )}
+        </div>
+        <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground/70">{app.description}</p>
+
+        {operation && !["error", "success"].includes(operation.status) ? (
+          <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full rounded-full bg-primary transition-all"
+              style={{ width: `${Math.max(2, operation.progressPercent)}%` }}
+            />
+          </div>
+        ) : (
+          <div className="mt-1.5 flex flex-wrap items-center gap-1">
+            <SourceBadge sourceName={app.sourceName} sourceKind={app.sourceKind} />
+            {app.categories.slice(0, 2).map((cat) => (
+              <span key={cat} className={cn(STORE_BADGE_SURFACE, "px-1.5 py-0.5 text-2xs text-muted-foreground/70")}>
+                {cat}
+              </span>
+            ))}
+            {app.webUiPort && (
+              <span className={cn(STORE_BADGE_SURFACE, "px-1.5 py-0.5 font-mono text-2xs text-muted-foreground/70")}>
+                :{app.webUiPort}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Status label */}
+      <div className="shrink-0 text-right">
+        {operation?.status === "error" ? (
+          <span className="text-2xs font-medium text-status-red">Failed</span>
+        ) : operation?.status === "success" ? (
+          <span className="text-2xs font-medium text-status-green">Done</span>
+        ) : busy ? (
+          <Loader2 className="size-3.5 animate-spin text-primary" />
+        ) : app.status === "installed" ? (
+          <span className={cn("text-2xs font-medium", app.updateAvailable ? "text-primary" : "text-status-green")}>
+            {app.updateAvailable ? "Update" : "Installed"}
+          </span>
+        ) : app.status === "error" ? (
+          <span className="text-2xs font-medium text-status-red">Error</span>
+        ) : (
+          <span className="text-2xs text-muted-foreground/40 transition-colors group-hover:text-muted-foreground">
+            Get →
+          </span>
+        )}
+      </div>
+    </button>
+  );
+}
+
+// ── Detail panel ──────────────────────────────────────────────────────────────
+
+function DetailInfoRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex items-start justify-between gap-4 py-2.5">
+      <span className="shrink-0 text-xs text-muted-foreground">{label}</span>
+      <div className="min-w-0 text-right text-xs font-medium text-foreground">{children}</div>
+    </div>
+  );
+}
 
 function AppStoreDetailPanel({
   app,
@@ -288,512 +359,199 @@ function AppStoreDetailPanel({
   onRedeploy,
   onUninstall,
   onCustomInstall,
-}: AppStoreDetailPanelProps) {
+}: {
+  app: StoreAppSummary | null;
+  detail: StoreAppDetail | null | undefined;
+  isLoading: boolean;
+  operation?: AppOperationState;
+  actionError: string | null;
+  onBack: () => void;
+  onInstall: () => void;
+  onUpdate: () => void;
+  onRedeploy: () => void;
+  onUninstall: () => void;
+  onCustomInstall: () => void;
+}) {
+  const busy = isOperationBusy(operation);
+
   return (
     <div className="flex h-full flex-col">
-      <div className="shrink-0 border-b border-glass-border/80 px-5 py-3">
+      {/* Nav bar */}
+      <div className="shrink-0 border-b border-glass-border/60 px-4 py-2.5">
         <button
           onClick={onBack}
-          className="text-xs text-primary hover:underline cursor-pointer"
+          className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
         >
-          {"< Back to Store"}
+          <ChevronLeft className="size-3.5" />
+          Back to Store
         </button>
       </div>
 
       {!app || isLoading ? (
-        <div className="flex-1 p-6 text-sm text-muted-foreground">
-          Loading app details...
+        <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+          Loading…
         </div>
       ) : !detail ? (
-        <div className="flex-1 p-6 text-sm text-status-red">
-          App details are unavailable.
+        <div className="flex flex-1 items-center justify-center text-sm text-status-red">
+          App details unavailable.
         </div>
       ) : (
-        <div className="flex-1 overflow-y-auto p-6 space-y-5">
-          {/* App header */}
-          <div className="flex items-start gap-4">
-            {/* Icon */}
-            <div className="flex size-[4.5rem] shrink-0 items-center justify-center overflow-hidden rounded-[calc(var(--radius)+0.75rem)] border border-glass-border bg-card/80 shadow-sm">
-              <StoreLogo
-                logoUrl={detail.logoUrl}
-                alt={`${detail.name} logo`}
-                className="size-11 object-contain"
-                fallbackLabel="app-logo-fallback-detail"
-              />
-            </div>
+        <div className="flex-1 overflow-y-auto">
+          <div className="space-y-5 p-5">
 
-            {/* Name + meta */}
-            <div className="flex-1 min-w-0 pt-0.5">
-              <h2 className="text-base font-semibold leading-tight text-foreground truncate">
-                {detail.name}
-              </h2>
-              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                <StatusBadge app={detail} operation={operation} />
-                {detail.categories.map((category) => (
-                  <span
-                    key={category}
-                    className={`${STORE_BADGE_SURFACE} px-1.5 py-px text-2xs uppercase tracking-[0.15em] text-muted-foreground`}
-                  >
-                    {category}
-                  </span>
-                ))}
-                <SourceBadge
-                  sourceName={detail.sourceName}
-                  sourceKind={detail.sourceKind}
-                />
+            {/* App header */}
+            <div className="flex items-start gap-4">
+              {/* Logo */}
+              <div className={cn(STORE_PANEL_INSET, "flex size-16 shrink-0 items-center justify-center overflow-hidden")}>
+                <StoreLogo logoUrl={detail.logoUrl} alt={detail.name} className="size-9 object-contain" />
               </div>
-              {operation ? (
-                <div className="mt-2 space-y-1">
-                  <p className="text-2xs text-muted-foreground">
-                    {operation.step} — {operation.progressPercent}%
-                  </p>
-                  <div className="h-1 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="h-full rounded-full bg-primary transition-all"
-                      style={{ width: `${Math.max(2, operation.progressPercent)}%` }}
-                    />
-                  </div>
-                  {operation.message ? (
-                    <p className="text-2xs text-status-red">{operation.message}</p>
+
+              {/* Name + badges + progress */}
+              <div className="min-w-0 flex-1 pt-0.5">
+                <h2 className="truncate text-base font-semibold text-foreground">{detail.name}</h2>
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  <AppStatusDot app={detail} operation={operation} />
+                  {operation ? (
+                    <span className="text-xs text-muted-foreground">
+                      {getStoreOperationLabel(operation)}… {operation.progressPercent}%
+                    </span>
+                  ) : app.status === "installed" ? (
+                    <span className={cn("text-xs font-medium", app.updateAvailable ? "text-primary" : "text-status-green")}>
+                      {app.updateAvailable ? "Update available" : "Installed"}
+                    </span>
                   ) : null}
+                  <SourceBadge sourceName={detail.sourceName} sourceKind={detail.sourceKind} />
+                  {detail.categories.map((cat) => (
+                    <span key={cat} className={cn(STORE_BADGE_SURFACE, "px-1.5 py-0.5 text-2xs text-muted-foreground/70 uppercase tracking-[0.13em]")}>
+                      {cat}
+                    </span>
+                  ))}
                 </div>
-              ) : null}
-            </div>
+                {operation && !["error", "success"].includes(operation.status) && (
+                  <div className="mt-2 space-y-1">
+                    <div className="h-1 overflow-hidden rounded-full bg-muted">
+                      <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.max(2, operation.progressPercent)}%` }} />
+                    </div>
+                    {operation.message && <p className="text-2xs text-status-red">{operation.message}</p>}
+                  </div>
+                )}
+              </div>
 
-            {/* Action buttons — uniform width, stacked */}
-            <div className="shrink-0 flex flex-col gap-1.5 items-stretch w-28">
-              {actionError ? (
-                <p className="text-2xs text-status-red text-center leading-tight">{actionError}</p>
-              ) : null}
+              {/* Actions */}
+              <div className="flex shrink-0 flex-col items-stretch gap-1.5 w-28">
+                {actionError && <p className="text-center text-2xs leading-tight text-status-red">{actionError}</p>}
 
-              {/* Primary action: Install → Open / Update based on state */}
-              {detail.status === "not_installed" ? (
-                <button
-                  onClick={onInstall}
-                  disabled={isOperationBusy(operation)}
-                  className="flex w-full items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-primary text-primary-foreground rounded-lg hover:brightness-110 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  <Download className="size-3.5" /> Install
-                </button>
-              ) : detail.updateAvailable ? (
-                <UpdateInfoTooltip app={detail}>
+                {detail.status === "not_installed" ? (
                   <button
-                    onClick={onUpdate}
-                    disabled={isOperationBusy(operation)}
-                    title={buildUpdateTitle(detail)}
-                    className="flex w-full items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-primary text-primary-foreground rounded-lg hover:brightness-110 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                    onClick={onInstall}
+                    disabled={busy}
+                    className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    <ArrowUpCircle className="size-3.5" /> Update
+                    <Download className="size-3.5" /> Install
                   </button>
-                </UpdateInfoTooltip>
-              ) : detail.webUiPort ? (
-                <a
-                  href={`http://${typeof window !== "undefined" ? window.location.hostname : "localhost"}:${detail.webUiPort}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex w-full items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-primary text-primary-foreground rounded-lg hover:brightness-110 transition-all cursor-pointer"
-                >
-                  <ExternalLink className="size-3.5" /> Open
-                </a>
-              ) : null}
+                ) : detail.updateAvailable ? (
+                  <UpdateInfoTooltip app={detail}>
+                    <button
+                      onClick={onUpdate}
+                      disabled={busy}
+                      className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <ArrowUpCircle className="size-3.5" /> Update
+                    </button>
+                  </UpdateInfoTooltip>
+                ) : detail.webUiPort ? (
+                  <a
+                    href={`http://${typeof window !== "undefined" ? window.location.hostname : "localhost"}:${detail.webUiPort}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition-all hover:brightness-110"
+                  >
+                    <ExternalLink className="size-3.5" /> Open
+                  </a>
+                ) : null}
 
-              {/* Secondary: Custom install (always) */}
-              <button
-                onClick={onCustomInstall}
-                disabled={isOperationBusy(operation)}
-                className="flex w-full items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-glass-border text-muted-foreground rounded-lg hover:bg-secondary/40 hover:text-foreground transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                <Wrench className="size-3.5" /> Custom
-              </button>
-
-              {/* Danger: Uninstall (only when installed) */}
-              {detail.status !== "not_installed" && (
                 <button
-                  onClick={onUninstall}
-                  disabled={isOperationBusy(operation)}
-                  className="flex w-full items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-status-red/40 text-status-red rounded-lg hover:bg-status-red/10 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                  onClick={onCustomInstall}
+                  disabled={busy}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-glass-border bg-background/55 px-3 py-2 text-xs text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  <Trash2 className="size-3.5" /> Uninstall
+                  <Wrench className="size-3.5" /> Custom
                 </button>
-              )}
+
+                {detail.status !== "not_installed" && (
+                  <button
+                    onClick={onUninstall}
+                    disabled={busy}
+                    className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-status-red/30 bg-status-red/8 px-3 py-2 text-xs font-medium text-status-red transition-colors hover:bg-status-red/15 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <Trash2 className="size-3.5" /> Uninstall
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
 
-          <div className={`${STORE_PANEL_INSET} p-4 text-xs leading-5 text-muted-foreground`}>
-            {detail.note}
-          </div>
+            {/* Description */}
+            <div className={cn(STORE_PANEL_INSET, "px-4 py-3 text-xs leading-5 text-muted-foreground")}>
+              {detail.note}
+            </div>
 
-          {detail.screenshots.length > 0 ? (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-2xs uppercase tracking-wide text-muted-foreground">
+            {/* Screenshots */}
+            {detail.screenshots.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/50">
                   Screenshots
                 </p>
-                <p className="text-2xs text-muted-foreground">
-                  Swipe or scroll
-                </p>
-              </div>
-              <div className="-mx-1 overflow-x-auto px-1 pb-2">
-                <div className="flex snap-x snap-mandatory gap-3">
-                  {detail.screenshots.slice(0, 4).map((screenshot, index) => (
+                <div className="flex gap-2.5 overflow-x-auto pb-1">
+                  {detail.screenshots.slice(0, 4).map((src, i) => (
                     <div
-                      key={`${screenshot}-${index}`}
-                      className="min-w-[min(100%,18rem)] sm:min-w-[20rem] md:min-w-[24rem] snap-start overflow-hidden rounded-[calc(var(--radius)+0.5rem)] border border-glass-border bg-card/82 shadow-sm"
+                      key={`${src}-${i}`}
+                      className={cn(STORE_PANEL_INSET, "min-w-[min(100%,18rem)] overflow-hidden sm:min-w-[20rem]")}
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element -- dynamic external screenshot URL from app catalog */}
-                      <img
-                        src={screenshot}
-                        alt={`${detail.name} screenshot ${index + 1}`}
-                        className="h-44 w-full object-cover sm:h-52 md:h-56"
-                      />
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={src} alt={`${detail.name} screenshot ${i + 1}`} className="h-44 w-full object-cover sm:h-48" />
                     </div>
                   ))}
                 </div>
               </div>
-            </div>
-          ) : null}
+            )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            <div className={`${STORE_PANEL_INSET} p-3`}>
-              <p className="text-2xs uppercase tracking-wide text-muted-foreground">
-                Platform
-              </p>
-              <p className="mt-1 text-xs text-foreground font-medium">
-                {detail.platform}
-              </p>
-            </div>
-            {detail.webUiPort ? (
-              <div className={`${STORE_PANEL_INSET} p-3`}>
-                <p className="text-2xs uppercase tracking-wide text-muted-foreground">
-                  Web UI Port
-                </p>
-                <p className="mt-1 text-xs text-foreground font-mono font-medium">
-                  {detail.webUiPort}
-                </p>
-              </div>
-            ) : null}
-            <div className={`${STORE_PANEL_INSET} p-3 md:col-span-2`}>
-              <p className="text-2xs uppercase tracking-wide text-muted-foreground">
-                Repository URL
-              </p>
-              {detail.repositoryUrl.startsWith("http://") ||
-              detail.repositoryUrl.startsWith("https://") ? (
-                <a
-                  href={detail.repositoryUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-1 block text-xs text-primary hover:underline break-all"
-                >
-                  {detail.repositoryUrl}
-                </a>
-              ) : (
-                <p className="mt-1 text-xs text-foreground break-all">
-                  {detail.repositoryUrl}
-                </p>
+            {/* Metadata */}
+            <div className={cn(STORE_PANEL_INSET, "divide-y divide-glass-border/40 px-4")}>
+              <DetailInfoRow label="Platform">{detail.platform}</DetailInfoRow>
+              {detail.webUiPort && (
+                <DetailInfoRow label="Web UI Port">
+                  <span className="font-mono">{detail.webUiPort}</span>
+                </DetailInfoRow>
               )}
+              <DetailInfoRow label="Source">
+                <SourceBadge sourceName={detail.sourceName} sourceKind={detail.sourceKind} />
+              </DetailInfoRow>
+              <DetailInfoRow label="Repository">
+                {detail.repositoryUrl.startsWith("http") ? (
+                  <a href={detail.repositoryUrl} target="_blank" rel="noreferrer" className="break-all text-primary hover:underline">
+                    {detail.repositoryUrl}
+                  </a>
+                ) : (
+                  <span className="break-all">{detail.repositoryUrl}</span>
+                )}
+              </DetailInfoRow>
             </div>
-          </div>
 
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-function CategorySidebar({
-  categories,
-  selectedCategory,
-  onSelect,
-}: {
-  categories: CatalogCategory[];
-  selectedCategory: string | null;
-  onSelect: (category: string | null) => void;
-}) {
-  return (
-    <aside className={`m-2 w-56 shrink-0 overflow-y-auto p-4 ${STORE_PANEL_SHELL}`}>
-      <div className="mb-4">
-        <p className="text-2xs uppercase tracking-[0.24em] text-muted-foreground">
-          Categories
-        </p>
-      </div>
-      <div className="space-y-1">
-        <button
-          type="button"
-          onClick={() => onSelect(null)}
-          className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs transition-colors ${
-            selectedCategory === null
-              ? "bg-primary/15 text-primary"
-              : "text-muted-foreground hover:bg-secondary/40 hover:text-foreground"
-          }`}
-        >
-          <span>All</span>
-        </button>
-        {categories.map((category) => (
-          <button
-            key={category.id}
-            type="button"
-            onClick={() => onSelect(category.name)}
-            className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs transition-colors ${
-              selectedCategory === category.name
-                ? "bg-primary/15 text-primary"
-                : "text-muted-foreground hover:bg-secondary/40 hover:text-foreground"
-            }`}
-            title={category.description}
-          >
-            <span className="truncate">{category.name}</span>
-            <span className={`${STORE_BADGE_SURFACE} px-1.5 py-0.5 text-2xs`}>
-              {category.appCount}
-            </span>
-          </button>
-        ))}
-      </div>
-    </aside>
-  );
-}
-
-function getSectionDescription(variant: "featured" | "recommended") {
-  if (variant === "featured") {
-    return "Spotlighted services with polished setups and strong out-of-the-box value.";
-  }
-
-  return "Curated picks that pair well with a growing self-hosted stack.";
-}
-
-function getSectionGridSpan(index: number) {
-  if (index === 0) {
-    return "xl:col-span-2";
-  }
-
-  if (index === 1) {
-    return "xl:col-span-2";
-  }
-
-  return "";
-}
-
-function getSectionCardTone(
-  variant: "featured" | "recommended",
-  index: number,
-) {
-  if (variant === "featured") {
-    return index === 0
-      ? "from-primary/24 via-primary/10 to-chart-3/18"
-      : "from-primary/16 via-transparent to-chart-2/12";
-  }
-
-  return index === 0
-    ? "from-chart-2/24 via-chart-1/10 to-chart-4/20"
-    : "from-chart-2/14 via-transparent to-primary/10";
-}
-
-function getSectionStatusPill(app: StoreAppSummary) {
-  if (app.status === "error") {
-    return {
-      label: "Error",
-      className: "border-status-red/30 bg-status-red/12 text-status-red",
-    };
-  }
-
-  if (app.status === "installed") {
-    return app.updateAvailable
-      ? {
-          label: "Update",
-          className: "border-primary/30 bg-primary/12 text-primary",
-        }
-      : {
-          label: "Installed",
-          className:
-            "border-status-green/30 bg-status-green/12 text-status-green",
-        };
-  }
-
-  return null;
-}
-
-function SectionCard({
-  title,
-  icon,
-  apps,
-  onSelect,
-  variant,
-}: {
-  title: string;
-  icon: ReactNode;
-  apps: StoreAppSummary[];
-  onSelect: (appId: string) => void;
-  variant: "featured" | "recommended";
-}) {
-  if (apps.length === 0) return null;
-
-  const visibleApps = apps.slice(0, STORE_SECTION_CARD_LIMIT);
-
-  return (
-    <section className="space-y-4">
-      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            {icon}
-            <h2 className="text-sm font-semibold text-foreground">{title}</h2>
-          </div>
-          <p className="max-w-2xl text-xs leading-5 text-muted-foreground">
-            {getSectionDescription(variant)}
-          </p>
-        </div>
-        <div className={`${STORE_BADGE_SURFACE} flex items-center gap-2 self-start px-3 py-1 text-2xs uppercase tracking-[0.22em] text-muted-foreground`}>
-          <span>{visibleApps.length} picks</span>
-        </div>
-      </div>
-
-      <div className="grid auto-rows-[minmax(13rem,auto)] grid-cols-[repeat(auto-fit,minmax(min(100%,17rem),1fr))] gap-3">
-        {visibleApps.map((app, index) => {
-          const isHero = index === 0;
-          const statusPill = getSectionStatusPill(app);
-
-          return (
-            <button
-              key={`${title}-${app.id}`}
-              type="button"
-              onClick={() => onSelect(app.id)}
-              className={`group relative overflow-hidden rounded-[calc(var(--radius)+1rem)] border border-glass-border bg-card/78 p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-card/88 ${getSectionGridSpan(index)}`}
-              style={{
-                contentVisibility: "auto",
-                containIntrinsicSize: isHero ? "340px" : "208px",
-              }}
-            >
-              <div
-                className={`absolute inset-0 bg-gradient-to-br ${getSectionCardTone(variant, index)} opacity-90`}
-              />
-              <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-background/28 to-transparent" />
-              {isHero ? (
-                <div className="absolute right-8 top-8 size-28 rounded-[var(--radius)] bg-primary/12 blur-3xl" />
-              ) : null}
-
-              <div className="relative flex h-full flex-col">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-[var(--radius)] border border-white/20 bg-background/55 px-2 py-1 text-2xs font-medium uppercase tracking-[0.18em] text-foreground/80 backdrop-blur-sm">
-                      {index === 0
-                        ? "Hero pick"
-                        : variant === "featured"
-                          ? "Spotlight"
-                          : "Curated"}
-                    </span>
-                  </div>
-                  {statusPill ? (
-                    <span
-                      className={`shrink-0 rounded-[var(--radius)] border px-2.5 py-1 text-2xs font-medium ${statusPill.className}`}
-                    >
-                      {statusPill.label}
-                    </span>
-                  ) : null}
-                </div>
-
-                <div
-                  className={`mt-5 flex h-full ${
-                    isHero
-                      ? "flex-col gap-5 xl:flex-row xl:items-end"
-                      : "flex-col gap-4"
-                  }`}
-                >
-                  <div
-                    className={`flex ${isHero ? "items-start gap-4" : "items-start gap-3"}`}
-                  >
-                    <div
-                      className={`${isHero ? "size-16 rounded-[calc(var(--radius)+0.625rem)]" : "size-12 rounded-[calc(var(--radius)+0.375rem)]"} flex shrink-0 items-center justify-center overflow-hidden border border-glass-border/80 bg-background/70 shadow-sm`}
-                    >
-                      <StoreLogo
-                        logoUrl={app.logoUrl}
-                        alt={`${app.name} logo`}
-                        className={`${isHero ? "size-9" : "size-7"} object-contain`}
-                        fallbackLabel="section-app-logo-fallback"
-                      />
-                    </div>
-
-                    <div className="min-w-0">
-                      <p
-                        className={`${isHero ? "text-xl" : "text-sm"} truncate font-semibold tracking-tight text-foreground`}
-                      >
-                        {app.name}
-                      </p>
-                      <p
-                        className={`${isHero ? "mt-2 line-clamp-3 max-w-2xl text-sm leading-6" : "mt-1 line-clamp-2 text-xs leading-5"} text-muted-foreground`}
-                      >
-                        {app.description}
-                      </p>
-
-                      <div className="mt-3 flex flex-wrap gap-1.5">
-                        {app.categories
-                          .slice(0, isHero ? 2 : 1)
-                          .map((category) => (
-                            <span
-                              key={`${app.id}-${category}`}
-                              className={`${STORE_BADGE_SURFACE} px-2 py-1 text-2xs uppercase tracking-[0.16em] text-foreground/75`}
-                            >
-                              {category}
-                            </span>
-                          ))}
-                        {app.webUiPort ? (
-                          <span className={`${STORE_BADGE_SURFACE} px-2 py-1 font-mono text-2xs text-foreground/75`}>
-                            :{app.webUiPort}
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div
-                    className={`flex items-end justify-between gap-3 ${
-                      isHero
-                        ? "mt-auto xl:min-w-52 xl:flex-col xl:items-end"
-                        : ""
-                    }`}
-                  >
-                    <div className="space-y-1 text-2xs text-muted-foreground">
-                      <p className="uppercase tracking-[0.18em] text-foreground/70">
-                        {app.status === "installed"
-                          ? app.updateAvailable
-                            ? "Ready to update"
-                            : "Installed and stable"
-                          : "Available now"}
-                      </p>
-                      <p
-                        className={`${isHero ? "max-w-56" : "max-w-44"} leading-5`}
-                      >
-                        {app.updateAvailable
-                          ? "A newer image is available for this service."
-                          : app.status === "installed"
-                            ? "Open details to manage, redeploy, or customize the stack."
-                            : isHero
-                              ? "Review ports, screenshots, and install options from the detail panel."
-                              : "Inspect setup details before installing."}
-                      </p>
-                    </div>
-
-                    <div className="inline-flex items-center gap-2 text-xs font-medium text-foreground/85 transition-transform group-hover:translate-x-1">
-                      <span>View details</span>
-                      <span aria-hidden="true">-&gt;</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
+// ── Main store ────────────────────────────────────────────────────────────────
 
 export function AppStore({
   onOpenCustomInstall,
   launchRequest,
 }: {
   onOpenCustomInstall: () => void;
-  launchRequest?: {
-    nonce: number;
-    search?: string;
-    appId?: string;
-  } | null;
+  launchRequest?: { nonce: number; search?: string; appId?: string } | null;
 }) {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search.trim(), 250);
@@ -801,24 +559,20 @@ export function AppStore({
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [customInstallTemplate, setCustomInstallTemplate] =
-    useState<StoreAppDetail | null>(null);
-  const [uninstallDialogApp, setUninstallDialogApp] =
-    useState<StoreAppSummary | null>(null);
+  const [customInstallTemplate, setCustomInstallTemplate] = useState<StoreAppDetail | null>(null);
+  const [uninstallDialogApp, setUninstallDialogApp] = useState<StoreAppSummary | null>(null);
   const [uninstallError, setUninstallError] = useState<string | null>(null);
   const [uninstallPending, setUninstallPending] = useState(false);
-  const [visibleCatalogCount, setVisibleCatalogCount] =
-    useState(STORE_PAGE_SIZE);
+  const [visibleCatalogCount, setVisibleCatalogCount] = useState(STORE_PAGE_SIZE);
   const [isSourcesDialogOpen, setIsSourcesDialogOpen] = useState(false);
+
   const queryClient = useQueryClient();
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const refreshAttemptedRef = useRef(false);
 
-  const { operationsByApp, installApp, updateApp, redeployApp, uninstallApp } =
-    useSharedStoreActions();
+  const { operationsByApp, installApp, updateApp, redeployApp, uninstallApp } = useSharedStoreActions();
   const storeSourcesQuery = useStoreSources();
-  const { addSource, updateSource, refreshSource, removeSource } =
-    useStoreSourceActions();
+  const { addSource, updateSource, refreshSource, removeSource } = useStoreSourceActions();
   const installedAppsQuery = useInstalledApps();
 
   const catalogQuery = useStoreCatalog({
@@ -830,23 +584,14 @@ export function AppStore({
   const catalog = catalogQuery.data;
   const apps = useMemo(() => catalog?.apps ?? [], [catalog]);
   const categories = catalog?.categories ?? [];
-  const visibleApps = useMemo(
-    () => apps.slice(0, visibleCatalogCount),
-    [apps, visibleCatalogCount],
-  );
+  const visibleApps = useMemo(() => apps.slice(0, visibleCatalogCount), [apps, visibleCatalogCount]);
   const hasMoreApps = visibleApps.length < apps.length;
 
-  const selectedSummary = useMemo(
-    () => apps.find((app) => app.id === selectedAppId) ?? null,
-    [apps, selectedAppId],
-  );
+  const selectedSummary = useMemo(() => apps.find((a) => a.id === selectedAppId) ?? null, [apps, selectedAppId]);
   const detailQuery = useStoreApp(selectedAppId);
   const selectedDetail = detailQuery.data;
 
-  const selectedOperationId =
-    selectedAppId && operationsByApp[selectedAppId]
-      ? operationsByApp[selectedAppId].operationId
-      : null;
+  const selectedOperationId = selectedAppId && operationsByApp[selectedAppId] ? operationsByApp[selectedAppId].operationId : null;
   const selectedOperationQuery = useStoreOperation(selectedOperationId);
   const selectedOperation =
     (selectedAppId ? operationsByApp[selectedAppId] : undefined) ??
@@ -863,30 +608,19 @@ export function AppStore({
       : undefined);
 
   const installedCount = installedAppsQuery.data?.length ?? 0;
-  const appById = useMemo(
-    () => new Map(apps.map((app) => [app.id, app])),
-    [apps],
-  );
+  const appById = useMemo(() => new Map(apps.map((a) => [a.id, a])), [apps]);
   const featuredApps = useMemo(
-    () =>
-      (catalog?.featuredAppIds ?? [])
-        .map((id) => appById.get(id))
-        .filter(Boolean) as StoreAppSummary[],
+    () => (catalog?.featuredAppIds ?? []).map((id) => appById.get(id)).filter(Boolean) as StoreAppSummary[],
     [appById, catalog?.featuredAppIds],
   );
   const recommendedApps = useMemo(
-    () =>
-      (catalog?.recommendedAppIds ?? [])
-        .map((id) => appById.get(id))
-        .filter(Boolean) as StoreAppSummary[],
+    () => (catalog?.recommendedAppIds ?? []).map((id) => appById.get(id)).filter(Boolean) as StoreAppSummary[],
     [appById, catalog?.recommendedAppIds],
   );
-  const shouldShowSections =
-    filter === "all" && !search.trim() && !selectedCategory;
+  const shouldShowStrips = filter === "all" && !search.trim() && !selectedCategory;
 
   useEffect(() => {
     if (!launchRequest) return;
-
     setFilter("all");
     setSelectedCategory(null);
     setActionError(null);
@@ -895,171 +629,79 @@ export function AppStore({
   }, [launchRequest]);
 
   useEffect(() => {
-    if (refreshAttemptedRef.current) {
-      return;
-    }
-
+    if (refreshAttemptedRef.current) return;
     refreshAttemptedRef.current = true;
-
     let cancelled = false;
-
     void (async () => {
       try {
-        const response = await fetch("/api/v1/store/check-updates", {
-          method: "POST",
-          cache: "no-store",
-        });
-
-        if (!response.ok || cancelled) {
-          return;
-        }
-
+        const res = await fetch("/api/v1/store/check-updates", { method: "POST", cache: "no-store" });
+        if (!res.ok || cancelled) return;
         await Promise.allSettled([
           queryClient.invalidateQueries({ queryKey: queryKeys.storeCatalog }),
           queryClient.invalidateQueries({ queryKey: queryKeys.installedApps }),
         ]);
-      } catch {
-        // Best-effort refresh only. The store should still open with cached state.
-      }
+      } catch { /* best-effort */ }
     })();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [queryClient]);
 
-  useEffect(() => {
-    setVisibleCatalogCount(STORE_PAGE_SIZE);
-  }, [debouncedSearch, filter, selectedCategory]);
+  useEffect(() => { setVisibleCatalogCount(STORE_PAGE_SIZE); }, [debouncedSearch, filter, selectedCategory]);
 
   useEffect(() => {
     const node = loadMoreRef.current;
-    if (!node || !hasMoreApps || typeof IntersectionObserver === "undefined") {
-      return;
-    }
-
+    if (!node || !hasMoreApps || typeof IntersectionObserver === "undefined") return;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (!entries.some((entry) => entry.isIntersecting)) {
-          return;
+        if (entries.some((e) => e.isIntersecting)) {
+          setVisibleCatalogCount((c) => Math.min(c + STORE_PAGE_SIZE, apps.length));
         }
-
-        setVisibleCatalogCount((current) =>
-          Math.min(current + STORE_PAGE_SIZE, apps.length),
-        );
       },
-      {
-        rootMargin: "240px 0px",
-      },
+      { rootMargin: "240px 0px" },
     );
-
     observer.observe(node);
     return () => observer.disconnect();
   }, [apps.length, hasMoreApps]);
 
   async function startInstall(app: StoreAppSummary) {
     setActionError(null);
-
     try {
-      await installApp({
-        appId: app.id,
-        webUiPort: app.webUiPort ?? undefined,
-      });
-    } catch (error) {
-      setActionError(
-        error instanceof Error ? error.message : "Unable to start install.",
-      );
-    }
-  }
-
-  async function startRedeploy(app: StoreAppSummary) {
-    setActionError(null);
-
-    try {
-      await redeployApp({
-        appId: app.id,
-      });
-    } catch (error) {
-      setActionError(
-        error instanceof Error ? error.message : "Unable to start redeploy.",
-      );
+      await installApp({ appId: app.id, webUiPort: app.webUiPort ?? undefined });
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Unable to start install.");
     }
   }
 
   async function startUpdate(app: StoreAppSummary) {
     setActionError(null);
-
     try {
-      await updateApp({
-        appId: app.id,
-      });
-    } catch (error) {
-      setActionError(
-        error instanceof Error ? error.message : "Unable to start update.",
-      );
+      await updateApp({ appId: app.id });
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Unable to start update.");
     }
   }
 
-  async function startUninstall(app: StoreAppSummary) {
-    setActionError(null);
-    setUninstallError(null);
-    setUninstallDialogApp(app);
-  }
-
-  async function submitDetailAction(
-    action: "install" | "update" | "redeploy" | "uninstall",
-  ) {
+  async function submitDetailAction(action: "install" | "update" | "redeploy" | "uninstall") {
     if (!selectedSummary || !selectedDetail) return;
     setActionError(null);
-
     try {
-      if (action === "uninstall") {
-        setUninstallError(null);
-        setUninstallDialogApp(selectedSummary);
-        return;
-      }
-
-      if (action === "install") {
-        await installApp({
-          appId: selectedSummary.id,
-          webUiPort: selectedSummary.webUiPort ?? undefined,
-        });
-        return;
-      }
-
-      if (action === "update") {
-        await updateApp({
-          appId: selectedSummary.id,
-        });
-        return;
-      }
-
-      await redeployApp({
-        appId: selectedSummary.id,
-      });
-    } catch (error) {
-      setActionError(
-        error instanceof Error ? error.message : "Request failed.",
-      );
+      if (action === "uninstall") { setUninstallDialogApp(selectedSummary); return; }
+      if (action === "install") { await installApp({ appId: selectedSummary.id, webUiPort: selectedSummary.webUiPort ?? undefined }); return; }
+      if (action === "update") { await updateApp({ appId: selectedSummary.id }); return; }
+      await redeployApp({ appId: selectedSummary.id });
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Request failed.");
     }
   }
 
   async function confirmUninstall(input: { deleteData: boolean }) {
     if (!uninstallDialogApp) return;
-
     setUninstallError(null);
     setUninstallPending(true);
-
     try {
-      await uninstallApp({
-        appId: uninstallDialogApp.id,
-        removeVolumes: input.deleteData,
-      });
+      await uninstallApp({ appId: uninstallDialogApp.id, removeVolumes: input.deleteData });
       setUninstallDialogApp(null);
-    } catch (error) {
-      setUninstallError(
-        error instanceof Error ? error.message : "Unable to start uninstall.",
-      );
+    } catch (err) {
+      setUninstallError(err instanceof Error ? err.message : "Unable to start uninstall.");
     } finally {
       setUninstallPending(false);
     }
@@ -1071,21 +713,12 @@ export function AppStore({
       appName={uninstallDialogApp?.name ?? null}
       isSubmitting={uninstallPending}
       error={uninstallError}
-      onOpenChange={(nextOpen) => {
-        if (!nextOpen) {
-          setUninstallDialogApp(null);
-          setUninstallError(null);
-        }
-      }}
+      onOpenChange={(open) => { if (!open) { setUninstallDialogApp(null); setUninstallError(null); } }}
       onConfirm={confirmUninstall}
     />
   );
 
-  function openCustomInstallSettings() {
-    if (!selectedDetail) return;
-    setCustomInstallTemplate(selectedDetail);
-  }
-
+  // ── Detail view ─────────────────────────────────────────────────────────────
   if (selectedAppId) {
     return (
       <div className="relative h-full">
@@ -1100,51 +733,45 @@ export function AppStore({
           onUpdate={() => void submitDetailAction("update")}
           onRedeploy={() => void submitDetailAction("redeploy")}
           onUninstall={() => void submitDetailAction("uninstall")}
-          onCustomInstall={openCustomInstallSettings}
+          onCustomInstall={() => { if (selectedDetail) setCustomInstallTemplate(selectedDetail); }}
         />
-        {customInstallTemplate ? (
+        {customInstallTemplate && (
           <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm">
-            <div className="relative h-[50vh] w-[min(96vw,980px)] overflow-hidden rounded-[calc(var(--radius)+0.75rem)] border border-glass-border bg-card shadow-2xl">
+            <div className={cn("relative h-[50vh] w-[min(96vw,980px)] overflow-hidden", STORE_PANEL_SHELL)}>
               <AppConfiguratorPanel
                 context="catalog_install"
                 template={customInstallTemplate}
-                actions={{
-                  installApp,
-                }}
+                actions={{ installApp }}
                 onClose={() => setCustomInstallTemplate(null)}
               />
             </div>
           </div>
-        ) : null}
+        )}
         {uninstallDialog}
       </div>
     );
   }
 
+  // ── Catalog view ─────────────────────────────────────────────────────────────
   return (
     <div className="flex h-full flex-col">
-      <div className={`relative z-10 m-2 flex shrink-0 items-center gap-3 border border-glass-border px-5 py-3 ${STORE_PANEL_SHELL}`}>
-        <div className="flex items-center gap-1 rounded-lg bg-background/55 p-0.5">
-          <button
-            onClick={() => setFilter("all")}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
-              filter === "all"
-                ? "bg-primary/20 text-primary"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            All Apps
-          </button>
-          <button
-            onClick={() => setFilter("installed")}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
-              filter === "installed"
-                ? "bg-primary/20 text-primary"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Installed ({installedCount})
-          </button>
+      {/* Header */}
+      <div className={cn("relative z-10 m-2 flex shrink-0 items-center gap-3 px-4 py-2.5", STORE_PANEL_SHELL)}>
+        {/* Filter tabs */}
+        <div className="flex items-center gap-0.5">
+          {(["all", "installed"] as const).map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setFilter(f)}
+              className={cn(
+                "rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors",
+                filter === f ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-background/50 hover:text-foreground",
+              )}
+            >
+              {f === "all" ? "All Apps" : `Installed (${installedCount})`}
+            </button>
+          ))}
         </div>
 
         <div className="flex-1" />
@@ -1154,14 +781,15 @@ export function AppStore({
           onManageSourcesClick={() => setIsSourcesDialogOpen(true)}
         />
 
-        <div className="relative w-56">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+        {/* Search */}
+        <div className="relative w-52">
+          <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground/60" />
           <input
             type="text"
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search apps..."
-            className="w-full rounded-lg border border-glass-border bg-background/55 py-1.5 pl-8 pr-3 text-xs text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary/40"
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search apps…"
+            className="w-full rounded-lg border border-glass-border bg-background/55 py-1.5 pl-8 pr-3 text-xs text-foreground outline-none transition-colors placeholder:text-muted-foreground/50 focus:border-primary/40"
           />
         </div>
       </div>
@@ -1172,248 +800,98 @@ export function AppStore({
         onOpenChange={setIsSourcesDialogOpen}
         sources={storeSourcesQuery.data ?? catalog?.sources ?? []}
         isLoading={storeSourcesQuery.isLoading}
-        error={
-          storeSourcesQuery.error instanceof Error
-            ? storeSourcesQuery.error.message
-            : null
-        }
+        error={storeSourcesQuery.error instanceof Error ? storeSourcesQuery.error.message : null}
         addPending={addSource.isPending}
         pendingSourceId={
           (refreshSource.isPending ? (refreshSource.variables as string | undefined) : undefined) ??
-          (updateSource.isPending
-            ? (updateSource.variables as { sourceId: string } | undefined)?.sourceId
-            : undefined) ??
+          (updateSource.isPending ? (updateSource.variables as { sourceId: string } | undefined)?.sourceId : undefined) ??
           (removeSource.isPending ? (removeSource.variables as string | undefined) : undefined) ??
           null
         }
-        onAddSource={async (input) => {
-          await addSource.mutateAsync(input);
-        }}
-        onToggleSource={async (input) => {
-          await updateSource.mutateAsync({
-            sourceId: input.sourceId,
-            payload: { enabled: input.enabled },
-          });
-        }}
-        onRefreshSource={async (sourceId) => {
-          await refreshSource.mutateAsync(sourceId);
-        }}
-        onRemoveSource={async (sourceId) => {
-          await removeSource.mutateAsync(sourceId);
-        }}
+        onAddSource={async (input) => { await addSource.mutateAsync(input); }}
+        onToggleSource={async (input) => { await updateSource.mutateAsync({ sourceId: input.sourceId, payload: { enabled: input.enabled } }); }}
+        onRefreshSource={async (sourceId) => { await refreshSource.mutateAsync(sourceId); }}
+        onRemoveSource={async (sourceId) => { await removeSource.mutateAsync(sourceId); }}
       />
 
       <div className="flex flex-1 overflow-hidden">
-        <CategorySidebar
-          categories={categories}
-          selectedCategory={selectedCategory}
-          onSelect={setSelectedCategory}
-        />
+        <CategorySidebar categories={categories} selectedCategory={selectedCategory} onSelect={setSelectedCategory} />
 
-        <div className={`m-2 flex-1 overflow-y-auto p-4 ${STORE_PANEL_SHELL}`}>
-          {actionError ? (
+        <div className={cn("m-2 flex-1 overflow-y-auto p-4", STORE_PANEL_SHELL)}>
+          {actionError && (
             <div className="mb-3 rounded-lg border border-status-red/30 bg-status-red/10 px-3 py-2 text-xs text-status-red">
               {actionError}
             </div>
-          ) : null}
+          )}
 
           {catalogQuery.isLoading ? (
-            <div className="text-sm text-muted-foreground">
-              Loading app catalog...
+            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+              Loading catalog…
             </div>
           ) : catalogQuery.isError ? (
-            <div className="text-sm text-status-red">
+            <div className="flex h-full items-center justify-center text-sm text-status-red">
               Unable to load app catalog.
             </div>
           ) : apps.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground">
+            <div className="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
               <Search className="size-8 opacity-30" />
               <span className="text-sm">No apps found</span>
             </div>
           ) : (
             <div className="space-y-6">
-              {shouldShowSections ? (
+              {/* Featured + Recommended strips */}
+              {shouldShowStrips && (
                 <>
-                  <SectionCard
-                    title="Featured Apps"
+                  <FeaturedStrip
+                    title="Featured"
                     icon={<Star className="size-4 text-primary" />}
                     apps={featuredApps}
                     onSelect={setSelectedAppId}
-                    variant="featured"
                   />
-                  <SectionCard
-                    title="Recommended for You"
+                  <FeaturedStrip
+                    title="Recommended"
                     icon={<Sparkles className="size-4 text-primary" />}
                     apps={recommendedApps}
                     onSelect={setSelectedAppId}
-                    variant="recommended"
                   />
                 </>
-              ) : null}
+              )}
 
-              <section className="space-y-3">
-                <div className="flex items-center justify-between gap-3">
+              {/* Catalog list */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-sm font-semibold text-foreground">
-                      {selectedCategory
-                        ? selectedCategory
-                        : filter === "installed"
-                          ? "Installed Apps"
-                          : "Catalog"}
+                      {selectedCategory ?? (filter === "installed" ? "Installed Apps" : "Catalog")}
                     </h2>
-                    <p className="text-xs text-muted-foreground">
-                      {apps.length} apps
-                    </p>
+                    <p className="text-xs text-muted-foreground/70">{apps.length} apps</p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
-                  {visibleApps.map((app) => {
-                    const operation = operationsByApp[app.id];
-                    const busy = isOperationBusy(operation);
-
-                    return (
-                      <div
-                        key={app.id}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => setSelectedAppId(app.id)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault();
-                            setSelectedAppId(app.id);
-                          }
-                        }}
-                        className="flex cursor-pointer items-center gap-3 rounded-[calc(var(--radius)+0.25rem)] border border-glass-border/80 bg-background/36 p-3 text-left transition-all hover:border-primary/20 hover:bg-background/58"
-                        style={{
-                          contentVisibility: "auto",
-                          containIntrinsicSize: "88px",
-                        }}
-                      >
-                        <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-[calc(var(--radius)+0.375rem)] border border-glass-border bg-card/82 shadow-sm">
-                          <StoreLogo
-                            logoUrl={app.logoUrl}
-                            alt={`${app.name} logo`}
-                            className="size-7 object-contain"
-                            fallbackLabel="app-logo-fallback"
-                          />
-                        </div>
-
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-sm font-medium text-foreground truncate">
-                              {app.name}
-                            </span>
-                            {app.webUiPort ? (
-                              <span className={`${STORE_BADGE_SURFACE} shrink-0 px-1.5 py-0.5 text-2xs font-mono text-muted-foreground`}>
-                                :{app.webUiPort}
-                              </span>
-                            ) : null}
-                          </div>
-                          <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
-                            {app.description}
-                          </p>
-                          <div className="mt-1 flex items-center gap-1 flex-wrap">
-                            <SourceBadge
-                              sourceName={app.sourceName}
-                              sourceKind={app.sourceKind}
-                            />
-                            {app.categories.slice(0, 2).map((category) => (
-                              <span
-                                key={`${app.id}-${category}`}
-                                className={`${STORE_BADGE_SURFACE} px-1.5 py-0.5 text-2xs text-muted-foreground`}
-                              >
-                                {category}
-                              </span>
-                            ))}
-                          </div>
-                          {operation ? (
-                            <div className="mt-1">
-                              <div className="h-1.5 overflow-hidden rounded-[var(--radius)] bg-muted">
-                                <div
-                                  className="h-full rounded-[var(--radius)] bg-primary transition-all"
-                                  style={{
-                                    width: `${Math.max(2, operation.progressPercent)}%`,
-                                  }}
-                                />
-                              </div>
-                              <p className="text-2xs text-muted-foreground mt-1">
-                                {operation.step} • {operation.progressPercent}%
-                              </p>
-                            </div>
-                          ) : null}
-                        </div>
-
-                        <div
-                          className="shrink-0 flex flex-col items-end gap-1.5"
-                          onClick={(event) => event.stopPropagation()}
-                        >
-                          <StatusBadge app={app} operation={operation} />
-                          {app.status === "not_installed" ? (
-                            <button
-                              onClick={() => void startInstall(app)}
-                              disabled={busy}
-                              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-primary/15 text-primary rounded-md hover:bg-primary/25 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                            >
-                              <Download className="size-3" /> Install
-                            </button>
-                          ) : (
-                            <div className="flex items-center gap-1">
-                              {app.updateAvailable ? (
-                                <UpdateInfoTooltip app={app}>
-                                  <button
-                                    onClick={() => void startUpdate(app)}
-                                    disabled={busy}
-                                    title={buildUpdateTitle(app)}
-                                    className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-primary/15 text-primary rounded-md hover:bg-primary/25 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                                  >
-                                    <ArrowUpCircle className="size-3" /> Update
-                                  </button>
-                                </UpdateInfoTooltip>
-                              ) : (
-                                <button
-                                  onClick={() => void startRedeploy(app)}
-                                  disabled={busy}
-                                  className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-primary/15 text-primary rounded-md hover:bg-primary/25 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                                >
-                                  <RefreshCw className="size-3" />
-                                </button>
-                              )}
-                              <button
-                                onClick={() => void startUninstall(app)}
-                                disabled={busy}
-                                className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-status-red/15 text-status-red rounded-md hover:bg-status-red/25 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                              >
-                                <Trash2 className="size-3" />
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                {hasMoreApps ? (
-                  <div className="flex flex-col items-center gap-3 py-2">
-                    <div
-                      ref={loadMoreRef}
-                      className="h-1 w-full"
-                      aria-hidden="true"
+                <div className="grid grid-cols-1 gap-1.5 lg:grid-cols-2">
+                  {visibleApps.map((app) => (
+                    <CatalogRow
+                      key={app.id}
+                      app={app}
+                      operation={operationsByApp[app.id]}
+                      onClick={() => setSelectedAppId(app.id)}
                     />
+                  ))}
+                </div>
+
+                {hasMoreApps && (
+                  <div className="flex flex-col items-center gap-3 py-2">
+                    <div ref={loadMoreRef} className="h-1 w-full" aria-hidden="true" />
                     <button
                       type="button"
-                      onClick={() =>
-                        setVisibleCatalogCount((current) =>
-                          Math.min(current + STORE_PAGE_SIZE, apps.length),
-                        )
-                      }
-                        className="rounded-lg border border-glass-border bg-background/55 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-secondary/40 hover:text-foreground"
+                      onClick={() => setVisibleCatalogCount((c) => Math.min(c + STORE_PAGE_SIZE, apps.length))}
+                      className="rounded-lg border border-glass-border bg-background/55 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-secondary/40 hover:text-foreground"
                     >
                       Load more apps
                     </button>
                   </div>
-                ) : null}
-              </section>
+                )}
+              </div>
             </div>
           )}
         </div>
