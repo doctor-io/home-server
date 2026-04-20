@@ -41,7 +41,8 @@ export async function PUT(request: Request) {
       });
 
     return NextResponse.json({ data: appearance });
-  } catch {
+  } catch (err) {
+    console.error("[appearance PUT]", err);
     return NextResponse.json({ error: "Failed to save appearance" }, { status: 500 });
   }
 }

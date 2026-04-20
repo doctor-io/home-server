@@ -387,6 +387,7 @@ export function FileManager() {
       showContextMenu={state.showContextMenu}
       showEmptyTrashConfirm={state.showEmptyTrashConfirm}
       showNetworkDialog={state.showNetworkDialog && !isDemoMode}
+      showGoogleDriveDialog={state.showGoogleDriveDialog && !isDemoMode}
       sidebarSections={sidebarSections}
       sortedEntries={visibleEntries}
       storageUsagePercent={storageSummary.percent}

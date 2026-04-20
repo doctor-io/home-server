@@ -35,6 +35,7 @@ type FileManagerDialogLayerProps = {
   showContextMenu: { x: number; y: number; entry: FileEntry } | null;
   showEmptyTrashConfirm: boolean;
   showNetworkDialog: boolean;
+  showGoogleDriveDialog: boolean;
   trashItemCount: number;
   createPending: boolean;
   renamePending: boolean;
@@ -52,6 +53,7 @@ type FileManagerDialogLayerProps = {
   onCloseFileInfoDialog: () => void;
   onConflictResolution: (choice: "replace" | "keep-both" | "skip" | "skip-all") => void;
   onCloseNetworkDialog: () => void;
+  onCloseGoogleDriveDialog: () => void;
   onNavigateToNetwork: () => void;
   onCopyContextEntry: () => void;
   onCopyContextPath: () => void;
@@ -84,6 +86,7 @@ export function FileManagerDialogLayer({
   onCloseCreateEntryDialog,
   onCloseFileInfoDialog,
   onCloseNetworkDialog,
+  onCloseGoogleDriveDialog,
   onCloseRenameDialog,
   onConfirmEmptyTrash,
   onConflictResolution,
@@ -113,6 +116,7 @@ export function FileManagerDialogLayer({
   showContextMenu,
   showEmptyTrashConfirm,
   showNetworkDialog,
+  showGoogleDriveDialog,
   trashItemCount,
 }: FileManagerDialogLayerProps) {
   return (

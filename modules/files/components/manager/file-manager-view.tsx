@@ -94,6 +94,7 @@ type FileManagerViewProps = {
   showContextMenu: { x: number; y: number; entry: FileEntry } | null;
   showEmptyTrashConfirm: boolean;
   showNetworkDialog: boolean;
+  showGoogleDriveDialog: boolean;
   sidebarSections: FileManagerSidebarSection[];
   sortedEntries: FileEntry[];
   storageUsagePercent: number;
@@ -171,6 +172,7 @@ export function FileManagerView({
   showContextMenu,
   showEmptyTrashConfirm,
   showNetworkDialog,
+  showGoogleDriveDialog,
   sidebarSections,
   sortedEntries,
   storageUsagePercent,
@@ -205,6 +207,7 @@ export function FileManagerView({
         storageUsageText={storageUsageText}
         onNavigateToPath={navigateToPath}
         onOpenNetworkDialog={() => dispatch({ type: "SHOW_NETWORK_DIALOG" })}
+        onOpenGoogleDriveDialog={() => dispatch({ type: "SHOW_GOOGLE_DRIVE_DIALOG" })}
         onMountDrive={onMountDrive}
         onEjectDrive={onEjectDrive}
       />
@@ -338,6 +341,7 @@ export function FileManagerView({
         showContextMenu={showContextMenu}
         showEmptyTrashConfirm={showEmptyTrashConfirm}
         showNetworkDialog={showNetworkDialog}
+        showGoogleDriveDialog={showGoogleDriveDialog}
         trashItemCount={trashItemCount}
         onCancelEmptyTrash={() => dispatch({ type: "HIDE_EMPTY_TRASH_CONFIRM" })}
         onChangeCreateEntryDialog={(value) => dispatch({ type: "UPDATE_CREATE_ENTRY_DIALOG", name: value, error: validateEntryName(value) })}
@@ -347,6 +351,7 @@ export function FileManagerView({
         onCloseCreateEntryDialog={() => dispatch({ type: "CLOSE_CREATE_ENTRY_DIALOG" })}
         onCloseFileInfoDialog={() => dispatch({ type: "CLOSE_FILE_INFO_DIALOG" })}
         onCloseNetworkDialog={() => dispatch({ type: "HIDE_NETWORK_DIALOG" })}
+        onCloseGoogleDriveDialog={() => dispatch({ type: "HIDE_GOOGLE_DRIVE_DIALOG" })}
         onCloseRenameDialog={() => dispatch({ type: "CLOSE_RENAME_DIALOG" })}
         onConfirmEmptyTrash={() => {
           void actions.confirmEmptyTrash();
