@@ -94,6 +94,7 @@ export type SettingsPanelProps = {
   wallpaperOptions: WallpaperOption[];
   accentOptions: AccentColorOption[];
   onAppearanceChange: (patch: Partial<AppearanceSettings>) => void;
+  wallpaperAccentColor: string | null;
   selectedSection?: string | null;
 };
 

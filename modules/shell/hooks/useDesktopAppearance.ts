@@ -1,9 +1,10 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   type AppearanceSettings,
   ACCENT_COLORS,
+  AUTO_ACCENT_VALUE,
   DEFAULT_APPEARANCE_SETTINGS,
   type DesktopFontSize,
   type DesktopIconSize,
@@ -11,6 +12,7 @@ import {
   sanitizeAppearanceSettings,
   WALLPAPER_OPTIONS,
 } from "@/lib/desktop/appearance"
+import { extractWallpaperColor } from "@/lib/desktop/wallpaper-color"
 
 const fontSizeScaleMap: Record<DesktopFontSize, number> = {
   compact: 14,
@@ -83,6 +85,8 @@ async function saveAppearance(appearance: AppearanceSettings): Promise<void> {
 export function useDesktopAppearance() {
   const [appearance, setAppearance] = useState<AppearanceSettings>(DEFAULT_APPEARANCE_SETTINGS)
   const [loaded, setLoaded] = useState(false)
+  const [wallpaperAccentColor, setWallpaperAccentColor] = useState<string | null>(null)
+  const extractingRef = useRef<string | null>(null)
 
   useEffect(() => {
     fetchAppearance().then((saved) => {
@@ -91,9 +95,20 @@ export function useDesktopAppearance() {
     });
   }, [])
 
+  // Extract wallpaper color whenever wallpaper changes (or on first load if auto is active)
   useEffect(() => {
-    applyAppearanceToDom(appearance)
-  }, [appearance])
+    const key = appearance.wallpaper
+    if (extractingRef.current === key) return
+    extractingRef.current = key
+    extractWallpaperColor(appearance.wallpaper).then(setWallpaperAccentColor)
+  }, [appearance.wallpaper])
+
+  useEffect(() => {
+    const resolved = appearance.accentColor === AUTO_ACCENT_VALUE
+      ? (wallpaperAccentColor ?? DEFAULT_APPEARANCE_SETTINGS.accentColor)
+      : appearance.accentColor
+    applyAppearanceToDom({ ...appearance, accentColor: resolved })
+  }, [appearance, wallpaperAccentColor])
 
   useEffect(() => {
     if (!loaded) return
@@ -122,5 +137,6 @@ export function useDesktopAppearance() {
     wallpapers: WALLPAPER_OPTIONS,
     accentColors: ACCENT_COLORS,
     appIconSize,
+    wallpaperAccentColor,
   }
 }

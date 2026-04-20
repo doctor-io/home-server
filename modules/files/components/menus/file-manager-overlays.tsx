@@ -2,6 +2,7 @@
 
 import type { FileEntry } from "@/modules/files/components/file-manager-presenters";
 import { FILES_MENU_SHELL } from "@/modules/files/components/file-manager-surface";
+import { cn } from "@/lib/utils";
 import {
   ArrowUp,
   ClipboardPaste,
@@ -63,136 +64,50 @@ export function FileManagerContextMenu({
 }) {
   return (
     <div
-      className={`absolute z-[200] min-w-44 py-1.5 ${FILES_MENU_SHELL}`}
+      className={cn("absolute z-[200] min-w-44 py-1.5", FILES_MENU_SHELL)}
       style={{ left: x, top: y }}
-      onClick={(event) => event.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
     >
-      <ContextMenuItem
-        icon={<FolderOpen className="size-3.5" />}
-        label="Open"
-        onClick={() => {
-          onOpen();
-          onClose();
-        }}
-      />
-      <ContextMenuItem
-        icon={<Info className="size-3.5" />}
-        label="Get Info"
-        onClick={() => {
-          onGetInfo();
-          onClose();
-        }}
-      />
-      <ContextMenuItem
-        icon={<Link2 className="size-3.5" />}
-        label="Copy Path"
-        onClick={() => {
-          onCopyPath();
-          onClose();
-        }}
-      />
-      {!isTrashView ? (
-        <ContextMenuItem
-          icon={<FileText className="size-3.5" />}
-          label="Rename"
-          onClick={() => {
-            onRename();
-            onClose();
-          }}
-        />
-      ) : null}
+      <MenuItem icon={<FolderOpen className="size-3.5" />} label="Open" onClick={() => { onOpen(); onClose(); }} />
+      <MenuItem icon={<Info className="size-3.5" />} label="Get Info" onClick={() => { onGetInfo(); onClose(); }} />
+      <MenuItem icon={<Link2 className="size-3.5" />} label="Copy Path" onClick={() => { onCopyPath(); onClose(); }} />
+      {!isTrashView && (
+        <MenuItem icon={<FileText className="size-3.5" />} label="Rename" onClick={() => { onRename(); onClose(); }} />
+      )}
 
-      <div className="mx-2 my-1 h-px bg-border" />
+      <Divider />
 
-      <ContextMenuItem
-        icon={<Copy className="size-3.5" />}
-        label="Copy"
-        onClick={() => {
-          onCopy();
-          onClose();
-        }}
-      />
-      <ContextMenuItem
-        icon={<Scissors className="size-3.5" />}
-        label="Cut"
-        onClick={() => {
-          onCut();
-          onClose();
-        }}
-      />
-      <ContextMenuItem
-        icon={<ClipboardPaste className="size-3.5" />}
-        label="Paste"
-        disabled={pasteDisabled}
-        onClick={() => {
-          onPaste();
-          onClose();
-        }}
-      />
+      <MenuItem icon={<Copy className="size-3.5" />} label="Copy" onClick={() => { onCopy(); onClose(); }} />
+      <MenuItem icon={<Scissors className="size-3.5" />} label="Cut" onClick={() => { onCut(); onClose(); }} />
+      <MenuItem icon={<ClipboardPaste className="size-3.5" />} label="Paste" disabled={pasteDisabled} onClick={() => { onPaste(); onClose(); }} />
 
-      <div className="mx-2 my-1 h-px bg-border" />
+      <Divider />
 
-      <ContextMenuItem
-        icon={<Star className="size-3.5 text-amber-400" />}
-        label="Toggle Star"
-        onClick={() => {
-          onToggleStar();
-          onClose();
-        }}
-      />
-      <ContextMenuItem
+      <MenuItem icon={<Star className="size-3.5 text-amber-400" />} label="Toggle Star" onClick={() => { onToggleStar(); onClose(); }} />
+      <MenuItem
         icon={<Download className="size-3.5" />}
         label={entry.type === "folder" ? "Download as Zip" : "Download"}
-        onClick={() => {
-          onDownload();
-          onClose();
-        }}
+        onClick={() => { onDownload(); onClose(); }}
       />
 
-      {entry.type === "folder" && !isTrashView ? (
+      {entry.type === "folder" && !isTrashView && (
         <>
-          <ContextMenuItem
+          <MenuItem
             icon={<Users className="size-3.5 text-sky-400" />}
             label={contextShareActive ? "Unshare Folder" : "Share Folder"}
-            onClick={() => {
-              onToggleShare();
-              onClose();
-            }}
+            onClick={() => { onToggleShare(); onClose(); }}
           />
-          <div className="mx-2 my-1 h-px bg-border" />
+          <Divider />
         </>
-      ) : null}
+      )}
 
       {isTrashView ? (
         <>
-          <ContextMenuItem
-            icon={<ArrowUp className="size-3.5" />}
-            label="Restore"
-            onClick={() => {
-              onRestore();
-              onClose();
-            }}
-          />
-          <ContextMenuItem
-            icon={<Trash2 className="size-3.5 text-status-red" />}
-            label="Delete Permanently"
-            danger
-            onClick={() => {
-              onDeletePermanently();
-              onClose();
-            }}
-          />
+          <MenuItem icon={<ArrowUp className="size-3.5" />} label="Restore" onClick={() => { onRestore(); onClose(); }} />
+          <MenuItem icon={<Trash2 className="size-3.5 text-status-red" />} label="Delete Permanently" danger onClick={() => { onDeletePermanently(); onClose(); }} />
         </>
       ) : (
-        <ContextMenuItem
-          icon={<Trash2 className="size-3.5 text-status-red" />}
-          label="Move to Trash"
-          danger
-          onClick={() => {
-            onMoveToTrash();
-            onClose();
-          }}
-        />
+        <MenuItem icon={<Trash2 className="size-3.5 text-status-red" />} label="Move to Trash" danger onClick={() => { onMoveToTrash(); onClose(); }} />
       )}
     </div>
   );
@@ -217,41 +132,23 @@ export function FileManagerBackgroundContextMenu({
 }) {
   return (
     <div
-      className={`absolute z-[200] min-w-44 py-1.5 ${FILES_MENU_SHELL}`}
+      className={cn("absolute z-[200] min-w-44 py-1.5", FILES_MENU_SHELL)}
       style={{ left: x, top: y }}
-      onClick={(event) => event.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
     >
-      <ContextMenuItem
-        icon={<ClipboardPaste className="size-3.5" />}
-        label="Paste"
-        disabled={pasteDisabled}
-        onClick={() => {
-          onPaste();
-          onClose();
-        }}
-      />
-      <div className="mx-2 my-1 h-px bg-border" />
-      <ContextMenuItem
-        icon={<FolderOpen className="size-3.5" />}
-        label="New Folder"
-        onClick={() => {
-          onNewFolder();
-          onClose();
-        }}
-      />
-      <ContextMenuItem
-        icon={<FileText className="size-3.5" />}
-        label="New File"
-        onClick={() => {
-          onNewFile();
-          onClose();
-        }}
-      />
+      <MenuItem icon={<ClipboardPaste className="size-3.5" />} label="Paste" disabled={pasteDisabled} onClick={() => { onPaste(); onClose(); }} />
+      <Divider />
+      <MenuItem icon={<FolderOpen className="size-3.5" />} label="New Folder" onClick={() => { onNewFolder(); onClose(); }} />
+      <MenuItem icon={<FileText className="size-3.5" />} label="New File" onClick={() => { onNewFile(); onClose(); }} />
     </div>
   );
 }
 
-function ContextMenuItem({
+function Divider() {
+  return <div className="mx-2 my-1 h-px bg-glass-border/60" />;
+}
+
+function MenuItem({
   danger,
   disabled,
   icon,
@@ -268,13 +165,14 @@ function ContextMenuItem({
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`flex w-full items-center gap-2.5 px-3 py-1.5 text-xs transition-colors cursor-pointer ${
+      className={cn(
+        "flex w-full items-center gap-2.5 px-3 py-1.5 text-xs transition-colors",
         disabled
-          ? "cursor-not-allowed text-muted-foreground/50"
+          ? "cursor-not-allowed text-muted-foreground/40"
           : danger
-            ? "text-status-red hover:bg-status-red/10"
-            : "text-foreground hover:bg-secondary/50"
-      }`}
+            ? "cursor-pointer text-status-red hover:bg-status-red/10"
+            : "cursor-pointer text-foreground hover:bg-background/50",
+      )}
     >
       {icon}
       {label}

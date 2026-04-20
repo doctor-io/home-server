@@ -211,8 +211,6 @@ export function FileManagerView({
       <div className={`m-2 flex min-w-0 flex-1 flex-col ${FILES_PANEL_SHELL}`}>
         <FileManagerToolbar
           canNavigateUp={currentPath.length > 0}
-          createFilePending={createFilePending}
-          createFolderPending={createFolderPending}
           currentEntriesCount={currentEntriesCount}
           currentPath={currentPath}
           currentPathForDisplay={currentPathForDisplay}
@@ -235,7 +233,6 @@ export function FileManagerView({
           onEmptyTrash={actions.handleEmptyTrash}
           onNavigateToPath={navigateToPath}
           onNavigateUp={() => dispatch({ type: "NAVIGATE_UP" })}
-          onOpenCreateEntryDialog={(kind) => dispatch({ type: "OPEN_CREATE_ENTRY_DIALOG", kind })}
           onSearchQueryChange={(query) => dispatch({ type: "SET_SEARCH_QUERY", query })}
           onSetViewMode={(mode) => dispatch({ type: "SET_VIEW_MODE", mode })}
           onToggleGlobalSearch={() => dispatch({ type: "TOGGLE_GLOBAL_SEARCH" })}

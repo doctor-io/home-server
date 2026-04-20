@@ -61,6 +61,7 @@ type SettingsRegistryContext = {
   wallpaperOptions: Parameters<typeof AppearanceSection>[0]["wallpaperOptions"];
   accentOptions: Parameters<typeof AppearanceSection>[0]["accentOptions"];
   onAppearanceChange: Parameters<typeof AppearanceSection>[0]["onAppearanceChange"];
+  wallpaperAccentColor: Parameters<typeof AppearanceSection>[0]["wallpaperAccentColor"];
   desktopPreferences: DesktopPreferencesApi;
   settingsBackend: SettingsBackend;
   generalController: {
@@ -146,6 +147,7 @@ export function buildSettingsSectionDefinitions(
           wallpaperOptions={context.wallpaperOptions}
           accentOptions={context.accentOptions}
           onAppearanceChange={context.onAppearanceChange}
+          wallpaperAccentColor={context.wallpaperAccentColor}
         />
       ),
     },

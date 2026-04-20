@@ -1,27 +1,23 @@
 "use client";
 
+import {
+  AlertTriangle,
+  Check,
+  ChevronRight,
+  Copy,
+  Download,
+  Eye,
+  EyeOff,
+  Info,
+} from "@/components/icons/platform-icons";
+import { SETTINGS_BADGE_SURFACE } from "@/modules/settings/components/panel/surface";
 import type { ControlAvailability } from "@/modules/settings/components/panel/types";
 import {
-    SETTINGS_BADGE_SURFACE,
-} from "@/modules/settings/components/panel/surface";
-import {
-    AlertTriangle,
-    Check,
-    ChevronRight,
-    Copy,
-    Download,
-    Eye,
-    EyeOff,
-    Info,
-    ToggleLeft,
-    ToggleRight,
-} from "@/components/icons/platform-icons";
-import {
-    createContext,
-    useContext,
-    useState,
-    type ChangeEvent,
-    type ReactNode,
+  createContext,
+  useContext,
+  useState,
+  type ChangeEvent,
+  type ReactNode,
 } from "react";
 
 const ControlAvailabilityContext = createContext<ControlAvailability>({
@@ -97,20 +93,23 @@ export function Toggle({
         <ControlDisabledHint text={availability.disabledReason} />
       </div>
       <button
+        type="button"
+        role="switch"
+        aria-checked={enabled}
+        aria-label={`Toggle ${label}`}
         onClick={availability.disabled ? undefined : onToggle}
-        className={`shrink-0 ${
+        disabled={availability.disabled}
+        className={`relative inline-flex h-5 w-10 shrink-0 items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${
           availability.disabled
             ? "cursor-not-allowed opacity-50"
             : "cursor-pointer"
-        }`}
-        aria-label={`Toggle ${label}`}
-        disabled={availability.disabled}
+        } ${enabled ? "bg-primary" : "bg-muted-foreground/30"}`}
       >
-        {enabled ? (
-          <ToggleRight className="size-7 text-primary" />
-        ) : (
-          <ToggleLeft className="size-7 text-muted-foreground" />
-        )}
+        <span
+          className={`pointer-events-none block size-5 rounded-full bg-white shadow-sm transition-transform ${
+            enabled ? "translate-x-5" : "translate-x-0"
+          }`}
+        />
       </button>
     </div>
   );

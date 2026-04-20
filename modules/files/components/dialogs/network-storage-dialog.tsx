@@ -158,7 +158,7 @@ export function NetworkStorageDialog({
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
         <DialogContent
           showCloseButton={false}
-          className="max-w-[min(96vw,60rem)] gap-0 overflow-hidden rounded-[calc(var(--radius)+0.75rem)] border-glass-border bg-card p-0 shadow-2xl shadow-black/45"
+          className="max-w-[min(96vw,60rem)] gap-0 overflow-hidden rounded-[calc(var(--radius)+0.75rem)] border-glass-border bg-popover/96 p-0 shadow-2xl shadow-black/45 backdrop-blur-2xl"
         >
           <DialogHeader className="sr-only">
             <DialogTitle>Network Storage</DialogTitle>
@@ -166,7 +166,7 @@ export function NetworkStorageDialog({
           </DialogHeader>
 
           {/* Header */}
-          <div className="border-b border-glass-border bg-card px-5 py-4">
+          <div className="border-b border-glass-border/60 bg-popover/70 px-5 py-4">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <h2 className="text-base font-semibold text-foreground">Network Storage</h2>
@@ -177,7 +177,7 @@ export function NetworkStorageDialog({
                   type="button"
                   onClick={() => void handleDiscoverServers()}
                   disabled={isBusy}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-glass-border bg-background/80 px-3 text-xs text-muted-foreground transition-colors hover:bg-secondary/40 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-glass-border bg-background/80 px-3 text-xs text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {discoverServers.isPending ? (
                     <Loader2 className="size-3.5 animate-spin" />
@@ -186,7 +186,7 @@ export function NetworkStorageDialog({
                   )}
                   Rescan
                 </button>
-                <DialogClose className="inline-flex size-9 items-center justify-center rounded-lg border border-glass-border bg-background/80 text-muted-foreground transition-colors hover:bg-secondary/40 hover:text-foreground">
+                <DialogClose className="inline-flex size-9 items-center justify-center rounded-lg border border-glass-border bg-background/80 text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground">
                   <XIcon className="size-4" />
                   <span className="sr-only">Close</span>
                 </DialogClose>
@@ -195,7 +195,7 @@ export function NetworkStorageDialog({
           </div>
 
           {/* Grid + floating add button */}
-          <div className="relative min-h-[50vh] overflow-y-auto bg-card p-5">
+          <div className="relative min-h-[50vh] overflow-y-auto p-5">
             <NetworkStorageGrid
               configuredShares={sharesQuery.data ?? []}
               discoveredServers={discoveredServers}
