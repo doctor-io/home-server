@@ -42,6 +42,7 @@ export type FileManagerState = {
   editorNotice: string | null;
   statusNotice: string | null;
   showNetworkDialog: boolean;
+  showGoogleDriveDialog: boolean;
   clipboardState: ClipboardState | null;
   isEmptyingTrash: boolean;
   includeHidden: boolean;
@@ -75,6 +76,7 @@ export const initialState: FileManagerState = {
   editorNotice: null,
   statusNotice: null,
   showNetworkDialog: false,
+  showGoogleDriveDialog: false,
   clipboardState: null,
   isEmptyingTrash: false,
   includeHidden: false,
@@ -113,6 +115,8 @@ export type FileManagerAction =
   | { type: "SET_STATUS_NOTICE"; notice: string | null }
   | { type: "SHOW_NETWORK_DIALOG" }
   | { type: "HIDE_NETWORK_DIALOG" }
+  | { type: "SHOW_GOOGLE_DRIVE_DIALOG" }
+  | { type: "HIDE_GOOGLE_DRIVE_DIALOG" }
   | { type: "SET_CLIPBOARD"; sourcePaths: string[]; names: string[]; operation: "copy" | "move" }
   | { type: "CLEAR_CLIPBOARD" }
   | { type: "SET_IS_EMPTYING_TRASH"; value: boolean }
@@ -221,6 +225,10 @@ export function fileManagerReducer(
       return { ...state, showNetworkDialog: true };
     case "HIDE_NETWORK_DIALOG":
       return { ...state, showNetworkDialog: false };
+    case "SHOW_GOOGLE_DRIVE_DIALOG":
+      return { ...state, showGoogleDriveDialog: true };
+    case "HIDE_GOOGLE_DRIVE_DIALOG":
+      return { ...state, showGoogleDriveDialog: false };
     case "SET_CLIPBOARD":
       return {
         ...state,

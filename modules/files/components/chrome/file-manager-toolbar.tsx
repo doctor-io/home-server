@@ -105,12 +105,12 @@ export function FileManagerToolbar({
           onClick={() => onNavigateToPath([])}
           className="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground"
         >
-          <HardDrive className="size-3.5" />
+          <HardDrive className="size-4" />
           <span className="hidden 2xl:inline">{rootLabel}</span>
         </button>
         {currentPath.map((segment, index) => (
           <div key={segment + index} className="flex min-w-0 items-center gap-0.5">
-            <ChevronRight className="size-3 shrink-0 text-muted-foreground/40" />
+            <ChevronRight className="size-3.5 shrink-0 text-muted-foreground/50" />
             <button
               onClick={() => onNavigateToPath(currentPath.slice(0, index + 1))}
               className="max-w-24 truncate rounded-md px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground sm:max-w-28 md:max-w-32"

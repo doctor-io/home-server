@@ -180,6 +180,22 @@ export const scheduledTasks = pgTable(
   (table) => [index("scheduled_tasks_next_run_at_idx").on(table.nextRunAt)],
 );
 
+export const scheduledTaskExecutions = pgTable(
+  "scheduled_task_executions",
+  {
+    id: text("id").primaryKey(),
+    taskId: text("task_id").notNull().references(() => scheduledTasks.id, { onDelete: "cascade" }),
+    status: text("status").notNull(),
+    output: text("output"),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    durationMs: integer("duration_ms"),
+  },
+  (table) => [
+    index("scheduled_task_executions_task_id_idx").on(table.taskId),
+    index("scheduled_task_executions_started_at_idx").on(table.startedAt.desc()),
+  ],
+);
+
 export const settings = pgTable("settings", {
   id: text("id").primaryKey().default("singleton"),
   appearanceJson: jsonb("appearance_json").notNull().default({}),
