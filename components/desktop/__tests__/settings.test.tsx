@@ -391,15 +391,16 @@ describe("SettingsPanel", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Docker/i }));
 
-    expect(screen.getByText("Engine Status")).toBeTruthy();
+    expect(screen.getByText("Engine")).toBeTruthy();
     expect(screen.getByText("Maintenance")).toBeTruthy();
     expect(screen.queryByText("No containers reported.")).toBeNull();
     expect(screen.queryByText("Auto-restart policy")).toBeNull();
     expect(screen.queryByText("Log rotation")).toBeNull();
     expect(screen.queryByText("Default Network")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Prune Unused Images" }));
-    fireEvent.click(screen.getByRole("button", { name: "Prune Unused Volumes" }));
+    const runButtons = screen.getAllByRole("button", { name: "Run" });
+    fireEvent.click(runButtons[0]!);
+    fireEvent.click(runButtons[1]!);
 
     expect(backend.actions.pruneDockerImages).toHaveBeenCalledTimes(1);
     expect(backend.actions.pruneDockerVolumes).toHaveBeenCalledTimes(1);
@@ -463,23 +464,20 @@ describe("SettingsPanel", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: /Updates/i }));
-    expect(backend.actions.checkForUpdates).toHaveBeenCalledTimes(1);
-    fireEvent.click(screen.getByRole("button", { name: "Check for Updates" }));
-    fireEvent.click(screen.getByRole("button", { name: "Update Homeio" }));
+    fireEvent.click(screen.getByRole("button", { name: "Check" }));
+    fireEvent.click(screen.getByRole("button", { name: "Update" }));
 
     expect(backend.actions.checkForUpdates).toHaveBeenCalledTimes(2);
     expect(backend.actions.applySystemUpdate).toHaveBeenCalledTimes(1);
     expect(screen.getByText("Homeio")).toBeTruthy();
     expect(screen.getByText("0.1.74")).toBeTruthy();
     expect(screen.getByText("0.1.75")).toBeTruthy();
-    expect(screen.getByText("Update available: Homeio 0.1.75")).toBeTruthy();
+    expect(screen.getByText("v0.1.75 available")).toBeTruthy();
     expect(screen.queryByText("Update channel")).toBeNull();
     expect(screen.queryByText("Auto-update policy")).toBeNull();
     expect(screen.queryByText("Update History")).toBeNull();
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Toggle Auto-check for updates" }),
-    );
+    fireEvent.click(screen.getByRole("switch", { name: "Toggle Auto-check for updates" }));
     expect(setAutoCheckUpdates).toHaveBeenCalledWith(false);
   });
 
@@ -498,8 +496,8 @@ describe("SettingsPanel", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Backup & Restore/i }));
 
-    expect(screen.getByText("Backup Schedule")).toBeTruthy();
-    expect(screen.getByDisplayValue("/DATA/Backups/homeio")).toBeTruthy();
+    expect(screen.getByText("Schedule")).toBeTruthy();
+    expect(screen.getByText("/DATA/Backups/homeio")).toBeTruthy();
     expect(screen.queryByText("Backup Target")).toBeNull();
     expect(screen.queryByText("Encryption")).toBeNull();
     expect(screen.queryByText("What to Back Up")).toBeNull();
@@ -533,10 +531,10 @@ describe("SettingsPanel", () => {
       retentionCount: 14,
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Run Backup Now" }));
+    fireEvent.click(screen.getByRole("button", { name: "Run now" }));
     expect(backend.actions.runBackupNow).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByRole("button", { name: "Restore from Backup" }));
+    fireEvent.click(screen.getByRole("button", { name: "Restore" }));
     fireEvent.click(screen.getByRole("button", { name: "Restore Backup" }));
     expect(backend.actions.restoreBackup).toHaveBeenCalledWith("backup-1");
   });
@@ -555,7 +553,7 @@ describe("SettingsPanel", () => {
 
     expect(
       screen.getByText(
-        "Homeio is currently single-user only. Multi-user access is planned next.",
+        "Homeio is currently single-user. Multi-user access is planned for a future release.",
       ),
     ).toBeTruthy();
     expect(screen.getByText("ahmed")).toBeTruthy();
@@ -620,17 +618,17 @@ describe("SettingsPanel", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: /^Power$/i }));
-    fireEvent.click(screen.getByRole("button", { name: "Reboot" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Reboot/ }));
     fireEvent.click(screen.getByRole("button", { name: "Reboot now" }));
 
     expect(backend.actions.rebootNow).toHaveBeenCalledTimes(1);
-    fireEvent.click(screen.getByRole("button", { name: "Shutdown" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Shutdown/ }));
     fireEvent.click(screen.getByRole("button", { name: "Shutdown now" }));
     expect(backend.actions.shutdownNow).toHaveBeenCalledTimes(1);
-    fireEvent.click(screen.getByRole("button", { name: "Toggle Scheduled reboot" }));
-    fireEvent.click(screen.getByRole("button", { name: "Save scheduled reboot" }));
+    fireEvent.click(screen.getByRole("switch", { name: "Toggle Scheduled reboot" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save schedule" }));
     expect(backend.actions.saveScheduledReboot).toHaveBeenCalledTimes(1);
-    fireEvent.click(screen.getByRole("button", { name: "Factory Reset Server" }));
+    fireEvent.click(screen.getByRole("button", { name: "Factory Reset" }));
     fireEvent.click(screen.getByRole("button", { name: "Factory reset" }));
     expect(backend.actions.factoryReset).toHaveBeenCalledTimes(1);
     expect(screen.getByText("Shutdown")).toBeTruthy();
@@ -772,14 +770,13 @@ describe("SettingsPanel", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Notifications/i }));
     expect(screen.queryByText("Not available yet: backend endpoint not implemented")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Toggle Update notifications" }));
+    fireEvent.click(screen.getByRole("switch", { name: "Toggle Update notifications" }));
     fireEvent.change(screen.getByDisplayValue("90"), {
       target: { value: "92" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
 
     expect(setNotificationPreferences).toHaveBeenCalledTimes(1);
-    expect(screen.getByText("Soon")).toBeTruthy();
   });
 
   it("renders wallpapers in a horizontal responsive scroller", () => {

@@ -9,6 +9,8 @@ import {
   RenameEntryDialog,
 } from "@/modules/files/components/dialogs/file-manager-dialogs";
 import { NetworkStorageDialog } from "@/modules/files/components/dialogs/network-storage-dialog";
+import { GoogleDriveDialog } from "@/modules/files/components/dialogs/google-drive-dialog";
+import { UsbStorageDialog } from "@/modules/files/components/dialogs/usb-storage-dialog";
 import type { FileInfoResponse } from "@/lib/shared/contracts/files";
 import type { FileEntry } from "@/modules/files/components/file-manager-presenters";
 import type {
@@ -36,6 +38,7 @@ type FileManagerDialogLayerProps = {
   showEmptyTrashConfirm: boolean;
   showNetworkDialog: boolean;
   showGoogleDriveDialog: boolean;
+  showUsbDialog: boolean;
   trashItemCount: number;
   createPending: boolean;
   renamePending: boolean;
@@ -54,7 +57,9 @@ type FileManagerDialogLayerProps = {
   onConflictResolution: (choice: "replace" | "keep-both" | "skip" | "skip-all") => void;
   onCloseNetworkDialog: () => void;
   onCloseGoogleDriveDialog: () => void;
+  onCloseUsbDialog: () => void;
   onNavigateToNetwork: () => void;
+  onNavigateToUsb: (path: string[]) => void;
   onCopyContextEntry: () => void;
   onCopyContextPath: () => void;
   onCutContextEntry: () => void;
@@ -87,6 +92,7 @@ export function FileManagerDialogLayer({
   onCloseFileInfoDialog,
   onCloseNetworkDialog,
   onCloseGoogleDriveDialog,
+  onCloseUsbDialog,
   onCloseRenameDialog,
   onConfirmEmptyTrash,
   onConflictResolution,
@@ -98,6 +104,7 @@ export function FileManagerDialogLayer({
   onGetInfoContextEntry,
   onMoveContextEntryToTrash,
   onNavigateToNetwork,
+  onNavigateToUsb,
   onOpenContextEntry,
   onOpenCreateEntryDialog,
   onPasteIntoBackground,
@@ -117,6 +124,7 @@ export function FileManagerDialogLayer({
   showEmptyTrashConfirm,
   showNetworkDialog,
   showGoogleDriveDialog,
+  showUsbDialog,
   trashItemCount,
 }: FileManagerDialogLayerProps) {
   return (
@@ -204,6 +212,17 @@ export function FileManagerDialogLayer({
         isOpen={showNetworkDialog}
         onClose={onCloseNetworkDialog}
         onNavigateToNetwork={onNavigateToNetwork}
+      />
+
+      <GoogleDriveDialog
+        isOpen={showGoogleDriveDialog}
+        onClose={onCloseGoogleDriveDialog}
+      />
+
+      <UsbStorageDialog
+        isOpen={showUsbDialog}
+        onClose={onCloseUsbDialog}
+        onNavigateToUsb={(path) => { onNavigateToUsb(path); onCloseUsbDialog(); }}
       />
     </>
   );

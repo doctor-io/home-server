@@ -16,6 +16,7 @@ export type StatusBarProps = {
   onLock?: () => void;
   onLogout?: () => void;
   isLogoutPending?: boolean;
+  onOpenNotifications?: () => void;
 };
 
 export type StatusPopover = "weather" | "wifi" | "battery" | "notifications" | "date";

@@ -12,6 +12,9 @@ import {
   stat,
   writeFile,
 } from "node:fs/promises";
+import { createWriteStream } from "node:fs";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import path from "node:path";
 import { withServerTiming } from "@/lib/server/logging/logger";
 import {
@@ -1423,7 +1426,7 @@ export async function searchFiles(params: SearchFilesParams): Promise<FileListRe
 export type UploadFilesParams = {
   /** Relative path of the target directory within FILES_ROOT */
   destinationPath: string;
-  files: { name: string; buffer: Buffer }[];
+  files: { name: string; size: number; stream: () => ReadableStream }[];
   includeHidden?: boolean;
 };
 
@@ -1437,7 +1440,7 @@ export async function uploadFiles(params: UploadFilesParams): Promise<FileUpload
   const skipped: string[] = [];
 
   await Promise.all(
-    params.files.map(async ({ name, buffer }) => {
+    params.files.map(async ({ name, size, stream }) => {
       let safeName: string;
       try {
         safeName = ensureSafeName(name, includeHidden);
@@ -1463,11 +1466,14 @@ export async function uploadFiles(params: UploadFilesParams): Promise<FileUpload
         return;
       }
 
-      await writeFile(targetPath.absolutePath, buffer);
+      await pipeline(
+        Readable.fromWeb(stream() as import("stream/web").ReadableStream),
+        createWriteStream(targetPath.absolutePath),
+      );
       uploaded.push({
         name: safeName,
         path: targetPath.relativePath,
-        sizeBytes: buffer.length,
+        sizeBytes: size,
       });
     }),
   );

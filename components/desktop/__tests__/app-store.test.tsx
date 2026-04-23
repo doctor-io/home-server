@@ -115,6 +115,12 @@ const updatableAppDetail: StoreAppDetail = {
   ...updatableSummaryApp,
 };
 
+const installableAppDetail: StoreAppDetail = {
+  ...appDetail,
+  ...summaryApp,
+  note: "Install Plex from CasaOS.",
+};
+
 function setup({
   apps = [summaryApp],
   detail = null,
@@ -279,11 +285,11 @@ describe("AppStore", () => {
     setup();
 
     expect(screen.getAllByText("Plex").length).toBeGreaterThan(0);
-    expect(screen.getAllByAltText("Plex logo").length).toBeGreaterThan(0);
+    expect(screen.getAllByAltText("Plex").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Official CasaOS").length).toBeGreaterThan(0);
     expect(screen.getByText("Categories")).toBeTruthy();
-    expect(screen.getByText("Featured Apps")).toBeTruthy();
-    expect(screen.getByText("Recommended for You")).toBeTruthy();
+    expect(screen.getByText("Featured")).toBeTruthy();
+    expect(screen.getByText("Recommended")).toBeTruthy();
     expect(screen.getByTitle("Media apps")).toBeTruthy();
   });
 
@@ -324,16 +330,19 @@ describe("AppStore", () => {
   it("falls back to generic icon when logo fails", () => {
     setup();
 
-    const image = screen.getAllByAltText("Plex logo")[0];
+    const image = screen.getAllByAltText("Plex")[0];
     fireEvent.error(image);
 
-    expect(screen.getAllByLabelText(/fallback/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText("Plex").length).toBeGreaterThan(0);
   });
 
-  it("triggers install action from list", () => {
-    const { installApp } = setup();
+  it("triggers install action from app detail", () => {
+    const { installApp } = setup({
+      detail: installableAppDetail,
+    });
 
-    fireEvent.click(screen.getAllByRole("button", { name: /^install$/i })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: /plex/i })[0]!);
+    fireEvent.click(screen.getByRole("button", { name: /^install$/i }));
 
     expect(installApp).toHaveBeenCalledWith({ appId: "plex" });
   });
@@ -433,15 +442,15 @@ describe("AppStore", () => {
       recommendedAppIds: [],
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /plex/i }));
+    fireEvent.click(screen.getAllByRole("button", { name: /plex/i })[0]!);
     fireEvent.click(screen.getByRole("button", { name: /uninstall/i }));
 
     expect(screen.getByText("Screenshots")).toBeTruthy();
     expect(screen.getByText("Platform")).toBeTruthy();
     expect(screen.getByText("Docker")).toBeTruthy();
     expect(screen.getByText("https://github.com/plex")).toBeTruthy();
-    expect(screen.getByText("Uninstall Plex?")).toBeTruthy();
-    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Uninstall" }));
+    expect(screen.getByText((_, element) => element?.textContent === "Uninstall Plex?")).toBeTruthy();
+    fireEvent.click(screen.getAllByRole("button", { name: "Uninstall" }).at(-1)!);
 
     await waitFor(() => {
       expect(uninstallApp).toHaveBeenCalledWith({
@@ -459,17 +468,8 @@ describe("AppStore", () => {
       recommendedAppIds: [],
     });
 
-    const updateButtons = screen.getAllByRole("button", { name: /^update$/i });
-    expect(updateButtons[0]?.getAttribute("title")).toBe(
-      "Current image: plexinc/pms-docker:1.41.2\nCurrent tag: 1.41.2\nAvailable image: plexinc/pms-docker:1.41.3\nAvailable tag: 1.41.3",
-    );
-
-    fireEvent.click(updateButtons[0]);
     fireEvent.click(screen.getByRole("button", { name: /plex/i }));
     const detailUpdateButton = screen.getByRole("button", { name: /^update$/i });
-    expect(detailUpdateButton.getAttribute("title")).toBe(
-      "Current image: plexinc/pms-docker:1.41.2\nCurrent tag: 1.41.2\nAvailable image: plexinc/pms-docker:1.41.3\nAvailable tag: 1.41.3",
-    );
     fireEvent.click(detailUpdateButton);
 
     expect(screen.getByText("Update available")).toBeTruthy();

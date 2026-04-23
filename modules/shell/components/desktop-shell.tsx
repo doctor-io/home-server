@@ -2,6 +2,7 @@
 
 import {
   Activity,
+  Bell,
   FolderOpen,
   Package,
   Search,
@@ -37,6 +38,7 @@ import { CommandPalette } from "@/modules/shell/components/command-palette";
 import { useDesktopAppearance } from "@/modules/shell/hooks/useDesktopAppearance";
 import { useRebootRecovery } from "@/modules/shell/hooks/useRebootRecovery";
 import { Monitor } from "@/modules/system/components/monitor";
+import { NotificationsPanel } from "@/modules/system/components/notifications-panel";
 import { StatusBar } from "@/modules/system/components/status-bar";
 import { SystemWidgets } from "@/modules/system/components/system-widgets";
 import { useRouter } from "next/navigation";
@@ -406,6 +408,7 @@ function DesktopShellInner() {
       id !== "app-store" &&
       id !== "terminal" &&
       id !== "monitor" &&
+      id !== "notifications" &&
       id !== "app-settings"
     )
       return;
@@ -709,6 +712,7 @@ function DesktopShellInner() {
           onLock={() => setLockState(true)}
           onLogout={handleLogout}
           isLogoutPending={isLogoutPending}
+          onOpenNotifications={() => openWindow("notifications")}
         />
 
         {/* Main Desktop Area */}
@@ -795,6 +799,25 @@ function DesktopShellInner() {
             animationsEnabled={appearance.animationsEnabled}
           >
             <Monitor />
+          </Window>
+        )}
+
+        {openWindows.includes("notifications") && (
+          <Window
+            title="Notifications"
+            icon={<Bell className="size-4 text-primary" />}
+            onClose={() => closeWindow("notifications")}
+            onMinimize={() => minimizeWindow("notifications")}
+            defaultWidth={640}
+            defaultHeight={520}
+            zIndex={getWindowZ("notifications")}
+            dockPosition={appearance.dockPosition}
+            onFocus={() => setFocusedWindow("notifications")}
+            isClosing={closingWindows.includes("notifications")}
+            isMinimized={minimizedWindows.includes("notifications")}
+            animationsEnabled={appearance.animationsEnabled}
+          >
+            <NotificationsPanel />
           </Window>
         )}
 

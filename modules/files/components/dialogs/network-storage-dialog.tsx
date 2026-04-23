@@ -2,13 +2,12 @@
 
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Loader2, Plus, RefreshCw, XIcon } from "@/components/icons/platform-icons";
+import { Loader2, Plus, RefreshCw, X } from "@/components/icons/platform-icons";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
   useCreateNetworkShare,
@@ -165,32 +164,41 @@ export function NetworkStorageDialog({
             <DialogDescription>Discover, mount, and manage SMB shares.</DialogDescription>
           </DialogHeader>
 
-          {/* Header */}
-          <div className="border-b border-glass-border/60 bg-popover/70 px-5 py-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <h2 className="text-base font-semibold text-foreground">Network Storage</h2>
-                <p className="text-sm text-muted-foreground">SMB/NAS shares on your network</p>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => void handleDiscoverServers()}
-                  disabled={isBusy}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-glass-border bg-background/80 px-3 text-xs text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {discoverServers.isPending ? (
-                    <Loader2 className="size-3.5 animate-spin" />
-                  ) : (
-                    <RefreshCw className="size-3.5" />
-                  )}
-                  Rescan
-                </button>
-                <DialogClose className="inline-flex size-9 items-center justify-center rounded-lg border border-glass-border bg-background/80 text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground">
-                  <XIcon className="size-4" />
-                  <span className="sr-only">Close</span>
-                </DialogClose>
-              </div>
+          {/* Window chrome title bar */}
+          <div className="flex h-11 shrink-0 select-none items-center gap-0 border-b border-glass-border/50 bg-popover/70 backdrop-blur-2xl">
+            {/* Traffic lights */}
+            <div className="flex items-center gap-1.5 px-4">
+              <button
+                onClick={onClose}
+                className="group flex size-3 cursor-pointer items-center justify-center rounded-full bg-[#ff5f57] transition-all hover:brightness-110"
+                aria-label="Close"
+              >
+                <X className="size-[7px] text-[#6a0002] opacity-0 transition-opacity group-hover:opacity-100" />
+              </button>
+              <span className="size-3 rounded-full bg-white/10" />
+              <span className="size-3 rounded-full bg-white/10" />
+            </div>
+
+            {/* Centered title */}
+            <div className="flex flex-1 items-center justify-center">
+              <span className="text-xs font-medium text-foreground/80">Network Storage</span>
+            </div>
+
+            {/* Right actions */}
+            <div className="flex items-center justify-end gap-2 px-4">
+              <button
+                type="button"
+                onClick={() => void handleDiscoverServers()}
+                disabled={isBusy}
+                className="inline-flex h-6 items-center gap-1 rounded-md border border-glass-border bg-background/80 px-2 text-[11px] text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {discoverServers.isPending ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <RefreshCw className="size-3" />
+                )}
+                Rescan
+              </button>
             </div>
           </div>
 
