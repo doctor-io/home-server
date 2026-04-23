@@ -151,16 +151,20 @@ export function AppearanceSection({
 
       {/* ── Theme ── */}
       <SectionDivider title="Theme" />
-      <div className="grid grid-cols-2 gap-2.5">
+      <div
+        data-testid="theme-scroller"
+        className="-mx-1 flex gap-2 overflow-x-auto px-1 py-1 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-glass-border"
+      >
         {themeOptions.map((theme) => {
           const active = appearance.theme === theme.value;
           return (
             <button
               key={theme.value}
               type="button"
+              title={theme.name}
               onClick={() => onAppearanceChange({ theme: theme.value })}
               className={cn(
-                "flex flex-col gap-2 rounded-[calc(var(--radius)+0.375rem)] border p-2.5 text-left transition-all cursor-pointer",
+                "flex w-44 shrink-0 flex-col gap-2 rounded-[calc(var(--radius)+0.375rem)] border p-2.5 text-left transition-all cursor-pointer",
                 active
                   ? "border-primary bg-primary/10 shadow-[0_0_0_1px_color-mix(in_oklab,var(--primary)_28%,transparent)]"
                   : "border-glass-border bg-background/46 hover:border-foreground/20 hover:bg-background/68",
@@ -185,7 +189,10 @@ export function AppearanceSection({
       {/* ── Accent Color ── */}
       <SectionDivider title="Accent Color" />
       <div className={cn(SETTINGS_PANEL_INSET, "p-3")}>
-        <div className="flex flex-wrap gap-2.5">
+        <div
+          data-testid="accent-scroller"
+          className="-mx-1 flex gap-2.5 overflow-x-auto px-1 py-1 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-glass-border"
+        >
           {/* Auto option — derives color from wallpaper */}
           {(() => {
             const active = appearance.accentColor === AUTO_ACCENT_VALUE;
@@ -196,7 +203,7 @@ export function AppearanceSection({
                 title="Auto (from wallpaper)"
                 onClick={() => onAppearanceChange({ accentColor: AUTO_ACCENT_VALUE })}
                 className={cn(
-                  "relative flex size-8 cursor-pointer items-center justify-center rounded-full border-2 transition-all overflow-hidden",
+                  "relative flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full border-2 transition-all overflow-hidden",
                   active
                     ? "border-foreground/60 scale-110 shadow-md"
                     : "border-transparent hover:scale-105 hover:border-foreground/20",
@@ -217,7 +224,7 @@ export function AppearanceSection({
                 title={color.name}
                 onClick={() => onAppearanceChange({ accentColor: color.value })}
                 className={cn(
-                  "relative flex size-8 cursor-pointer items-center justify-center rounded-full border-2 transition-all",
+                  "relative flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full border-2 transition-all",
                   active
                     ? "border-foreground/60 scale-110 shadow-md"
                     : "border-transparent hover:scale-105 hover:border-foreground/20",
@@ -238,7 +245,10 @@ export function AppearanceSection({
 
       {/* ── Wallpaper ── */}
       <SectionDivider title="Wallpaper" />
-      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 py-2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-glass-border">
+      <div
+        data-testid="wallpaper-scroller"
+        className="-mx-1 flex gap-2 overflow-x-auto px-1 py-2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-glass-border"
+      >
         {wallpaperOptions.map((wallpaper) => {
           const active = appearance.wallpaper === wallpaper.src;
           return (
@@ -301,6 +311,7 @@ export function AppearanceSection({
               <button
                 key={preset.name}
                 type="button"
+                aria-label={`Set ${preset.name} radius`}
                 onClick={() => onAppearanceChange({ radius: preset.value })}
                 className={cn(
                   "flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-2 py-1.5 transition-all cursor-pointer",

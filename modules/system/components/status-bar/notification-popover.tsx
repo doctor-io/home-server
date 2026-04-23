@@ -8,6 +8,7 @@ type NotificationPopoverProps = {
   notifications: Notification[];
   onMarkAllRead: () => void;
   onClearAll: () => void;
+  onViewAll?: () => void;
 };
 
 export function NotificationPopover({
@@ -15,6 +16,7 @@ export function NotificationPopover({
   notifications,
   onMarkAllRead,
   onClearAll,
+  onViewAll,
 }: NotificationPopoverProps) {
   return (
     <PopoverShell onClose={onClose} className="w-80">
@@ -71,7 +73,7 @@ export function NotificationPopover({
         )}
       </div>
       <div className="border-t border-glass-border px-3 py-2">
-        <button className="text-xs text-primary hover:underline cursor-pointer">
+        <button onClick={onViewAll} className="text-xs text-primary hover:underline cursor-pointer">
           View all notifications
         </button>
       </div>

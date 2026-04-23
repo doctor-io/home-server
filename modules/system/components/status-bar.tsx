@@ -40,6 +40,7 @@ export function StatusBar({
   onLock: _onLock,
   onLogout: _onLogout,
   isLogoutPending: _isLogoutPending = false,
+  onOpenNotifications,
 }: StatusBarProps) {
   const {
     metrics,
@@ -199,6 +200,7 @@ export function StatusBar({
                 onMarkAllRead={markAllRead}
                 onClearAll={clearNotifications}
                 onClose={closePopovers}
+                onViewAll={() => { closePopovers(); onOpenNotifications?.(); }}
               />
             )}
           </div>

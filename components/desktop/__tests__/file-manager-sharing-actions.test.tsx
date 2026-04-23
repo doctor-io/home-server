@@ -73,10 +73,12 @@ describe("FileManager sharing and actions", () => {
   it("creates folder and file from header actions", async () => {
     await renderFileManager();
 
+    fireEvent.contextMenu(screen.getByText("This folder is empty"), { clientX: 100, clientY: 100 });
     fireEvent.click(screen.getByRole("button", { name: /new folder/i }));
     fireEvent.change(screen.getByLabelText("Folder name"), { target: { value: "New Folder" } });
     fireEvent.click(screen.getByRole("button", { name: "Create" }));
 
+    fireEvent.contextMenu(screen.getByText("This folder is empty"), { clientX: 110, clientY: 110 });
     fireEvent.click(screen.getByRole("button", { name: /new file/i }));
     fireEvent.change(screen.getByLabelText("File name"), { target: { value: "New File.txt" } });
     fireEvent.click(screen.getByRole("button", { name: "Create" }));

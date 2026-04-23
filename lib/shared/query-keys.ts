@@ -34,5 +34,7 @@ export const queryKeys = {
     ["logs", source] as const,
   notifications: ["notifications"] as const,
   scheduledTasks: ["scheduled-tasks"] as const,
+  taskExecutions: (taskId: string) => ["scheduled-tasks", taskId, "executions"] as const,
+  googleDriveConnections: ["google-drive", "connections"] as const,
   usbDrives: ["files", "usb"] as const,
 };

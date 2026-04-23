@@ -7,6 +7,7 @@ import { normalizePathForBackend } from "@/modules/files/components/file-manager
 import { FILES_MENU_SHELL, FILES_PANEL_SHELL } from "@/modules/files/components/file-manager-surface";
 import { PeopleRegular, DeleteRegular, ArrowEjectRegular } from "@fluentui/react-icons";
 import { useRef, useState, useEffect, type ReactNode } from "react";
+import { FEATURE_FLAGS } from "@/lib/shared/feature-flags";
 
 export type FileManagerSidebarItem = {
   name: string;
@@ -36,6 +37,7 @@ type SidebarProps = {
   onNavigateToPath: (path: string[]) => void;
   onOpenNetworkDialog: () => void;
   onOpenGoogleDriveDialog: () => void;
+  onOpenUsbDialog: () => void;
   onMountDrive: (driveId: string) => void;
   onEjectDrive: (driveId: string) => void;
 };
@@ -56,6 +58,7 @@ export function FileManagerSidebar({
   onNavigateToPath,
   onOpenNetworkDialog,
   onOpenGoogleDriveDialog,
+  onOpenUsbDialog,
   onMountDrive,
   onEjectDrive,
 }: SidebarProps) {
@@ -106,12 +109,21 @@ export function FileManagerSidebar({
                           Network Storage
                         </button>
                         <button
-                          onClick={() => { setAddMenuOpen(false); onOpenGoogleDriveDialog(); }}
+                          onClick={() => { setAddMenuOpen(false); onOpenUsbDialog(); }}
                           className="flex w-full items-center gap-2.5 px-3 py-2 text-[13px] text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground"
                         >
-                          <Cloud className="size-3.5 shrink-0 text-sky-400/70" />
-                          Google Drive
+                          <HardDrive className="size-3.5 shrink-0 text-amber-400/70" />
+                          USB Drives
                         </button>
+                        {FEATURE_FLAGS.GOOGLE_DRIVE && (
+                          <button
+                            onClick={() => { setAddMenuOpen(false); onOpenGoogleDriveDialog(); }}
+                            className="flex w-full items-center gap-2.5 px-3 py-2 text-[13px] text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground"
+                          >
+                            <Cloud className="size-3.5 shrink-0 text-sky-400/70" />
+                            Google Drive
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>

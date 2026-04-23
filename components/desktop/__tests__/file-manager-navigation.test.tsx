@@ -75,7 +75,7 @@ describe("FileManager navigation", () => {
 
     return renderFileManager().then(() => {
       expect(screen.queryByRole("button", { name: "nastabib.local" })).toBeNull();
-      expect(screen.queryByRole("button", { name: "Add network storage" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Add location" })).toBeNull();
     });
   });
 

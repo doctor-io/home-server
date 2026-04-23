@@ -388,6 +388,7 @@ export function FileManager() {
       showEmptyTrashConfirm={state.showEmptyTrashConfirm}
       showNetworkDialog={state.showNetworkDialog && !isDemoMode}
       showGoogleDriveDialog={state.showGoogleDriveDialog && !isDemoMode}
+      showUsbDialog={state.showUsbDialog && !isDemoMode}
       sidebarSections={sidebarSections}
       sortedEntries={visibleEntries}
       storageUsagePercent={storageSummary.percent}

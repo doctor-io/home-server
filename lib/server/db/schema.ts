@@ -202,6 +202,28 @@ export const settings = pgTable("settings", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const filesGoogleDriveTokens = pgTable(
+  "files_google_drive_tokens",
+  {
+    id: text("id").primaryKey(),
+    email: text("email").notNull(),
+    displayName: text("display_name"),
+    accessTokenCiphertext: text("access_token_ciphertext").notNull(),
+    accessTokenIv: text("access_token_iv").notNull(),
+    accessTokenTag: text("access_token_tag").notNull(),
+    refreshTokenCiphertext: text("refresh_token_ciphertext"),
+    refreshTokenIv: text("refresh_token_iv"),
+    refreshTokenTag: text("refresh_token_tag"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("files_google_drive_tokens_email_idx").on(table.email),
+    index("files_google_drive_tokens_created_at_idx").on(table.createdAt),
+  ],
+);
+
 export const filesTrashEntries = pgTable(
   "files_trash_entries",
   {

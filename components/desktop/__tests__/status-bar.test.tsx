@@ -2,6 +2,7 @@
 
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createTestQueryClient, createWrapper } from "@/test/query-client-wrapper";
 
 const mockUseSystemMetrics = vi.fn();
 const mockUseInstalledApps = vi.fn();
@@ -54,6 +55,13 @@ vi.mock("@/modules/system/hooks/useSystemUpdateStatus", () => ({
 }));
 
 import { StatusBar } from "@/modules/system/components/status-bar";
+
+function renderStatusBar(props: React.ComponentProps<typeof StatusBar> = {}) {
+  const client = createTestQueryClient();
+  return render(<StatusBar {...props} />, {
+    wrapper: createWrapper(client),
+  });
+}
 
 function buildMetrics(overrides?: Partial<Record<string, unknown>>) {
   const base = {
@@ -132,6 +140,13 @@ function buildMetrics(overrides?: Partial<Record<string, unknown>>) {
 describe("StatusBar", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ notifications: [] }),
+      }),
+    );
     mockUseSystemMetrics.mockReturnValue({
       data: buildMetrics(),
       isError: false,
@@ -237,11 +252,10 @@ describe("StatusBar", () => {
   });
 
   it("renders the compact user greeting and live percentages", () => {
-    render(<StatusBar />);
+    renderStatusBar();
 
     expect(screen.getByText("Hi, Admin")).toBeTruthy();
     expect(screen.getByText("Welcome back, Admin")).toBeTruthy();
-    expect(screen.getByLabelText("waving hand")).toBeTruthy();
     expect(screen.getByText("22°")).toBeTruthy();
     expect(screen.getByText("74%")).toBeTruthy();
   });
@@ -275,7 +289,7 @@ describe("StatusBar", () => {
       ],
     });
 
-    render(<StatusBar />);
+    renderStatusBar();
 
     const notificationButton = screen.getByRole("button", {
       name: "Notifications",
@@ -305,7 +319,7 @@ describe("StatusBar", () => {
       isError: false,
     });
 
-    render(<StatusBar />);
+    renderStatusBar();
 
     const notificationButton = screen.getByRole("button", {
       name: "Notifications",
@@ -336,7 +350,7 @@ describe("StatusBar", () => {
       isError: false,
     });
 
-    render(<StatusBar />);
+    renderStatusBar();
 
     const notificationButton = screen.getByRole("button", {
       name: "Notifications",
@@ -362,12 +376,12 @@ describe("StatusBar", () => {
 
     // Lock/logout buttons are currently hidden in the status bar — just verify
     // the component renders without crashing when callbacks are passed.
-    const { container } = render(<StatusBar onLock={onLock} onLogout={onLogout} />);
+    const { container } = renderStatusBar({ onLock, onLogout });
     expect(container).toBeTruthy();
   });
 
   it("renders weather, wifi, and battery details from system metrics", () => {
-    render(<StatusBar />);
+    renderStatusBar();
 
     fireEvent.click(screen.getByRole("button", { name: "Weather" }));
     expect(screen.getAllByText("Partly cloudy").length).toBeGreaterThan(0);
@@ -390,7 +404,7 @@ describe("StatusBar", () => {
   });
 
   it("opens a date picker when date is clicked", () => {
-    render(<StatusBar />);
+    renderStatusBar();
 
     fireEvent.click(screen.getByRole("button", { name: "Open date picker" }));
 

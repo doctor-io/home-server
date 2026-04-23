@@ -95,6 +95,7 @@ type FileManagerViewProps = {
   showEmptyTrashConfirm: boolean;
   showNetworkDialog: boolean;
   showGoogleDriveDialog: boolean;
+  showUsbDialog: boolean;
   sidebarSections: FileManagerSidebarSection[];
   sortedEntries: FileEntry[];
   storageUsagePercent: number;
@@ -173,6 +174,7 @@ export function FileManagerView({
   showEmptyTrashConfirm,
   showNetworkDialog,
   showGoogleDriveDialog,
+  showUsbDialog,
   sidebarSections,
   sortedEntries,
   storageUsagePercent,
@@ -208,6 +210,7 @@ export function FileManagerView({
         onNavigateToPath={navigateToPath}
         onOpenNetworkDialog={() => dispatch({ type: "SHOW_NETWORK_DIALOG" })}
         onOpenGoogleDriveDialog={() => dispatch({ type: "SHOW_GOOGLE_DRIVE_DIALOG" })}
+        onOpenUsbDialog={() => dispatch({ type: "SHOW_USB_DIALOG" })}
         onMountDrive={onMountDrive}
         onEjectDrive={onEjectDrive}
       />
@@ -342,6 +345,7 @@ export function FileManagerView({
         showEmptyTrashConfirm={showEmptyTrashConfirm}
         showNetworkDialog={showNetworkDialog}
         showGoogleDriveDialog={showGoogleDriveDialog}
+        showUsbDialog={showUsbDialog}
         trashItemCount={trashItemCount}
         onCancelEmptyTrash={() => dispatch({ type: "HIDE_EMPTY_TRASH_CONFIRM" })}
         onChangeCreateEntryDialog={(value) => dispatch({ type: "UPDATE_CREATE_ENTRY_DIALOG", name: value, error: validateEntryName(value) })}
@@ -352,6 +356,7 @@ export function FileManagerView({
         onCloseFileInfoDialog={() => dispatch({ type: "CLOSE_FILE_INFO_DIALOG" })}
         onCloseNetworkDialog={() => dispatch({ type: "HIDE_NETWORK_DIALOG" })}
         onCloseGoogleDriveDialog={() => dispatch({ type: "HIDE_GOOGLE_DRIVE_DIALOG" })}
+        onCloseUsbDialog={() => dispatch({ type: "HIDE_USB_DIALOG" })}
         onCloseRenameDialog={() => dispatch({ type: "CLOSE_RENAME_DIALOG" })}
         onConfirmEmptyTrash={() => {
           void actions.confirmEmptyTrash();
@@ -369,6 +374,9 @@ export function FileManagerView({
         onNavigateToNetwork={() => {
           dispatch({ type: "NAVIGATE_TO_PATH", path: ["Network"] });
           dispatch({ type: "HIDE_NETWORK_DIALOG" });
+        }}
+        onNavigateToUsb={(path) => {
+          dispatch({ type: "NAVIGATE_TO_PATH", path });
         }}
         onOpenContextEntry={() => showContextMenu && navigateTo(showContextMenu.entry)}
         onOpenCreateEntryDialog={(kind) => dispatch({ type: "OPEN_CREATE_ENTRY_DIALOG", kind })}

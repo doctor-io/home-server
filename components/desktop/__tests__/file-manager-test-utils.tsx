@@ -24,6 +24,7 @@ export const mockUseCreateLocalFolderShare = vi.fn();
 export const mockUseDeleteLocalFolderShare = vi.fn();
 export const mockUseSystemMetrics = vi.fn();
 export const mockUseCurrentUser = vi.fn();
+export const mockUseUsbDrives = vi.fn();
 
 vi.mock("@/modules/files/hooks/useFiles", () => ({
   buildAssetUrl: (filePath: string) => `/api/v1/files/asset?path=${encodeURIComponent(filePath)}`,
@@ -59,6 +60,10 @@ vi.mock("@/modules/system/hooks/useSystemMetrics", () => ({
   useSystemMetrics: (...args: unknown[]) => mockUseSystemMetrics(...args),
 }));
 
+vi.mock("@/modules/files/hooks/useUsbDrives", () => ({
+  useUsbDrives: (...args: unknown[]) => mockUseUsbDrives(...args),
+}));
+
 vi.mock("@/hooks/useCurrentUser", () => ({
   useCurrentUser: (...args: unknown[]) => mockUseCurrentUser(...args),
 }));
@@ -71,6 +76,14 @@ vi.mock("@/modules/files/hooks/useLocalFolderShares", () => ({
 
 vi.mock("@/modules/files/components/dialogs/network-storage-dialog", () => ({
   NetworkStorageDialog: () => null,
+}));
+
+vi.mock("@/modules/files/components/dialogs/google-drive-dialog", () => ({
+  GoogleDriveDialog: () => null,
+}));
+
+vi.mock("@/modules/files/components/dialogs/usb-storage-dialog", () => ({
+  UsbStorageDialog: () => null,
 }));
 
 export async function renderFileManager() {
@@ -121,6 +134,7 @@ export function resetFileManagerMocks() {
   mockUseDeleteLocalFolderShare.mockReset();
   mockUseSystemMetrics.mockReset();
   mockUseCurrentUser.mockReset();
+  mockUseUsbDrives.mockReset();
 
   mockUseFilesDirectory.mockReturnValue(mockDirectory([]));
   mockUseFilesRoot.mockReturnValue({
@@ -178,6 +192,15 @@ export function resetFileManagerMocks() {
     isLoading: false,
     isError: false,
     error: null,
+  });
+  mockUseUsbDrives.mockReturnValue({
+    drives: [],
+    mount: vi.fn(),
+    unmount: vi.fn(),
+    eject: vi.fn(),
+    isMounting: false,
+    isUnmounting: false,
+    isEjecting: false,
   });
   mockUseLocalFolderShares.mockReturnValue({ data: [], isLoading: false, isError: false, error: null });
   mockUseCreateLocalFolderShare.mockReturnValue({

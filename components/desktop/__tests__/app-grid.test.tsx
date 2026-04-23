@@ -416,8 +416,10 @@ describe("AppGrid context menu", () => {
     openContextMenuFor("Plex");
     fireEvent.click(screen.getByRole("button", { name: "Remove App" }));
 
-    expect(screen.getByText("Uninstall Plex?")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Uninstall" }));
+    expect(
+      screen.getByText((_, element) => element?.textContent === "Uninstall Plex?"),
+    ).toBeTruthy();
+    fireEvent.click(screen.getAllByRole("button", { name: "Uninstall" }).at(-1)!);
 
     await waitFor(() => {
       expect(uninstallApp).toHaveBeenCalledWith({

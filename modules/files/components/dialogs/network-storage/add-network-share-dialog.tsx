@@ -3,13 +3,12 @@
 import { Input } from "@/components/ui/input";
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Loader2, Plus, RefreshCw, Search, XIcon } from "@/components/icons/platform-icons";
+import { ArrowLeft, Loader2, Plus, RefreshCw, Search, X } from "@/components/icons/platform-icons";
 
 export type AddNetworkShareDraft = {
   host: string;
@@ -62,30 +61,44 @@ export function AddNetworkShareDialog({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent showCloseButton={false} className="max-w-[34rem] gap-0 border-glass-border bg-popover/96 p-0 shadow-2xl shadow-black/45 backdrop-blur-2xl">
-        <DialogHeader className="border-b border-glass-border/60 px-5 py-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-start gap-3">
-              <button
-                type="button"
-                onClick={onClose}
-                className="inline-flex size-9 items-center justify-center rounded-lg border border-glass-border bg-background/80 text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground"
-                aria-label="Back"
-              >
-                <ArrowLeft className="size-4" />
-              </button>
-              <div>
-                <DialogTitle className="text-sm">Add Network Share</DialogTitle>
-                <DialogDescription className="mt-0.5">
-                  Connect to an SMB share
-                </DialogDescription>
-              </div>
-            </div>
-            <DialogClose className="inline-flex size-9 items-center justify-center rounded-lg border border-glass-border bg-background/80 text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground">
-              <XIcon className="size-4" />
-              <span className="sr-only">Close</span>
-            </DialogClose>
-          </div>
+        <DialogHeader className="sr-only">
+          <DialogTitle>Add Network Share</DialogTitle>
+          <DialogDescription>Connect to an SMB share</DialogDescription>
         </DialogHeader>
+
+        {/* Window chrome title bar */}
+        <div className="flex h-11 shrink-0 select-none items-center gap-0 border-b border-glass-border/50 bg-popover/70 backdrop-blur-2xl">
+          {/* Traffic lights */}
+          <div className="flex items-center gap-1.5 px-4">
+            <button
+              onClick={onClose}
+              className="group flex size-3 cursor-pointer items-center justify-center rounded-full bg-[#ff5f57] transition-all hover:brightness-110"
+              aria-label="Close"
+            >
+              <X className="size-[7px] text-[#6a0002] opacity-0 transition-opacity group-hover:opacity-100" />
+            </button>
+            <span className="size-3 rounded-full bg-white/10" />
+            <span className="size-3 rounded-full bg-white/10" />
+          </div>
+
+          {/* Centered title */}
+          <div className="flex flex-1 items-center justify-center">
+            <span className="text-xs font-medium text-foreground/80">Add Network Share</span>
+          </div>
+
+          {/* Right action — back button to balance */}
+          <div className="flex items-center justify-end px-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-6 items-center gap-1 rounded-md border border-glass-border bg-background/80 px-2 text-[11px] text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground"
+              aria-label="Back"
+            >
+              <ArrowLeft className="size-3" />
+              Back
+            </button>
+          </div>
+        </div>
 
         <div className="space-y-5 px-5 py-5">
           {/* Server */}
