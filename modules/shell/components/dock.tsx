@@ -98,15 +98,20 @@ export function Dock({
                     style={{
                       transform: `scale(${scale})`,
                       transition: animationsEnabled
-                        ? "transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)"
+                        ? "transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94), background-color 0.15s, color 0.15s, box-shadow 0.15s"
                         : "none",
-                    }}
-                    className={`relative size-11 rounded-xl flex items-center justify-center cursor-pointer transition-colors ${
-                      isFocused
-                        ? "bg-primary/20 text-primary"
+                      boxShadow: isFocused
+                        ? "inset 0 1px 0 rgba(255,255,255,0.15), 0 2px 8px rgba(0,0,0,0.25)"
                         : isRunning
-                          ? "bg-secondary/65 text-foreground hover:bg-secondary/85"
-                          : "bg-secondary/50 text-muted-foreground hover:text-foreground hover:bg-secondary/80"
+                          ? "inset 0 1px 0 rgba(255,255,255,0.08)"
+                          : undefined,
+                    }}
+                    className={`relative size-11 rounded-2xl flex items-center justify-center cursor-pointer ${
+                      isFocused
+                        ? "bg-primary/18 text-primary"
+                        : isRunning
+                          ? "bg-white/[0.09] text-foreground/90 hover:bg-white/[0.13] hover:text-foreground"
+                          : "text-foreground/45 hover:bg-white/[0.06] hover:text-foreground/80"
                     }`}
                     aria-label={item.name}
                     aria-pressed={isFocused}
@@ -120,10 +125,12 @@ export function Dock({
               </Tooltip>
               {/* Always rendered to reserve space — invisible when not running */}
               <span
-                className={`h-[3px] w-4 rounded-full transition-colors ${
+                className={`rounded-full transition-all duration-200 ${
                   isRunning
-                    ? isFocused ? "bg-primary" : "bg-foreground/50"
-                    : "invisible"
+                    ? isFocused
+                      ? "h-[3px] w-4 bg-primary"
+                      : "h-[3px] w-2.5 bg-foreground/30"
+                    : "invisible h-[3px] w-4"
                 }`}
               />
             </div>

@@ -70,7 +70,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       meta: { userId: session.userId, username: session.username, taskId },
     });
     return NextResponse.json({ task });
-  } catch {
+  } catch (error) {
+    logServerAction({
+      level: "error",
+      layer: "api",
+      action: "scheduled-tasks.patch.response",
+      status: "error",
+      requestId,
+      message: "Failed to update scheduled task",
+      error,
+      meta: { taskId },
+    });
     return NextResponse.json({ error: "Failed to update scheduled task" }, { status: 500 });
   }
 }
@@ -92,7 +102,17 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       meta: { userId: session.userId, username: session.username, taskId },
     });
     return NextResponse.json({ ok: true });
-  } catch {
+  } catch (error) {
+    logServerAction({
+      level: "error",
+      layer: "api",
+      action: "scheduled-tasks.delete.response",
+      status: "error",
+      requestId,
+      message: "Failed to delete scheduled task",
+      error,
+      meta: { taskId },
+    });
     return NextResponse.json({ error: "Failed to delete scheduled task" }, { status: 500 });
   }
 }

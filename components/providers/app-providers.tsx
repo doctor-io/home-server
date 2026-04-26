@@ -24,7 +24,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
       <QueryClientProvider client={queryClient}>
         {children}
-        <Toaster position="bottom-right" richColors />
+        <Toaster position="bottom-center" offset="5.75rem" />
       </QueryClientProvider>
     </ThemeProvider>
   );

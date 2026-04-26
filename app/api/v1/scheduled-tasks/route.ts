@@ -34,7 +34,16 @@ export async function GET(request: NextRequest) {
   try {
     const tasks = await listScheduledTasks();
     return NextResponse.json({ tasks });
-  } catch {
+  } catch (error) {
+    logServerAction({
+      level: "error",
+      layer: "api",
+      action: "scheduled-tasks.get.response",
+      status: "error",
+      requestId,
+      message: "Failed to fetch scheduled tasks",
+      error,
+    });
     return NextResponse.json({ error: "Failed to fetch scheduled tasks" }, { status: 500 });
   }
 }
@@ -67,7 +76,16 @@ export async function POST(request: NextRequest) {
       meta: { userId: session.userId, username: session.username, taskId: task.id, label: task.label },
     });
     return NextResponse.json({ task }, { status: 201 });
-  } catch {
+  } catch (error) {
+    logServerAction({
+      level: "error",
+      layer: "api",
+      action: "scheduled-tasks.post.response",
+      status: "error",
+      requestId,
+      message: "Failed to create scheduled task",
+      error,
+    });
     return NextResponse.json({ error: "Failed to create scheduled task" }, { status: 500 });
   }
 }

@@ -35,7 +35,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       meta: { userId: session.userId, username: session.username, taskId },
     });
     return NextResponse.json({ ok: true });
-  } catch {
+  } catch (error) {
+    logServerAction({
+      level: "error",
+      layer: "api",
+      action: "scheduled-tasks.run.post.response",
+      status: "error",
+      requestId,
+      message: "Failed to run scheduled task",
+      error,
+      meta: { taskId },
+    });
     return NextResponse.json({ error: "Failed to run scheduled task" }, { status: 500 });
   }
 }

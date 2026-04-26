@@ -1,16 +1,16 @@
 import { formatBytesCompact } from "@/lib/client/format";
 import type { FileListEntry } from "@/lib/shared/contracts/files";
 import {
-  File,
-  FileArchive,
-  FileCode,
-  FileCog,
-  FileImage,
-  FileText,
-  FileVideo,
-  Folder,
-  Music,
-} from "@/components/icons/platform-icons";
+  ArchiveFileIcon,
+  AudioFileIcon,
+  CodeFileIcon,
+  DocumentFileIcon,
+  FolderIcon,
+  GenericFileIcon,
+  ImageFileIcon,
+  TextFileIcon,
+  VideoFileIcon,
+} from "@/components/icons/file-icons";
 
 export type FileEntry = {
   name: string;
@@ -75,39 +75,39 @@ export function toUiFileEntry(entry: FileListEntry): FileEntry {
 
 function getFileIconForSize(entry: FileEntry, sizeClass: string) {
   if (entry.type === "folder") {
-    return <Folder className={`${sizeClass} text-sky-400`} />;
+    return <FolderIcon className={sizeClass} name={entry.name} />;
   }
   const ext = (entry.ext ?? entry.name.split(".").pop() ?? "").toLowerCase();
   if (["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp"].includes(ext)) {
-    return <FileImage className={`${sizeClass} text-pink-400`} />;
+    return <ImageFileIcon className={sizeClass} />;
   }
   if (["mp3", "wav", "ogg", "m4a", "flac", "aac", "opus"].includes(ext)) {
-    return <Music className={`${sizeClass} text-orange-400`} />;
+    return <AudioFileIcon className={sizeClass} />;
   }
   if (["mp4", "mkv", "avi", "mov", "webm"].includes(ext)) {
-    return <FileVideo className={`${sizeClass} text-amber-400`} />;
+    return <VideoFileIcon className={sizeClass} />;
   }
   if (["gz", "tar", "zip", "rar", "7z", "deb", "iso"].includes(ext)) {
-    return <FileArchive className={`${sizeClass} text-orange-400`} />;
+    return <ArchiveFileIcon className={sizeClass} />;
   }
-  if (["js", "ts", "py", "sh", "json", "yml", "yaml", "conf", "env", "md", "css", "html"].includes(ext)) {
-    return <FileCode className={`${sizeClass} text-emerald-400`} />;
+  if (["js", "ts", "tsx", "jsx", "py", "sh", "json", "yml", "yaml", "conf", "env", "md", "css", "html"].includes(ext)) {
+    return <CodeFileIcon className={sizeClass} />;
   }
-  if (["log", "csv"].includes(ext)) {
-    return <FileCog className={`${sizeClass} text-muted-foreground`} />;
+  if (["txt", "log", "csv"].includes(ext)) {
+    return <TextFileIcon className={sizeClass} />;
   }
-  if (["txt", "doc", "pdf"].includes(ext)) {
-    return <FileText className={`${sizeClass} text-blue-300`} />;
+  if (["pdf", "doc", "docx"].includes(ext)) {
+    return <DocumentFileIcon className={sizeClass} />;
   }
-  return <File className={`${sizeClass} text-muted-foreground`} />;
+  return <GenericFileIcon className={sizeClass} />;
 }
 
 export function getFileIcon(entry: FileEntry) {
-  return getFileIconForSize(entry, "size-4");
+  return getFileIconForSize(entry, "size-5");
 }
 
 export function getLargeFileIcon(entry: FileEntry) {
-  return getFileIconForSize(entry, "size-10");
+  return getFileIconForSize(entry, "size-14");
 }
 
 export function getEditorLanguage(entry: FileEntry): string {
