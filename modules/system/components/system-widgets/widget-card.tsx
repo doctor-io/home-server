@@ -18,7 +18,7 @@ export function WidgetCard({
   return (
     <section
       className={cn(
-        "shrink-0 rounded-2xl border border-white/[0.09] p-4",
+        "relative shrink-0 overflow-hidden rounded-2xl border border-white/[0.09] p-4",
         className,
       )}
       style={{
@@ -27,10 +27,17 @@ export function WidgetCard({
         boxShadow: "var(--system-shadow-surface), inset 0 1px 0 rgba(255,255,255,0.12)",
       }}
     >
+      {/* Subtle accent top highlight */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
+
       {title ? (
-        <header className="flex items-center gap-2 mb-3">
-          {Icon ? <Icon className="size-4 text-primary" /> : null}
-          <h3 className="text-xs font-semibold text-foreground uppercase tracking-wider">
+        <header className="mb-3.5 flex items-center gap-2">
+          {Icon ? (
+            <div className="flex size-5 items-center justify-center rounded-md bg-primary/15 ring-1 ring-inset ring-primary/20">
+              <Icon className="size-3 text-primary" />
+            </div>
+          ) : null}
+          <h3 className="text-[10px] font-semibold uppercase tracking-[0.15em] text-foreground/55">
             {title}
           </h3>
         </header>

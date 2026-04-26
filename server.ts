@@ -49,6 +49,15 @@ async function applyCompression(
   });
 }
 
+process.on("uncaughtException", (error) => {
+  console.error("Uncaught exception:", error);
+  process.exit(1);
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled promise rejection:", reason);
+});
+
 async function main() {
   await app.prepare();
   void import("./lib/server/modules/files/path-resolver")

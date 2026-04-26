@@ -72,7 +72,7 @@ function GridThumbnail({ entry }: { entry: FileEntry }) {
   const src = buildAssetUrl(entry.path);
 
   return (
-    <div className="relative size-10">
+    <div className="relative size-14">
       <div
         className={cn(
           "absolute inset-0 flex items-center justify-center transition-opacity duration-150",
@@ -88,7 +88,7 @@ function GridThumbnail({ entry }: { entry: FileEntry }) {
         onLoad={() => setStatus("loaded")}
         onError={() => setStatus("error")}
         className={cn(
-          "size-10 rounded-md object-cover transition-opacity duration-150",
+          "size-14 rounded-lg object-cover transition-opacity duration-150",
           status === "loaded" ? "opacity-100" : "opacity-0",
         )}
         loading="lazy"
@@ -119,7 +119,7 @@ export function FileGrid({
 
   return (
     <>
-      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
         {visible.map((entry) => {
           const isImage = entry.type === "file" && IMAGE_EXTS.has((entry.ext ?? "").toLowerCase());
           const isSelected = selectedFiles.has(entry.name);
@@ -131,7 +131,7 @@ export function FileGrid({
               onDoubleClick={() => onOpenEntry(entry)}
               onContextMenu={(event) => onEntryContextMenu(event, entry)}
               className={cn(
-                "flex cursor-pointer flex-col items-center gap-2 rounded-xl border p-3 transition-all",
+                "flex cursor-pointer flex-col items-center gap-3 rounded-xl border p-4 transition-all",
                 isSelected
                   ? "border-primary/30 bg-primary/15"
                   : "border-transparent hover:bg-background/50",
@@ -139,8 +139,8 @@ export function FileGrid({
             >
               <div className="relative">
                 {pendingEntryPath === entry.path ? (
-                  <div className="flex size-10 items-center justify-center">
-                    <Loader2 className="size-6 animate-spin text-primary" />
+                  <div className="flex size-14 items-center justify-center">
+                    <Loader2 className="size-7 animate-spin text-primary" />
                   </div>
                 ) : isImage ? (
                   <GridThumbnail entry={entry} />
@@ -148,7 +148,7 @@ export function FileGrid({
                   getLargeFileIcon(entry)
                 )}
                 {entry.starred && pendingEntryPath !== entry.path && (
-                  <Star className="absolute -right-1 -top-1 size-3 fill-amber-400 text-amber-400" />
+                  <Star className="absolute -right-1 -top-1 size-3.5 fill-amber-400 text-amber-400" />
                 )}
               </div>
               <div className="flex w-full flex-col items-center gap-0.5">
@@ -213,7 +213,7 @@ export function FileList({
           onDoubleClick={() => onOpenEntry(entry)}
           onContextMenu={(event) => onEntryContextMenu(event, entry)}
           className={cn(
-            "flex cursor-pointer items-center gap-3 px-3 py-2 text-left transition-colors",
+            "flex cursor-pointer items-center gap-3 px-3 py-2.5 text-left transition-colors",
             selectedFiles.has(entry.name) ? "bg-primary/15" : "hover:bg-background/50",
           )}
         >

@@ -12,15 +12,15 @@ export function QuickStatsCard({ stats }: QuickStatsCardProps) {
         {stats.map((item) => (
           <div
             key={item.label}
-            className="flex flex-col items-center gap-0 py-1.5 rounded-lg bg-glass-highlight"
+            className="flex flex-col items-center gap-0.5 rounded-xl border border-white/[0.07] bg-white/[0.04] py-2.5"
           >
             <span className="text-base leading-tight font-bold text-foreground font-mono">
               {item.value}
             </span>
-            <span className="text-2xs leading-tight text-muted-foreground uppercase tracking-wider">
+            <span className="text-2xs leading-tight text-muted-foreground/80 uppercase tracking-wider">
               {item.label}
             </span>
-            <span className="text-2xs leading-tight text-muted-foreground/70 text-center px-1.5 w-full truncate">
+            <span className="text-2xs leading-tight text-muted-foreground/50 text-center px-1.5 w-full truncate">
               {item.sub}
             </span>
           </div>
