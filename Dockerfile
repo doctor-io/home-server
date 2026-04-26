@@ -48,7 +48,7 @@ COPY --from=deps --chown=homeio:homeio /app/node_modules ./node_modules
 
 # Drizzle config + schema for migrations
 COPY --from=builder --chown=homeio:homeio /app/drizzle.config.ts ./drizzle.config.ts
-COPY --from=builder --chown=homeio:homeio /app/lib/server/db/schema-definitions.ts ./lib/server/db/schema-definitions.ts
+COPY --from=builder --chown=homeio:homeio /app/lib/server/db/schema.ts ./lib/server/db/schema.ts
 
 # Entrypoint
 COPY --chown=homeio:homeio docker-entrypoint.sh ./docker-entrypoint.sh
