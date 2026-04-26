@@ -19,16 +19,22 @@ describe("Dock", () => {
 
     expect(appStoreButton.getAttribute("aria-pressed")).toBe("true");
     expect(terminalButton.getAttribute("aria-pressed")).toBe("false");
-    expect(appStoreButton.className).toContain("bg-primary/20");
-    expect(terminalButton.className).toContain("bg-secondary/65");
+    expect(appStoreButton.className).toContain("bg-primary/18");
+    expect(terminalButton.className).toContain("bg-white/[0.09]");
 
     const runningDots = Array.from(container.querySelectorAll("span")).filter(
       (element) =>
+        element.className.includes("rounded-full") &&
         element.className.includes("h-[3px]") &&
-        element.className.includes("w-4") &&
-        element.className.includes("transition-colors") &&
+        element.className.includes("transition-all") &&
         !element.className.includes("invisible"),
     );
     expect(runningDots).toHaveLength(2);
+    expect(runningDots.some((element) => element.className.includes("w-4"))).toBe(
+      true,
+    );
+    expect(
+      runningDots.some((element) => element.className.includes("w-2.5")),
+    ).toBe(true);
   });
 });
