@@ -1,30 +1,39 @@
 "use client";
 
-import { formatUptimeShort } from "@/lib/client/format";
+import { formatBytesCompact, formatUptimeShort } from "@/lib/client/format";
 import {
-    calculateDockerTotals,
-    containerToProcess,
-    getStatusBadgeColor,
+  calculateDockerTotals,
+  containerToProcess,
+  getStatusBadgeColor,
 } from "@/lib/client/monitor-utils";
 import { useDockerStats } from "@/modules/system/hooks/useDockerStats";
 import { useSystemMetrics } from "@/modules/system/hooks/useSystemMetrics";
 import {
-    Activity,
-    AlertTriangle,
-    ArrowDown,
-    ArrowUp,
-    Container,
-    Cpu,
-    Gauge,
-    HardDrive,
-    MemoryStick,
-    Network,
-    Search,
+  Activity,
+  AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  Container,
+  Cpu,
+  Gauge,
+  HardDrive,
+  MemoryStick,
+  Network,
+  Search,
 } from "@/components/icons/platform-icons";
+import { PANEL_INSET } from "@/lib/ui/surface-tokens";
 import { useEffect, useMemo, useState } from "react";
+import { cn } from "@/lib/utils";
 
-type MonitorTab = "processes" | "resources" | "network";
+type MonitorTab = "processes" | "network";
 type SortKey = "cpu" | "memory" | "network" | "disk";
+
+const TABS: { id: MonitorTab; label: string }[] = [
+  { id: "processes", label: "Processes" },
+  { id: "network", label: "Network" },
+];
+
+// ── Metric card ───────────────────────────────────────────────────────────────
 
 function MetricCard({
   label,
@@ -40,34 +49,34 @@ function MetricCard({
   color: string;
 }) {
   return (
-    <div className="rounded-xl border border-glass-border bg-glass p-3">
-      <div className="mb-2 flex items-center justify-between">
-        <span className="text-xs uppercase tracking-wider text-muted-foreground">
+    <div className={cn(PANEL_INSET, "flex flex-col gap-2 px-4 py-3")}>
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/50">
           {label}
         </span>
-        <Icon className={`size-3.5 ${color}`} />
+        <div className={cn("flex size-6 items-center justify-center rounded-md border border-glass-border/60 bg-background/55", color)}>
+          <Icon className="size-3" />
+        </div>
       </div>
-      <div className="text-xl font-semibold text-foreground font-mono">
-        {value}
-      </div>
-      <div className="text-xs text-muted-foreground">{sub}</div>
+      <div className="font-mono text-2xl font-bold tabular-nums text-foreground">{value}</div>
+      <div className="text-[11px] text-muted-foreground/70">{sub}</div>
     </div>
   );
 }
 
+// ── History bars ──────────────────────────────────────────────────────────────
+
 function HistoryBars({ values, color }: { values: number[]; color: string }) {
   return (
-    <div className="flex h-16 items-end gap-1 rounded-xl border border-glass-border bg-glass p-2">
+    <div className={cn(PANEL_INSET, "flex h-10 items-end gap-px px-2 py-1.5")}>
       {values.length === 0 ? (
-        <span className="m-auto text-xs text-muted-foreground">
-          Collecting…
-        </span>
+        <span className="m-auto text-xs text-muted-foreground/50">Collecting…</span>
       ) : (
         values.map((v, i) => (
           <span
             key={`${i}-${v}`}
-            className={`w-1.5 rounded-sm ${color} transition-all duration-300`}
-            style={{ height: `${Math.max(6, Math.round(v))}%` }}
+            className={cn("flex-1 rounded-[1px] transition-all duration-300", color)}
+            style={{ height: `${Math.max(4, Math.round(v))}%` }}
           />
         ))
       )}
@@ -75,13 +84,51 @@ function HistoryBars({ values, color }: { values: number[]; color: string }) {
   );
 }
 
-/** Format bytes to a human-readable string (KB / MB / GB / TB). */
-function formatBytes(bytes: number): string {
-  if (bytes >= 1024 ** 4) return `${(bytes / 1024 ** 4).toFixed(2)} TB`;
-  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
-  if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(0)} MB`;
-  return `${(bytes / 1024).toFixed(0)} KB`;
+// ── Resource history card ─────────────────────────────────────────────────────
+
+function ResourceHistoryCard({
+  icon: Icon,
+  title,
+  iconColor,
+  barColor,
+  history,
+  rows,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  iconColor: string;
+  barColor: string;
+  history: number[];
+  rows: { label: string; value: string }[];
+}) {
+  return (
+    <div className={cn(PANEL_INSET, "flex flex-col gap-2 p-3")}>
+      <div className="flex items-center gap-2">
+        <Icon className={cn("size-3.5", iconColor)} />
+        <span className="text-xs font-semibold text-foreground">{title}</span>
+      </div>
+      <HistoryBars values={history} color={barColor} />
+      <div className="divide-y divide-glass-border/40">
+        {rows.map((r) => (
+          <InfoRow key={r.label} label={r.label} value={r.value} mono />
+        ))}
+      </div>
+    </div>
+  );
 }
+
+// ── Info row ──────────────────────────────────────────────────────────────────
+
+function InfoRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="flex items-center justify-between py-2">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className={cn("text-xs font-medium text-foreground", mono && "font-mono")}>{value}</span>
+    </div>
+  );
+}
+
+// ── Monitor ───────────────────────────────────────────────────────────────────
 
 export function Monitor() {
   const [tab, setTab] = useState<MonitorTab>("processes");
@@ -89,66 +136,55 @@ export function Monitor() {
   const [sortBy, setSortBy] = useState<SortKey>("cpu");
   const [cpuHistory, setCpuHistory] = useState<number[]>([]);
   const [memHistory, setMemHistory] = useState<number[]>([]);
+  const [peakCpu, setPeakCpu] = useState(0);
+  const [peakMem, setPeakMem] = useState(0);
 
-  // Real system metrics (updated continuously via useSystemSse)
   const { data: systemMetrics } = useSystemMetrics();
-  const {
-    stats: dockerStats,
-    daemonAvailable,
-    isConnected: dockerConnected,
-  } = useDockerStats();
+  const { stats: dockerStats, daemonAvailable, isConnected: dockerConnected } = useDockerStats();
 
-  // Calculate total Docker stats
-  const dockerTotals = useMemo(
-    () => calculateDockerTotals(dockerStats),
-    [dockerStats],
-  );
+  const dockerTotals = useMemo(() => calculateDockerTotals(dockerStats), [dockerStats]);
 
-  // Append real system metrics to rolling history arrays
   useEffect(() => {
     if (!systemMetrics) return;
-
-    const cpuValue = systemMetrics.cpu.normalizedPercent ?? 0;
-    const memValue = systemMetrics.memory.usedPercent ?? 0;
-
-    setCpuHistory((prev) => [...prev.slice(-23), cpuValue]);
-    setMemHistory((prev) => [...prev.slice(-23), memValue]);
+    const cpu = systemMetrics.cpu.normalizedPercent ?? 0;
+    const mem = systemMetrics.memory.usedPercent ?? 0;
+    setCpuHistory((prev) => {
+      if (prev.length > 0 && prev[prev.length - 1] === cpu) return prev;
+      return [...prev.slice(-59), cpu];
+    });
+    setMemHistory((prev) => {
+      if (prev.length > 0 && prev[prev.length - 1] === mem) return prev;
+      return [...prev.slice(-59), mem];
+    });
+    setPeakCpu((prev) => Math.max(prev, cpu));
+    setPeakMem((prev) => Math.max(prev, mem));
   }, [systemMetrics]);
 
-  // Convert Docker stats to process format
-  const dockerProcesses = useMemo(
-    () => dockerStats.map(containerToProcess),
-    [dockerStats],
-  );
+  const dockerProcesses = useMemo(() => dockerStats.map(containerToProcess), [dockerStats]);
 
   const filteredProcesses = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const filtered = q
-      ? dockerProcesses.filter((p) => p.name.toLowerCase().includes(q))
-      : dockerProcesses;
-
+    const filtered = q ? dockerProcesses.filter((p) => p.name.toLowerCase().includes(q)) : dockerProcesses;
     return [...filtered].sort((a, b) => b[sortBy] - a[sortBy]);
   }, [dockerProcesses, query, sortBy]);
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-3 border-b border-glass-border px-4 py-3">
-        <div className="flex items-center gap-1 rounded-lg bg-glass p-0.5">
-          {[
-            { id: "processes" as const, label: "Processes" },
-            { id: "resources" as const, label: "Resources" },
-            { id: "network" as const, label: "Network" },
-          ].map((item) => (
+      {/* Header */}
+      <div className="flex shrink-0 items-center gap-3 border-b border-glass-border/60 px-4 py-2.5">
+        <div className="flex items-center gap-0.5">
+          {TABS.map((t) => (
             <button
-              key={item.id}
-              onClick={() => setTab(item.id)}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-all cursor-pointer ${
-                tab === item.id
-                  ? "bg-primary/20 text-primary"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={cn(
+                "rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors",
+                tab === t.id
+                  ? "bg-primary/15 text-primary"
+                  : "text-muted-foreground hover:bg-background/50 hover:text-foreground",
+              )}
             >
-              {item.label}
+              {t.label}
             </button>
           ))}
         </div>
@@ -156,23 +192,25 @@ export function Monitor() {
         <div className="flex-1" />
 
         {tab === "processes" && (
-          <div className="relative w-56">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <div className="relative w-52">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground/60" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search container..."
-              className="w-full rounded-lg border border-glass-border bg-glass py-1.5 pl-8 pr-3 text-xs text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary/40"
+              placeholder="Search containers…"
+              className="w-full rounded-lg border border-glass-border bg-background/55 py-1.5 pl-8 pr-3 text-xs text-foreground outline-none placeholder:text-muted-foreground/50 focus:border-primary/40"
             />
           </div>
         )}
       </div>
 
+      {/* ── Processes tab ── */}
       {tab === "processes" && (
         <div className="flex-1 overflow-y-auto p-3">
+          {/* Metric summary */}
           <div className="mb-3 grid grid-cols-5 gap-2">
             <MetricCard
-              label="CPU Load"
+              label="CPU"
               icon={Cpu}
               value={`${systemMetrics?.cpu.normalizedPercent?.toFixed(1) ?? "--"}%`}
               sub="System average"
@@ -183,9 +221,8 @@ export function Monitor() {
               icon={MemoryStick}
               value={`${systemMetrics?.memory.usedPercent?.toFixed(1) ?? "--"}%`}
               sub={
-                systemMetrics?.memory.usedBytes &&
-                systemMetrics?.memory.totalBytes
-                  ? `${(systemMetrics.memory.usedBytes / 1024 / 1024 / 1024).toFixed(1)} / ${(systemMetrics.memory.totalBytes / 1024 / 1024 / 1024).toFixed(1)} GB`
+                systemMetrics?.memory.usedBytes && systemMetrics?.memory.totalBytes
+                  ? `${(systemMetrics.memory.usedBytes / 1024 ** 3).toFixed(1)} / ${(systemMetrics.memory.totalBytes / 1024 ** 3).toFixed(1)} GB`
                   : "--"
               }
               color="text-chart-2"
@@ -199,78 +236,133 @@ export function Monitor() {
                   ? "daemon unreachable"
                   : `${dockerStats.filter((c) => c.state === "running").length} running`
               }
-              color={
-                daemonAvailable === false ? "text-status-amber" : "text-chart-4"
-              }
+              color={daemonAvailable === false ? "text-status-amber" : "text-chart-4"}
             />
             <MetricCard
-              label="Network RX"
+              label="Net RX"
               icon={ArrowDown}
-              value={`${(dockerTotals.totalNetworkRx / 1024 / 1024).toFixed(1)} MB`}
-              sub="Total received"
+              value={`${(dockerTotals.totalNetworkRx / 1024 ** 2).toFixed(1)}`}
+              sub="MB received"
               color="text-status-green"
             />
             <MetricCard
-              label="Network TX"
+              label="Net TX"
               icon={ArrowUp}
-              value={`${(dockerTotals.totalNetworkTx / 1024 / 1024).toFixed(1)} MB`}
-              sub="Total sent"
+              value={`${(dockerTotals.totalNetworkTx / 1024 ** 2).toFixed(1)}`}
+              sub="MB sent"
               color="text-sky-400"
             />
           </div>
 
-          <div className="overflow-hidden rounded-xl border border-glass-border bg-glass">
-            <div className="flex items-center justify-between border-b border-glass-border px-3 py-2">
-              <div className="flex items-center gap-2 text-xs font-medium text-foreground">
-                <Container className="size-3.5" />
-                <span>Docker Containers</span>
+          {/* Resource charts */}
+          <div className="mb-3 grid grid-cols-2 gap-2">
+            <ResourceHistoryCard
+              icon={Cpu}
+              title="CPU History"
+              iconColor="text-primary"
+              barColor="bg-primary/80"
+              history={cpuHistory}
+              rows={[
+                { label: "Current", value: `${systemMetrics?.cpu.normalizedPercent?.toFixed(1) ?? "--"}%` },
+                { label: "Peak", value: peakCpu > 0 ? `${peakCpu.toFixed(0)}%` : "--" },
+              ]}
+            />
+            <ResourceHistoryCard
+              icon={MemoryStick}
+              title="Memory Pressure"
+              iconColor="text-chart-2"
+              barColor="bg-chart-2/80"
+              history={memHistory}
+              rows={[
+                { label: "Used %", value: `${systemMetrics?.memory.usedPercent?.toFixed(1) ?? "--"}%` },
+                { label: "Used", value: systemMetrics?.memory.usedBytes ? `${(systemMetrics.memory.usedBytes / 1024 ** 3).toFixed(1)} GB` : "--" },
+              ]}
+            />
+
+            <div className={cn(PANEL_INSET, "flex flex-col gap-2 p-3")}>
+              <div className="flex items-center gap-2">
+                <HardDrive className="size-3.5 text-chart-4" />
+                <span className="text-xs font-semibold text-foreground">Disk Usage</span>
+              </div>
+              {systemMetrics?.storage ? (
+                <>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-background/65">
+                    <div className="h-full rounded-full bg-chart-4 transition-all duration-300" style={{ width: `${systemMetrics.storage.usedPercent.toFixed(1)}%` }} />
+                  </div>
+                  <div className="divide-y divide-glass-border/40">
+                    <InfoRow label="Used" value={formatBytesCompact(systemMetrics.storage.usedBytes)} mono />
+                    <InfoRow label="Total" value={formatBytesCompact(systemMetrics.storage.totalBytes)} mono />
+                    <InfoRow label="Usage" value={`${systemMetrics.storage.usedPercent.toFixed(1)}%`} mono />
+                  </div>
+                </>
+              ) : (
+                <p className="py-4 text-center text-xs text-muted-foreground/60">Storage data unavailable</p>
+              )}
+            </div>
+
+            <div className={cn(PANEL_INSET, "flex flex-col gap-2 p-3")}>
+              <div className="flex items-center gap-2">
+                <Gauge className="size-3.5 text-status-amber" />
+                <span className="text-xs font-semibold text-foreground">Load Average</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { label: "1m", value: systemMetrics?.cpu.oneMinute?.toFixed(2) },
+                  { label: "5m", value: systemMetrics?.cpu.fiveMinute?.toFixed(2) },
+                  { label: "15m", value: systemMetrics?.cpu.fifteenMinute?.toFixed(2) },
+                ].map(({ label, value }) => (
+                  <div key={label} className={cn(PANEL_INSET, "flex flex-col items-center gap-1 py-3")}>
+                    <span className="font-mono text-sm font-bold text-foreground">{value ?? "--"}</span>
+                    <span className="text-[11px] text-muted-foreground/60">{label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Container table */}
+          <div className={cn(PANEL_INSET, "overflow-hidden")}>
+            <div className="flex items-center justify-between border-b border-glass-border/50 px-4 py-2.5">
+              <div className="flex items-center gap-2">
+                <Container className="size-3.5 text-primary" />
+                <span className="text-xs font-semibold text-foreground">Docker Containers</span>
                 {dockerConnected && daemonAvailable !== false && (
-                  <span className="text-status-green">● Live</span>
+                  <span className="flex items-center gap-1 text-[11px] text-status-green">
+                    <span className="size-1.5 rounded-full bg-status-green" />
+                    Live
+                  </span>
                 )}
               </div>
               {daemonAvailable === false && (
-                <span className="flex items-center gap-1 text-xs text-status-amber">
+                <span className="flex items-center gap-1.5 text-xs text-status-amber">
                   <AlertTriangle className="size-3.5" />
                   Docker daemon unreachable
                 </span>
               )}
               {daemonAvailable !== false && dockerStats.length === 0 && (
-                <span className="text-xs text-muted-foreground">
-                  No containers running
-                </span>
+                <span className="text-xs text-muted-foreground/60">No containers running</span>
               )}
             </div>
-            <div className="grid grid-cols-[2.2fr_0.8fr_1fr_1fr_1fr_1fr] gap-2 border-b border-glass-border px-3 py-2 text-xs uppercase tracking-wider text-muted-foreground">
+
+            <div className="grid grid-cols-[2.2fr_0.7fr_0.8fr_0.8fr_0.8fr_0.8fr] gap-2 border-b border-glass-border/40 px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/50">
               <span>Container</span>
               <span>Status</span>
-              <button
-                onClick={() => setSortBy("cpu")}
-                className={`cursor-pointer text-left hover:text-foreground ${sortBy === "cpu" ? "text-primary" : ""}`}
-              >
-                CPU %
-              </button>
-              <button
-                onClick={() => setSortBy("memory")}
-                className={`cursor-pointer text-left hover:text-foreground ${sortBy === "memory" ? "text-primary" : ""}`}
-              >
-                Memory MB
-              </button>
-              <button
-                onClick={() => setSortBy("network")}
-                className={`cursor-pointer text-left hover:text-foreground ${sortBy === "network" ? "text-primary" : ""}`}
-              >
-                Net MB
-              </button>
-              <button
-                onClick={() => setSortBy("disk")}
-                className={`cursor-pointer text-left hover:text-foreground ${sortBy === "disk" ? "text-primary" : ""}`}
-              >
-                Disk MB
-              </button>
+              {(["cpu", "memory", "network", "disk"] as SortKey[]).map((key, i) => (
+                <button
+                  key={key}
+                  onClick={() => setSortBy(key)}
+                  className={cn(
+                    "text-left transition-colors hover:text-foreground",
+                    sortBy === key ? "text-primary" : "",
+                  )}
+                >
+                  {["CPU %", "Mem MB", "Net MB", "Disk MB"][i]}
+                </button>
+              ))}
             </div>
 
             {filteredProcesses.length === 0 ? (
-              <div className="px-3 py-8 text-center text-sm text-muted-foreground">
+              <div className="px-4 py-8 text-center text-sm text-muted-foreground">
                 {daemonAvailable === false
                   ? "Cannot connect to Docker daemon"
                   : query
@@ -278,277 +370,114 @@ export function Monitor() {
                     : "No containers running"}
               </div>
             ) : (
-              filteredProcesses.map((p) => (
-                <div
-                  key={`${p.name}-${p.pid}`}
-                  className="grid grid-cols-[2.2fr_0.8fr_1fr_1fr_1fr_1fr] gap-2 border-b border-glass-border/60 px-3 py-2.5 text-xs last:border-none hover:bg-secondary/35"
-                >
-                  <div className="flex min-w-0 items-center gap-2">
-                    <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-semibold text-primary">
-                      {p.name[0]?.toUpperCase() ?? "C"}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-foreground">
-                        {p.name}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        ID: {p.pid}
-                      </p>
+              <div className="divide-y divide-glass-border/40">
+                {filteredProcesses.map((p) => (
+                  <div
+                    key={`${p.name}-${p.pid}`}
+                    className="grid grid-cols-[2.2fr_0.7fr_0.8fr_0.8fr_0.8fr_0.8fr] gap-2 px-4 py-2.5 text-xs transition-colors hover:bg-background/30"
+                  >
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <div className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-glass-border bg-background/55 text-xs font-bold text-primary">
+                        {p.name[0]?.toUpperCase() ?? "C"}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-foreground">{p.name}</p>
+                        <p className="font-mono text-[11px] text-muted-foreground/60">{p.pid}</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center">
-                    <span
-                      className={`rounded-[var(--radius)] px-2 py-0.5 text-xs ${getStatusBadgeColor(p.status)}`}
-                    >
-                      {p.status}
+                    <span className={cn("flex items-center")}>
+                      <span className={cn("rounded-md px-2 py-0.5 text-[11px] font-medium", getStatusBadgeColor(p.status))}>
+                        {p.status}
+                      </span>
                     </span>
+                    <span className="flex items-center font-mono text-foreground">{p.cpu.toFixed(1)}%</span>
+                    <span className="flex items-center font-mono text-foreground">{Math.round(p.memory)} MB</span>
+                    <span className="flex items-center font-mono text-foreground">{p.network.toFixed(1)} MB</span>
+                    <span className="flex items-center font-mono text-foreground">{p.disk.toFixed(1)} MB</span>
                   </div>
-                  <span className="flex items-center font-mono text-foreground">
-                    {p.cpu.toFixed(1)}%
-                  </span>
-                  <span className="flex items-center font-mono text-foreground">
-                    {Math.round(p.memory)} MB
-                  </span>
-                  <span className="flex items-center font-mono text-foreground">
-                    {p.network.toFixed(1)} MB
-                  </span>
-                  <span className="flex items-center font-mono text-foreground">
-                    {p.disk.toFixed(1)} MB
-                  </span>
-                </div>
-              ))
+                ))}
+              </div>
             )}
           </div>
         </div>
       )}
 
-      {tab === "resources" && (
-        <div className="flex-1 overflow-y-auto p-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-xl border border-glass-border bg-glass p-3">
-              <div className="mb-2 flex items-center gap-2 text-xs font-medium text-foreground">
-                <Cpu className="size-3.5 text-primary" /> CPU History
-              </div>
-              <HistoryBars values={cpuHistory} color="bg-primary/85" />
-              <p className="mt-2 text-xs text-muted-foreground">
-                Current{" "}
-                {systemMetrics?.cpu.normalizedPercent?.toFixed(1) ?? "--"}% |
-                Peak{" "}
-                {cpuHistory.length > 0
-                  ? Math.max(...cpuHistory).toFixed(0)
-                  : "--"}
-                %
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-glass-border bg-glass p-3">
-              <div className="mb-2 flex items-center gap-2 text-xs font-medium text-foreground">
-                <MemoryStick className="size-3.5 text-chart-2" /> Memory
-                Pressure
-              </div>
-              <HistoryBars values={memHistory} color="bg-chart-2/85" />
-              <p className="mt-2 text-xs text-muted-foreground">
-                Current {systemMetrics?.memory.usedPercent?.toFixed(1) ?? "--"}%
-                |
-                {systemMetrics?.memory.usedBytes
-                  ? ` Used ${(systemMetrics.memory.usedBytes / 1024 / 1024 / 1024).toFixed(1)} GB`
-                  : ""}
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-glass-border bg-glass p-3">
-              <div className="mb-2 flex items-center gap-2 text-xs font-medium text-foreground">
-                <HardDrive className="size-3.5 text-chart-4" /> Disk Usage
-              </div>
-              {systemMetrics?.storage ? (
-                <>
-                  <div className="h-2 overflow-hidden rounded-[var(--radius)] bg-secondary/60">
-                    <div
-                      className="h-full bg-chart-4 transition-all duration-300"
-                      style={{
-                        width: `${systemMetrics.storage.usedPercent.toFixed(1)}%`,
-                      }}
-                    />
-                  </div>
-                  <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-                    <span>
-                      {formatBytes(systemMetrics.storage.usedBytes)}
-                      {" / "}
-                      {formatBytes(systemMetrics.storage.totalBytes)}
-                    </span>
-                    <span className="font-mono">
-                      {systemMetrics.storage.usedPercent.toFixed(1)}%
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <p className="py-2 text-center text-xs text-muted-foreground">
-                  Storage data unavailable
-                </p>
-              )}
-            </div>
-
-            <div className="rounded-xl border border-glass-border bg-glass p-3">
-              <div className="mb-2 flex items-center gap-2 text-xs font-medium text-foreground">
-                <Gauge className="size-3.5 text-status-amber" /> Load Average
-              </div>
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="rounded-lg bg-secondary/40 py-2">
-                  <p className="text-sm font-mono text-foreground">
-                    {systemMetrics?.cpu.oneMinute?.toFixed(2) ?? "--"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">1m</p>
-                </div>
-                <div className="rounded-lg bg-secondary/40 py-2">
-                  <p className="text-sm font-mono text-foreground">
-                    {systemMetrics?.cpu.fiveMinute?.toFixed(2) ?? "--"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">5m</p>
-                </div>
-                <div className="rounded-lg bg-secondary/40 py-2">
-                  <p className="text-sm font-mono text-foreground">
-                    {systemMetrics?.cpu.fifteenMinute?.toFixed(2) ?? "--"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">15m</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
+      {/* ── Network tab ── */}
       {tab === "network" && (
-        <div className="flex-1 overflow-y-auto p-4">
-          <div className="grid gap-3">
-            {/* WiFi Connection */}
-            {systemMetrics?.wifi.connected && (
-              <div className="rounded-xl border border-glass-border bg-glass p-3">
-                <div className="mb-3 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Network className="size-4 text-primary" />
+        <div className="flex-1 overflow-y-auto p-3">
+          <div className="flex flex-col gap-2">
+            {systemMetrics?.wifi.connected ? (
+              <div className={cn(PANEL_INSET, "overflow-hidden")}>
+                <div className="flex items-center justify-between px-4 py-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-glass-border bg-background/55">
+                      <Network className="size-3.5 text-primary" />
+                    </div>
                     <div>
-                      <p className="text-sm font-medium text-foreground">
-                        {systemMetrics.wifi.iface ?? "WiFi"}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {systemMetrics.wifi.ssid ?? "Connected"} •{" "}
-                        {systemMetrics.wifi.ipv4 ?? "No IP"}
+                      <p className="text-sm font-medium text-foreground">{systemMetrics.wifi.iface ?? "Network"}</p>
+                      <p className="text-[11px] text-muted-foreground/70">
+                        {systemMetrics.wifi.ssid ?? "Connected"} · {systemMetrics.wifi.ipv4 ?? "No IP"}
                       </p>
                     </div>
                   </div>
-                  <span className="rounded-[var(--radius)] bg-status-green/15 px-2 py-0.5 text-xs text-status-green">
+                  <span className="rounded-md bg-status-green/12 px-2 py-0.5 text-xs font-medium text-status-green">
                     Connected
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="rounded-lg bg-secondary/40 p-2">
-                    <p className="mb-1 flex items-center gap-1 text-xs uppercase tracking-wider text-muted-foreground">
-                      <ArrowDown className="size-3 text-status-green" />{" "}
-                      Download
-                    </p>
-                    <p className="text-sm font-mono text-foreground">
-                      {systemMetrics.wifi.downloadMbps?.toFixed(1) ?? "--"} Mbps
-                    </p>
-                  </div>
-                  <div className="rounded-lg bg-secondary/40 p-2">
-                    <p className="mb-1 flex items-center gap-1 text-xs uppercase tracking-wider text-muted-foreground">
-                      <ArrowUp className="size-3 text-sky-400" /> Upload
-                    </p>
-                    <p className="text-sm font-mono text-foreground">
-                      {systemMetrics.wifi.uploadMbps?.toFixed(1) ?? "--"} Mbps
-                    </p>
-                  </div>
-                  <div className="rounded-lg bg-secondary/40 p-2">
-                    <p className="mb-1 text-xs text-muted-foreground">Signal</p>
-                    <p className="text-sm font-mono text-foreground">
-                      {systemMetrics.wifi.signalPercent ?? "--"}%
-                    </p>
-                  </div>
-                  <div className="rounded-lg bg-secondary/40 p-2">
-                    <p className="mb-1 text-xs text-muted-foreground">
-                      TX Rate
-                    </p>
-                    <p className="text-sm font-mono text-foreground">
-                      {systemMetrics.wifi.txRateMbps?.toFixed(0) ?? "--"} Mbps
-                    </p>
-                  </div>
+                <div className="divide-y divide-glass-border/40 border-t border-glass-border/50 px-4">
+                  <InfoRow label="Download" value={`${systemMetrics.wifi.downloadMbps?.toFixed(1) ?? "--"} Mbps`} mono />
+                  <InfoRow label="Upload" value={`${systemMetrics.wifi.uploadMbps?.toFixed(1) ?? "--"} Mbps`} mono />
+                  <InfoRow label="Signal" value={`${systemMetrics.wifi.signalPercent ?? "--"}%`} mono />
+                  <InfoRow label="TX Rate" value={`${systemMetrics.wifi.txRateMbps?.toFixed(0) ?? "--"} Mbps`} mono />
                 </div>
               </div>
-            )}
-
-            {!systemMetrics?.wifi.connected && (
-              <div className="rounded-xl border border-glass-border bg-glass p-4 text-center">
-                <Network className="mx-auto mb-2 size-8 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">
-                  No active network connection
-                </p>
+            ) : (
+              <div className={cn(PANEL_INSET, "flex flex-col items-center gap-2 py-8 text-center")}>
+                <Network className="size-7 text-muted-foreground/30" />
+                <p className="text-sm text-muted-foreground">No active network connection</p>
               </div>
             )}
 
-            {/* Docker Network Stats */}
-            <div className="rounded-xl border border-glass-border bg-glass p-3">
-              <div className="mb-2 flex items-center gap-2 text-xs font-medium text-foreground">
-                <Container className="size-3.5 text-primary" /> Container
-                Network Activity
+            <div className={cn(PANEL_INSET, "overflow-hidden")}>
+              <div className="flex items-center gap-2 border-b border-glass-border/50 px-4 py-3">
+                <Container className="size-3.5 text-primary" />
+                <span className="text-xs font-semibold text-foreground">Container Network Activity</span>
               </div>
               {daemonAvailable === false ? (
-                <p className="py-2 text-center text-xs text-muted-foreground">
-                  Docker daemon unreachable
-                </p>
+                <p className="px-4 py-4 text-xs text-muted-foreground/60">Docker daemon unreachable</p>
               ) : (
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="rounded-lg bg-secondary/40 p-2 text-center">
-                    <p className="text-xl font-mono text-foreground">
-                      {(dockerTotals.totalNetworkRx / 1024 / 1024).toFixed(1)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">MB Received</p>
-                  </div>
-                  <div className="rounded-lg bg-secondary/40 p-2 text-center">
-                    <p className="text-xl font-mono text-foreground">
-                      {(dockerTotals.totalNetworkTx / 1024 / 1024).toFixed(1)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">MB Sent</p>
-                  </div>
+                <div className="grid grid-cols-2 divide-x divide-glass-border/50">
+                  {[
+                    { label: "MB Received", value: (dockerTotals.totalNetworkRx / 1024 ** 2).toFixed(1) },
+                    { label: "MB Sent", value: (dockerTotals.totalNetworkTx / 1024 ** 2).toFixed(1) },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="flex flex-col items-center gap-1 py-4">
+                      <span className="font-mono text-2xl font-bold tabular-nums text-foreground">{value}</span>
+                      <span className="text-[11px] text-muted-foreground/60">{label}</span>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
 
-            {/* System Info */}
-            <div className="rounded-xl border border-glass-border bg-glass p-3">
-              <div className="mb-2 flex items-center gap-2 text-xs font-medium text-foreground">
-                <Activity className="size-3.5 text-primary" /> System Info
+            <div className={cn(PANEL_INSET, "overflow-hidden")}>
+              <div className="flex items-center gap-2 border-b border-glass-border/50 px-4 py-3">
+                <Activity className="size-3.5 text-primary" />
+                <span className="text-xs font-semibold text-foreground">System Info</span>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-lg bg-secondary/40 p-2">
-                  <p className="mb-1 text-xs text-muted-foreground">Hostname</p>
-                  <p className="text-sm font-mono text-foreground">
-                    {systemMetrics?.hostname ?? "--"}
-                  </p>
-                </div>
-                <div className="rounded-lg bg-secondary/40 p-2">
-                  <p className="mb-1 text-xs text-muted-foreground">Platform</p>
-                  <p className="text-sm font-mono text-foreground">
-                    {systemMetrics?.platform ?? "--"}
-                  </p>
-                </div>
-                <div className="rounded-lg bg-secondary/40 p-2">
-                  <p className="mb-1 text-xs text-muted-foreground">Uptime</p>
-                  <p className="text-sm font-mono text-foreground">
-                    {systemMetrics?.uptimeSeconds
-                      ? formatUptimeShort(systemMetrics.uptimeSeconds)
-                      : "--"}
-                  </p>
-                </div>
-                <div className="rounded-lg bg-secondary/40 p-2">
-                  <p className="mb-1 text-xs text-muted-foreground">
-                    Containers
-                  </p>
-                  <p className="text-sm font-mono text-foreground">
-                    {daemonAvailable === false
-                      ? "unavailable"
-                      : `${dockerStats.length} total`}
-                  </p>
-                </div>
+              <div className="divide-y divide-glass-border/40 px-4">
+                <InfoRow label="Hostname" value={systemMetrics?.hostname ?? "--"} mono />
+                <InfoRow label="Platform" value={systemMetrics?.platform ?? "--"} mono />
+                <InfoRow
+                  label="Uptime"
+                  value={systemMetrics?.uptimeSeconds ? formatUptimeShort(systemMetrics.uptimeSeconds) : "--"}
+                  mono
+                />
+                <InfoRow
+                  label="Containers"
+                  value={daemonAvailable === false ? "unavailable" : `${dockerStats.length} total`}
+                  mono
+                />
               </div>
             </div>
           </div>

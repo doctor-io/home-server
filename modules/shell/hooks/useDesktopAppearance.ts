@@ -1,18 +1,18 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   type AppearanceSettings,
   ACCENT_COLORS,
+  AUTO_ACCENT_VALUE,
   DEFAULT_APPEARANCE_SETTINGS,
   type DesktopFontSize,
   type DesktopIconSize,
   type DesktopTheme,
-  readStoredAppearanceSettings,
   sanitizeAppearanceSettings,
   WALLPAPER_OPTIONS,
-  writeStoredAppearanceSettings,
 } from "@/lib/desktop/appearance"
+import { extractWallpaperColor } from "@/lib/desktop/wallpaper-color"
 
 const fontSizeScaleMap: Record<DesktopFontSize, number> = {
   compact: 14,
@@ -49,11 +49,7 @@ function applyAppearanceToDom(settings: AppearanceSettings) {
   root.style.setProperty("--ring", settings.accentColor)
   root.style.setProperty("--sidebar-primary", settings.accentColor)
   root.style.setProperty("--chart-1", settings.accentColor)
-  // Always disable accent-color tinting — tinted = dark smoked glass, not accent-colored
   root.style.setProperty("--system-tint-amount", "0%")
-  // Override --dock based on glass style:
-  // clear  → very transparent (you see the wallpaper through)
-  // tinted → dark smoked glass (like tinted car windows — darker, more opaque)
   if (resolvedTheme === "dark") {
     root.style.setProperty(
       "--dock",
@@ -71,22 +67,52 @@ function applyAppearanceToDom(settings: AppearanceSettings) {
   }
 }
 
+async function fetchAppearance(): Promise<AppearanceSettings> {
+  const res = await fetch("/api/v1/settings/appearance", { cache: "no-store" });
+  if (!res.ok) return DEFAULT_APPEARANCE_SETTINGS;
+  const json = await res.json() as { data: AppearanceSettings };
+  return sanitizeAppearanceSettings(json.data);
+}
+
+async function saveAppearance(appearance: AppearanceSettings): Promise<void> {
+  await fetch("/api/v1/settings/appearance", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(appearance),
+  });
+}
+
 export function useDesktopAppearance() {
   const [appearance, setAppearance] = useState<AppearanceSettings>(DEFAULT_APPEARANCE_SETTINGS)
   const [loaded, setLoaded] = useState(false)
+  const [wallpaperAccentColor, setWallpaperAccentColor] = useState<string | null>(null)
+  const extractingRef = useRef<string | null>(null)
 
   useEffect(() => {
-    setAppearance(readStoredAppearanceSettings(window.localStorage))
-    setLoaded(true)
+    fetchAppearance().then((saved) => {
+      setAppearance(saved)
+      setLoaded(true)
+    });
   }, [])
 
+  // Extract wallpaper color whenever wallpaper changes (or on first load if auto is active)
   useEffect(() => {
-    applyAppearanceToDom(appearance)
-  }, [appearance])
+    const key = appearance.wallpaper
+    if (extractingRef.current === key) return
+    extractingRef.current = key
+    extractWallpaperColor(appearance.wallpaper).then(setWallpaperAccentColor)
+  }, [appearance.wallpaper])
+
+  useEffect(() => {
+    const resolved = appearance.accentColor === AUTO_ACCENT_VALUE
+      ? (wallpaperAccentColor ?? DEFAULT_APPEARANCE_SETTINGS.accentColor)
+      : appearance.accentColor
+    applyAppearanceToDom({ ...appearance, accentColor: resolved })
+  }, [appearance, wallpaperAccentColor])
 
   useEffect(() => {
     if (!loaded) return
-    writeStoredAppearanceSettings(window.localStorage, appearance)
+    saveAppearance(appearance);
   }, [appearance, loaded])
 
   useEffect(() => {
@@ -111,5 +137,6 @@ export function useDesktopAppearance() {
     wallpapers: WALLPAPER_OPTIONS,
     accentColors: ACCENT_COLORS,
     appIconSize,
+    wallpaperAccentColor,
   }
 }

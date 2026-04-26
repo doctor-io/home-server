@@ -19,6 +19,20 @@ if (typeof window !== "undefined" && !window.matchMedia) {
   });
 }
 
+if (typeof globalThis !== "undefined" && !("EventSource" in globalThis)) {
+  class EventSourceMock {
+    addEventListener() {}
+    removeEventListener() {}
+    close() {}
+  }
+
+  Object.defineProperty(globalThis, "EventSource", {
+    configurable: true,
+    writable: true,
+    value: EventSourceMock,
+  });
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
 });

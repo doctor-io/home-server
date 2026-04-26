@@ -1,16 +1,23 @@
 "use client";
 
-import { Plus } from "@/components/icons/platform-icons";
+import { Cloud, HardDrive, Plus } from "@/components/icons/platform-icons";
+import { cn } from "@/lib/utils";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { normalizePathForBackend } from "@/modules/files/components/file-manager-presenters";
-import { PeopleRegular, DeleteRegular } from "@fluentui/react-icons";
-import { FILES_PANEL_SHELL } from "@/modules/files/components/file-manager-surface";
-import type { ReactNode } from "react";
+import { FILES_MENU_SHELL, FILES_PANEL_SHELL } from "@/modules/files/components/file-manager-surface";
+import { PeopleRegular, DeleteRegular, ArrowEjectRegular } from "@fluentui/react-icons";
+import { useRef, useState, useEffect, type ReactNode } from "react";
+import { FEATURE_FLAGS } from "@/lib/shared/feature-flags";
 
 export type FileManagerSidebarItem = {
   name: string;
   icon: ReactNode;
   path: string[];
+};
+
+export type RemovableSidebarItem = FileManagerSidebarItem & {
+  driveId: string;
+  isMounted: boolean;
 };
 
 export type FileManagerSidebarSection = {
@@ -23,104 +30,211 @@ type SidebarProps = {
   isSharedView: boolean;
   isTrashView: boolean;
   locationItems: FileManagerSidebarItem[];
+  removableItems: RemovableSidebarItem[];
   sidebarSections: FileManagerSidebarSection[];
   storageUsagePercent: number;
   storageUsageText: string;
   onNavigateToPath: (path: string[]) => void;
   onOpenNetworkDialog: () => void;
+  onOpenGoogleDriveDialog: () => void;
+  onOpenUsbDialog: () => void;
+  onMountDrive: (driveId: string) => void;
+  onEjectDrive: (driveId: string) => void;
 };
+
+function isPathActive(itemPath: string[], currentPath: string[]): boolean {
+  return JSON.stringify(normalizePathForBackend(itemPath)) === JSON.stringify(currentPath);
+}
 
 export function FileManagerSidebar({
   currentPath,
   isSharedView,
   isTrashView,
   locationItems,
+  removableItems,
   sidebarSections,
   storageUsagePercent,
   storageUsageText,
   onNavigateToPath,
   onOpenNetworkDialog,
+  onOpenGoogleDriveDialog,
+  onOpenUsbDialog,
+  onMountDrive,
+  onEjectDrive,
 }: SidebarProps) {
   const currentUserQuery = useCurrentUser();
   const isDemoMode = currentUserQuery.data?.isDemoMode ?? false;
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const addMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!addMenuOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (addMenuRef.current && !addMenuRef.current.contains(e.target as Node)) {
+        setAddMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [addMenuOpen]);
 
   return (
-    <aside className={`m-2 flex w-48 shrink-0 flex-col overflow-y-auto ${FILES_PANEL_SHELL}`}>
-      <div className="flex flex-col gap-4 p-3 pt-4">
-        {sidebarSections.map((section) => (
-          <div key={section.title}>
-            <div className="flex items-center justify-between px-2">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
-                {section.title}
-              </span>
-              {section.title === "Locations" && !isDemoMode ? (
-                <button
-                  onClick={onOpenNetworkDialog}
-                  className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-secondary/40 hover:text-foreground"
-                  title="Add network storage"
-                  aria-label="Add network storage"
-                >
-                  <Plus className="size-3.5" />
-                </button>
-              ) : null}
+    <aside className={cn("m-2 flex w-48 shrink-0 flex-col", FILES_PANEL_SHELL)}>
+      <div className="flex-1 overflow-y-auto px-2 py-3">
+        {sidebarSections.map((section) => {
+          const items = section.title === "Locations" ? locationItems : section.items;
+          return (
+            <div key={section.title} className="mb-3">
+              <div className="mb-1 flex items-center justify-between px-3">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/50">
+                  {section.title}
+                </span>
+                {section.title === "Locations" && !isDemoMode && (
+                  <div ref={addMenuRef} className="relative">
+                    <button
+                      onClick={() => setAddMenuOpen((v) => !v)}
+                      title="Add location"
+                      aria-label="Add location"
+                      className="rounded-md p-0.5 text-muted-foreground/50 transition-colors hover:bg-background/50 hover:text-foreground"
+                    >
+                      <Plus className="size-3" />
+                    </button>
+                    {addMenuOpen && (
+                      <div className={cn("absolute right-0 top-full z-50 mt-1 w-44 py-1", FILES_MENU_SHELL)}>
+                        <button
+                          onClick={() => { setAddMenuOpen(false); onOpenNetworkDialog(); }}
+                          className="flex w-full items-center gap-2.5 px-3 py-2 text-[13px] text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground"
+                        >
+                          <HardDrive className="size-3.5 shrink-0 text-muted-foreground/60" />
+                          Network Storage
+                        </button>
+                        <button
+                          onClick={() => { setAddMenuOpen(false); onOpenUsbDialog(); }}
+                          className="flex w-full items-center gap-2.5 px-3 py-2 text-[13px] text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground"
+                        >
+                          <HardDrive className="size-3.5 shrink-0 text-amber-400/70" />
+                          USB Drives
+                        </button>
+                        {FEATURE_FLAGS.GOOGLE_DRIVE && (
+                          <button
+                            onClick={() => { setAddMenuOpen(false); onOpenGoogleDriveDialog(); }}
+                            className="flex w-full items-center gap-2.5 px-3 py-2 text-[13px] text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground"
+                          >
+                            <Cloud className="size-3.5 shrink-0 text-sky-400/70" />
+                            Google Drive
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-0.5">
+                {items.map((item) => {
+                  const isActive = isPathActive(item.path, currentPath);
+                  return (
+                    <button
+                      key={item.name}
+                      onClick={() => onNavigateToPath(item.path)}
+                      className={cn(
+                        "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
+                        isActive
+                          ? "bg-primary/15 text-foreground"
+                          : "text-muted-foreground hover:bg-background/50 hover:text-foreground",
+                      )}
+                    >
+                      <span className={cn("size-4 shrink-0", isActive ? "text-primary" : "text-muted-foreground/60")}>
+                        {item.icon}
+                      </span>
+                      <span className="flex-1 truncate text-left text-[13px] font-medium">{item.name}</span>
+                    </button>
+                  );
+                })}
+
+                {section.title === "Locations" && removableItems.length > 0 && (
+                  <>
+                    <div className="mb-0.5 mt-2 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/40">
+                      Removable
+                    </div>
+                    {removableItems.map((item) => {
+                      const isActive = item.isMounted && isPathActive(item.path, currentPath);
+                      return (
+                        <div key={item.driveId} className="flex items-center gap-0.5">
+                          <button
+                            onClick={() => item.isMounted ? onNavigateToPath(item.path) : onMountDrive(item.driveId)}
+                            className={cn(
+                              "flex flex-1 items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
+                              isActive
+                                ? "bg-primary/15 text-foreground"
+                                : item.isMounted
+                                  ? "text-muted-foreground hover:bg-background/50 hover:text-foreground"
+                                  : "text-muted-foreground/40 hover:text-muted-foreground",
+                            )}
+                          >
+                            <span className={cn("size-4 shrink-0", isActive ? "text-primary" : "text-muted-foreground/40")}>
+                              {item.icon}
+                            </span>
+                            <span className="flex-1 truncate text-left text-[13px] font-medium">{item.name}</span>
+                            {!item.isMounted && (
+                              <span className="ml-auto shrink-0 text-[10px] text-muted-foreground/40">mount</span>
+                            )}
+                          </button>
+                          {item.isMounted && (
+                            <button
+                              onClick={() => onEjectDrive(item.driveId)}
+                              title="Eject"
+                              className="rounded-md p-1 text-muted-foreground/40 transition-colors hover:bg-background/50 hover:text-foreground"
+                            >
+                              <ArrowEjectRegular className="size-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
+              </div>
             </div>
-            <div className="mt-1.5 flex flex-col gap-0.5">
-              {(section.title === "Locations" ? locationItems : section.items).map((item) => {
-                const isActive =
-                  JSON.stringify(normalizePathForBackend(item.path)) ===
-                  JSON.stringify(currentPath);
-                return (
-                  <button
-                    key={item.name}
-                    onClick={() => onNavigateToPath(item.path)}
-                    className={`flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-sm transition-colors cursor-pointer ${
-                      isActive
-                        ? "bg-primary/15 text-foreground"
-                        : "text-foreground/60 hover:text-foreground hover:bg-secondary/40"
-                    }`}
-                  >
-                    {item.icon}
-                    <span className="truncate">{item.name}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
-      <div className="mt-auto border-t border-glass-border/80 p-3">
-        <div className="mb-3 flex flex-col gap-0.5">
+      <div className="shrink-0 border-t border-glass-border/60 px-3 py-3">
+        <div className="mb-2.5 flex flex-col gap-0.5">
           <button
             onClick={() => onNavigateToPath(["Shared"])}
-            className={`flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-sm transition-colors cursor-pointer ${
+            className={cn(
+              "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
               isSharedView
                 ? "bg-primary/15 text-foreground"
-                : "text-foreground/60 hover:text-foreground hover:bg-secondary/40"
-            }`}
+                : "text-muted-foreground hover:bg-background/50 hover:text-foreground",
+            )}
           >
-            <PeopleRegular className="size-3.5 text-sky-400" />
-            <span>Shared</span>
+            <PeopleRegular className={cn("size-4 shrink-0", isSharedView ? "text-primary" : "text-sky-400/70")} />
+            <span className="text-[13px] font-medium">Shared</span>
           </button>
           <button
             onClick={() => onNavigateToPath(["Trash"])}
-            className={`flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-sm transition-colors cursor-pointer ${
+            className={cn(
+              "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
               isTrashView
                 ? "bg-primary/15 text-foreground"
-                : "text-foreground/60 hover:text-foreground hover:bg-secondary/40"
-            }`}
+                : "text-muted-foreground hover:bg-background/50 hover:text-foreground",
+            )}
           >
-            <DeleteRegular className="size-3.5 text-status-red" />
-            <span>Trash</span>
+            <DeleteRegular className={cn("size-4 shrink-0", isTrashView ? "text-primary" : "text-status-red/60")} />
+            <span className="text-[13px] font-medium">Trash</span>
           </button>
         </div>
+
         <div className="mb-1.5 flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">Storage</span>
-          <span className="text-xs text-muted-foreground">{storageUsageText}</span>
+          <span className="text-[11px] font-medium text-muted-foreground/70">Storage</span>
+          <span className="text-[11px] text-muted-foreground/50">{storageUsageText}</span>
         </div>
-        <div className="h-1.5 overflow-hidden rounded-lg bg-background/65">
+        <div className="h-1 overflow-hidden rounded-full bg-background/65">
           <div
-            className="h-full rounded-lg bg-primary"
+            className="h-full rounded-full bg-primary/70 transition-all duration-300"
             style={{ width: `${storageUsagePercent}%` }}
           />
         </div>

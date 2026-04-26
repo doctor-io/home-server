@@ -40,6 +40,7 @@ export function StatusBar({
   onLock: _onLock,
   onLogout: _onLogout,
   isLogoutPending: _isLogoutPending = false,
+  onOpenNotifications,
 }: StatusBarProps) {
   const {
     metrics,
@@ -83,16 +84,17 @@ export function StatusBar({
   return (
     <header className="fixed top-3 left-1/2 -translate-x-1/2 z-50 min-w-[50%] w-auto max-w-[96vw]">
       <div
-        className="flex items-center gap-2 px-4 py-2 border border-white/[0.09] rounded-2xl"
+        className="flex items-center gap-1.5 px-3.5 py-1.5 border border-white/[0.09] rounded-2xl"
         style={{
           background: "var(--system-surface)",
           backdropFilter: "blur(40px) saturate(160%)",
-          boxShadow: "var(--system-shadow-floating), inset 0 1px 0 rgba(255,255,255,0.12)",
+          boxShadow:
+            "var(--system-shadow-floating), inset 0 1px 0 rgba(255,255,255,0.12)",
           overflow: "visible",
         }}
       >
-        <div className="flex items-center gap-2 pr-3 border-r border-glass-border/60">
-          <div className="flex size-6 items-center justify-center overflow-hidden rounded-[8px] border border-primary/20 bg-white/80 shadow-sm shadow-black/10">
+        <div className="flex items-center gap-2 pr-3 border-r border-glass-border/50">
+          <div className="flex size-6 items-center justify-center overflow-hidden rounded-[8px] bg-primary/12 ring-1 ring-primary/25 shadow-sm shadow-black/20">
             <Image
               src="/icon.png"
               alt="Homeio"
@@ -101,16 +103,9 @@ export function StatusBar({
               className="size-5"
             />
           </div>
-          <span className="text-xs font-semibold tracking-tight text-foreground">
+          <span className="text-xs font-semibold tracking-tight text-foreground/90">
             <span className="xl:hidden">{`Hi, ${toTitleCaseUsername(username)}`}</span>
             <span className="hidden xl:inline">{`Welcome back, ${toTitleCaseUsername(username)}`}</span>
-          </span>
-          <span
-            className="text-sm leading-none text-status-amber"
-            role="img"
-            aria-label="waving hand"
-          >
-            👋
           </span>
         </div>
 
@@ -120,7 +115,7 @@ export function StatusBar({
           <div className="relative">
             <button
               onClick={() => togglePopover("weather")}
-              className="flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-secondary/40 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-white/[0.07] transition-colors cursor-pointer"
               aria-label="Weather"
             >
               <CloudSun className="size-3.5 text-status-amber" />
@@ -138,7 +133,7 @@ export function StatusBar({
           <div className="relative">
             <button
               onClick={() => togglePopover("wifi")}
-              className="p-1.5 rounded-lg hover:bg-secondary/40 transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg hover:bg-white/[0.07] transition-colors cursor-pointer"
               aria-label="WiFi networks"
             >
               {isEthernet ? (
@@ -168,7 +163,7 @@ export function StatusBar({
           <div className="relative">
             <button
               onClick={() => togglePopover("battery")}
-              className="flex items-center gap-1 p-1.5 rounded-lg hover:bg-secondary/40 transition-colors cursor-pointer"
+              className="flex items-center gap-1 p-1.5 rounded-lg hover:bg-white/[0.07] transition-colors cursor-pointer"
               aria-label="Battery status"
             >
               <BatteryFull className="size-4 text-status-green" />
@@ -189,12 +184,12 @@ export function StatusBar({
           <div className="relative">
             <button
               onClick={() => togglePopover("notifications")}
-              className="relative p-1.5 rounded-lg hover:bg-secondary/40 transition-colors cursor-pointer"
+              className="relative p-1.5 rounded-lg hover:bg-white/[0.07] transition-colors cursor-pointer"
               aria-label="Notifications"
             >
               <Bell className="size-4 text-muted-foreground" />
               {unreadCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 size-4 rounded-[var(--radius)] bg-primary text-xs text-primary-foreground flex items-center justify-center font-bold">
+                <span className="absolute -top-0.5 -right-0.5 size-4 rounded-full bg-primary text-[9px] text-primary-foreground flex items-center justify-center font-bold shadow-sm shadow-black/30">
                   {unreadCount}
                 </span>
               )}
@@ -205,6 +200,7 @@ export function StatusBar({
                 onMarkAllRead={markAllRead}
                 onClearAll={clearNotifications}
                 onClose={closePopovers}
+                onViewAll={() => { closePopovers(); onOpenNotifications?.(); }}
               />
             )}
           </div>
@@ -214,7 +210,7 @@ export function StatusBar({
           {/* {onLock ? (
             <button
               onClick={onLock}
-              className="p-1.5 rounded-lg hover:bg-secondary/40 transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg hover:bg-white/[0.07] transition-colors cursor-pointer"
               aria-label="Lock screen"
               title="Lock screen"
             >
@@ -233,7 +229,7 @@ export function StatusBar({
           <div className="relative flex items-center gap-2 pl-1">
             <button
               onClick={() => togglePopover("date")}
-              className="flex flex-row items-end rounded-lg px-1.5 gap-2 py-1 text-right transition-colors hover:bg-secondary/40 cursor-pointer"
+              className="flex flex-row items-end rounded-lg px-1.5 gap-2 py-1 text-right transition-colors hover:bg-white/[0.07] cursor-pointer"
               aria-label="Open date picker"
             >
               <span className="hidden xl:text-xs xl:leading-tight xl:text-muted-foreground xl:block">

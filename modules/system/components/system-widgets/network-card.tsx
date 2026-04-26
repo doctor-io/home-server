@@ -12,25 +12,29 @@ export function NetworkCard({ network }: NetworkCardProps) {
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <ArrowDown className="size-3.5 text-status-green" />
+            <div className="flex size-4 items-center justify-center rounded-md bg-status-green/15">
+              <ArrowDown className="size-2.5 text-status-green" />
+            </div>
             <span className="text-xs text-muted-foreground">Download</span>
           </div>
-          <span className="text-sm font-mono font-medium text-foreground">
+          <span className="text-sm font-mono font-semibold text-status-green">
             {network.downloadText}
           </span>
         </div>
 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <ArrowUp className="size-3.5 text-primary" />
+            <div className="flex size-4 items-center justify-center rounded-md bg-primary/12">
+              <ArrowUp className="size-2.5 text-primary" />
+            </div>
             <span className="text-xs text-muted-foreground">Upload</span>
           </div>
-          <span className="text-sm font-mono font-medium text-foreground">
+          <span className="text-sm font-mono font-semibold text-primary">
             {network.uploadText}
           </span>
         </div>
 
-        <div className="h-px bg-border" />
+        <div className="h-px bg-white/[0.07]" />
 
         <DetailRow label="SSID" value={network.ssid} />
         <DetailRow label="Interface" value={network.interfaceName} />
@@ -46,8 +50,8 @@ export function NetworkCard({ network }: NetworkCardProps) {
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-xs text-muted-foreground">{label}</span>
-      <span className="text-xs font-mono text-foreground">{value}</span>
+      <span className="text-xs text-muted-foreground/70">{label}</span>
+      <span className="text-xs font-mono text-foreground/80">{value}</span>
     </div>
   );
 }

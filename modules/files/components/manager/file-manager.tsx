@@ -29,6 +29,7 @@ import {
   useLocalFolderShares,
 } from "@/modules/files/hooks/useLocalFolderShares";
 import { useNetworkShares } from "@/modules/files/hooks/useNetworkShares";
+import { useUsbDrives } from "@/modules/files/hooks/useUsbDrives";
 import {
   useDeleteFromTrash,
   useEmptyTrash,
@@ -45,6 +46,7 @@ import {
   getLocalSharesByPath,
   getLocationItems,
   getOpenFileDetails,
+  getRemovableItems,
   getStorageSummary,
   getViewFlags,
   sidebarSections,
@@ -73,6 +75,7 @@ export function FileManager() {
   const systemMetricsQuery = useSystemMetrics();
   const networkSharesQuery = useNetworkShares();
   const localSharesQuery = useLocalFolderShares();
+  const usbDrivesQuery = useUsbDrives();
   const createFolderMutation = useCreateFolder();
   const createFileMutation = useCreateFile();
   const pasteFileEntryMutation = usePasteFileEntry();
@@ -151,7 +154,8 @@ export function FileManager() {
     openFilePath &&
       openFileViewer?.mode === "text" &&
       !fileContentQuery.isLoading &&
-      !saveFileContentMutation.isPending,
+      !saveFileContentMutation.isPending &&
+      openFileState.hasUnsavedChanges,
   );
 
   const storageSummary = getStorageSummary(systemMetricsQuery.data?.storage);
@@ -163,6 +167,10 @@ export function FileManager() {
   const locationItems = useMemo(
     () => (isDemoMode ? [] : getLocationItems(networkSharesQuery.data)),
     [isDemoMode, networkSharesQuery.data],
+  );
+  const removableItems = useMemo(
+    () => (isDemoMode ? [] : getRemovableItems(usbDrivesQuery.drives)),
+    [isDemoMode, usbDrivesQuery.drives],
   );
   const counts = useMemo(() => getBrowserCounts(sortedEntries), [sortedEntries]);
   const clipboardDisplayName = getClipboardDisplayName(state.clipboardState);
@@ -339,6 +347,9 @@ export function FileManager() {
       isStarredView={viewFlags.isStarredView}
       isTrashView={viewFlags.isTrashView}
       locationItems={locationItems}
+      removableItems={removableItems}
+      onMountDrive={usbDrivesQuery.mount}
+      onEjectDrive={usbDrivesQuery.eject}
       navigateTo={navigateTo}
       navigateToPath={navigateToPath}
       onEntryClick={handleEntryClick}
@@ -358,6 +369,7 @@ export function FileManager() {
         dispatch({ type: "SELECT_FILE", name: entry.name });
       }}
       openFile={state.openFile}
+      hasUnsavedChanges={openFileState.hasUnsavedChanges}
       openFileBadgeLabel={openFileState.badgeLabel}
       openFileContent={openFileState.content}
       openFileKey={openFilePath}
@@ -375,6 +387,8 @@ export function FileManager() {
       showContextMenu={state.showContextMenu}
       showEmptyTrashConfirm={state.showEmptyTrashConfirm}
       showNetworkDialog={state.showNetworkDialog && !isDemoMode}
+      showGoogleDriveDialog={state.showGoogleDriveDialog && !isDemoMode}
+      showUsbDialog={state.showUsbDialog && !isDemoMode}
       sidebarSections={sidebarSections}
       sortedEntries={visibleEntries}
       storageUsagePercent={storageSummary.percent}

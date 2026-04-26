@@ -15,6 +15,7 @@ export type PreviewBodyProps = {
   fileContentIsError: boolean;
   fileContentIsLoading: boolean;
   onChangeOpenFileDraft: (value: SetStateAction<string>) => void;
+  onSaveOpenFile?: () => void;
   openFile: { entry: FileEntry };
   openFileAssetUrl: string;
   openFileContent: string;
@@ -28,6 +29,7 @@ export function PreviewBody({
   fileContentIsError,
   fileContentIsLoading,
   onChangeOpenFileDraft,
+  onSaveOpenFile,
   openFile,
   openFileAssetUrl,
   openFileContent,
@@ -60,6 +62,7 @@ export function PreviewBody({
         language={openFileLanguage}
         value={openFileContent}
         onChange={(value) => onChangeOpenFileDraft(value)}
+        onSave={onSaveOpenFile}
       />
     );
   }

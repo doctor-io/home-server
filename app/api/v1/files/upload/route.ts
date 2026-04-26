@@ -11,8 +11,7 @@ import {
 
 export const runtime = "nodejs";
 
-// Next.js default body size limit is 4 MB; raise it for file uploads
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 export async function POST(request: NextRequest) {
   const requestId = createRequestId();
@@ -27,8 +26,7 @@ export async function POST(request: NextRequest) {
       async () => {
         const formData = await request.formData();
         const destinationPath = (formData.get("path") as string | null) ?? "";
-        const includeHidden =
-          formData.get("includeHidden") === "true";
+        const includeHidden = formData.get("includeHidden") === "true";
 
         const fileEntries = formData.getAll("file");
         if (fileEntries.length === 0) {
@@ -38,13 +36,13 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        const files: { name: string; buffer: Buffer }[] = [];
+        const files: { name: string; size: number; stream: () => ReadableStream }[] = [];
         for (const entry of fileEntries) {
           if (!(entry instanceof File)) continue;
-          const arrayBuffer = await entry.arrayBuffer();
           files.push({
             name: entry.name,
-            buffer: Buffer.from(arrayBuffer),
+            size: entry.size,
+            stream: () => entry.stream(),
           });
         }
 

@@ -23,7 +23,8 @@ export type SettingsSectionId =
   | "updates"
   | "appearance"
   | "power"
-  | "logs";
+  | "scheduled-tasks"
+  | "advanced";
 
 export type SettingsSection = {
   id: SettingsSectionId;
@@ -93,6 +94,7 @@ export type SettingsPanelProps = {
   wallpaperOptions: WallpaperOption[];
   accentOptions: AccentColorOption[];
   onAppearanceChange: (patch: Partial<AppearanceSettings>) => void;
+  wallpaperAccentColor: string | null;
   selectedSection?: string | null;
 };
 

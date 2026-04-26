@@ -3,6 +3,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { dispatchDesktopNotificationEvent } from "@/lib/desktop/notification-events";
+import { createTestQueryClient, createWrapper } from "@/test/query-client-wrapper";
 
 const mockUseSystemMetrics = vi.fn();
 const mockUseInstalledApps = vi.fn();
@@ -108,6 +109,13 @@ function buildMetrics(params?: {
 describe("useStatusBarData", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ notifications: [] }),
+      }),
+    );
 
     mockUseSystemMetrics.mockReturnValue({ data: buildMetrics(), isError: false });
     mockUseInstalledApps.mockReturnValue({
@@ -147,7 +155,10 @@ describe("useStatusBarData", () => {
   });
 
   it("builds ui state and supports read/clear notification actions", async () => {
-    const { result } = renderHook(() => useStatusBarData());
+    const client = createTestQueryClient();
+    const { result } = renderHook(() => useStatusBarData(), {
+      wrapper: createWrapper(client),
+    });
 
     await waitFor(() => {
       expect(result.current.unreadCount).toBe(3);
@@ -170,7 +181,10 @@ describe("useStatusBarData", () => {
   });
 
   it("limits cpu warning notifications to one per minute", async () => {
-    const { result, rerender } = renderHook(() => useStatusBarData());
+    const client = createTestQueryClient();
+    const { result, rerender } = renderHook(() => useStatusBarData(), {
+      wrapper: createWrapper(client),
+    });
 
     await waitFor(() => {
       expect(
@@ -216,7 +230,10 @@ describe("useStatusBarData", () => {
     mockUseInstalledApps.mockReturnValue({ data: [] });
     mockUseCurrentUser.mockReturnValue({ data: { id: "u1", username: "admin" } });
 
-    const { result, rerender } = renderHook(() => useStatusBarData());
+    const client = createTestQueryClient();
+    const { result, rerender } = renderHook(() => useStatusBarData(), {
+      wrapper: createWrapper(client),
+    });
 
     await waitFor(() => {
       const snapshot = result.current.notifications.find(
@@ -255,7 +272,10 @@ describe("useStatusBarData", () => {
       isError: false,
     });
 
-    const { result } = renderHook(() => useStatusBarData());
+    const client = createTestQueryClient();
+    const { result } = renderHook(() => useStatusBarData(), {
+      wrapper: createWrapper(client),
+    });
 
     expect(result.current.isWifiConnected).toBe(false);
     expect(result.current.wifiIconClassName).toContain("text-status-red");
@@ -276,7 +296,10 @@ describe("useStatusBarData", () => {
       },
     });
 
-    const { result } = renderHook(() => useStatusBarData());
+    const client = createTestQueryClient();
+    const { result } = renderHook(() => useStatusBarData(), {
+      wrapper: createWrapper(client),
+    });
 
     await waitFor(() => {
       expect(
@@ -294,7 +317,10 @@ describe("useStatusBarData", () => {
     });
     mockUseInstalledApps.mockReturnValue({ data: [] });
 
-    const { result } = renderHook(() => useStatusBarData());
+    const client = createTestQueryClient();
+    const { result } = renderHook(() => useStatusBarData(), {
+      wrapper: createWrapper(client),
+    });
 
     act(() => {
       dispatchDesktopNotificationEvent({

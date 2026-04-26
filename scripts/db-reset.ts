@@ -4,7 +4,7 @@ import { reset } from "drizzle-seed";
 import { Pool } from "pg";
 
 // path to a file with schema you want to reset
-import * as schema from "../lib/server/db/schema-definitions";
+import * as schema from "../lib/server/db/schema";
 
 function isMissingRelationError(error: unknown) {
   const err = error as {

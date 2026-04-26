@@ -1,6 +1,6 @@
 "use client";
 
-import { FileManagerSidebar, FileManagerStatusBar, FileManagerToolbar, type FileManagerSidebarItem, type FileManagerSidebarSection } from "@/modules/files/components/file-manager-chrome";
+import { FileManagerSidebar, FileManagerStatusBar, FileManagerToolbar, type FileManagerSidebarItem, type FileManagerSidebarSection, type RemovableSidebarItem } from "@/modules/files/components/file-manager-chrome";
 import { FileManagerFileArea } from "@/modules/files/components/content/file-manager-content";
 import { FILES_PANEL_SHELL } from "@/modules/files/components/file-manager-surface";
 import { FileManagerDialogLayer } from "@/modules/files/components/manager/file-manager-dialog-layer";
@@ -67,11 +67,15 @@ type FileManagerViewProps = {
   isStarredView: boolean;
   isTrashView: boolean;
   locationItems: FileManagerSidebarItem[];
+  removableItems: RemovableSidebarItem[];
+  onMountDrive: (driveId: string) => void;
+  onEjectDrive: (driveId: string) => void;
   navigateTo: (entry: FileEntry) => void;
   navigateToPath: (pathSegments: string[]) => void;
   onEntryClick: (event: MouseEvent, entry: FileEntry) => void;
   onPositionBackgroundContextMenu: (event: MouseEvent) => void;
   onPositionEntryContextMenu: (event: MouseEvent, entry: FileEntry) => void;
+  hasUnsavedChanges: boolean;
   openFile: OpenFileState | null;
   openFileBadgeLabel: string;
   openFileContent: string;
@@ -90,6 +94,8 @@ type FileManagerViewProps = {
   showContextMenu: { x: number; y: number; entry: FileEntry } | null;
   showEmptyTrashConfirm: boolean;
   showNetworkDialog: boolean;
+  showGoogleDriveDialog: boolean;
+  showUsbDialog: boolean;
   sidebarSections: FileManagerSidebarSection[];
   sortedEntries: FileEntry[];
   storageUsagePercent: number;
@@ -132,6 +138,7 @@ export function FileManagerView({
   globalSearch,
   globalSearchIsFetching,
   hasMoreSearchResults,
+  hasUnsavedChanges,
   includeHidden,
   isDragOver,
   isEmptyingTrash,
@@ -140,6 +147,9 @@ export function FileManagerView({
   isStarredView,
   isTrashView,
   locationItems,
+  removableItems,
+  onMountDrive,
+  onEjectDrive,
   navigateTo,
   navigateToPath,
   onEntryClick,
@@ -163,6 +173,8 @@ export function FileManagerView({
   showContextMenu,
   showEmptyTrashConfirm,
   showNetworkDialog,
+  showGoogleDriveDialog,
+  showUsbDialog,
   sidebarSections,
   sortedEntries,
   storageUsagePercent,
@@ -191,17 +203,20 @@ export function FileManagerView({
         isSharedView={isSharedView}
         isTrashView={isTrashView}
         locationItems={locationItems}
+        removableItems={removableItems}
         sidebarSections={sidebarSections}
         storageUsagePercent={storageUsagePercent}
         storageUsageText={storageUsageText}
         onNavigateToPath={navigateToPath}
         onOpenNetworkDialog={() => dispatch({ type: "SHOW_NETWORK_DIALOG" })}
+        onOpenGoogleDriveDialog={() => dispatch({ type: "SHOW_GOOGLE_DRIVE_DIALOG" })}
+        onOpenUsbDialog={() => dispatch({ type: "SHOW_USB_DIALOG" })}
+        onMountDrive={onMountDrive}
+        onEjectDrive={onEjectDrive}
       />
       <div className={`m-2 flex min-w-0 flex-1 flex-col ${FILES_PANEL_SHELL}`}>
         <FileManagerToolbar
           canNavigateUp={currentPath.length > 0}
-          createFilePending={createFilePending}
-          createFolderPending={createFolderPending}
           currentEntriesCount={currentEntriesCount}
           currentPath={currentPath}
           currentPathForDisplay={currentPathForDisplay}
@@ -224,7 +239,6 @@ export function FileManagerView({
           onEmptyTrash={actions.handleEmptyTrash}
           onNavigateToPath={navigateToPath}
           onNavigateUp={() => dispatch({ type: "NAVIGATE_UP" })}
-          onOpenCreateEntryDialog={(kind) => dispatch({ type: "OPEN_CREATE_ENTRY_DIALOG", kind })}
           onSearchQueryChange={(query) => dispatch({ type: "SET_SEARCH_QUERY", query })}
           onSetViewMode={(mode) => dispatch({ type: "SET_VIEW_MODE", mode })}
           onToggleGlobalSearch={() => dispatch({ type: "TOGGLE_GLOBAL_SEARCH" })}
@@ -245,6 +259,7 @@ export function FileManagerView({
           fileContentIsLoading={fileContentIsLoading}
           globalSearchIsFetching={globalSearchIsFetching}
           hasMoreSearchResults={hasMoreSearchResults}
+          hasUnsavedChanges={hasUnsavedChanges}
           isDragOver={isDragOver}
           isGlobalSearchActive={isGlobalSearchActive}
           isStarredView={isStarredView}
@@ -329,6 +344,8 @@ export function FileManagerView({
         showContextMenu={showContextMenu}
         showEmptyTrashConfirm={showEmptyTrashConfirm}
         showNetworkDialog={showNetworkDialog}
+        showGoogleDriveDialog={showGoogleDriveDialog}
+        showUsbDialog={showUsbDialog}
         trashItemCount={trashItemCount}
         onCancelEmptyTrash={() => dispatch({ type: "HIDE_EMPTY_TRASH_CONFIRM" })}
         onChangeCreateEntryDialog={(value) => dispatch({ type: "UPDATE_CREATE_ENTRY_DIALOG", name: value, error: validateEntryName(value) })}
@@ -338,6 +355,8 @@ export function FileManagerView({
         onCloseCreateEntryDialog={() => dispatch({ type: "CLOSE_CREATE_ENTRY_DIALOG" })}
         onCloseFileInfoDialog={() => dispatch({ type: "CLOSE_FILE_INFO_DIALOG" })}
         onCloseNetworkDialog={() => dispatch({ type: "HIDE_NETWORK_DIALOG" })}
+        onCloseGoogleDriveDialog={() => dispatch({ type: "HIDE_GOOGLE_DRIVE_DIALOG" })}
+        onCloseUsbDialog={() => dispatch({ type: "HIDE_USB_DIALOG" })}
         onCloseRenameDialog={() => dispatch({ type: "CLOSE_RENAME_DIALOG" })}
         onConfirmEmptyTrash={() => {
           void actions.confirmEmptyTrash();
@@ -355,6 +374,9 @@ export function FileManagerView({
         onNavigateToNetwork={() => {
           dispatch({ type: "NAVIGATE_TO_PATH", path: ["Network"] });
           dispatch({ type: "HIDE_NETWORK_DIALOG" });
+        }}
+        onNavigateToUsb={(path) => {
+          dispatch({ type: "NAVIGATE_TO_PATH", path });
         }}
         onOpenContextEntry={() => showContextMenu && navigateTo(showContextMenu.entry)}
         onOpenCreateEntryDialog={(kind) => dispatch({ type: "OPEN_CREATE_ENTRY_DIALOG", kind })}
