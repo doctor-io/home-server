@@ -4,6 +4,7 @@ import {
   Activity,
   Bell,
   FolderOpen,
+  HardDrive,
   Package,
   Search,
   Settings,
@@ -38,6 +39,7 @@ import { CommandPalette } from "@/modules/shell/components/command-palette";
 import { useDesktopAppearance } from "@/modules/shell/hooks/useDesktopAppearance";
 import { useRebootRecovery } from "@/modules/shell/hooks/useRebootRecovery";
 import { Monitor } from "@/modules/system/components/monitor";
+import { DiskManager } from "@/modules/system/components/disk-manager";
 import { NotificationsPanel } from "@/modules/system/components/notifications-panel";
 import { StatusBar } from "@/modules/system/components/status-bar";
 import { SystemWidgets } from "@/modules/system/components/system-widgets";
@@ -409,7 +411,8 @@ function DesktopShellInner() {
       id !== "terminal" &&
       id !== "monitor" &&
       id !== "notifications" &&
-      id !== "app-settings"
+      id !== "app-settings" &&
+      id !== "disk-manager"
     )
       return;
 
@@ -779,6 +782,7 @@ function DesktopShellInner() {
               onAppearanceChange={updateAppearance}
               wallpaperAccentColor={wallpaperAccentColor}
               selectedSection={settingsSectionRequest}
+              onOpenDiskManager={() => openWindow("disk-manager")}
             />
           </Window>
         )}
@@ -914,6 +918,25 @@ function DesktopShellInner() {
               commandRequest={terminalCommandRequest}
               readOnly={terminalMode === "logs"}
             />
+          </Window>
+        )}
+
+        {openWindows.includes("disk-manager") && (
+          <Window
+            title="Disk Manager"
+            icon={<HardDrive className="size-4 text-amber-400" />}
+            onClose={() => closeWindow("disk-manager")}
+            onMinimize={() => minimizeWindow("disk-manager")}
+            defaultWidth={980}
+            defaultHeight={640}
+            zIndex={getWindowZ("disk-manager")}
+            dockPosition={appearance.dockPosition}
+            onFocus={() => setFocusedWindow("disk-manager")}
+            isClosing={closingWindows.includes("disk-manager")}
+            isMinimized={minimizedWindows.includes("disk-manager")}
+            animationsEnabled={appearance.animationsEnabled}
+          >
+            <DiskManager />
           </Window>
         )}
 

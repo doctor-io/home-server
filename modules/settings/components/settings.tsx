@@ -36,6 +36,7 @@ export function SettingsPanel({
   onAppearanceChange,
   wallpaperAccentColor,
   selectedSection,
+  onOpenDiskManager,
 }: SettingsPanelProps) {
   const settingsBackend = useSettingsBackend();
   const desktopPreferences = useDesktopPreferences();
@@ -78,6 +79,7 @@ export function SettingsPanel({
     securityController,
     notificationController,
     backupController,
+    onOpenDiskManager,
   });
   const activeDefinition =
     sectionDefinitions.find((section) => section.id === activeSection) ??

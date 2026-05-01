@@ -37,4 +37,6 @@ export const queryKeys = {
   taskExecutions: (taskId: string) => ["scheduled-tasks", taskId, "executions"] as const,
   googleDriveConnections: ["google-drive", "connections"] as const,
   usbDrives: ["files", "usb"] as const,
+  disks: ["system", "disks"] as const,
+  serverInfo: ["system", "info"] as const,
 };

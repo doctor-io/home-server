@@ -64,6 +64,7 @@ type SettingsRegistryContext = {
   wallpaperAccentColor: Parameters<typeof AppearanceSection>[0]["wallpaperAccentColor"];
   desktopPreferences: DesktopPreferencesApi;
   settingsBackend: SettingsBackend;
+  onOpenDiskManager?: () => void;
   generalController: {
     draft: { hostname: string; timezone: string };
     setHostname: (value: string) => void;
@@ -174,7 +175,7 @@ export function buildSettingsSectionDefinitions(
     },
     {
       ...SETTINGS_SECTIONS[4], // Storage
-      render: () => <StorageSection data={context.settingsBackend.storage} />,
+      render: () => <StorageSection data={context.settingsBackend.storage} onOpenDiskManager={context.onOpenDiskManager} />,
       save: getDefaultSaveConfig(context.settingsBackend, "storage"),
     },
     {

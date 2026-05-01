@@ -42,7 +42,7 @@ type BadgeType =
   | "music"    | "video"  | "image"
   | "document" | "code"   | "archive"
   | "network"  | "backup" | "share"
-  | "desktop"  | "trash";
+  | "desktop"  | "trash"  | "app";
 
 const FOLDER_BADGE_MAP: Record<string, BadgeType> = {
   // Downloads
@@ -69,6 +69,8 @@ const FOLDER_BADGE_MAP: Record<string, BadgeType> = {
   backup: "backup", backups: "backup",
   // Desktop
   desktop: "desktop",
+  // Apps / AppData
+  apps: "app", appdata: "app",
   // Trash
   trash: "trash", ".trash": "trash",
 };
@@ -193,6 +195,15 @@ function FolderBadgeOverlay({ type }: { type: BadgeType }) {
           <line x1="33.5" y1="36" x2="33.5" y2="42" />
           <line x1="36" y1="36" x2="36" y2="42" />
           <line x1="38.5" y1="36" x2="38.5" y2="42" />
+        </g>
+      )}
+
+      {type === "app" && (
+        <g {...s}>
+          <rect x="29.5" y="30.5" width="5.5" height="5.5" rx="1" />
+          <rect x="37"   y="30.5" width="5.5" height="5.5" rx="1" />
+          <rect x="29.5" y="38"   width="5.5" height="5.5" rx="1" />
+          <rect x="37"   y="38"   width="5.5" height="5.5" rx="1" />
         </g>
       )}
     </g>

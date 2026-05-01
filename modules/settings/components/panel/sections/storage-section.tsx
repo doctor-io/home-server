@@ -8,10 +8,12 @@ import {
 import { SETTINGS_PANEL_INSET } from "@/modules/settings/components/panel/surface";
 import type { SettingsBackend } from "@/modules/settings/components/panel/types";
 import { HardDrive, Thermometer } from "@/components/icons/platform-icons";
+import { HardDriveRegular, ChevronRightRegular } from "@fluentui/react-icons";
 import { cn } from "@/lib/utils";
 
 type StorageSectionProps = {
   data: SettingsBackend["storage"];
+  onOpenDiskManager?: () => void;
 };
 
 const DISK_COLORS = [
@@ -39,7 +41,7 @@ function StatusDot({ status }: { status: string }) {
   );
 }
 
-export function StorageSection({ data }: StorageSectionProps) {
+export function StorageSection({ data, onOpenDiskManager }: StorageSectionProps) {
   const rootUsedPct = data.usedPercent != null ? Number(data.usedPercent.toFixed(1)) : 0;
   const smartData = data.smart;
   const smartCheckedLabel = smartData?.checkedAt
@@ -50,6 +52,28 @@ export function StorageSection({ data }: StorageSectionProps) {
     <div className="flex flex-col gap-1">
       {data.warning && (
         <InfoBanner text={data.warning} variant={data.unavailable ? "warning" : "info"} />
+      )}
+
+      {/* ── Disk Manager shortcut ── */}
+      {onOpenDiskManager && (
+        <button
+          onClick={onOpenDiskManager}
+          className={cn(
+            SETTINGS_PANEL_INSET,
+            "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-background/60",
+          )}
+        >
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-glass-border bg-background/55">
+            <HardDriveRegular className="size-4 text-amber-400" />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-medium text-foreground">Disk & Partition Manager</p>
+            <p className="text-[11px] text-muted-foreground/70">
+              Format, mount, and manage partitions
+            </p>
+          </div>
+          <ChevronRightRegular className="size-4 text-muted-foreground/40" />
+        </button>
       )}
 
       {/* ── Files root ── */}

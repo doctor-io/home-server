@@ -2,8 +2,8 @@
 
 This document outlines what's shipping now and what's planned for future releases. It's a living document — priorities shift based on community feedback. If something here matters to you, open an issue or leave a 👍 on the relevant discussion.
 
-**Current stable release:** [v1.4.x](https://github.com/doctor-io/homeio/releases)  
-**In active development:** v1.5
+**Current stable release:** [v1.5.x](https://github.com/doctor-io/homeio/releases)  
+**In active development:** v1.6.x
 
 ---
 
@@ -16,13 +16,11 @@ This document outlines what's shipping now and what's planned for future release
 
 ---
 
-## v1.5 — Productivity
+## v1.5 — Productivity ✅ Released
 
 > *Features that reduce the need to SSH in.*
 
-**Status: active development**
-
-### Monaco File Editor ✅
+### Monaco File Editor
 
 The text preview is now a full code editor:
 
@@ -32,7 +30,7 @@ The text preview is now a full code editor:
 - Unsaved-changes indicator with discard confirmation
 - Edit Docker Compose files, `.env` configs, and shell scripts from the file manager without SSH
 
-### Notification System ✅
+### Notification System
 
 - Persistent `notifications` table in PostgreSQL
 - Event sources: app install/update/uninstall, container crash, disk above 85%, backup result, scheduled task failure, system update available
@@ -40,7 +38,7 @@ The text preview is now a full code editor:
 - Mark as read, clear all
 - Notification preferences per category in Settings
 
-### Scheduled Tasks ✅
+### Scheduled Tasks
 
 A built-in cron job runner — no SSH, no crontab editing:
 
@@ -50,7 +48,7 @@ A built-in cron job runner — no SSH, no crontab editing:
 - Enable / disable without deleting
 - Failure notifications via the notification system
 
-### USB Drive Support 🚧
+### USB Drive Support
 
 Detect, mount, and browse USB drives from the file manager:
 
@@ -62,9 +60,16 @@ Detect, mount, and browse USB drives from the file manager:
 
 ---
 
-## v1.6 — Storage Expansion
+## v1.6 — Storage Expansion & Polish
 
 > *Homeio as the central hub for all your data.*
+
+**Status: active development**
+
+### Bug Fixes & Cross-Browser Compatibility 🚧
+
+- Firefox: blur overlay appearing over flyout popovers and the status bar when open
+- Firefox: app grid icons not centered / incorrect rendering inside rounded containers
 
 ### Disk & Partition Manager
 
@@ -162,4 +167,4 @@ To set clear expectations for contributors and users:
 
 ---
 
-*Updated April 2026 · [Open an issue](https://github.com/doctor-io/homeio/issues) to suggest a feature or report a problem*
+*Updated May 2026 · [Open an issue](https://github.com/doctor-io/homeio/issues) to suggest a feature or report a problem*

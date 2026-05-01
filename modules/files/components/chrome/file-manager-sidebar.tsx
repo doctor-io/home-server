@@ -95,22 +95,22 @@ export function FileManagerSidebar({
                       onClick={() => setAddMenuOpen((v) => !v)}
                       title="Add location"
                       aria-label="Add location"
-                      className="rounded-md p-0.5 text-muted-foreground/50 transition-colors hover:bg-background/50 hover:text-foreground"
+                      className="flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground/50 transition-colors hover:bg-background/60 hover:text-foreground"
                     >
                       <Plus className="size-3" />
                     </button>
                     {addMenuOpen && (
-                      <div className={cn("absolute right-0 top-full z-50 mt-1 w-44 py-1", FILES_MENU_SHELL)}>
+                      <div className={cn("absolute right-0 top-full z-50 mt-1.5 w-44 overflow-hidden py-1", FILES_MENU_SHELL)}>
                         <button
                           onClick={() => { setAddMenuOpen(false); onOpenNetworkDialog(); }}
-                          className="flex w-full items-center gap-2.5 px-3 py-2 text-[13px] text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground"
+                          className="flex w-full items-center gap-2.5 px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground"
                         >
                           <HardDrive className="size-3.5 shrink-0 text-muted-foreground/60" />
                           Network Storage
                         </button>
                         <button
                           onClick={() => { setAddMenuOpen(false); onOpenUsbDialog(); }}
-                          className="flex w-full items-center gap-2.5 px-3 py-2 text-[13px] text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground"
+                          className="flex w-full items-center gap-2.5 px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground"
                         >
                           <HardDrive className="size-3.5 shrink-0 text-amber-400/70" />
                           USB Drives
@@ -118,7 +118,7 @@ export function FileManagerSidebar({
                         {FEATURE_FLAGS.GOOGLE_DRIVE && (
                           <button
                             onClick={() => { setAddMenuOpen(false); onOpenGoogleDriveDialog(); }}
-                            className="flex w-full items-center gap-2.5 px-3 py-2 text-[13px] text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground"
+                            className="flex w-full items-center gap-2.5 px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground"
                           >
                             <Cloud className="size-3.5 shrink-0 text-sky-400/70" />
                             Google Drive

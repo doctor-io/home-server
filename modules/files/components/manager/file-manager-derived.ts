@@ -1,13 +1,10 @@
 import { createElement } from "react";
 import {
-  AppsSettingsRegular,
-  ArrowDownloadRegular,
-  DocumentRegular,
+  FolderRegular,
   HardDriveRegular,
   HomeRegular,
   StarFilled,
   UsbRegular,
-  VideoRegular,
 } from "@fluentui/react-icons";
 import type { FileReadResponse } from "@/lib/shared/contracts/files";
 import type { FileManagerSidebarSection, RemovableSidebarItem } from "@/modules/files/components/chrome/file-manager-sidebar";
@@ -41,22 +38,22 @@ export const sidebarSections: FileManagerSidebarSection[] = [
       },
       {
         name: "Documents",
-        icon: createElement(DocumentRegular, { className: "size-4 text-sky-400" }),
+        icon: createElement(FolderRegular, { className: "size-4 text-sky-400" }),
         path: ["Documents"],
       },
       {
         name: "Downloads",
-        icon: createElement(ArrowDownloadRegular, { className: "size-4 text-emerald-400" }),
+        icon: createElement(FolderRegular, { className: "size-4 text-emerald-400" }),
         path: ["Downloads"],
       },
       {
         name: "Media",
-        icon: createElement(VideoRegular, { className: "size-4 text-amber-400" }),
+        icon: createElement(FolderRegular, { className: "size-4 text-amber-400" }),
         path: ["Media"],
       },
       {
         name: "Apps",
-        icon: createElement(AppsSettingsRegular, { className: "size-4 text-violet-400" }),
+        icon: createElement(FolderRegular, { className: "size-4 text-violet-400" }),
         path: ["AppData"],
       },
     ],
