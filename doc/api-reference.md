@@ -1,6 +1,6 @@
 # API Reference
 
-This reference is generated from the current `app/api/**/route.ts` tree and verified against route exports. Auth means the route currently calls `authenticateSession()` in code; it does not mean the route is safe by design. There is no central middleware.
+This reference is generated from the current `app/api/**/route.ts` tree and verified against route exports. Auth means the route is protected by the shared `requireApiSession()` helper or an auth-specific session check. There is no central middleware.
 
 ## Response Conventions
 
@@ -8,7 +8,8 @@ This reference is generated from the current `app/api/**/route.ts` tree and veri
 - Preferred error shape: `{ "error": string, "code"?: string, "details"?: unknown }`.
 - Current code is inconsistent. Examples: `app/api/v1/files/route.ts` returns `{ data, meta }`; `app/api/v1/scheduled-tasks/route.ts` returns `{ tasks }`; auth routes use auth-specific shapes.
 - Routes that parse JSON generally return `400` for invalid JSON or validation failure.
-- Protected routes return `401` when `authenticateSession()` fails.
+- Protected routes return `401` when session authentication fails.
+- `POST /api/auth/login` returns `429` with `{ "error": "Too many login attempts" }` after 5 failed attempts per 15 minutes for the same normalized username/client IP.
 
 ## Auth Routes
 
@@ -51,6 +52,8 @@ This reference is generated from the current `app/api/**/route.ts` tree and veri
 | `POST` | `/api/v1/store/sources/[sourceId]/refresh` | Y | Refresh catalog source |
 
 Contracts: `lib/shared/contracts/apps.ts`, `lib/shared/contracts/docker.ts`. Operation SSE events: `operation.step`, `operation.completed`, `operation.failed`, `heartbeat`.
+
+Store operation mutation routes can return `409` with `code: "operation_conflict"` when the same app already has an active operation, or `429` with `code: "operation_limit_reached"` when `serverEnv.STORE_MAX_CONCURRENT_OPERATIONS` is reached.
 
 ## Docker
 
@@ -104,6 +107,8 @@ Docker stats SSE events: `stats.updated`, `heartbeat`.
 | `DELETE` | `/api/v1/files/google-drive/connections/[id]` | Y | Delete Drive connection |
 
 Contracts: `lib/shared/contracts/files.ts`, `lib/shared/contracts/usb.ts`. File service errors use `FileServiceErrorCode`.
+
+`POST /api/v1/files/upload` accepts multipart `FormData` with `path`, optional `includeHidden`, and repeated `file` parts. The client upload helper uses `XMLHttpRequest` for progress and supports `AbortSignal` cancellation. Next's route-handler proxy upload limit is configured by `experimental.proxyClientMaxBodySize` in `next.config.mjs`; external reverse proxies may still enforce their own limit.
 
 ## Network
 

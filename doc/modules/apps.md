@@ -66,7 +66,7 @@ This module displays installed Docker Compose apps, loads the App Store catalog,
 ## Known Issues
 
 - `lib/server/modules/apps/operations.ts` is over 1,200 lines and runs operations in-process via `queueMicrotask()`.
-- There is no external operation queue or concurrency limit.
+- There is no external operation queue. `startStoreOperation()` uses an in-memory per-app guard and `serverEnv.STORE_MAX_CONCURRENT_OPERATIONS` global cap.
 - Routes in this domain are protected by `requireApiSession()` except documented OAuth-style bootstrap routes outside this module.
 - Demo app data and CDN icon URLs are hardcoded in `lib/server/modules/apps/service.ts`.
 
@@ -77,7 +77,8 @@ To add a new operation:
 1. Add action/status types in `lib/shared/contracts/apps.ts`.
 2. Add persistence fields only if needed in `lib/server/db/schema.ts`.
 3. Add operation logic in `lib/server/modules/apps/operations.ts`, keeping changes narrow.
-4. Add a route under `app/api/v1/store/apps/[appId]/`.
-5. Add a client action in `modules/apps/hooks/useStoreActions.ts`.
-6. Add UI in `modules/apps/components/`.
-7. Add tests beside the route and in `lib/server/modules/apps/__tests__/`.
+4. Preserve the existing `StoreOperationError` behavior for same-app conflicts (`409`) and global caps (`429`).
+5. Add a route under `app/api/v1/store/apps/[appId]/`.
+6. Add a client action in `modules/apps/hooks/useStoreActions.ts`.
+7. Add UI in `modules/apps/components/`.
+8. Add tests beside the route and in `lib/server/modules/apps/__tests__/`.

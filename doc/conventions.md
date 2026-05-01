@@ -134,7 +134,7 @@ return NextResponse.json({ error: String(error) }, { status: 500 });
 - Versioned application APIs live under `app/api/v1/`.
 - Auth bootstrap routes live under `app/api/auth/`.
 - Use `export const runtime = "nodejs"` for routes that call Node APIs, Docker, PostgreSQL, or server modules.
-- New protected routes must read `getAuthCookieName()` and call `authenticateSession()`.
+- New protected `/api/v1/**` routes must call `requireApiSession()` from `lib/server/modules/auth/api.ts`.
 - Prefer `NextResponse.json({ data })` or `NextResponse.json({ error, code })`.
 
 Current code is inconsistent: `app/api/v1/scheduled-tasks/route.ts` returns `{ tasks }`, while `app/api/v1/files/route.ts` returns `{ data, meta }`. New code should use `{ data }` unless extending an existing route.
@@ -142,9 +142,8 @@ Current code is inconsistent: `app/api/v1/scheduled-tasks/route.ts` returns `{ t
 ✅ Good:
 
 ```ts
-const sessionToken = request.cookies.get(getAuthCookieName())?.value;
-const session = await authenticateSession(sessionToken);
-if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+const auth = await requireApiSession(request);
+if (!auth.ok) return auth.response;
 ```
 
 ❌ Bad:
@@ -177,7 +176,7 @@ controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
 setInterval(sendHeartbeat, 30_000);
 ```
 
-Known gap: `app/api/v1/system/stream/route.ts`, `app/api/v1/notifications/stream/route.ts`, and other streams currently do not authenticate.
+Authenticate before constructing `ReadableStream`. Unauthorized SSE requests should return `401` JSON and never open a stream.
 
 ## Server Actions vs API Routes
 
@@ -224,8 +223,8 @@ The repo uses few barrel files. `modules/settings/components/panel/sections/inde
 
 - Do not extend files over 500 lines without flagging the refactor risk. Current examples: `lib/server/modules/docker/compose-runner.ts`, `lib/server/modules/apps/operations.ts`, `lib/server/modules/files/service.ts`, `modules/shell/components/desktop-shell.tsx`, `modules/system/components/disk-manager.tsx`.
 - Do not add new text-based YAML manipulation in `compose-runner.ts` casually. Prefer narrow helper functions and tests.
-- Do not add in-process long-running work without considering operation limits. App operations already use `queueMicrotask()` and have no external queue.
+- Do not add in-process long-running work without considering operation limits. App operations already use `queueMicrotask()` plus in-memory per-app and global concurrency guards.
 - Do not add new unauthenticated `/api/v1/**` routes unless explicitly public.
-- Do not use `any`; ESLint only warns. Prefer `unknown` plus Zod parsing or shared contracts.
-- Do not duplicate env file parsing. The audit found parsing in `drizzle.config.ts`, `scripts/db-migrate.ts`, and `compose-runner.ts`.
+- Do not use `any`; ESLint treats `@typescript-eslint/no-explicit-any` as an error. Prefer `unknown` plus Zod parsing or shared contracts.
+- Do not duplicate env file parsing. Use `lib/shared/env-file.ts`, shared by `drizzle.config.ts`, `scripts/db-migrate.ts`, and `compose-runner.ts`.
 - `npm run build` now fails on TypeScript errors; keep it that way.

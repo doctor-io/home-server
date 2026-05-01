@@ -54,7 +54,7 @@ Scheduled tasks run recurring jobs such as shell commands, app restarts, backups
 
 - The audit originally inferred this module rather than reading it; current code now contains the module and route tests.
 - Task execution is in-process, not a separate worker service.
-- Routes in this module do authenticate with `authenticateSession()`.
+- Routes in this module call `requireApiSession()`. Some handlers also retain older `authenticateRequest()` checks, so avoid copying that duplicate pattern into new routes.
 
 ## How To Extend
 

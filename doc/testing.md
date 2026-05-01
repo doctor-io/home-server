@@ -71,8 +71,9 @@ Import `GET`, `POST`, etc. directly, construct `NextRequest` or `Request`, and m
 - `lib/server/modules/docker/compose-runner.ts`: brittle YAML/text transforms and Docker CLI calls.
 - `lib/server/modules/apps/operations.ts`: operation state machine, async progress, failure cleanup.
 - `lib/server/modules/files/service.ts`: path handling, write conflicts, trash, upload behavior.
-- SSE routes: heartbeat, abort cleanup, auth behavior once fixed.
-- Auth route brute-force/rate-limit behavior once implemented.
+- SSE routes: heartbeat, abort cleanup, and unauthorized `401` behavior.
+- Auth route brute-force/rate-limit behavior in `app/api/auth/login/__tests__/route.test.ts`.
+- Architecture route-auth guard in `app/api/v1/__tests__/auth-architecture.test.ts`.
 - D-Bus helper protocol: `services/dbus-helper/__tests__/protocol.test.ts` should expand with new helper methods.
 
 ## Coverage Targets

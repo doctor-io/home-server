@@ -19,6 +19,8 @@ Homeio is currently single-user. Authentication uses a username/password account
 | `lib/server/modules/auth/password.ts` | scrypt hashing and verification |
 | `lib/server/modules/auth/cookies.ts` | Cookie name and cookie options |
 | `lib/server/modules/auth/repository.ts` | `users` and `sessions` queries |
+| `lib/server/modules/auth/api.ts` | Shared `requireApiSession()` helper for protected API routes |
+| `lib/server/modules/auth/rate-limit.ts` | In-memory failed-login limiter |
 | `app/api/auth/login/route.ts` | Login endpoint |
 | `app/api/auth/me/route.ts` | Current session endpoint |
 
@@ -28,6 +30,7 @@ Homeio is currently single-user. Authentication uses a username/password account
 - `loginUser()`
 - `logoutSession()`
 - `authenticateSession()`
+- `requireApiSession()`
 - `verifyUnlockPassword()`
 - `createSessionToken()`
 - `parseSessionToken()`
@@ -52,10 +55,10 @@ Homeio is currently single-user. Authentication uses a username/password account
 
 ## Known Issues
 
-- No login rate limiting or account lockout.
-- No central auth middleware; routes must call `authenticateSession()` manually.
+- Login rate limiting is in-memory only: 5 failures per 15 minutes per normalized username/client IP.
+- No central auth middleware; protected `/api/v1/**` routes must call `requireApiSession()` and are checked by `app/api/v1/__tests__/auth-architecture.test.ts`.
 - The audit notes `passwordHash` circulates in authenticated session lookup results.
-- Default session secrets in examples are unsafe if not changed before exposure.
+- Development/test session secret defaults are allowed, but production startup rejects known defaults and secrets shorter than 32 characters.
 
 ## How To Extend
 
@@ -65,5 +68,5 @@ To add a protected auth-adjacent feature:
 2. Add service code in `lib/server/modules/auth/`.
 3. Add repository functions if user/session persistence changes.
 4. Add route code under `app/api/auth/` or protected `/api/v1/**`.
-5. Call `authenticateSession()` in route handlers that require a user.
+5. Call `requireApiSession()` in protected `/api/v1/**` route handlers.
 6. Add route and service tests.

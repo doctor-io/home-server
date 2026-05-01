@@ -13,8 +13,8 @@ Defended:
 
 Not fully defended:
 
-- Brute force login attempts.
-- Centralized authorization for all `/api/v1/**` routes.
+- Brute force attempts across multiple app processes; the current limiter is in-memory.
+- Middleware-level authorization for all `/api/v1/**` routes.
 - Exposure of Docker socket capabilities.
 
 ## Auth Mechanism
@@ -22,6 +22,10 @@ Not fully defended:
 `lib/server/modules/auth/session-token.ts` signs `{sessionId}.{expiresAtEpochSeconds}` with HMAC-SHA256 using `AUTH_SESSION_SECRET`. The token is stored in the `homeio_session` cookie from `lib/server/modules/auth/cookies.ts` with `httpOnly` and `sameSite: lax`; the `Secure` flag depends on HTTPS request context.
 
 Passwords are hashed in `lib/server/modules/auth/password.ts` using Node `crypto.scrypt` with a random salt. scrypt is a valid KDF, but argon2 is more common for new web password storage. The custom session format is simpler than JWT/PASETO and avoids token claims, but it is non-standard and relies on a strong `AUTH_SESSION_SECRET`.
+
+`app/api/auth/login/route.ts` uses the in-memory limiter in `lib/server/modules/auth/rate-limit.ts`. Failed attempts are keyed by normalized username plus client IP from `x-forwarded-for` or `x-real-ip`; the current limit is 5 failures per 15 minutes. A successful login clears the key. Limited requests return `429` with `{ "error": "Too many login attempts" }`.
+
+`lib/server/env.ts` rejects unsafe production `AUTH_SESSION_SECRET` values at runtime. In production, known defaults (`dev-session-secret-change-me`, `change-me-to-a-random-32-char-secret`) and secrets shorter than 32 characters fail startup, except during the Next production build phase where runtime secrets may not be present.
 
 ## Path Jailing
 
@@ -41,7 +45,7 @@ Network and USB features use `services/dbus-helper/` over `DBUS_HELPER_SOCKET_PA
 |---|---:|---|---|
 | Missing middleware-level auth | Medium | A future route could bypass auth if it is outside the architecture test scope | Mitigated by `requireApiSession()` and architecture test |
 | Login rate limiting is in-memory | Medium | Distributed deployments would not share brute-force counters across processes | Mitigated for single-process installs |
-| Default `AUTH_SESSION_SECRET` in examples | High | Users who do not change it risk forged session tokens | Open; documented in README |
+| Unsafe production `AUTH_SESSION_SECRET` | High | Users who do not change it risk forged session tokens | Mitigated at runtime by `lib/server/env.ts`; development/test defaults still work |
 | Docker socket mounted | High | App compromise can become host compromise through Docker | Accepted deployment trade-off |
 | WebSocket terminal is full shell | High | Authenticated terminal access is host shell access, not command allowlist | Open documentation gap |
 | `passwordHash` returned from session lookup | Low | Hash circulates in memory unnecessarily | Open |

@@ -110,7 +110,7 @@ sequenceDiagram
   Ops->>N: createNotification()
 ```
 
-Operations run in-process via `queueMicrotask()` in `lib/server/modules/apps/operations.ts`. There is no external worker or queue limit.
+Operations run in-process via `queueMicrotask()` in `lib/server/modules/apps/operations.ts`. There is no external worker. The module keeps an in-memory `activeOperationsByApp` guard, rejects concurrent operations for the same app with `409 operation_conflict`, and rejects global concurrency above `serverEnv.STORE_MAX_CONCURRENT_OPERATIONS` with `429 operation_limit_reached`.
 
 ## Boundaries
 
@@ -130,6 +130,8 @@ Operations run in-process via `queueMicrotask()` in `lib/server/modules/apps/ope
 
 `dist-server/` is the compiled custom Node server used by `npm run start` and the Docker runner. `tsc-alias` rewrites `@/*` aliases after the server build.
 
+`next.config.mjs` sets both `experimental.serverActions.bodySizeLimit` and `experimental.proxyClientMaxBodySize` to `10gb`. The proxy setting is required for large `POST /api/v1/files/upload` route-handler requests; Server Actions use a separate limit.
+
 ## Deployment Topology
 
 - Docker Compose: `docker-compose.yml` runs `homeio` plus `db`; the app mounts `/var/run/docker.sock`, `/DATA`, and app stack storage.
@@ -138,8 +140,8 @@ Operations run in-process via `queueMicrotask()` in `lib/server/modules/apps/ope
 
 ## Current Architecture Risks
 
-- No central `middleware.ts`; API auth depends on each route calling `authenticateSession()`.
+- No central `middleware.ts`; API auth depends on each route calling the shared route helper.
 - `/api/v1/**` routes use `requireApiSession()` except documented OAuth bootstrap/callback routes.
 - `lib/server/modules/docker/compose-runner.ts` is large and manipulates YAML textually.
-- `lib/server/modules/apps/operations.ts` runs long operations in-process.
+- `lib/server/modules/apps/operations.ts` runs long operations in-process with in-memory concurrency guards, not a durable external queue.
 - Production builds fail on TypeScript errors; do not reintroduce `typescript.ignoreBuildErrors`.

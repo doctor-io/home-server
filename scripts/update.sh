@@ -425,9 +425,15 @@ server {
     listen [::]:${PUBLIC_PORT};
     server_name _;
 
-    client_max_body_size 10g;
-    proxy_read_timeout 3600s;
-    proxy_send_timeout 3600s;
+    client_max_body_size 10G;
+    client_body_timeout 7200s;
+    client_header_timeout 300s;
+    client_body_buffer_size 128k;
+
+    proxy_read_timeout 7200s;
+    proxy_send_timeout 7200s;
+    proxy_connect_timeout 300s;
+
     proxy_intercept_errors on;
     error_page 502 503 504 /__homeio_unavailable.html;
 
@@ -440,12 +446,16 @@ server {
     location / {
         proxy_pass http://homeio_backend;
         proxy_http_version 1.1;
+
+        proxy_request_buffering off;
+        proxy_buffering off;
+
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_set_header Connection "";
-        proxy_buffering off;
+
         gzip off;
     }
 }

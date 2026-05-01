@@ -39,6 +39,7 @@ Important env vars include:
 - `LOG_TO_FILE`
 - `STORE_STACKS_ROOT`
 - `STORE_APP_DATA_ROOT`
+- `STORE_MAX_CONCURRENT_OPERATIONS`
 - `FILES_ROOT`
 - `DOCKER_SOCKET_PATH`
 - `DBUS_HELPER_SOCKET_PATH`
@@ -112,7 +113,7 @@ Use `cn()` from `@/lib/utils`.
 ## PR Checklist
 
 - Code follows [conventions.md](./conventions.md).
-- Protected routes call `authenticateSession()`.
+- Protected `/api/v1/**` routes call `requireApiSession()`.
 - New APIs have contracts in `lib/shared/contracts/`.
 - New query keys are in `lib/shared/query-keys.ts`.
 - Server files under `lib/server/` import `"server-only"`.

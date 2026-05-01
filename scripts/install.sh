@@ -939,27 +939,31 @@ server {
     listen [::]:${PUBLIC_PORT};
     server_name _;
 
-    client_max_body_size 10g;
+    client_max_body_size 10G;
+    client_body_timeout 3600s;
+    client_header_timeout 3600s;
+    client_body_buffer_size 128k;
+    client_body_temp_path /var/lib/nginx/body;
+
     proxy_read_timeout 3600s;
     proxy_send_timeout 3600s;
     proxy_intercept_errors on;
-    error_page 502 503 504 /__homeio_unavailable.html;
 
-    location = /__homeio_unavailable.html {
-        root ${maintenance_root};
-        default_type text/html;
-        add_header Cache-Control "no-store, no-cache, must-revalidate" always;
-    }
+    error_page 502 503 504 /__homeio_unavailable.html;
 
     location / {
         proxy_pass http://homeio_backend;
         proxy_http_version 1.1;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_set_header Connection "";
+
+        proxy_request_buffering off;
         proxy_buffering off;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "";
+
         gzip off;
     }
 }

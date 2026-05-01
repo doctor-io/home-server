@@ -22,7 +22,9 @@ The file manager browses `FILES_ROOT`, reads and writes text files, uploads/down
 | `lib/server/modules/files/usb-storage.ts` | USB drive list/mount/unmount/eject |
 | `lib/server/modules/files/google-drive.ts` | Google Drive token/connections |
 | `modules/files/components/manager/file-manager.tsx` | Main file manager container |
+| `modules/files/components/dialogs/file-manager-dialogs.tsx` | File manager modal dialogs, including upload progress |
 | `modules/files/components/manager/file-manager-state.ts` | Reducer state shape |
+| `modules/files/hooks/files-api.ts` | Fetch/XHR helpers, including abortable upload |
 | `modules/files/hooks/useFiles.ts` | Main file query/mutation hook |
 
 ## Public API
@@ -70,6 +72,8 @@ The file manager browses `FILES_ROOT`, reads and writes text files, uploads/down
 - `modules/files/components/manager/file-manager-state.ts` has a large state shape.
 - The audit found `getCurrentEntries()` in `file-manager-derived.ts` using `unknown[]` parameters.
 - File routes are protected by `requireApiSession()`; path jailing remains the main filesystem safety control.
+- Large uploads depend on `next.config.mjs` `experimental.proxyClientMaxBodySize: "10gb"` and any external reverse-proxy body-size limits.
+- Upload progress is shown in `UploadProgressDialog`; closing the dialog cancels the active XHR through an `AbortController`.
 
 ## How To Extend
 
@@ -81,4 +85,5 @@ To add a new file operation:
 4. Add a route under `app/api/v1/files/`.
 5. Add query/mutation support in `modules/files/hooks/files-api.ts` and `useFiles.ts`.
 6. Wire UI in `modules/files/components/manager/` or `modules/files/components/dialogs/`.
-7. Add server and route tests.
+7. For upload changes, preserve `AbortSignal` cancellation in `uploadFilesToPath()`.
+8. Add server and route tests.
