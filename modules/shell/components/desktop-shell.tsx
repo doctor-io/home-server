@@ -430,6 +430,10 @@ function DesktopShellInner() {
           subtitle: "Browse and install apps",
         },
         terminal: { title: "Open Terminal", subtitle: "Shell and logs" },
+        monitor: { title: "Open Monitor", subtitle: "System performance" },
+        notifications: { title: "Open Notifications", subtitle: "Activity feed" },
+        "app-settings": { title: "Open App Settings", subtitle: "App configuration" },
+        "disk-manager": { title: "Open Disk Manager", subtitle: "Storage management" },
       }[id];
 
       if (metadata) {
@@ -479,7 +483,7 @@ function DesktopShellInner() {
   );
 
   const openCommandPaletteWindow = useCallback(
-    (windowId: "files" | "settings" | "app-store" | "terminal") => {
+    (windowId: "files" | "settings" | "app-store" | "terminal" | "monitor" | "notifications" | "app-settings" | "disk-manager") => {
       if (typeof window !== "undefined") {
         const metadata = {
           files: { title: "Open Files", subtitle: "Folder and file browser" },
@@ -489,6 +493,10 @@ function DesktopShellInner() {
             subtitle: "Browse and install apps",
           },
           terminal: { title: "Open Terminal", subtitle: "Shell and logs" },
+          monitor: { title: "Open Monitor", subtitle: "System performance" },
+          notifications: { title: "Open Notifications", subtitle: "Activity feed" },
+          "app-settings": { title: "Open App Settings", subtitle: "App configuration" },
+          "disk-manager": { title: "Open Disk Manager", subtitle: "Storage management" },
         }[windowId];
 
         setRecentActions(

@@ -7,7 +7,7 @@ export type RecentCommandAction =
       kind: "window";
       title: string;
       subtitle: string;
-      windowId: "files" | "settings" | "app-store" | "terminal";
+      windowId: "files" | "settings" | "app-store" | "terminal" | "monitor" | "notifications" | "app-settings" | "disk-manager";
     }
   | {
       key: string;
@@ -25,12 +25,18 @@ export type RecentCommandAction =
       appId?: string;
     };
 
-function isWindowId(value: unknown): value is RecentCommandAction["windowId"] {
+type WindowRecentAction = Extract<RecentCommandAction, { kind: "window" }>;
+
+function isWindowId(value: unknown): value is WindowRecentAction["windowId"] {
   return (
     value === "files" ||
     value === "settings" ||
     value === "app-store" ||
-    value === "terminal"
+    value === "terminal" ||
+    value === "monitor" ||
+    value === "notifications" ||
+    value === "app-settings" ||
+    value === "disk-manager"
   );
 }
 
