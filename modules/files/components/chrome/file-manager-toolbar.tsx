@@ -55,6 +55,11 @@ type ToolbarProps = {
 const iconBtn = "inline-flex size-7 items-center justify-center rounded-lg transition-colors";
 const iconBtnIdle = "text-muted-foreground hover:bg-background/50 hover:text-foreground";
 
+function getUploadPercent(progress: ToolbarProps["uploadProgress"]) {
+  if (!progress || progress.total <= 0) return 0;
+  return Math.min(100, Math.max(0, Math.round((progress.loaded / progress.total) * 100)));
+}
+
 export function FileManagerToolbar({
   canNavigateUp,
   currentEntriesCount,
@@ -86,6 +91,8 @@ export function FileManagerToolbar({
   onToggleSortDir,
   onUploadInputChange,
 }: ToolbarProps) {
+  const uploadPercent = getUploadPercent(uploadProgress);
+
   return (
     <div className={cn("flex flex-nowrap items-center gap-2 overflow-x-auto border-b border-glass-border/60 px-3 py-2", FILES_PANEL_SHELL)}>
 
@@ -123,30 +130,41 @@ export function FileManagerToolbar({
 
       {/* Upload */}
       {!isTrashView && !isStarredView && (
-        <div className="relative">
-          <button
-            onClick={() => uploadInputRef.current?.click()}
-            disabled={uploadFilesPending}
-            aria-label="Upload files"
-            title="Upload files"
-            className={cn(iconBtn, iconBtnIdle, "disabled:cursor-not-allowed disabled:opacity-50")}
-          >
-            {uploadFilesPending && uploadProgress ? (
-              <Loader2 className="size-3.5 animate-spin text-primary" />
-            ) : (
-              <Upload className="size-3.5" />
-            )}
-          </button>
-          {uploadProgress && uploadProgress.total > 0 && (
+        <div className="shrink-0">
+          {uploadFilesPending && uploadProgress ? (
             <div
-              className="absolute -bottom-1 left-0 right-0 h-0.5 overflow-hidden rounded-full bg-white/10"
-              title={`${Math.round((uploadProgress.loaded / uploadProgress.total) * 100)}%`}
+              className="w-36 overflow-hidden rounded-[var(--system-radius-control)] border border-glass-border/50 bg-popover/80 shadow-[0_8px_24px_rgba(0,0,0,0.18)] backdrop-blur-2xl sm:w-44"
+              title={`${uploadPercent}% uploaded`}
+              role="progressbar"
+              aria-label="Uploading files"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={uploadPercent}
             >
-              <div
-                className="h-full bg-primary transition-all duration-150"
-                style={{ width: `${Math.min(100, Math.round((uploadProgress.loaded / uploadProgress.total) * 100))}%` }}
-              />
+              <div className="flex h-8 items-center gap-2 px-3">
+                <span className="min-w-0 flex-1 truncate text-xs font-medium text-foreground/80">
+                  Uploading
+                </span>
+                <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground/80">
+                  {uploadPercent}%
+                </span>
+              </div>
+              <div className="h-1 overflow-hidden bg-white/10">
+                <div
+                  className="h-full bg-primary transition-all duration-150"
+                  style={{ width: `${uploadPercent}%` }}
+                />
+              </div>
             </div>
+          ) : (
+            <button
+              onClick={() => uploadInputRef.current?.click()}
+              aria-label="Upload files"
+              title="Upload files"
+              className={cn(iconBtn, iconBtnIdle)}
+            >
+              <Upload className="size-3.5" />
+            </button>
           )}
           <input
             ref={uploadInputRef}

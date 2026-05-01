@@ -939,7 +939,7 @@ server {
     listen [::]:${PUBLIC_PORT};
     server_name _;
 
-    client_max_body_size 32m;
+    client_max_body_size 10g;
     proxy_read_timeout 3600s;
     proxy_send_timeout 3600s;
     proxy_intercept_errors on;

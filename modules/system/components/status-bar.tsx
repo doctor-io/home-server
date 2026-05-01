@@ -83,15 +83,19 @@ export function StatusBar({
 
   return (
     <header className="fixed top-3 left-1/2 -translate-x-1/2 z-50 min-w-[50%] w-auto max-w-[96vw]">
+      {/* Blur is on a separate element so it doesn't create a Firefox stacking context over the flyout popovers */}
       <div
-        className="flex items-center gap-1.5 px-3.5 py-1.5 border border-white/[0.09] rounded-2xl"
+        aria-hidden="true"
+        className="absolute inset-0 rounded-2xl border border-white/[0.09] pointer-events-none"
         style={{
           background: "var(--system-surface)",
           backdropFilter: "blur(40px) saturate(160%)",
           boxShadow:
             "var(--system-shadow-floating), inset 0 1px 0 rgba(255,255,255,0.12)",
-          overflow: "visible",
         }}
+      />
+      <div
+        className="relative flex items-center gap-1.5 px-3.5 py-1.5"
       >
         <div className="flex items-center gap-2 pr-3 border-r border-glass-border/50">
           <div className="flex size-6 items-center justify-center overflow-hidden rounded-[8px] bg-primary/12 ring-1 ring-primary/25 shadow-sm shadow-black/20">
