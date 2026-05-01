@@ -30,7 +30,7 @@ async function probe<T>(action: string, fn: () => Promise<T>, fallback: T): Prom
 }
 
 async function collect(): Promise<ServerHardwareInfo> {
-  const [cpuData, graphics, memLayout, osInfo, systemInfo, biosInfo, baseboardInfo, batteryData] =
+  const [cpuData, graphics, memLayout, osInfo, systemInfo, biosInfo, baseboardInfo, batteryData, networkIfaces] =
     await Promise.all([
       probe("server-info.cpu", () => si.cpu(), null),
       probe("server-info.graphics", () => si.graphics(), { controllers: [], displays: [] }),
@@ -40,6 +40,7 @@ async function collect(): Promise<ServerHardwareInfo> {
       probe("server-info.bios", () => si.bios(), null),
       probe("server-info.baseboard", () => si.baseboard(), null),
       probe("server-info.battery", () => si.battery(), null),
+      probe("server-info.networkInterfaces", () => si.networkInterfaces(), []),
     ]);
 
   return {
@@ -112,6 +113,23 @@ async function collect(): Promise<ServerHardwareInfo> {
         ? Number(batteryData.designedCapacity.toFixed(1)) : null,
       cycleCount: batteryData?.hasBattery && typeof batteryData.cycleCount === "number" && batteryData.cycleCount >= 0
         ? Math.round(batteryData.cycleCount) : null,
+    },
+    network: {
+      interfaces: (Array.isArray(networkIfaces) ? networkIfaces : [])
+        .filter((iface) => !iface.internal && !iface.virtual && iface.iface)
+        .map((iface) => ({
+          iface: iface.iface,
+          type: toStr(iface.type),
+          operstate: iface.operstate === "up" || iface.operstate === "down" ? iface.operstate : null,
+          ip4: toStr(iface.ip4),
+          ip4subnet: toStr(iface.ip4subnet),
+          ip6: toStr(iface.ip6),
+          mac: toStr(iface.mac),
+          speedMbps: typeof iface.speed === "number" && iface.speed > 0 ? iface.speed : null,
+          duplex: toStr(iface.duplex),
+          dhcp: Boolean(iface.dhcp),
+          isDefault: Boolean(iface.default),
+        })),
     },
   };
 }

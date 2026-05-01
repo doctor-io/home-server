@@ -67,6 +67,20 @@ export type ServerBatteryInfo = {
   cycleCount: number | null;
 };
 
+export type ServerNetworkInterface = {
+  iface: string;
+  type: string | null;
+  operstate: "up" | "down" | null;
+  ip4: string | null;
+  ip4subnet: string | null;
+  ip6: string | null;
+  mac: string | null;
+  speedMbps: number | null;
+  duplex: string | null;
+  dhcp: boolean;
+  isDefault: boolean;
+};
+
 export type ServerHardwareInfo = {
   fetchedAt: string;
   os: ServerOsInfo;
@@ -82,4 +96,7 @@ export type ServerHardwareInfo = {
     controllers: ServerGpuController[];
   };
   battery: ServerBatteryInfo;
+  network: {
+    interfaces: ServerNetworkInterface[];
+  };
 };

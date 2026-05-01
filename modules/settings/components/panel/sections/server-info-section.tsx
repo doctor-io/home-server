@@ -2,8 +2,10 @@
 
 import { SETTINGS_PANEL_INSET } from "@/modules/settings/components/panel/surface";
 import { useServerInfo } from "@/modules/system/hooks/useServerInfo";
+import { useSystemMetrics } from "@/modules/system/hooks/useSystemMetrics";
 import { cn } from "@/lib/utils";
 import type { ServerHardwareInfo } from "@/lib/shared/contracts/server-info";
+import type { SystemMetricsSnapshot } from "@/lib/shared/contracts/system";
 import { useState } from "react";
 
 function formatBytes(bytes: number | null): string {
@@ -128,6 +130,152 @@ function GpuTab({ info }: { info: ServerHardwareInfo }) {
   );
 }
 
+function ThermalTab({ metrics }: { metrics: SystemMetricsSnapshot | undefined }) {
+  const temp = metrics?.temperature;
+
+  if (!metrics) {
+    return <div className="px-4 py-3 text-xs text-muted-foreground">Loading temperature data…</div>;
+  }
+
+  const main = temp?.mainCelsius;
+  const max = temp?.maxCelsius;
+  const cores = temp?.coresCelsius ?? [];
+
+  if (main === null && cores.length === 0) {
+    return <div className="px-4 py-3 text-xs text-muted-foreground">Temperature sensors not available on this host.</div>;
+  }
+
+  function tempColor(c: number) {
+    if (c >= 85) return "text-status-red";
+    if (c >= 70) return "text-status-amber";
+    return "text-status-green";
+  }
+
+  function tempBarColor(c: number) {
+    if (c >= 85) return "bg-status-red";
+    if (c >= 70) return "bg-status-amber";
+    return "bg-status-green";
+  }
+
+  return (
+    <div>
+      {/* Summary row */}
+      <div className="flex gap-6 border-b border-glass-border/40 px-4 py-3">
+        {main != null && (
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground/60">CPU</div>
+            <div className={cn("mt-0.5 text-lg font-semibold tabular-nums", tempColor(main))}>{main}°C</div>
+          </div>
+        )}
+        {max != null && (
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground/60">Max</div>
+            <div className={cn("mt-0.5 text-lg font-semibold tabular-nums", tempColor(max))}>{max}°C</div>
+          </div>
+        )}
+      </div>
+
+      {/* Per-core grid */}
+      {cores.length > 0 && (
+        <div className="px-4 pb-3 pt-3">
+          <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/50">
+            Cores
+          </div>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 sm:grid-cols-3">
+            {cores.map((c, i) => (
+              <div key={i}>
+                <div className="mb-1 flex items-center justify-between">
+                  <span className="text-[11px] text-muted-foreground/70">Core {i}</span>
+                  <span className={cn("text-[11px] font-medium tabular-nums", tempColor(c))}>{c}°C</span>
+                </div>
+                <div className="h-1 overflow-hidden rounded-full bg-background/50">
+                  <div
+                    className={cn("h-full rounded-full transition-all", tempBarColor(c))}
+                    style={{ width: `${Math.min((c / 100) * 100, 100)}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NetworkTab({ info }: { info: ServerHardwareInfo }) {
+  const { interfaces } = info.network;
+
+  if (interfaces.length === 0) {
+    return <div className="px-4 py-3 text-xs text-muted-foreground">No network interfaces found.</div>;
+  }
+
+  return (
+    <div className="divide-y divide-glass-border/40 px-4">
+      {interfaces.map((iface, i) => (
+        <div key={i} className="py-3">
+          {/* Header row */}
+          <div className="mb-2 flex items-center gap-2">
+            <span className="font-mono text-xs font-semibold text-foreground">{iface.iface}</span>
+            {iface.type && (
+              <span className="rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide bg-background/60 text-muted-foreground/70">
+                {iface.type}
+              </span>
+            )}
+            {iface.isDefault && (
+              <span className="rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide bg-primary/15 text-primary">
+                default
+              </span>
+            )}
+            <div className="ml-auto flex items-center gap-1.5">
+              <div className={cn(
+                "size-1.5 rounded-full",
+                iface.operstate === "up" ? "bg-status-green" : iface.operstate === "down" ? "bg-status-red" : "bg-muted-foreground/30",
+              )} />
+              <span className="text-[11px] text-muted-foreground/60">{iface.operstate ?? "unknown"}</span>
+            </div>
+          </div>
+
+          {/* Details */}
+          <div className="space-y-0.5">
+            {iface.ip4 && (
+              <div className="flex justify-between gap-4">
+                <span className="text-[11px] text-muted-foreground/60">IPv4</span>
+                <span className="font-mono text-[11px] text-foreground/80">
+                  {iface.ip4}{iface.ip4subnet ? `/${iface.ip4subnet}` : ""}
+                </span>
+              </div>
+            )}
+            {iface.ip6 && (
+              <div className="flex justify-between gap-4">
+                <span className="shrink-0 text-[11px] text-muted-foreground/60">IPv6</span>
+                <span className="max-w-[70%] break-all font-mono text-[11px] text-foreground/80">{iface.ip6}</span>
+              </div>
+            )}
+            {iface.mac && (
+              <div className="flex justify-between gap-4">
+                <span className="text-[11px] text-muted-foreground/60">MAC</span>
+                <span className="font-mono text-[11px] text-foreground/80">{iface.mac}</span>
+              </div>
+            )}
+            <div className="flex gap-4">
+              {iface.speedMbps && (
+                <span className="text-[11px] text-muted-foreground/60">{iface.speedMbps} Mbps</span>
+              )}
+              {iface.duplex && (
+                <span className="text-[11px] text-muted-foreground/60">{iface.duplex} duplex</span>
+              )}
+              {iface.dhcp && (
+                <span className="text-[11px] text-muted-foreground/60">DHCP</span>
+              )}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function FirmwareTab({ info }: { info: ServerHardwareInfo }) {
   const { bios, baseboard } = info;
   return (
@@ -167,29 +315,31 @@ function SkeletonTab() {
   );
 }
 
-type TabId = "os" | "cpu" | "memory" | "gpu" | "battery" | "firmware";
+type TabId = "os" | "cpu" | "memory" | "gpu" | "thermal" | "network" | "battery" | "firmware";
 
 export function ServerInfoSection() {
   const { data: info, isLoading, isError } = useServerInfo();
+  const { data: metrics } = useSystemMetrics();
   const [activeTab, setActiveTab] = useState<TabId>("os");
 
   const tabs: { id: TabId; label: string; hidden?: boolean }[] = [
-    { id: "os", label: "OS" },
-    { id: "cpu", label: "CPU" },
-    { id: "memory", label: "Memory" },
-    { id: "gpu", label: "GPU" },
-    { id: "battery", label: "Battery", hidden: !info?.battery.hasBattery },
+    { id: "os",       label: "OS" },
+    { id: "cpu",      label: "CPU" },
+    { id: "memory",   label: "Memory" },
+    { id: "gpu",      label: "GPU" },
+    { id: "thermal",  label: "Thermal" },
+    { id: "network",  label: "Network" },
+    { id: "battery",  label: "Battery",  hidden: !info?.battery.hasBattery },
     { id: "firmware", label: "Firmware", hidden: !info?.bios.vendor && !info?.baseboard.manufacturer },
   ];
 
   const visibleTabs = tabs.filter((t) => !t.hidden);
-
-  const safeTab = visibleTabs.find((t) => t.id === activeTab) ? activeTab : visibleTabs[0]?.id ?? "os";
+  const safeTab = visibleTabs.find((t) => t.id === activeTab) ? activeTab : (visibleTabs[0]?.id ?? "os");
 
   return (
     <div className={cn(SETTINGS_PANEL_INSET, "overflow-hidden")}>
       {/* Tab bar */}
-      <div className="flex items-center gap-1 border-b border-glass-border/50 px-2 py-2">
+      <div className="flex flex-wrap items-center gap-1 border-b border-glass-border/50 px-2 py-2">
         {visibleTabs.map((tab) => (
           <button
             key={tab.id}
@@ -217,11 +367,13 @@ export function ServerInfoSection() {
         {isError && (
           <div className="px-4 py-3 text-xs text-muted-foreground">Failed to load hardware information.</div>
         )}
-        {info && safeTab === "os" && <OsTab info={info} />}
-        {info && safeTab === "cpu" && <CpuTab info={info} />}
-        {info && safeTab === "memory" && <MemoryTab info={info} />}
-        {info && safeTab === "gpu" && <GpuTab info={info} />}
-        {info && safeTab === "battery" && <BatteryTab info={info} />}
+        {info && safeTab === "os"       && <OsTab info={info} />}
+        {info && safeTab === "cpu"      && <CpuTab info={info} />}
+        {info && safeTab === "memory"   && <MemoryTab info={info} />}
+        {info && safeTab === "gpu"      && <GpuTab info={info} />}
+        {         safeTab === "thermal" && <ThermalTab metrics={metrics} />}
+        {info && safeTab === "network"  && <NetworkTab info={info} />}
+        {info && safeTab === "battery"  && <BatteryTab info={info} />}
         {info && safeTab === "firmware" && <FirmwareTab info={info} />}
       </div>
     </div>
