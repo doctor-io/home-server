@@ -7,6 +7,7 @@ import {
 import { getAllContainersStats } from "@/lib/server/modules/docker/stats";
 import { toSseChunk } from "@/lib/server/realtime/sse";
 import type { DockerStatsPayload } from "@/lib/shared/contracts/docker";
+import { requireApiSession } from "@/lib/server/modules/auth/api";
 
 export const runtime = "nodejs";
 
@@ -21,6 +22,8 @@ let activeDockerStatsConnections = 0;
  * Returns 429 when more than MAX_DOCKER_STATS_CONNECTIONS clients are connected.
  */
 export async function GET(request: Request) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   if (activeDockerStatsConnections >= MAX_DOCKER_STATS_CONNECTIONS) {
     logServerAction({
       level: "warn",

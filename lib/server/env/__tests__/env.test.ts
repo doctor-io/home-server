@@ -24,6 +24,7 @@ describe("server env", () => {
     expect(serverEnv.PG_MAX_CONNECTIONS).toBe(10);
     expect(serverEnv.WEBSOCKET_ENABLED).toBe(true);
     expect(serverEnv.STORE_STACKS_ROOT).toBe("DATA/AppData");
+    expect(serverEnv.STORE_MAX_CONCURRENT_OPERATIONS).toBe(3);
     expect(serverEnv.STORE_APP_DATA_ROOT).toBe("DATA/AppData");
     expect(serverEnv.FILES_ROOT).toBe("DATA");
     expect(serverEnv.FILES_ALLOW_HIDDEN).toBe(false);
@@ -35,6 +36,7 @@ describe("server env", () => {
 
   it("uses /DATA/AppData as default stacks root in production", async () => {
     process.env.NODE_ENV = "production";
+    process.env.AUTH_SESSION_SECRET = "a-valid-production-session-secret";
     delete process.env.STORE_STACKS_ROOT;
     delete process.env.STORE_APP_DATA_ROOT;
     delete process.env.FILES_ROOT;
@@ -59,6 +61,41 @@ describe("server env", () => {
 
     await expect(import("@/lib/server/env")).rejects.toThrow(
       "Invalid server environment",
+    );
+  });
+
+  it("parses STORE_MAX_CONCURRENT_OPERATIONS", async () => {
+    process.env.STORE_MAX_CONCURRENT_OPERATIONS = "7";
+
+    const { serverEnv } = await import("@/lib/server/env");
+
+    expect(serverEnv.STORE_MAX_CONCURRENT_OPERATIONS).toBe(7);
+  });
+
+  it("allows the default session secret outside production", async () => {
+    process.env.NODE_ENV = "development";
+    process.env.AUTH_SESSION_SECRET = "dev-session-secret-change-me";
+
+    const { serverEnv } = await import("@/lib/server/env");
+
+    expect(serverEnv.AUTH_SESSION_SECRET).toBe("dev-session-secret-change-me");
+  });
+
+  it("rejects default session secrets in production", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.AUTH_SESSION_SECRET = "change-me-to-a-random-32-char-secret";
+
+    await expect(import("@/lib/server/env")).rejects.toThrow(
+      "AUTH_SESSION_SECRET must be a non-default value",
+    );
+  });
+
+  it("rejects short session secrets in production", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.AUTH_SESSION_SECRET = "short-secret-over-16";
+
+    await expect(import("@/lib/server/env")).rejects.toThrow(
+      "AUTH_SESSION_SECRET must be a non-default value",
     );
   });
 });

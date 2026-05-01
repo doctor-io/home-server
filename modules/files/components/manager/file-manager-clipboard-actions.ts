@@ -14,7 +14,7 @@ type AsyncMutation<TArgs> = {
   mutateAsync: (args: TArgs) => Promise<unknown>;
 };
 
-type UseFileManagerClipboardActionsArgs = {
+export type UseFileManagerClipboardActionsArgs = {
   clipboardState: ClipboardState | null;
   dispatch: (action: FileManagerAction) => void;
   openFile: OpenFileState | null;

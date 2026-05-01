@@ -70,6 +70,7 @@ type FileManagerViewProps = {
   removableItems: RemovableSidebarItem[];
   onMountDrive: (driveId: string) => void;
   onEjectDrive: (driveId: string) => void;
+  onCancelUpload: () => void;
   navigateTo: (entry: FileEntry) => void;
   navigateToPath: (pathSegments: string[]) => void;
   onEntryClick: (event: MouseEvent, entry: FileEntry) => void;
@@ -150,6 +151,7 @@ export function FileManagerView({
   removableItems,
   onMountDrive,
   onEjectDrive,
+  onCancelUpload,
   navigateTo,
   navigateToPath,
   onEntryClick,
@@ -233,7 +235,6 @@ export function FileManagerView({
           sortDir={sortDir}
           uploadFilesPending={uploadPending}
           uploadInputRef={uploadInputRef}
-          uploadProgress={uploadProgress}
           viewMode={viewMode}
           onCycleSortBy={() => dispatch({ type: "SET_SORT_BY", by: sortBy === "name" ? "modified" : sortBy === "modified" ? "size" : "name" })}
           onEmptyTrash={actions.handleEmptyTrash}
@@ -347,7 +348,10 @@ export function FileManagerView({
         showGoogleDriveDialog={showGoogleDriveDialog}
         showUsbDialog={showUsbDialog}
         trashItemCount={trashItemCount}
+        uploadPending={uploadPending}
+        uploadProgress={uploadProgress}
         onCancelEmptyTrash={() => dispatch({ type: "HIDE_EMPTY_TRASH_CONFIRM" })}
+        onCancelUpload={onCancelUpload}
         onChangeCreateEntryDialog={(value) => dispatch({ type: "UPDATE_CREATE_ENTRY_DIALOG", name: value, error: validateEntryName(value) })}
         onChangeRenameDialog={(value) => dispatch({ type: "UPDATE_RENAME_DIALOG", name: value, error: validateEntryName(value) })}
         onCloseBackgroundContextMenu={() => dispatch({ type: "HIDE_BACKGROUND_CONTEXT_MENU" })}

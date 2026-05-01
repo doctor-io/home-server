@@ -3,6 +3,7 @@ import path from "node:path";
 import { Readable } from "node:stream";
 import { type NextRequest, NextResponse } from "next/server";
 import { serverEnv } from "@/lib/server/env";
+import { requireApiSession } from "@/lib/server/modules/auth/api";
 import {
   createRequestId,
   logServerAction,
@@ -22,6 +23,8 @@ function toAttachmentFilename(filePath: string) {
 }
 
 export async function GET(request: NextRequest) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   const requestId = createRequestId();
 
   try {

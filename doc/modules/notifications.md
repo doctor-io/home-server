@@ -48,7 +48,7 @@ Notifications persist user-visible events in PostgreSQL and stream real-time upd
 
 - SSE pub/sub is in-memory and does not replay events after restart.
 - The notification list has a hard cap in service code.
-- Notification routes and stream are currently unauthenticated in code.
+- Notification routes and stream are protected by `requireApiSession()`.
 - `toRecord()` in `service.ts` casts DB `kind` values without runtime validation, per the audit.
 
 ## How To Extend

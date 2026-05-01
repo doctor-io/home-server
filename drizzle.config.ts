@@ -1,42 +1,16 @@
 import type { Config } from "drizzle-kit";
 import fs from "node:fs";
 import path from "node:path";
+import { parseEnvFileContent } from "./lib/shared/env-file";
 
 const DEFAULT_DATABASE_URL =
   "postgresql://postgres:postgres@127.0.0.1:5432/home_server";
 
-function stripWrappingQuotes(value: string) {
-  const trimmed = value.trim();
-  if (
-    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
-    (trimmed.startsWith("'") && trimmed.endsWith("'"))
-  ) {
-    return trimmed.slice(1, -1);
-  }
-  return trimmed;
-}
-
 function readDatabaseUrlFromEnvFile(filePath: string) {
   if (!fs.existsSync(filePath)) return null;
 
-  const contents = fs.readFileSync(filePath, "utf8");
-  const lines = contents.split(/\r?\n/);
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-
-    const separatorIndex = trimmed.indexOf("=");
-    if (separatorIndex <= 0) continue;
-
-    const key = trimmed.slice(0, separatorIndex).trim();
-    if (key !== "DATABASE_URL") continue;
-
-    const value = trimmed.slice(separatorIndex + 1);
-    const parsed = stripWrappingQuotes(value);
-    if (parsed.length > 0) return parsed;
-  }
-
-  return null;
+  const env = parseEnvFileContent(fs.readFileSync(filePath, "utf8"));
+  return env.DATABASE_URL || null;
 }
 
 function resolveDatabaseUrl() {

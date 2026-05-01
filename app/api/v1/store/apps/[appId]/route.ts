@@ -5,6 +5,7 @@ import {
   withServerTiming,
 } from "@/lib/server/logging/logger";
 import { getStoreAppDetail } from "@/lib/server/modules/store/service";
+import { requireApiSession } from "@/lib/server/modules/auth/api";
 
 export const runtime = "nodejs";
 
@@ -14,7 +15,9 @@ type Context = {
   }>;
 };
 
-export async function GET(_request: Request, context: Context) {
+export async function GET(request: Request, context: Context) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   const requestId = createRequestId();
   const { appId } = await context.params;
 

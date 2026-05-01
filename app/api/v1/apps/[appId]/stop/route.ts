@@ -5,6 +5,8 @@ import {
   withServerTiming,
 } from "@/lib/server/logging/logger";
 import { startAppLifecycleAction } from "@/lib/server/modules/store/service";
+import { requireApiSession } from "@/lib/server/modules/auth/api";
+import { StoreOperationError } from "@/lib/server/modules/apps/operations";
 
 export const runtime = "nodejs";
 
@@ -14,7 +16,9 @@ type Context = {
   }>;
 };
 
-export async function POST(_request: Request, context: Context) {
+export async function POST(request: Request, context: Context) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   const requestId = createRequestId();
   const { appId } = await context.params;
 
@@ -45,6 +49,16 @@ export async function POST(_request: Request, context: Context) {
       },
     );
   } catch (error) {
+    if (error instanceof StoreOperationError) {
+      return NextResponse.json(
+        {
+          error: error.message,
+          code: error.code,
+        },
+        { status: error.statusCode },
+      );
+    }
+
     logServerAction({
       level: "error",
       layer: "api",

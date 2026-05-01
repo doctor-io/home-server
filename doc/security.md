@@ -16,7 +16,6 @@ Not fully defended:
 - Brute force login attempts.
 - Centralized authorization for all `/api/v1/**` routes.
 - Exposure of Docker socket capabilities.
-- Unauthenticated SSE/API routes in current code.
 
 ## Auth Mechanism
 
@@ -40,19 +39,17 @@ Network and USB features use `services/dbus-helper/` over `DBUS_HELPER_SOCKET_PA
 
 | Gap | Severity | Exploit scenario | Status |
 |---|---:|---|---|
-| Unauthenticated SSE/API routes | High | A LAN attacker reads metrics/notifications or calls unauthenticated file/app/network routes | Open |
-| No login rate limiting | High | Online brute force against `/api/auth/login` | Open |
+| Missing middleware-level auth | Medium | A future route could bypass auth if it is outside the architecture test scope | Mitigated by `requireApiSession()` and architecture test |
+| Login rate limiting is in-memory | Medium | Distributed deployments would not share brute-force counters across processes | Mitigated for single-process installs |
 | Default `AUTH_SESSION_SECRET` in examples | High | Users who do not change it risk forged session tokens | Open; documented in README |
 | Docker socket mounted | High | App compromise can become host compromise through Docker | Accepted deployment trade-off |
-| `typescript.ignoreBuildErrors: true` | Medium | Type errors ship into production builds | Open |
 | WebSocket terminal is full shell | High | Authenticated terminal access is host shell access, not command allowlist | Open documentation gap |
 | `passwordHash` returned from session lookup | Low | Hash circulates in memory unnecessarily | Open |
 | `services/dbus-helper/` plain JS | Medium | Lower type safety for privileged sidecar protocol | Open |
 
 ## Mitigation Priorities
 
-1. Add centralized middleware or route wrapper for `/api/v1/**`.
-2. Authenticate all SSE streams.
-3. Add login rate limiting and lockout/backoff.
-4. Fail builds on TypeScript errors.
-5. Separate terminal UX/docs for allowlisted command execution vs full PTY.
+1. Move from per-route helper auth to middleware or generated route wrappers if feasible.
+2. Consider persistent/distributed login rate limiting if Homeio ever runs multiple app processes.
+3. Separate terminal UX/docs for allowlisted command execution vs full PTY.
+4. Reduce Docker socket exposure where deployment topology allows it.

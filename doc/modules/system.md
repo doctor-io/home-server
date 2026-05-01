@@ -62,7 +62,7 @@ The system module exposes metrics, Docker info/stats, server info, updates, back
 
 ## Known Issues
 
-- `app/api/v1/system/stream/route.ts` is unauthenticated.
+- `app/api/v1/system/stream/route.ts` authenticates before opening the SSE stream.
 - Some metrics cache TTL constants are hardcoded in `lib/server/modules/system/service.ts`.
 - `modules/system/components/disk-manager.tsx` is over 500 lines.
 - Power and disk routes are high-risk because they perform destructive host actions.

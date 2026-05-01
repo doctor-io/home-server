@@ -63,6 +63,7 @@ export function FileManager() {
   const rootRef = useRef<HTMLDivElement>(null);
   const statusNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
+  const uploadAbortControllerRef = useRef<AbortController | null>(null);
   const [state, dispatch] = useReducer(fileManagerReducer, initialState);
   const currentUserQuery = useCurrentUser();
 
@@ -226,6 +227,7 @@ export function FileManager() {
     systemHostname: systemMetricsQuery.data?.hostname ?? "",
     systemNetworkAddress: systemMetricsQuery.data?.wifi?.ipv4 ?? "",
     toggleStarMutation,
+    uploadAbortControllerRef,
     uploadFilesMutation,
   });
 
@@ -350,6 +352,7 @@ export function FileManager() {
       removableItems={removableItems}
       onMountDrive={usbDrivesQuery.mount}
       onEjectDrive={usbDrivesQuery.eject}
+      onCancelUpload={() => uploadAbortControllerRef.current?.abort()}
       navigateTo={navigateTo}
       navigateToPath={navigateToPath}
       onEntryClick={handleEntryClick}

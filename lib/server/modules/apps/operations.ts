@@ -39,6 +39,7 @@ import {
 } from "@/lib/server/modules/apps/stacks-repository";
 import { resolveInstalledComposePath } from "@/lib/server/modules/apps/installed-compose-path";
 import { logServerAction } from "@/lib/server/logging/logger";
+import { serverEnv } from "@/lib/server/env";
 import type {
   InstalledStackConfig,
   StoreOperation,
@@ -77,6 +78,17 @@ const IS_TEST_ENV = process.env.NODE_ENV === "test" || process.env.VITEST === "t
  * Cleared on operation completion (success or error).
  */
 const activeOperationsByApp = new Set<string>();
+
+export class StoreOperationError extends Error {
+  constructor(
+    message: string,
+    public readonly code: "operation_conflict" | "operation_limit_reached",
+    public readonly statusCode: number,
+  ) {
+    super(message);
+    this.name = "StoreOperationError";
+  }
+}
 
 /** Exposed only for unit tests — clears the in-memory guard between test cases. */
 export function _resetActiveOperationsForTesting() {
@@ -1209,8 +1221,18 @@ async function executeStoreOperation(operationId: string, params: OperationParam
 
 export async function startStoreOperation(params: OperationParams) {
   if (activeOperationsByApp.has(params.appId)) {
-    throw new Error(
+    throw new StoreOperationError(
       `App ${params.appId} already has an active operation in progress. Wait for it to complete before starting another.`,
+      "operation_conflict",
+      409,
+    );
+  }
+
+  if (activeOperationsByApp.size >= serverEnv.STORE_MAX_CONCURRENT_OPERATIONS) {
+    throw new StoreOperationError(
+      "Too many app operations are already running. Wait for one to complete before starting another.",
+      "operation_limit_reached",
+      429,
     );
   }
 

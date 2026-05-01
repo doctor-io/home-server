@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/server/modules/files/service", () => ({
@@ -16,12 +16,27 @@ vi.mock("@/lib/server/modules/files/service", () => ({
 }));
 
 import { GET } from "@/app/api/v1/files/route";
+import { requireApiSession } from "@/lib/server/modules/auth/api";
 import {
   FileServiceError,
   listDirectory,
 } from "@/lib/server/modules/files/service";
 
 describe("GET /api/v1/files", () => {
+  it("returns 401 without a session", async () => {
+    vi.mocked(requireApiSession).mockResolvedValueOnce({
+      session: null,
+      response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    });
+
+    const response = await GET(
+      new NextRequest("http://localhost/api/v1/files?path=Documents"),
+    );
+
+    expect(response.status).toBe(401);
+    expect(listDirectory).not.toHaveBeenCalled();
+  });
+
   it("returns directory entries", async () => {
     vi.mocked(listDirectory).mockResolvedValueOnce({
       root: "/",

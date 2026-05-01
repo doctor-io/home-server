@@ -69,7 +69,7 @@ The file manager browses `FILES_ROOT`, reads and writes text files, uploads/down
 - `lib/server/modules/files/service.ts` is very large.
 - `modules/files/components/manager/file-manager-state.ts` has a large state shape.
 - The audit found `getCurrentEntries()` in `file-manager-derived.ts` using `unknown[]` parameters.
-- Many file routes are currently unauthenticated, so path jailing is the main safety control on those surfaces.
+- File routes are protected by `requireApiSession()`; path jailing remains the main filesystem safety control.
 
 ## How To Extend
 

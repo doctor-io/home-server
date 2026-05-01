@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { NextResponse } from "next/server";
 
 vi.mock("@/lib/server/env", () => ({
   serverEnv: {
@@ -64,8 +65,23 @@ vi.mock("@/lib/server/modules/system/service", () => ({
 }));
 
 import { GET } from "@/app/api/v1/system/stream/route";
+import { requireApiSession } from "@/lib/server/modules/auth/api";
 
 describe("GET /api/v1/system/stream", () => {
+  it("returns 401 without a session before opening the stream", async () => {
+    vi.mocked(requireApiSession).mockResolvedValueOnce({
+      session: null,
+      response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    });
+
+    const response = await GET(
+      new Request("http://localhost/api/v1/system/stream"),
+    );
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get("Content-Type")).not.toBe("text/event-stream");
+  });
+
   it("returns SSE stream and emits initial metrics frame", async () => {
     const controller = new AbortController();
     const request = new Request("http://localhost/api/v1/system/stream", {

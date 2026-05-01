@@ -51,7 +51,7 @@ None.
 
 - `services/dbus-helper/` is plain JavaScript, not TypeScript.
 - The helper is not started by `server.ts`; install scripts manage it for bare-metal setups.
-- Network routes are currently unauthenticated in code.
+- Network routes are protected by `requireApiSession()`.
 
 ## How To Extend
 

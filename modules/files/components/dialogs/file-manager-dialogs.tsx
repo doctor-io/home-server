@@ -196,6 +196,73 @@ export function EmptyTrashConfirmDialog({
   );
 }
 
+function getUploadPercent(progress: { loaded: number; total: number } | null) {
+  if (!progress || progress.total <= 0) return 0;
+  return Math.min(100, Math.max(0, Math.round((progress.loaded / progress.total) * 100)));
+}
+
+export function UploadProgressDialog({
+  progress,
+  onCancel,
+}: {
+  progress: { loaded: number; total: number } | null;
+  onCancel: () => void;
+}) {
+  const uploadPercent = getUploadPercent(progress);
+  const uploadedText = progress
+    ? `${formatBytesCompact(progress.loaded)} of ${formatBytesCompact(progress.total)}`
+    : "Preparing upload";
+
+  return (
+    <div className={overlay}>
+      <div
+        className={cn("w-full max-w-sm p-4", FILES_MENU_SHELL)}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Upload progress"
+      >
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="truncate text-sm font-semibold text-foreground">Uploading files</div>
+            <div className="mt-0.5 text-xs tabular-nums text-muted-foreground">{uploadedText}</div>
+          </div>
+          <button
+            onClick={onCancel}
+            aria-label="Cancel upload"
+            title="Cancel upload"
+            className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground"
+          >
+            <X className="size-3.5" />
+          </button>
+        </div>
+
+        <div
+          className="overflow-hidden rounded-full bg-white/10"
+          role="progressbar"
+          aria-label="Upload progress"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={uploadPercent}
+        >
+          <div
+            className="h-2 rounded-full bg-primary transition-all duration-150"
+            style={{ width: `${uploadPercent}%` }}
+          />
+        </div>
+        <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+          <span>Uploading</span>
+          <span className="tabular-nums">{uploadPercent}%</span>
+        </div>
+        <div className="mt-4 flex justify-end">
+          <button onClick={onCancel} className={cancelBtn}>
+            Cancel upload
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function FileInfoDialogOverlay({
   fileInfo,
   onClose,

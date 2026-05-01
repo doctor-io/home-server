@@ -1,9 +1,12 @@
 import { ejectUsbDrive } from "@/lib/server/modules/files/usb-storage";
 import { NextResponse } from "next/server";
+import { requireApiSession } from "@/lib/server/modules/auth/api";
 
 export const runtime = "nodejs";
 
-export async function POST(_req: Request, { params }: { params: Promise<{ driveId: string }> }) {
+export async function POST(request: Request, { params }: { params: Promise<{ driveId: string }> }) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   const { driveId } = await params;
   try {
     await ejectUsbDrive(driveId);

@@ -52,7 +52,7 @@ Docker itself is not persisted directly. Docker-backed app state is in:
 - `lib/server/modules/docker/compose-runner.ts` is over 1,400 lines.
 - Compose YAML manipulation is text-based and fragile.
 - Docker access depends on the host Docker socket, which is a high-privilege boundary.
-- Some Docker read routes are currently unauthenticated.
+- Docker read and mutation routes are protected by `requireApiSession()`.
 
 ## How To Extend
 

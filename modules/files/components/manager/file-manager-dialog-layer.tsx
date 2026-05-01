@@ -7,6 +7,7 @@ import {
   FileInfoDialogOverlay,
   PasteConflictDialog,
   RenameEntryDialog,
+  UploadProgressDialog,
 } from "@/modules/files/components/dialogs/file-manager-dialogs";
 import { NetworkStorageDialog } from "@/modules/files/components/dialogs/network-storage-dialog";
 import { GoogleDriveDialog } from "@/modules/files/components/dialogs/google-drive-dialog";
@@ -40,6 +41,8 @@ type FileManagerDialogLayerProps = {
   showGoogleDriveDialog: boolean;
   showUsbDialog: boolean;
   trashItemCount: number;
+  uploadPending: boolean;
+  uploadProgress: { loaded: number; total: number } | null;
   createPending: boolean;
   renamePending: boolean;
   onCloseContextMenu: () => void;
@@ -52,6 +55,7 @@ type FileManagerDialogLayerProps = {
   onChangeRenameDialog: (value: string) => void;
   onSubmitRenameDialog: () => void;
   onCancelEmptyTrash: () => void;
+  onCancelUpload: () => void;
   onConfirmEmptyTrash: () => void;
   onCloseFileInfoDialog: () => void;
   onConflictResolution: (choice: "replace" | "keep-both" | "skip" | "skip-all") => void;
@@ -84,6 +88,7 @@ export function FileManagerDialogLayer({
   fileInfoDialog,
   isTrashView,
   onCancelEmptyTrash,
+  onCancelUpload,
   onChangeCreateEntryDialog,
   onChangeRenameDialog,
   onCloseBackgroundContextMenu,
@@ -126,6 +131,8 @@ export function FileManagerDialogLayer({
   showGoogleDriveDialog,
   showUsbDialog,
   trashItemCount,
+  uploadPending,
+  uploadProgress,
 }: FileManagerDialogLayerProps) {
   return (
     <>
@@ -196,6 +203,10 @@ export function FileManagerDialogLayer({
 
       {fileInfoDialog ? (
         <FileInfoDialogOverlay fileInfo={fileInfoDialog} onClose={onCloseFileInfoDialog} />
+      ) : null}
+
+      {uploadPending || uploadProgress ? (
+        <UploadProgressDialog progress={uploadProgress} onCancel={onCancelUpload} />
       ) : null}
 
       {pasteConflict ? (

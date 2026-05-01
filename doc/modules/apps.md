@@ -67,7 +67,7 @@ This module displays installed Docker Compose apps, loads the App Store catalog,
 
 - `lib/server/modules/apps/operations.ts` is over 1,200 lines and runs operations in-process via `queueMicrotask()`.
 - There is no external operation queue or concurrency limit.
-- Some routes in this domain are currently unauthenticated.
+- Routes in this domain are protected by `requireApiSession()` except documented OAuth-style bootstrap routes outside this module.
 - Demo app data and CDN icon URLs are hardcoded in `lib/server/modules/apps/service.ts`.
 
 ## How To Extend

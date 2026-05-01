@@ -12,6 +12,7 @@ import {
   updateSystemSecuritySettings,
 } from "@/lib/server/modules/system/security-service";
 import type { SystemSecuritySettings } from "@/lib/shared/contracts/system";
+import { requireApiSession } from "@/lib/server/modules/auth/api";
 
 export const runtime = "nodejs";
 
@@ -52,6 +53,8 @@ function isValidationError(error: unknown) {
 }
 
 export async function GET(request: NextRequest) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   const requestId = createRequestId();
 
   try {
@@ -106,6 +109,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   const requestId = createRequestId();
 
   try {

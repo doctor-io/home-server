@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { listGoogleDriveConnections, GoogleDriveError } from "@/lib/server/modules/files/google-drive";
 import { createRequestId, logServerAction } from "@/lib/server/logging/logger";
+import { requireApiSession } from "@/lib/server/modules/auth/api";
 
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(request: Request) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   const requestId = createRequestId();
 
   try {

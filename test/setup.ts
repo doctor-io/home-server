@@ -2,6 +2,25 @@ import { afterEach, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
+vi.mock("@/lib/server/modules/auth/api", async () => {
+  const { NextResponse } = await import("next/server");
+
+  return {
+    requireApiSession: vi.fn(async () => ({
+      session: {
+        sessionId: "test-session",
+        userId: "test-user",
+        username: "admin",
+        passwordHash: "test-password-hash",
+        expiresAt: new Date(Date.now() + 3600_000),
+      },
+      response: null,
+    })),
+    unauthorizedApiResponse: () =>
+      NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+  };
+});
+
 // next-themes calls window.matchMedia on mount; JSDOM doesn't implement it.
 if (typeof window !== "undefined" && !window.matchMedia) {
   Object.defineProperty(window, "matchMedia", {

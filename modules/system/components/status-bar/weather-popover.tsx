@@ -96,6 +96,9 @@ export function WeatherPopover({ weather, onClose }: WeatherPopoverProps) {
 }
 
 function ForecastIcon({ weatherCode }: { weatherCode: number | null }) {
+  if (weatherCode === null) {
+    return <Cloud className="size-3.5 text-muted-foreground" />;
+  }
   if (weatherCode === 0) {
     return <Sun className="size-3.5 text-status-amber" />;
   }

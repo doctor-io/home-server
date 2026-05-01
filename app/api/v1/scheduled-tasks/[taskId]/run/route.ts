@@ -4,10 +4,13 @@ import type { NextRequest } from "next/server";
 import { getAuthCookieName } from "@/lib/server/modules/auth/cookies";
 import { authenticateSession } from "@/lib/server/modules/auth/service";
 import { createRequestId, logServerAction } from "@/lib/server/logging/logger";
+import { requireApiSession } from "@/lib/server/modules/auth/api";
 
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ taskId: string }> }) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   const requestId = createRequestId();
   const sessionToken = request.cookies.get(getAuthCookieName())?.value;
   const session = await authenticateSession(sessionToken);

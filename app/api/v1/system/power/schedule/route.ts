@@ -7,6 +7,7 @@ import {
 } from "@/lib/server/logging/logger";
 import { getAuthCookieName } from "@/lib/server/modules/auth/cookies";
 import { authenticateSession } from "@/lib/server/modules/auth/service";
+import { requireApiSession } from "@/lib/server/modules/auth/api";
 import {
   getScheduledRebootConfig,
   setScheduledRebootConfig,
@@ -56,6 +57,8 @@ async function authenticate(request: NextRequest, requestId: string, action: str
 }
 
 export async function GET(request: NextRequest) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   const requestId = createRequestId();
 
   try {
@@ -92,6 +95,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   const requestId = createRequestId();
 
   try {

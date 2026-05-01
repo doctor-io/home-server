@@ -139,7 +139,7 @@ Operations run in-process via `queueMicrotask()` in `lib/server/modules/apps/ope
 ## Current Architecture Risks
 
 - No central `middleware.ts`; API auth depends on each route calling `authenticateSession()`.
-- Several current `/api/v1/**` routes do not authenticate, including SSE streams.
+- `/api/v1/**` routes use `requireApiSession()` except documented OAuth bootstrap/callback routes.
 - `lib/server/modules/docker/compose-runner.ts` is large and manipulates YAML textually.
 - `lib/server/modules/apps/operations.ts` runs long operations in-process.
-- `next.config.mjs` has `typescript.ignoreBuildErrors: true`.
+- Production builds fail on TypeScript errors; do not reintroduce `typescript.ignoreBuildErrors`.

@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { requireApiSession } from "@/lib/server/modules/auth/api";
 import {
   createRequestId,
   withServerTiming,
@@ -21,6 +22,8 @@ export const runtime = "nodejs";
  * - docker: journalctl -u docker (last 500 lines)
  */
 export async function GET(request: NextRequest) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   const requestId = createRequestId();
 
   return withServerTiming(

@@ -228,4 +228,4 @@ The repo uses few barrel files. `modules/settings/components/panel/sections/inde
 - Do not add new unauthenticated `/api/v1/**` routes unless explicitly public.
 - Do not use `any`; ESLint only warns. Prefer `unknown` plus Zod parsing or shared contracts.
 - Do not duplicate env file parsing. The audit found parsing in `drizzle.config.ts`, `scripts/db-migrate.ts`, and `compose-runner.ts`.
-- Do not assume `npm run build` catches type errors; `next.config.mjs` has `typescript.ignoreBuildErrors: true`.
+- `npm run build` now fails on TypeScript errors; keep it that way.

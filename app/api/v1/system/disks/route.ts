@@ -4,10 +4,13 @@ import { createRequestId, logServerAction, withServerTiming } from "@/lib/server
 import { getAuthCookieName } from "@/lib/server/modules/auth/cookies";
 import { authenticateSession } from "@/lib/server/modules/auth/service";
 import { listDisks } from "@/lib/server/modules/system/disk-service";
+import { requireApiSession } from "@/lib/server/modules/auth/api";
 
 export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   const requestId = createRequestId();
   const sessionToken = request.cookies.get(getAuthCookieName())?.value;
 

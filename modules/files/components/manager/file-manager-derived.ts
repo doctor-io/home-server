@@ -6,7 +6,7 @@ import {
   StarFilled,
   UsbRegular,
 } from "@fluentui/react-icons";
-import type { FileReadResponse } from "@/lib/shared/contracts/files";
+import type { FileListEntry, FileReadResponse } from "@/lib/shared/contracts/files";
 import type { FileManagerSidebarSection, RemovableSidebarItem } from "@/modules/files/components/chrome/file-manager-sidebar";
 import type { UsbDrive } from "@/lib/shared/contracts/usb";
 import {
@@ -122,11 +122,11 @@ export function getCurrentEntries({
   isStarredView,
   starredEntries,
 }: {
-  directoryEntries: unknown[] | undefined;
-  globalEntries: unknown[] | undefined;
+  directoryEntries: FileListEntry[] | undefined;
+  globalEntries: FileListEntry[] | undefined;
   isGlobalSearchActive: boolean;
   isStarredView: boolean;
-  starredEntries: unknown[] | undefined;
+  starredEntries: FileListEntry[] | undefined;
 }) {
   if (isGlobalSearchActive) {
     return (globalEntries ?? []).map(toUiFileEntry);
