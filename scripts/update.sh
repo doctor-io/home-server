@@ -12,11 +12,13 @@ INSTALL_DIR="${HOMEIO_INSTALL_DIR:-/opt/home-server}"
 ENV_FILE="${HOMEIO_ENV_FILE:-${INSTALL_DIR}/.env}"
 SERVICE_NAME="${HOMEIO_SERVICE_NAME:-home-server}"
 DBUS_SERVICE_NAME="${HOMEIO_DBUS_SERVICE_NAME:-home-server-dbus}"
+UPLOAD_SERVICE_NAME="${HOMEIO_UPLOAD_SERVICE_NAME:-home-server-upload}"
 APP_PORT="${HOMEIO_APP_PORT:-${HOMEIO_PORT:-12026}}"
 PUBLIC_PORT="${HOMEIO_PUBLIC_PORT:-80}"
 NGINX_SITE_NAME="${HOMEIO_NGINX_SITE_NAME:-home-server}"
 REPO_URL="${HOMEIO_REPO_URL:-https://github.com/doctor-io/homeio.git}"
 REPO_BRANCH="${HOMEIO_REPO_BRANCH:-main}"
+GO_VERSION="${GO_VERSION:-1.23.4}"
 
 # SHA-256 of drizzle/0000_slippery_black_queen.sql — used to seed the migration journal
 # for legacy installs that were bootstrapped with drizzle push (no __drizzle_migrations table).
@@ -39,6 +41,11 @@ fi
 DBUS_SERVICE_UNIT="${DBUS_SERVICE_NAME}"
 if [[ "${DBUS_SERVICE_UNIT}" != *.service ]]; then
 	DBUS_SERVICE_UNIT="${DBUS_SERVICE_UNIT}.service"
+fi
+
+UPLOAD_SERVICE_UNIT="${UPLOAD_SERVICE_NAME}"
+if [[ "${UPLOAD_SERVICE_UNIT}" != *.service ]]; then
+	UPLOAD_SERVICE_UNIT="${UPLOAD_SERVICE_UNIT}.service"
 fi
 
 BACKUP_DIR=""
@@ -201,6 +208,116 @@ run_database_migrations() {
 		|| { print_error "Database schema sync failed. Rolling back."; exit 1; }
 
 	print_status "Database schema synced successfully."
+}
+
+install_go() {
+	local arch go_arch
+	case "$(uname -m)" in
+		x86_64)  arch="amd64" ;;
+		aarch64) arch="arm64" ;;
+		*) print_error "Unsupported architecture: $(uname -m)"; exit 1 ;;
+	esac
+	go_arch="${arch}"
+
+	if command -v go >/dev/null 2>&1; then
+		local current
+		current="$(go version 2>/dev/null | awk '{print $3}' | sed 's/^go//')"
+		if [[ "${current}" == "${GO_VERSION}" ]]; then
+			print_status "Go ${GO_VERSION} already installed."
+			export PATH="/usr/local/go/bin:${PATH}"
+			return
+		fi
+		print_status "Existing Go ${current} detected; installing Go ${GO_VERSION}."
+	fi
+
+	print_status "Installing Go ${GO_VERSION}..."
+	local tarball="go${GO_VERSION}.linux-${go_arch}.tar.gz"
+	curl -fsSL "https://go.dev/dl/${tarball}" -o "/tmp/${tarball}"
+	rm -rf /usr/local/go
+	tar -C /usr/local -xzf "/tmp/${tarball}"
+	rm -f "/tmp/${tarball}"
+
+	if [[ ! -f /etc/profile.d/go.sh ]]; then
+		echo 'export PATH="/usr/local/go/bin:$PATH"' > /etc/profile.d/go.sh
+	fi
+	export PATH="/usr/local/go/bin:${PATH}"
+	print_status "Go ${GO_VERSION} installed."
+}
+
+build_upload_server() {
+	print_status "Building upload server (Go)..."
+	export PATH="/usr/local/go/bin:${PATH}"
+
+	local src="${INSTALL_DIR}/services/upload-server"
+	[[ -d "${src}" ]] || { print_warn "Upload server source not found at ${src}; skipping."; return; }
+
+	mkdir -p "${INSTALL_DIR}/bin"
+
+	local build_log
+	build_log="$(mktemp)"
+	if ! (cd "${src}" && go build -o "${INSTALL_DIR}/bin/upload-server" .) >"${build_log}" 2>&1; then
+		print_error "Failed to build upload server."
+		print_error "Last output:"
+		tail -10 "${build_log}" >&2
+		rm -f "${build_log}"
+		exit 1
+	fi
+	rm -f "${build_log}"
+	print_status "Upload server built: ${INSTALL_DIR}/bin/upload-server"
+}
+
+stop_upload_server() {
+	if systemctl cat "${UPLOAD_SERVICE_UNIT}" >/dev/null 2>&1; then
+		print_status "Stopping ${UPLOAD_SERVICE_NAME} service..."
+		systemctl stop "${UPLOAD_SERVICE_UNIT}" >/dev/null 2>&1 || true
+	fi
+}
+
+restart_upload_server_service() {
+	local unit_file="/etc/systemd/system/${UPLOAD_SERVICE_UNIT}"
+
+	if [[ ! -f "${unit_file}" ]]; then
+		print_status "Installing ${UPLOAD_SERVICE_NAME} service for the first time..."
+		cat >"${unit_file}" <<EOF
+[Unit]
+Description=${APP_NAME} Upload Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+EnvironmentFile=${ENV_FILE}
+Environment=UPLOAD_SERVER_ADDR=127.0.0.1:3001
+ExecStart=${INSTALL_DIR}/bin/upload-server
+Restart=always
+RestartSec=5
+KillMode=process
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=${UPLOAD_SERVICE_NAME}
+
+[Install]
+WantedBy=multi-user.target
+EOF
+		systemctl daemon-reload
+		systemctl enable "${UPLOAD_SERVICE_UNIT}"
+	fi
+
+	if [[ ! -f "${INSTALL_DIR}/bin/upload-server" ]]; then
+		print_warn "Upload server binary not found; skipping service restart."
+		return
+	fi
+
+	print_status "Restarting ${UPLOAD_SERVICE_NAME} service..."
+	systemctl daemon-reload
+	systemctl restart "${UPLOAD_SERVICE_UNIT}"
+
+	sleep 1
+	if systemctl is-active --quiet "${UPLOAD_SERVICE_UNIT}"; then
+		print_status "Upload server service restarted successfully."
+	else
+		print_warn "Upload server service failed to start. Check: journalctl -u ${UPLOAD_SERVICE_NAME} -n 20"
+	fi
 }
 
 build_app() {
@@ -443,6 +560,19 @@ server {
         add_header Cache-Control "no-store, no-cache, must-revalidate" always;
     }
 
+    # Route file uploads directly to the Go upload server, bypassing Next.js.
+    location = /api/v1/files/upload {
+        proxy_pass http://127.0.0.1:3001/upload;
+        proxy_http_version 1.1;
+        proxy_request_buffering off;
+        proxy_buffering off;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    }
+
     location / {
         proxy_pass http://homeio_backend;
         proxy_http_version 1.1;
@@ -487,6 +617,7 @@ rollback_release() {
 	ROLLBACK_DONE="true"
 
 	print_error "Update failed! Attempting rollback..."
+	stop_upload_server
 	stop_service
 
 	if [[ -n "${BACKUP_DIR}" && -d "${BACKUP_DIR}" ]]; then
@@ -502,7 +633,9 @@ rollback_release() {
 	print_status "Rebuilding application after rollback..."
 	cd "${INSTALL_DIR}" && npm ci --no-audit --no-fund
 	cd "${INSTALL_DIR}" && npm run build
+	build_upload_server || true
 	start_service
+	restart_upload_server_service || true
 
 	if healthcheck; then
 		print_status "Rollback succeeded."
@@ -581,6 +714,7 @@ main() {
 	trap 'on_error ${LINENO} $?' ERR
 
 	ensure_service_shutdown_behavior
+	stop_upload_server
 	stop_service
 
 	if [[ -n "${HOMEIO_RELEASE_TAG}" ]]; then
@@ -603,12 +737,15 @@ main() {
 	fi
 
 	ensure_security_dependencies
+	install_go
 	install_dependencies_if_needed
 	run_database_migrations
 	build_app
+	build_upload_server
 	start_service
 	configure_reverse_proxy
 	restart_dbus_helper_service
+	restart_upload_server_service
 
 	print_status "Running health check..."
 	if ! healthcheck; then

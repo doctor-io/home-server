@@ -25,6 +25,7 @@ export const mockUseDeleteLocalFolderShare = vi.fn();
 export const mockUseSystemMetrics = vi.fn();
 export const mockUseCurrentUser = vi.fn();
 export const mockUseUsbDrives = vi.fn();
+export const mockUseGoogleDriveConnections = vi.fn();
 
 vi.mock("@/modules/files/hooks/useFiles", () => ({
   buildAssetUrl: (filePath: string) => `/api/v1/files/asset?path=${encodeURIComponent(filePath)}`,
@@ -62,6 +63,10 @@ vi.mock("@/modules/system/hooks/useSystemMetrics", () => ({
 
 vi.mock("@/modules/files/hooks/useUsbDrives", () => ({
   useUsbDrives: (...args: unknown[]) => mockUseUsbDrives(...args),
+}));
+
+vi.mock("@/modules/files/hooks/useGoogleDrive", () => ({
+  useGoogleDriveConnections: (...args: unknown[]) => mockUseGoogleDriveConnections(...args),
 }));
 
 vi.mock("@/hooks/useCurrentUser", () => ({
@@ -135,6 +140,7 @@ export function resetFileManagerMocks() {
   mockUseSystemMetrics.mockReset();
   mockUseCurrentUser.mockReset();
   mockUseUsbDrives.mockReset();
+  mockUseGoogleDriveConnections.mockReset();
 
   mockUseFilesDirectory.mockReturnValue(mockDirectory([]));
   mockUseFilesRoot.mockReturnValue({
@@ -202,6 +208,7 @@ export function resetFileManagerMocks() {
     isUnmounting: false,
     isEjecting: false,
   });
+  mockUseGoogleDriveConnections.mockReturnValue({ data: [], isLoading: false, isError: false, error: null });
   mockUseLocalFolderShares.mockReturnValue({ data: [], isLoading: false, isError: false, error: null });
   mockUseCreateLocalFolderShare.mockReturnValue({
     mutateAsync: vi.fn().mockResolvedValue({
