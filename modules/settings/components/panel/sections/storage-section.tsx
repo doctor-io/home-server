@@ -67,7 +67,12 @@ export function StorageSection({ data, onOpenDiskManager }: StorageSectionProps)
             <HardDriveRegular className="size-4 text-amber-400" />
           </div>
           <div className="flex-1">
-            <p className="text-sm font-medium text-foreground">Disk & Partition Manager</p>
+            <p className="flex items-center gap-2 text-sm font-medium text-foreground">
+              Disk & Partition Manager
+              <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-400">
+                Experimental
+              </span>
+            </p>
             <p className="text-[11px] text-muted-foreground/70">
               Format, mount, and manage partitions
             </p>
