@@ -25,11 +25,14 @@ export type FileManagerSidebarSection = {
   items: FileManagerSidebarItem[];
 };
 
+export type CloudSidebarItem = FileManagerSidebarItem & { accountEmail: string };
+
 type SidebarProps = {
   currentPath: string[];
   isSharedView: boolean;
   isTrashView: boolean;
   locationItems: FileManagerSidebarItem[];
+  cloudItems: CloudSidebarItem[];
   removableItems: RemovableSidebarItem[];
   sidebarSections: FileManagerSidebarSection[];
   storageUsagePercent: number;
@@ -51,6 +54,7 @@ export function FileManagerSidebar({
   isSharedView,
   isTrashView,
   locationItems,
+  cloudItems,
   removableItems,
   sidebarSections,
   storageUsagePercent,
@@ -82,7 +86,10 @@ export function FileManagerSidebar({
     <aside className={cn("m-2 flex w-48 shrink-0 flex-col", FILES_PANEL_SHELL)}>
       <div className="flex-1 overflow-y-auto px-2 py-3">
         {sidebarSections.map((section) => {
-          const items = section.title === "Locations" ? locationItems : section.items;
+          const isCloud = section.title === "Cloud";
+          const items =
+            section.title === "Locations" ? locationItems : isCloud ? cloudItems : section.items;
+          if (isCloud && cloudItems.length === 0) return null;
           return (
             <div key={section.title} className="mb-3">
               <div className="mb-1 flex items-center justify-between px-3">

@@ -1,10 +1,11 @@
 "use client";
 
-import { FileManagerSidebar, FileManagerStatusBar, FileManagerToolbar, type FileManagerSidebarItem, type FileManagerSidebarSection, type RemovableSidebarItem } from "@/modules/files/components/file-manager-chrome";
+import { FileManagerSidebar, FileManagerStatusBar, FileManagerToolbar, type FileManagerSidebarItem, type FileManagerSidebarSection, type RemovableSidebarItem, type CloudSidebarItem } from "@/modules/files/components/file-manager-chrome";
 import { FileManagerFileArea } from "@/modules/files/components/content/file-manager-content";
 import { FILES_PANEL_SHELL } from "@/modules/files/components/file-manager-surface";
 import { FileManagerDialogLayer } from "@/modules/files/components/manager/file-manager-dialog-layer";
 import { validateEntryName } from "@/modules/files/components/manager/file-manager-derived";
+import { GoogleDrivePanel } from "@/modules/files/components/panels/google-drive-panel";
 import { buildAssetUrl, toFilePath } from "@/modules/files/hooks/useFiles";
 import type { MouseEvent, RefObject, SetStateAction } from "react";
 import type { FileEntry } from "@/modules/files/components/file-manager-presenters";
@@ -67,6 +68,8 @@ type FileManagerViewProps = {
   isStarredView: boolean;
   isTrashView: boolean;
   locationItems: FileManagerSidebarItem[];
+  cloudItems: CloudSidebarItem[];
+  activeDriveConnection: { id: string; email: string } | null;
   removableItems: RemovableSidebarItem[];
   onMountDrive: (driveId: string) => void;
   onEjectDrive: (driveId: string) => void;
@@ -148,6 +151,8 @@ export function FileManagerView({
   isStarredView,
   isTrashView,
   locationItems,
+  cloudItems,
+  activeDriveConnection,
   removableItems,
   onMountDrive,
   onEjectDrive,
@@ -205,6 +210,7 @@ export function FileManagerView({
         isSharedView={isSharedView}
         isTrashView={isTrashView}
         locationItems={locationItems}
+        cloudItems={cloudItems}
         removableItems={removableItems}
         sidebarSections={sidebarSections}
         storageUsagePercent={storageUsagePercent}
@@ -216,6 +222,14 @@ export function FileManagerView({
         onMountDrive={onMountDrive}
         onEjectDrive={onEjectDrive}
       />
+      {activeDriveConnection ? (
+        <div className={`m-2 min-w-0 flex-1 overflow-hidden ${FILES_PANEL_SHELL}`}>
+          <GoogleDrivePanel
+            connectionId={activeDriveConnection.id}
+            accountEmail={activeDriveConnection.email}
+          />
+        </div>
+      ) : (
       <div className={`m-2 flex min-w-0 flex-1 flex-col ${FILES_PANEL_SHELL}`}>
         <FileManagerToolbar
           canNavigateUp={currentPath.length > 0}
@@ -330,6 +344,7 @@ export function FileManagerView({
           }}
         />
       </div>
+      )}
       <FileManagerDialogLayer
         clipboardState={clipboardState}
         contextShare={contextShare}

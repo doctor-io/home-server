@@ -6,9 +6,11 @@ import {
   StarFilled,
   UsbRegular,
 } from "@fluentui/react-icons";
+import { Cloud } from "@/components/icons/platform-icons";
 import type { FileListEntry, FileReadResponse } from "@/lib/shared/contracts/files";
 import type { FileManagerSidebarSection, RemovableSidebarItem } from "@/modules/files/components/chrome/file-manager-sidebar";
 import type { UsbDrive } from "@/lib/shared/contracts/usb";
+import type { GoogleDriveConnection } from "@/modules/files/hooks/useGoogleDrive";
 import {
   normalizePathForDisplay,
   toUiFileEntry,
@@ -21,6 +23,8 @@ const BYTES_PER_GB = 1024 ** 3;
 const BYTES_PER_MB = 1024 ** 2;
 
 export const STARRED_VIRTUAL_PATH = ["⭐Starred"] as const;
+
+export const DRIVE_PATH_PREFIX = "Drive" as const;
 
 export const sidebarSections: FileManagerSidebarSection[] = [
   {
@@ -60,6 +64,10 @@ export const sidebarSections: FileManagerSidebarSection[] = [
   },
   {
     title: "Locations",
+    items: [],
+  },
+  {
+    title: "Cloud",
     items: [],
   },
 ];
@@ -178,7 +186,19 @@ export function getViewFlags(currentPath: string[]) {
     isSharedView: currentPath[0] === "Shared",
     isStarredView: currentPath.length === 1 && currentPath[0] === STARRED_VIRTUAL_PATH[0],
     isTrashView: currentPath[0] === "Trash",
+    isDriveView: currentPath[0] === DRIVE_PATH_PREFIX && Boolean(currentPath[1]),
   };
+}
+
+export function getDriveItems(
+  connections: GoogleDriveConnection[] | undefined,
+): Array<{ id: string; name: string; email: string; path: string[] }> {
+  return (connections ?? []).map((conn) => ({
+    id: conn.id,
+    name: conn.displayName ?? conn.email,
+    email: conn.email,
+    path: [DRIVE_PATH_PREFIX, conn.id],
+  }));
 }
 
 export function getLocationItems(

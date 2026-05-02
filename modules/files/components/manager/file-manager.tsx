@@ -30,6 +30,8 @@ import {
 } from "@/modules/files/hooks/useLocalFolderShares";
 import { useNetworkShares } from "@/modules/files/hooks/useNetworkShares";
 import { useUsbDrives } from "@/modules/files/hooks/useUsbDrives";
+import { useGoogleDriveConnections } from "@/modules/files/hooks/useGoogleDrive";
+import { Cloud } from "@/components/icons/platform-icons";
 import {
   useDeleteFromTrash,
   useEmptyTrash,
@@ -43,6 +45,7 @@ import {
   getClipboardDisplayName,
   getCurrentEntries,
   getCurrentPathForDisplay,
+  getDriveItems,
   getLocalSharesByPath,
   getLocationItems,
   getOpenFileDetails,
@@ -77,6 +80,7 @@ export function FileManager() {
   const networkSharesQuery = useNetworkShares();
   const localSharesQuery = useLocalFolderShares();
   const usbDrivesQuery = useUsbDrives();
+  const googleDriveConnectionsQuery = useGoogleDriveConnections();
   const createFolderMutation = useCreateFolder();
   const createFileMutation = useCreateFile();
   const pasteFileEntryMutation = usePasteFileEntry();
@@ -173,6 +177,23 @@ export function FileManager() {
     () => (isDemoMode ? [] : getRemovableItems(usbDrivesQuery.drives)),
     [isDemoMode, usbDrivesQuery.drives],
   );
+  const driveItems = useMemo(
+    () =>
+      isDemoMode
+        ? []
+        : getDriveItems(googleDriveConnectionsQuery.data).map((item) => ({
+            ...item,
+            icon: <Cloud className="size-4 text-sky-400" />,
+            accountEmail: item.email,
+          })),
+    [isDemoMode, googleDriveConnectionsQuery.data],
+  );
+  const activeDriveConnection = useMemo(() => {
+    if (!viewFlags.isDriveView) return null;
+    const connectionId = state.currentPath[1];
+    const conn = googleDriveConnectionsQuery.data?.find((c) => c.id === connectionId);
+    return conn ? { id: conn.id, email: conn.email } : null;
+  }, [viewFlags.isDriveView, state.currentPath, googleDriveConnectionsQuery.data]);
   const counts = useMemo(() => getBrowserCounts(sortedEntries), [sortedEntries]);
   const clipboardDisplayName = getClipboardDisplayName(state.clipboardState);
   const contextShare =
@@ -349,6 +370,8 @@ export function FileManager() {
       isStarredView={viewFlags.isStarredView}
       isTrashView={viewFlags.isTrashView}
       locationItems={locationItems}
+      cloudItems={driveItems}
+      activeDriveConnection={activeDriveConnection}
       removableItems={removableItems}
       onMountDrive={usbDrivesQuery.mount}
       onEjectDrive={usbDrivesQuery.eject}
