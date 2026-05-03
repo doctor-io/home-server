@@ -6,6 +6,7 @@ import { SectionDivider, InfoBanner } from "@/modules/settings/components/panel/
 import { SETTINGS_PANEL_INSET } from "@/modules/settings/components/panel/surface";
 import { queryKeys } from "@/lib/shared/query-keys";
 import type { GoogleOAuthConfigPublic } from "@/lib/shared/contracts/google-drive";
+import type { TailscaleConfigPublic } from "@/lib/shared/contracts/tailscale";
 import { cn } from "@/lib/utils";
 import { Check, Eye, EyeOff, ExternalLink } from "@/components/icons/platform-icons";
 
@@ -29,6 +30,29 @@ async function saveGoogleOAuthConfig(payload: { clientId: string; clientSecret: 
 
 async function clearGoogleOAuthConfig(): Promise<void> {
   const res = await fetch("/api/v1/settings/google-oauth", { method: "DELETE" });
+  if (!res.ok) throw new Error("Failed to clear");
+}
+
+async function fetchTailscaleConfig(): Promise<TailscaleConfigPublic> {
+  const res = await fetch("/api/v1/settings/tailscale", { cache: "no-store" });
+  const json = (await res.json()) as { data?: TailscaleConfigPublic; error?: string };
+  if (!res.ok) throw new Error(json.error ?? "Failed to fetch");
+  return json.data!;
+}
+
+async function saveTailscaleConfig(payload: { tailnet: string; apiKey: string }): Promise<TailscaleConfigPublic> {
+  const res = await fetch("/api/v1/settings/tailscale", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const json = (await res.json()) as { data?: TailscaleConfigPublic; error?: string };
+  if (!res.ok) throw new Error(json.error ?? "Failed to save");
+  return json.data!;
+}
+
+async function clearTailscaleConfig(): Promise<void> {
+  const res = await fetch("/api/v1/settings/tailscale", { method: "DELETE" });
   if (!res.ok) throw new Error("Failed to clear");
 }
 
@@ -213,11 +237,145 @@ function GoogleDriveConfig() {
   );
 }
 
+function TailscaleConfig() {
+  const queryClient = useQueryClient();
+  const { data: saved, isLoading } = useQuery({
+    queryKey: queryKeys.tailscaleConfig,
+    queryFn: fetchTailscaleConfig,
+  });
+
+  const [tailnet, setTailnet] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [savedOk, setSavedOk] = useState(false);
+
+  const saveMutation = useMutation({
+    mutationFn: saveTailscaleConfig,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tailscaleConfig });
+      setTailnet("");
+      setApiKey("");
+      setSavedOk(true);
+      setTimeout(() => setSavedOk(false), 3000);
+    },
+  });
+
+  const clearMutation = useMutation({
+    mutationFn: clearTailscaleConfig,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tailscaleConfig });
+    },
+  });
+
+  const isConfigured = Boolean(saved?.tailnet && saved?.hasApiKey);
+  const isBusy = saveMutation.isPending || clearMutation.isPending || isLoading;
+  const effectiveTailnet = tailnet.trim() || saved?.tailnet || "";
+  const canSave = effectiveTailnet.length > 0 && apiKey.trim().length > 0;
+
+  function handleSave() {
+    if (!canSave) return;
+    saveMutation.mutate({
+      tailnet: effectiveTailnet,
+      apiKey: apiKey.trim(),
+    });
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      {isConfigured && !saveMutation.error && (
+        <InfoBanner
+          text={savedOk ? "Tailscale credentials saved successfully." : `Tailscale configured · Tailnet: ${saved?.tailnet}`}
+          variant="info"
+        />
+      )}
+      {saveMutation.error && (
+        <InfoBanner text={(saveMutation.error as Error).message} variant="warning" />
+      )}
+      {clearMutation.error && (
+        <InfoBanner text={(clearMutation.error as Error).message} variant="warning" />
+      )}
+
+      <div className={cn(SETTINGS_PANEL_INSET, "flex items-center justify-between px-4 py-2.5")}>
+        <div className="text-[11px] text-muted-foreground/70">
+          Store a Tailscale API access token for tailnet automation and private-network integrations.
+        </div>
+        <a
+          href="https://login.tailscale.com/admin/settings/keys"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="ml-4 flex shrink-0 items-center gap-1 text-[11px] text-primary hover:underline"
+        >
+          Tailscale keys
+          <ExternalLink className="size-3" />
+        </a>
+      </div>
+
+      <InputRow
+        label="Tailnet"
+        description="Use the tailnet name from the Tailscale admin console"
+      >
+        <input
+          value={tailnet}
+          onChange={(e) => setTailnet(e.target.value)}
+          placeholder={saved?.tailnet || "example.com"}
+          disabled={isBusy}
+          className={inputCls}
+        />
+      </InputRow>
+
+      <InputRow label="API access token" description="Kept encrypted in the database">
+        <div className="relative">
+          <input
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            type={showApiKey ? "text" : "password"}
+            placeholder={saved?.hasApiKey ? "••••••••••••••••" : "tskey-api-..."}
+            disabled={isBusy}
+            className={cn(inputCls, "pr-9")}
+          />
+          <button
+            type="button"
+            onClick={() => setShowApiKey((v) => !v)}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground"
+            tabIndex={-1}
+          >
+            {showApiKey ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+          </button>
+        </div>
+      </InputRow>
+
+      <div className={cn(SETTINGS_PANEL_INSET, "flex items-center justify-between px-4 py-2.5")}>
+        {isConfigured ? (
+          <button
+            onClick={() => clearMutation.mutate()}
+            disabled={isBusy}
+            className="text-[11px] text-status-red hover:underline disabled:opacity-50"
+          >
+            {clearMutation.isPending ? "Removing…" : "Remove credentials"}
+          </button>
+        ) : (
+          <span />
+        )}
+        <button
+          onClick={handleSave}
+          disabled={!canSave || isBusy}
+          className="flex h-7 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {savedOk && <Check className="size-3" />}
+          {saveMutation.isPending ? "Saving…" : savedOk ? "Saved" : "Save credentials"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function IntegrationsSection() {
   return (
     <div className="flex flex-col gap-1">
       <SectionDivider title="Google Drive" />
       <GoogleDriveConfig />
+      <SectionDivider title="Tailscale" />
+      <TailscaleConfig />
     </div>
   );
 }

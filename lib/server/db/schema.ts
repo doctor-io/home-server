@@ -205,6 +205,10 @@ export const settings = pgTable("settings", {
   googleClientSecretIv: text("google_client_secret_iv"),
   googleClientSecretTag: text("google_client_secret_tag"),
   googleRedirectUri: text("google_redirect_uri"),
+  tailscaleTailnet: text("tailscale_tailnet"),
+  tailscaleApiKeyCiphertext: text("tailscale_api_key_ciphertext"),
+  tailscaleApiKeyIv: text("tailscale_api_key_iv"),
+  tailscaleApiKeyTag: text("tailscale_api_key_tag"),
 });
 
 export const filesGoogleDriveTokens = pgTable(
