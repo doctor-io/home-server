@@ -167,6 +167,7 @@ export const StarFilled = Star;
 export const Sun = createKoraIcon(`${STATUS}/weather-clear.svg`);
 export const TerminalSquare = createKoraIcon(`${APPS}/org.gnome.Terminal.svg`);
 export const Thermometer = createKoraIcon(`${STATUS}/weather-clear-wind.svg`);
+export const Tailscale = createKoraIcon(`${DEVICES}/network-vpn.svg`);
 export const ToggleLeft = createKoraIcon(`${ACTION}/checkbox.svg`);
 export const ToggleRight = createKoraIcon(`${ACTION}/checked-completed.svg`);
 export const Trash2 = createKoraIcon(`${ACTION}/edit-delete.svg`);

@@ -7,3 +7,14 @@ export type TailscaleConfigSaveRequest = {
   tailnet: string;
   apiKey: string;
 };
+
+export type TailscaleStatusPublic = {
+  installed: boolean;
+  running: boolean;
+  connected: boolean;
+  backendState: string | null;
+  hostname: string | null;
+  dnsName: string | null;
+  tailscaleIps: string[];
+  error: string | null;
+};

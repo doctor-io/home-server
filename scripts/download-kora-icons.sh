@@ -212,6 +212,7 @@ devices/scalable/drive-removable-media-usb.svg
 devices/scalable/input-gaming.svg
 devices/scalable/memory.svg
 devices/scalable/network-server.svg
+devices/scalable/network-vpn.svg
 devices/scalable/network-wired.svg
 devices/scalable/network-wireless.svg
 devices/scalable/server-database.svg

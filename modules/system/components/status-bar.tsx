@@ -1,6 +1,6 @@
 "use client";
 
-import { BatteryFull, Bell, CloudSun } from "@/components/icons/platform-icons";
+import { BatteryFull, Bell, CloudSun, Tailscale } from "@/components/icons/platform-icons";
 import { BatteryPopover } from "@/modules/system/components/status-bar/battery-popover";
 import { DatePickerPopover } from "@/modules/system/components/status-bar/date-picker-popover";
 import { NotificationPopover } from "@/modules/system/components/status-bar/notification-popover";
@@ -15,6 +15,7 @@ import {
   formatTime,
 } from "@/modules/system/components/status-bar/utils";
 import { WeatherPopover } from "@/modules/system/components/status-bar/weather-popover";
+import { TailscalePopover } from "@/modules/system/components/status-bar/tailscale-popover";
 import {
   EthernetIcon,
   WifiStatusIcon,
@@ -180,6 +181,19 @@ export function StatusBar({
                 battery={metrics?.battery}
                 onClose={closePopovers}
               />
+            )}
+          </div>
+
+          <div className="relative">
+            <button
+              onClick={() => togglePopover("tailscale")}
+              className="p-1.5 rounded-lg hover:bg-white/[0.07] transition-colors cursor-pointer"
+              aria-label="Tailscale status"
+            >
+              <Tailscale className="size-4 text-primary" />
+            </button>
+            {activePopover === "tailscale" && (
+              <TailscalePopover onClose={closePopovers} />
             )}
           </div>
 

@@ -19,7 +19,7 @@ export type StatusBarProps = {
   onOpenNotifications?: () => void;
 };
 
-export type StatusPopover = "weather" | "wifi" | "battery" | "notifications" | "date";
+export type StatusPopover = "weather" | "wifi" | "battery" | "tailscale" | "notifications" | "date";
 
 export type WifiPopoverProps = {
   metrics: SystemMetricsSnapshot | undefined;
