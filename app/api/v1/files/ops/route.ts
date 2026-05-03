@@ -15,6 +15,7 @@ import {
   pasteEntry,
   renameEntry,
   toggleStarEntry,
+  unzipEntry,
 } from "@/lib/server/modules/files/service";
 
 export const runtime = "nodejs";
@@ -48,6 +49,10 @@ const opsSchema = z.discriminatedUnion("action", [
   }),
   z.object({
     action: z.literal("toggle_star"),
+    path: z.string().trim().min(1),
+  }),
+  z.object({
+    action: z.literal("unzip"),
     path: z.string().trim().min(1),
   }),
 ]);
@@ -143,6 +148,21 @@ export async function POST(request: Request) {
 
         if (parsed.data.action === "toggle_star") {
           const data = await toggleStarEntry({
+            path: parsed.data.path,
+            includeHidden,
+          });
+          return NextResponse.json(
+            { data },
+            {
+              headers: {
+                "Cache-Control": "no-store",
+              },
+            },
+          );
+        }
+
+        if (parsed.data.action === "unzip") {
+          const data = await unzipEntry({
             path: parsed.data.path,
             includeHidden,
           });

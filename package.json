@@ -1,6 +1,6 @@
 {
   "name": "homeio",
-  "version": "1.6.13",
+  "version": "1.6.14",
   "description": "Self-hosted home server dashboard — desktop-style UI for managing Docker apps, files, terminal, and system resources.",
   "author": "doctor-io",
   "license": "MIT",
@@ -81,6 +81,7 @@
     "embla-carousel-react": "8.6.0",
     "input-otp": "1.4.2",
     "js-yaml": "^4.1.1",
+    "lucide-react": "^1.14.0",
     "next": "^16.2.1",
     "next-themes": "^0.4.6",
     "openmeteo": "^1.2.3",

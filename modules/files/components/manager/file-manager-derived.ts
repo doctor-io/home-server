@@ -1,12 +1,5 @@
 import { createElement } from "react";
-import {
-  FolderRegular,
-  HardDriveRegular,
-  HomeRegular,
-  StarFilled,
-  UsbRegular,
-} from "@fluentui/react-icons";
-import { Cloud } from "@/components/icons/platform-icons";
+import { Cloud, Folder, HardDrive, Home, StarFilled, Usb } from "@/components/icons/platform-icons";
 import type { FileListEntry, FileReadResponse } from "@/lib/shared/contracts/files";
 import type { FileManagerSidebarSection, RemovableSidebarItem } from "@/modules/files/components/chrome/file-manager-sidebar";
 import type { UsbDrive } from "@/lib/shared/contracts/usb";
@@ -32,7 +25,7 @@ export const sidebarSections: FileManagerSidebarSection[] = [
     items: [
       {
         name: "Home",
-        icon: createElement(HomeRegular, { className: "size-4 text-muted-foreground" }),
+        icon: createElement(Home, { className: "size-4 text-muted-foreground" }),
         path: [],
       },
       {
@@ -42,22 +35,22 @@ export const sidebarSections: FileManagerSidebarSection[] = [
       },
       {
         name: "Documents",
-        icon: createElement(FolderRegular, { className: "size-4 text-sky-400" }),
+        icon: createElement(Folder, { className: "size-4 text-sky-400" }),
         path: ["Documents"],
       },
       {
         name: "Downloads",
-        icon: createElement(FolderRegular, { className: "size-4 text-emerald-400" }),
+        icon: createElement(Folder, { className: "size-4 text-emerald-400" }),
         path: ["Downloads"],
       },
       {
         name: "Media",
-        icon: createElement(FolderRegular, { className: "size-4 text-amber-400" }),
+        icon: createElement(Folder, { className: "size-4 text-amber-400" }),
         path: ["Media"],
       },
       {
         name: "Apps",
-        icon: createElement(FolderRegular, { className: "size-4 text-violet-400" }),
+        icon: createElement(Folder, { className: "size-4 text-violet-400" }),
         path: ["AppData"],
       },
     ],
@@ -217,7 +210,7 @@ export function getLocationItems(
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([host, hostPath]) => ({
       name: host,
-      icon: createElement(HardDriveRegular, { className: "size-4 text-cyan-400" }),
+      icon: createElement(HardDrive, { className: "size-4 text-cyan-400" }),
       path: hostPath,
     }));
 }
@@ -229,7 +222,7 @@ function usbPathSegment(label: string, id: string): string {
 export function getRemovableItems(drives: UsbDrive[]): RemovableSidebarItem[] {
   return drives.map((drive) => ({
     name: drive.label,
-    icon: createElement(UsbRegular, { className: "size-4 text-amber-400" }),
+    icon: createElement(Usb, { className: "size-4 text-amber-400" }),
     path: ["Removable", usbPathSegment(drive.label, drive.id)],
     driveId: drive.id,
     isMounted: drive.isMounted,

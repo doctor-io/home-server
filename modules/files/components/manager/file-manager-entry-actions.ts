@@ -59,6 +59,7 @@ export type UseFileManagerEntryActionsArgs = {
     onProgress: (loaded: number, total: number) => void;
     signal: AbortSignal;
   }, { uploaded: unknown[]; skipped: unknown[] }>;
+  unzipFileMutation: AsyncMutation<string, { destinationPath: string }>;
 };
 
 export function useFileManagerEntryActions({
@@ -94,6 +95,7 @@ export function useFileManagerEntryActions({
   toggleStarMutation,
   uploadAbortControllerRef,
   uploadFilesMutation,
+  unzipFileMutation,
 }: UseFileManagerEntryActionsArgs) {
   return useMemo(() => {
     async function handleTrashSelected() {
@@ -288,6 +290,15 @@ export function useFileManagerEntryActions({
       window.open(entry.type === "folder" ? buildZipUrl(entry.path) : buildDownloadUrl(entry.path), "_blank", "noopener,noreferrer");
     }
 
+    async function handleUnzipEntry(entry: FileEntry) {
+      try {
+        await unzipFileMutation.mutateAsync(entry.path);
+        setStatusNotice("Unzipped successfully");
+      } catch (error) {
+        setStatusNotice(error instanceof Error ? error.message : "Failed to unzip");
+      }
+    }
+
     async function handleShareFolder(entry: FileEntry) {
       try {
         const result = await createLocalShareMutation.mutateAsync({ path: entry.path });
@@ -378,6 +389,7 @@ export function useFileManagerEntryActions({
       handleToggleStar,
       handleTrashSelected,
       handleUnshareFolder,
+      handleUnzipEntry,
       handleUploadFiles,
       submitCreateEntryDialog,
       submitRenameDialog,
@@ -415,5 +427,6 @@ export function useFileManagerEntryActions({
     toggleStarMutation,
     uploadAbortControllerRef,
     uploadFilesMutation,
+    unzipFileMutation,
   ]);
 }

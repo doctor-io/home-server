@@ -2,8 +2,8 @@
 
 This document outlines what's shipping now and what's planned for future releases. It's a living document — priorities shift based on community feedback. If something here matters to you, open an issue or leave a 👍 on the relevant discussion.
 
-**Current stable release:** [v1.5.x](https://github.com/doctor-io/homeio/releases)  
-**In active development:** v1.6.x
+**Current release line:** v1.6.x  
+**Package version in this branch:** v1.6.13
 
 ---
 
@@ -60,11 +60,11 @@ Detect, mount, and browse USB drives from the file manager:
 
 ---
 
-## v1.6 — Storage Expansion & Polish
+## v1.6 — Storage Expansion & Polish ✅ Current
 
 > *Homeio as the central hub for all your data.*
 
-**Status: active development**
+**Status: shipping in the 1.6.x line**
 
 ### Bug Fixes & Cross-Browser Compatibility 🚧
 
@@ -82,16 +82,40 @@ Homeio already installs `parted`, `e2fsprogs`, and `gdisk` on bare-metal setups 
 - Wipe a disk
 - Clear warnings before any destructive action — every dangerous operation requires explicit confirmation
 
+### Server Information
+
+The Settings app now includes a server information view:
+
+- Hostname, OS, kernel, uptime, CPU, memory, and filesystem details
+- Network interface inventory with address, speed, and traffic fields where available
+- Thermal readings where the host exposes sensor data
+- Disk and temperature warnings feed recent actions and notifications
+
 ### Google Drive Integration
 
-Mount a Google Drive account as a location in the file manager:
+Use Google Drive accounts as file manager locations:
 
-- OAuth2 flow — connect an account from Settings → Storage → Cloud Accounts
+- OAuth2 setup from Settings → Integrations, with encrypted client secret storage
+- OAuth2 flow for connecting accounts once the Google Cloud credentials are configured
 - Google Drive appears in the file manager sidebar alongside local and network locations
-- Browse folders, preview files, upload, download, move within Drive
+- Browse folders, preview files, upload, download, create folders, move, and delete within Drive
 - Multiple accounts supported
-- OAuth tokens stored encrypted in the database (same pattern as SMB credentials)
+- OAuth tokens stored encrypted in the database
 - Files are not synced locally — accessed on demand via the Drive API
+
+### Safer Large Uploads
+
+- Next.js upload route now stream-parses multipart requests with `busboy` instead of buffering complete uploads in memory
+- Bare-metal installs include a Go upload sidecar that listens on `/run/home-server/upload.sock`
+- Install and update scripts build the sidecar, write the systemd unit, and report service/unit-file status
+- Upload socket permissions are set so the app process can read and write through the socket
+- Upload progress and cancellation remain available in the file manager UI
+
+### Shell & Visual Polish
+
+- Dock and file-type icons now use bundled Kora-style assets with platform icon fallbacks
+- File manager supports archive extraction through the existing file operation route
+- Cross-browser visual fixes continue for Firefox blur and icon rendering issues
 
 ---
 

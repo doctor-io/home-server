@@ -69,6 +69,7 @@ type FileManagerDialogLayerProps = {
   onCutContextEntry: () => void;
   onDeleteContextEntry: () => void;
   onDownloadContextEntry: () => void;
+  onUnzipContextEntry: () => void;
   onGetInfoContextEntry: () => void;
   onMoveContextEntryToTrash: () => void;
   onOpenContextEntry: () => void;
@@ -106,6 +107,7 @@ export function FileManagerDialogLayer({
   onCutContextEntry,
   onDeleteContextEntry,
   onDownloadContextEntry,
+  onUnzipContextEntry,
   onGetInfoContextEntry,
   onMoveContextEntryToTrash,
   onNavigateToNetwork,
@@ -150,6 +152,7 @@ export function FileManagerDialogLayer({
           onCut={onCutContextEntry}
           onDeletePermanently={onDeleteContextEntry}
           onDownload={onDownloadContextEntry}
+          onUnzip={onUnzipContextEntry}
           onGetInfo={onGetInfoContextEntry}
           onMoveToTrash={onMoveContextEntryToTrash}
           onOpen={onOpenContextEntry}

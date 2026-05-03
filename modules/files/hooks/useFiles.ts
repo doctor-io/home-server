@@ -18,6 +18,7 @@ import {
   saveFileContent,
   toFilePath,
   toggleStar,
+  unzipFile,
   uploadFilesToPath,
 } from "@/modules/files/hooks/files-api";
 
@@ -211,6 +212,17 @@ export function useUploadFiles() {
     mutationFn: uploadFilesToPath,
     onSuccess: (_data, variables) => {
       invalidateFileListPath(queryClient, variables.destinationPath);
+    },
+  });
+}
+
+export function useUnzipFile() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (pathValue: string) => unzipFile(pathValue),
+    onSuccess: (data) => {
+      invalidateFileListPath(queryClient, data.destinationPath);
     },
   });
 }

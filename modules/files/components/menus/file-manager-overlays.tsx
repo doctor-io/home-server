@@ -8,6 +8,7 @@ import {
   ClipboardPaste,
   Copy,
   Download,
+  FileArchive,
   FileText,
   FolderOpen,
   Info,
@@ -37,6 +38,7 @@ export function FileManagerContextMenu({
   onRestore,
   onToggleShare,
   onToggleStar,
+  onUnzip,
   pasteDisabled,
   x,
   y,
@@ -61,6 +63,7 @@ export function FileManagerContextMenu({
   onRestore: () => void;
   onToggleShare: () => void;
   onToggleStar: () => void;
+  onUnzip: () => void;
 }) {
   return (
     <div
@@ -89,6 +92,13 @@ export function FileManagerContextMenu({
         label={entry.type === "folder" ? "Download as Zip" : "Download"}
         onClick={() => { onDownload(); onClose(); }}
       />
+      {entry.type === "file" && entry.ext === "zip" && !isTrashView && (
+        <MenuItem
+          icon={<FileArchive className="size-3.5" />}
+          label="Unzip Here"
+          onClick={() => { onUnzip(); onClose(); }}
+        />
+      )}
 
       {entry.type === "folder" && !isTrashView && (
         <>

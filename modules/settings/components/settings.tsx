@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 const SIDEBAR_GROUPS: { label: string; ids: SettingsSectionId[] }[] = [
   { label: "System",         ids: ["general", "appearance", "updates"] },
   { label: "Infrastructure", ids: ["network", "storage", "docker"] },
+  { label: "Integrations",  ids: ["integrations"] },
   { label: "Automation",     ids: ["scheduled-tasks", "backup"] },
   { label: "Access",         ids: ["users", "security", "notifications"] },
   { label: "Danger Zone",    ids: ["power", "advanced"] },

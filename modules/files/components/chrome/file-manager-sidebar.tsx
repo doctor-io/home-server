@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { normalizePathForBackend } from "@/modules/files/components/file-manager-presenters";
 import { FILES_MENU_SHELL, FILES_PANEL_SHELL } from "@/modules/files/components/file-manager-surface";
-import { PeopleRegular, DeleteRegular, ArrowEjectRegular } from "@fluentui/react-icons";
+import { Users, Trash2, EjectIcon } from "@/components/icons/platform-icons";
 import { useRef, useState, useEffect, type ReactNode } from "react";
 import { FEATURE_FLAGS } from "@/lib/shared/feature-flags";
 
@@ -193,7 +193,7 @@ export function FileManagerSidebar({
                               title="Eject"
                               className="rounded-md p-1 text-muted-foreground/40 transition-colors hover:bg-background/50 hover:text-foreground"
                             >
-                              <ArrowEjectRegular className="size-3.5" />
+                              <EjectIcon className="size-3.5" />
                             </button>
                           )}
                         </div>
@@ -218,7 +218,7 @@ export function FileManagerSidebar({
                 : "text-muted-foreground hover:bg-background/50 hover:text-foreground",
             )}
           >
-            <PeopleRegular className={cn("size-4 shrink-0", isSharedView ? "text-primary" : "text-sky-400/70")} />
+            <Users className={cn("size-4 shrink-0", isSharedView ? "text-primary" : "text-sky-400/70")} />
             <span className="text-[13px] font-medium">Shared</span>
           </button>
           <button
@@ -230,7 +230,7 @@ export function FileManagerSidebar({
                 : "text-muted-foreground hover:bg-background/50 hover:text-foreground",
             )}
           >
-            <DeleteRegular className={cn("size-4 shrink-0", isTrashView ? "text-primary" : "text-status-red/60")} />
+            <Trash2 className={cn("size-4 shrink-0", isTrashView ? "text-primary" : "text-status-red/60")} />
             <span className="text-[13px] font-medium">Trash</span>
           </button>
         </div>

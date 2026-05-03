@@ -20,6 +20,7 @@ type FileManagerViewProps = {
     handleCopyEntryPath: (entry: FileEntry) => Promise<void>;
     handleDeleteFromTrash: (entry: FileEntry) => Promise<void>;
     handleDownloadEntry: (entry: FileEntry) => void;
+    handleUnzipEntry: (entry: FileEntry) => Promise<void>;
     handleEmptyTrash: () => void;
     handleGetInfo: (entry: FileEntry) => Promise<void>;
     handleMoveSelectedToTrash: (entry: FileEntry) => Promise<void>;
@@ -388,6 +389,7 @@ export function FileManagerView({
         onCutContextEntry={() => showContextMenu && actions.setClipboardFromEntries([showContextMenu.entry], "move")}
         onDeleteContextEntry={() => showContextMenu && void actions.handleDeleteFromTrash(showContextMenu.entry)}
         onDownloadContextEntry={() => showContextMenu && actions.handleDownloadEntry(showContextMenu.entry)}
+        onUnzipContextEntry={() => showContextMenu && void actions.handleUnzipEntry(showContextMenu.entry)}
         onGetInfoContextEntry={() => showContextMenu && void actions.handleGetInfo(showContextMenu.entry)}
         onMoveContextEntryToTrash={() => showContextMenu && void actions.handleMoveSelectedToTrash(showContextMenu.entry)}
         onNavigateToNetwork={() => {

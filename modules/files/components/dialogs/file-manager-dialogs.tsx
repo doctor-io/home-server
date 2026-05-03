@@ -8,7 +8,7 @@ import {
 import { cn } from "@/lib/utils";
 import { formatBytesCompact } from "@/lib/client/format";
 import type { FileInfoResponse } from "@/lib/shared/contracts/files";
-import { File, Folder, Trash2, X } from "@/components/icons/platform-icons";
+import { File, Folder, Trash2, Upload, X } from "@/components/icons/platform-icons";
 
 const cancelBtn = "rounded-lg px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50";
 const inputField = "mt-1 h-8 w-full rounded-lg border border-glass-border bg-background/55 px-2 text-xs text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-primary/40 focus:bg-background/70";
@@ -216,47 +216,55 @@ export function UploadProgressDialog({
   return (
     <div className={overlay}>
       <div
-        className={cn("w-full max-w-sm p-4", FILES_MENU_SHELL)}
+        className={cn("w-full max-w-sm overflow-hidden p-0", FILES_MENU_SHELL)}
         role="dialog"
         aria-modal="true"
         aria-label="Upload progress"
       >
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <div className="truncate text-sm font-semibold text-foreground">Uploading files</div>
-            <div className="mt-0.5 text-xs tabular-nums text-muted-foreground">{uploadedText}</div>
+        <div className="flex h-11 shrink-0 select-none items-center border-b border-glass-border/50 bg-popover/70 backdrop-blur-2xl">
+          <div className="flex items-center gap-1.5 px-4">
+            <button
+              onClick={onCancel}
+              aria-label="Cancel upload"
+              title="Cancel upload"
+              className="group flex size-3 cursor-pointer items-center justify-center rounded-full bg-[#ff5f57] ring-1 ring-inset ring-black/10"
+            >
+              <X className="size-[7px] text-[#6a0002] opacity-0 transition-opacity group-hover:opacity-100" />
+            </button>
+            <span className="size-3 rounded-full bg-white/10" />
+            <span className="size-3 rounded-full bg-white/10" />
           </div>
-          <button
-            onClick={onCancel}
-            aria-label="Cancel upload"
-            title="Cancel upload"
-            className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground"
-          >
-            <X className="size-3.5" />
-          </button>
+          <div className="flex flex-1 items-center justify-center gap-1.5">
+            <Upload className="size-3.5 text-primary/70" />
+            <span className="text-xs font-medium text-foreground/80">Uploading files</span>
+          </div>
+          <div className="w-[76px]" />
         </div>
 
-        <div
-          className="overflow-hidden rounded-full bg-white/10"
-          role="progressbar"
-          aria-label="Upload progress"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={uploadPercent}
-        >
+        <div className="p-4">
+          <div className="mb-3 text-xs tabular-nums text-muted-foreground">{uploadedText}</div>
           <div
-            className="h-2 rounded-full bg-primary transition-all duration-150"
-            style={{ width: `${uploadPercent}%` }}
-          />
-        </div>
-        <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-          <span>Uploading</span>
-          <span className="tabular-nums">{uploadPercent}%</span>
-        </div>
-        <div className="mt-4 flex justify-end">
-          <button onClick={onCancel} className={cancelBtn}>
-            Cancel upload
-          </button>
+            className="overflow-hidden rounded-full bg-white/10"
+            role="progressbar"
+            aria-label="Upload progress"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={uploadPercent}
+          >
+            <div
+              className="h-2 rounded-full bg-primary transition-all duration-150"
+              style={{ width: `${uploadPercent}%` }}
+            />
+          </div>
+          <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+            <span>Uploading</span>
+            <span className="tabular-nums">{uploadPercent}%</span>
+          </div>
+          <div className="mt-4 flex justify-end">
+            <button onClick={onCancel} className={cancelBtn}>
+              Cancel upload
+            </button>
+          </div>
         </div>
       </div>
     </div>

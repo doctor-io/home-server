@@ -16,16 +16,16 @@ import {
 import type { DiskDevice, DiskFilesystem, DiskPartition } from "@/lib/shared/contracts/disks";
 import { DISK_FILESYSTEMS } from "@/lib/shared/contracts/disks";
 import {
-  ArrowSyncRegular,
-  HardDriveRegular,
-  WarningRegular,
-  DismissRegular,
-  CheckmarkRegular,
-  ArrowDownloadRegular,
-  ArrowUploadRegular,
-  DeleteRegular,
-  AddRegular,
-} from "@fluentui/react-icons";
+  RefreshCw    as ArrowSyncRegular,
+  HardDrive    as HardDriveRegular,
+  AlertTriangle as WarningRegular,
+  X            as DismissRegular,
+  Check        as CheckmarkRegular,
+  Download     as ArrowDownloadRegular,
+  Upload       as ArrowUploadRegular,
+  Trash2       as DeleteRegular,
+  Plus         as AddRegular,
+} from "@/components/icons/platform-icons";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 

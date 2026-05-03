@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { FILES_BADGE_SURFACE } from "@/modules/files/components/file-manager-surface";
-import { DeleteRegular } from "@fluentui/react-icons";
+import { Trash2 } from "@/components/icons/platform-icons";
 
 type StatusBarProps = {
   clipboardName: string | null;
@@ -51,7 +51,7 @@ export function FileManagerStatusBar({
                   FILES_BADGE_SURFACE,
                 )}
               >
-                <DeleteRegular className="size-3" />
+                <Trash2 className="size-3" />
                 <span>Trash selected</span>
               </button>
             )}

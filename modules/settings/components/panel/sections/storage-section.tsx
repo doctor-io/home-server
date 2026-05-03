@@ -8,7 +8,7 @@ import {
 import { SETTINGS_PANEL_INSET } from "@/modules/settings/components/panel/surface";
 import type { SettingsBackend } from "@/modules/settings/components/panel/types";
 import { HardDrive, Thermometer } from "@/components/icons/platform-icons";
-import { HardDriveRegular, ChevronRightRegular } from "@fluentui/react-icons";
+import { HardDrive as HardDriveRegular, ChevronRight as ChevronRightRegular } from "@/components/icons/platform-icons";
 import { cn } from "@/lib/utils";
 
 type StorageSectionProps = {

@@ -1,3 +1,9 @@
+export type GoogleOAuthConfigPublic = {
+  clientId: string;
+  redirectUri: string;
+  hasSecret: boolean;
+};
+
 export type DriveFileEntry = {
   id: string;
   name: string;

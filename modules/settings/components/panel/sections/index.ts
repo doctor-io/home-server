@@ -12,3 +12,4 @@ export { UsersSection } from "@/modules/settings/components/panel/sections/users
 export { LogsSection } from "@/modules/settings/components/panel/sections/logs-section";
 export { ScheduledTasksSection } from "@/modules/settings/components/panel/sections/scheduled-tasks-section";
 export { AdvancedSection } from "@/modules/settings/components/panel/sections/advanced-section";
+export { IntegrationsSection } from "@/modules/settings/components/panel/sections/integrations-section";

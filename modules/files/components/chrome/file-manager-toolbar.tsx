@@ -14,10 +14,10 @@ import {
   SortAsc,
   SortDesc,
   Upload,
+  Trash2,
 } from "@/components/icons/platform-icons";
 import { cn } from "@/lib/utils";
 import { FILES_PANEL_SHELL } from "@/modules/files/components/file-manager-surface";
-import { DeleteRegular } from "@fluentui/react-icons";
 import type { RefObject } from "react";
 
 type ToolbarProps = {
@@ -190,7 +190,7 @@ export function FileManagerToolbar({
             title="Permanently delete all items in Trash"
             className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-status-red transition-colors hover:bg-status-red/10 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <DeleteRegular className="size-3.5" />
+            <Trash2 className="size-3.5" />
             <span className="hidden xl:inline">Empty Trash</span>
           </button>
         )}

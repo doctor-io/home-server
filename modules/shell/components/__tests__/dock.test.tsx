@@ -19,8 +19,11 @@ describe("Dock", () => {
 
     expect(appStoreButton.getAttribute("aria-pressed")).toBe("true");
     expect(terminalButton.getAttribute("aria-pressed")).toBe("false");
-    expect(appStoreButton.className).toContain("bg-primary/18");
-    expect(terminalButton.className).toContain("bg-white/[0.09]");
+    // focused state is expressed as a ring shadow on the inner icon element
+    const appStoreIcon = appStoreButton.querySelector("img, [class*='rounded-2xl']");
+    const terminalIcon = terminalButton.querySelector("img, [class*='rounded-2xl']");
+    expect(appStoreIcon?.className).toContain("shadow-[0_0_0_2px_hsl(var(--primary)");
+    expect(terminalIcon?.className).not.toContain("shadow-[0_0_0_2px_hsl(var(--primary)");
 
     const runningDots = Array.from(container.querySelectorAll("span")).filter(
       (element) =>

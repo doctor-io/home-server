@@ -11,7 +11,7 @@ export async function GET(request: Request) {
   const requestId = createRequestId();
 
   try {
-    const configured = isGoogleDriveConfigured();
+    const configured = await isGoogleDriveConfigured();
     const connections = configured ? await listGoogleDriveConnections() : [];
     return NextResponse.json({ data: connections, configured }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {

@@ -27,6 +27,7 @@ export const mockUseSystemMetrics = vi.fn();
 export const mockUseCurrentUser = vi.fn();
 export const mockUseUsbDrives = vi.fn();
 export const mockUseGoogleDriveConnections = vi.fn();
+export const mockUseUnzipFile = vi.fn();
 
 vi.mock("@/modules/files/hooks/useFiles", () => ({
   buildAssetUrl: (filePath: string) => `/api/v1/files/asset?path=${encodeURIComponent(filePath)}`,
@@ -45,6 +46,7 @@ vi.mock("@/modules/files/hooks/useFiles", () => ({
   useStarredFiles: (...args: unknown[]) => mockUseStarredFiles(...args),
   useSearchFiles: (...args: unknown[]) => mockUseSearchFiles(...args),
   useUploadFiles: (...args: unknown[]) => mockUseUploadFiles(...args),
+  useUnzipFile: (...args: unknown[]) => mockUseUnzipFile(...args),
 }));
 
 vi.mock("@/modules/files/hooks/useTrashActions", () => ({
@@ -141,6 +143,7 @@ export function resetFileManagerMocks() {
   mockUseCurrentUser.mockReset();
   mockUseUsbDrives.mockReset();
   mockUseGoogleDriveConnections.mockReset();
+  mockUseUnzipFile.mockReset();
 
   mockUseFilesDirectory.mockReturnValue(mockDirectory([]));
   mockUseFilesRoot.mockReturnValue({
@@ -224,6 +227,7 @@ export function resetFileManagerMocks() {
     mutateAsync: vi.fn().mockResolvedValue({ removed: true, id: "local-1" }),
   });
   mockUseUploadFiles.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+  mockUseUnzipFile.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
   mockUseSearchFiles.mockReturnValue({
     data: { entries: [] },
     isLoading: false,

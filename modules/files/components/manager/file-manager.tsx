@@ -21,6 +21,7 @@ import {
   useSearchFiles,
   useStarredFiles,
   useToggleFileStar,
+  useUnzipFile,
   useUploadFiles,
 } from "@/modules/files/hooks/useFiles";
 import {
@@ -95,6 +96,7 @@ export function FileManager() {
   const getFileInfoMutation = useFileEntryInfo();
   const toggleStarMutation = useToggleFileStar();
   const uploadFilesMutation = useUploadFiles();
+  const unzipFileMutation = useUnzipFile();
 
   const openFilePath = state.openFile ? toFilePath(state.openFile.path) : null;
   const fileContentQuery = useFileContent(openFilePath);
@@ -250,6 +252,7 @@ export function FileManager() {
     toggleStarMutation,
     uploadAbortControllerRef,
     uploadFilesMutation,
+    unzipFileMutation,
   });
 
   useEffect(() => {

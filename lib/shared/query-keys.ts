@@ -35,6 +35,7 @@ export const queryKeys = {
   notifications: ["notifications"] as const,
   scheduledTasks: ["scheduled-tasks"] as const,
   taskExecutions: (taskId: string) => ["scheduled-tasks", taskId, "executions"] as const,
+  googleOAuthConfig: ["google-oauth", "config"] as const,
   googleDriveConnections: ["google-drive", "connections"] as const,
   googleDriveBrowse: (connectionId: string, folderId: string) =>
     ["google-drive", "browse", connectionId, folderId] as const,

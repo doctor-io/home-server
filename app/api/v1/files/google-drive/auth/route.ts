@@ -8,7 +8,7 @@ export async function GET(request: Request) {
   const origin = new URL(request.url).origin;
   try {
     const state = generateState();
-    const url = buildAuthUrl(state);
+    const url = await buildAuthUrl(state);
 
     const cookieStore = await cookies();
     cookieStore.set("gd_oauth_state", state, {

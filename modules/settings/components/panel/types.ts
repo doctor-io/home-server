@@ -16,6 +16,7 @@ export type SettingsSectionId =
   | "network"
   | "storage"
   | "docker"
+  | "integrations"
   | "users"
   | "security"
   | "notifications"

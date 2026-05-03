@@ -105,10 +105,18 @@ Docker stats SSE events: `stats.updated`, `heartbeat`.
 | `GET` | `/api/v1/files/google-drive/callback` | N | OAuth callback |
 | `GET` | `/api/v1/files/google-drive/connections` | Y | List Drive connections |
 | `DELETE` | `/api/v1/files/google-drive/connections/[id]` | Y | Delete Drive connection |
+| `GET` | `/api/v1/files/google-drive/[id]/browse` | Y | Browse Drive folder |
+| `GET` | `/api/v1/files/google-drive/[id]/download` | Y | Download Drive file |
+| `POST` | `/api/v1/files/google-drive/[id]/upload` | Y | Upload Drive file |
+| `POST` | `/api/v1/files/google-drive/[id]/folders` | Y | Create Drive folder |
+| `PATCH` | `/api/v1/files/google-drive/[id]/files/[fileId]` | Y | Move/rename Drive file |
+| `DELETE` | `/api/v1/files/google-drive/[id]/files/[fileId]` | Y | Delete Drive file |
 
-Contracts: `lib/shared/contracts/files.ts`, `lib/shared/contracts/usb.ts`. File service errors use `FileServiceErrorCode`.
+Contracts: `lib/shared/contracts/files.ts`, `lib/shared/contracts/usb.ts`, `lib/shared/contracts/google-drive.ts`. File service errors use `FileServiceErrorCode`.
 
-`POST /api/v1/files/upload` accepts multipart `FormData` with `path`, optional `includeHidden`, and repeated `file` parts. The client upload helper uses `XMLHttpRequest` for progress and supports `AbortSignal` cancellation. Next's route-handler proxy upload limit is configured by `experimental.proxyClientMaxBodySize` in `next.config.mjs`; external reverse proxies may still enforce their own limit.
+`POST /api/v1/files/upload` accepts multipart `FormData` with `path`, optional `includeHidden`, and repeated `file` parts. The route stream-parses multipart content with `busboy`, passes each file stream to the file service, and avoids holding whole uploads in memory. The client upload helper uses `XMLHttpRequest` for progress and supports `AbortSignal` cancellation. Next's route-handler proxy upload limit is configured by `experimental.proxyClientMaxBodySize` in `next.config.mjs`; external reverse proxies may still enforce their own limit.
+
+`POST /api/v1/files/ops` also supports `action: "unzip"` for archive extraction beside create/rename/paste/info/star operations.
 
 ## Network
 
@@ -152,6 +160,9 @@ Contract: `lib/shared/contracts/scheduled-tasks.ts`.
 |---|---|---:|---|
 | `GET` | `/api/v1/settings/appearance` | Y | Appearance settings |
 | `PUT` | `/api/v1/settings/appearance` | Y | Save appearance settings |
+| `GET` | `/api/v1/settings/google-oauth` | Y | Public Google OAuth config status |
+| `PUT` | `/api/v1/settings/google-oauth` | Y | Save Google OAuth client credentials |
+| `DELETE` | `/api/v1/settings/google-oauth` | Y | Clear Google OAuth client credentials |
 | `GET` | `/api/v1/system/info` | Y | Server info |
 | `GET` | `/api/v1/system/metrics` | Y | Metrics snapshot |
 | `GET` | `/api/v1/system/stream` | Y | SSE metrics stream |

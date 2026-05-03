@@ -11,6 +11,7 @@ import type {
   FileRenameResponse,
   FileRootResponse,
   FileToggleStarResponse,
+  FileUnzipResponse,
   FileWriteRequest,
   FileWriteResponse,
 } from "@/lib/shared/contracts/files";
@@ -54,6 +55,10 @@ type FileInfoApiResponse = {
 
 type FileToggleStarApiResponse = {
   data: FileToggleStarResponse;
+};
+
+type FileUnzipApiResponse = {
+  data: FileUnzipResponse;
 };
 
 export function buildListEndpoint(filePath: string, includeHidden = false) {
@@ -313,6 +318,25 @@ export async function toggleStar(pathValue: string) {
   }
 
   const json = (await response.json()) as FileToggleStarApiResponse;
+  return json.data;
+}
+
+export async function unzipFile(pathValue: string) {
+  const response = await fetch("/api/v1/files/ops", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "unzip", path: pathValue }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await getErrorBody(response);
+    throw new Error(
+      errorBody.error ??
+        `Failed to unzip (${response.status})${errorBody.code ? ` [${errorBody.code}]` : ""}`,
+    );
+  }
+
+  const json = (await response.json()) as FileUnzipApiResponse;
   return json.data;
 }
 
