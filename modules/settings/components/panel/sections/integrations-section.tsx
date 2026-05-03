@@ -6,7 +6,11 @@ import { SectionDivider, InfoBanner } from "@/modules/settings/components/panel/
 import { SETTINGS_PANEL_INSET } from "@/modules/settings/components/panel/surface";
 import { queryKeys } from "@/lib/shared/query-keys";
 import type { GoogleOAuthConfigPublic } from "@/lib/shared/contracts/google-drive";
-import type { TailscaleConfigPublic } from "@/lib/shared/contracts/tailscale";
+import type {
+  TailscaleConfigPublic,
+  TailscaleInstallResult,
+  TailscaleStatusPublic,
+} from "@/lib/shared/contracts/tailscale";
 import { cn } from "@/lib/utils";
 import { Check, Eye, EyeOff, ExternalLink } from "@/components/icons/platform-icons";
 
@@ -56,6 +60,20 @@ async function clearTailscaleConfig(): Promise<void> {
   if (!res.ok) throw new Error("Failed to clear");
 }
 
+async function fetchTailscaleStatus(): Promise<TailscaleStatusPublic> {
+  const res = await fetch("/api/v1/system/tailscale/status", { cache: "no-store" });
+  const json = (await res.json()) as { data?: TailscaleStatusPublic; error?: string };
+  if (!res.ok) throw new Error(json.error ?? "Failed to fetch");
+  return json.data!;
+}
+
+async function installTailscaleService(): Promise<TailscaleInstallResult> {
+  const res = await fetch("/api/v1/system/tailscale/install", { method: "POST" });
+  const json = (await res.json()) as { data?: TailscaleInstallResult; error?: string };
+  if (!res.ok) throw new Error(json.error ?? "Failed to install Tailscale");
+  return json.data!;
+}
+
 function InputRow({ label, description, children }: { label: string; description?: string; children: React.ReactNode }) {
   return (
     <div className={cn(SETTINGS_PANEL_INSET, "flex items-start justify-between gap-4 px-4 py-3")}>
@@ -69,6 +87,21 @@ function InputRow({ label, description, children }: { label: string; description
 }
 
 const inputCls = "h-8 w-64 rounded-lg border border-glass-border bg-background/55 px-3 text-xs text-foreground placeholder:text-muted-foreground/40 focus:border-primary/40 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50";
+
+function StatusPill({ tone, label }: { tone: "ok" | "warn" | "muted"; label: string }) {
+  return (
+    <span
+      className={cn(
+        "rounded-full border px-2 py-0.5 text-[10px] font-medium",
+        tone === "ok" && "border-status-green/25 bg-status-green/10 text-status-green",
+        tone === "warn" && "border-status-yellow/25 bg-status-yellow/10 text-status-yellow",
+        tone === "muted" && "border-glass-border bg-background/55 text-muted-foreground",
+      )}
+    >
+      {label}
+    </span>
+  );
+}
 
 function GoogleDriveConfig() {
   const queryClient = useQueryClient();
@@ -243,6 +276,11 @@ function TailscaleConfig() {
     queryKey: queryKeys.tailscaleConfig,
     queryFn: fetchTailscaleConfig,
   });
+  const { data: status, isLoading: isStatusLoading } = useQuery({
+    queryKey: queryKeys.tailscaleStatus,
+    queryFn: fetchTailscaleStatus,
+    refetchInterval: 10_000,
+  });
 
   const [tailnet, setTailnet] = useState("");
   const [apiKey, setApiKey] = useState("");
@@ -267,10 +305,42 @@ function TailscaleConfig() {
     },
   });
 
+  const activateMutation = useMutation({
+    mutationFn: async () => {
+      const hasNewCredentials = effectiveTailnet.length > 0 && apiKey.trim().length > 0;
+      if (hasNewCredentials) {
+        await saveTailscaleConfig({
+          tailnet: effectiveTailnet,
+          apiKey: apiKey.trim(),
+        });
+      }
+      if (!status?.installed) {
+        await installTailscaleService();
+      }
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tailscaleConfig });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tailscaleStatus });
+      setTailnet("");
+      setApiKey("");
+      setSavedOk(true);
+      setTimeout(() => setSavedOk(false), 3000);
+    },
+  });
+
   const isConfigured = Boolean(saved?.tailnet && saved?.hasApiKey);
-  const isBusy = saveMutation.isPending || clearMutation.isPending || isLoading;
+  const isBusy = saveMutation.isPending || clearMutation.isPending || activateMutation.isPending || isLoading;
   const effectiveTailnet = tailnet.trim() || saved?.tailnet || "";
   const canSave = effectiveTailnet.length > 0 && apiKey.trim().length > 0;
+  const canActivate = isConfigured || canSave;
+  const serviceLabel = isStatusLoading
+    ? "Checking"
+    : status?.installed
+      ? status.running
+        ? "Running"
+        : "Installed"
+      : "Not installed";
+  const connectionLabel = status?.connected ? "Connected" : "Disconnected";
 
   function handleSave() {
     if (!canSave) return;
@@ -284,7 +354,7 @@ function TailscaleConfig() {
     <div className="flex flex-col gap-1">
       {isConfigured && !saveMutation.error && (
         <InfoBanner
-          text={savedOk ? "Tailscale credentials saved successfully." : `Tailscale configured · Tailnet: ${saved?.tailnet}`}
+          text={savedOk ? "Tailscale updated successfully." : `Tailscale configured · Tailnet: ${saved?.tailnet}`}
           variant="info"
         />
       )}
@@ -294,10 +364,58 @@ function TailscaleConfig() {
       {clearMutation.error && (
         <InfoBanner text={(clearMutation.error as Error).message} variant="warning" />
       )}
+      {activateMutation.error && (
+        <InfoBanner text={(activateMutation.error as Error).message} variant="warning" />
+      )}
+      {status?.error && (
+        <InfoBanner text={status.error} variant="warning" />
+      )}
+
+      <div className={cn(SETTINGS_PANEL_INSET, "flex flex-col gap-3 px-4 py-3")}>
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/integrations/tailscale-light.svg"
+              alt=""
+              className="size-9 rounded-lg bg-black/15 p-1.5"
+            />
+            <div className="min-w-0">
+              <div className="text-sm font-medium text-foreground">Tailscale</div>
+              <div className="mt-0.5 text-[11px] text-muted-foreground/70">
+                Private mesh network access for this server.
+              </div>
+            </div>
+          </div>
+          <StatusPill
+            tone={status?.connected ? "ok" : status?.installed ? "warn" : "muted"}
+            label={status?.connected ? "Active" : status?.installed ? "Needs login" : "Inactive"}
+          />
+        </div>
+
+        <div className="grid gap-2 text-[11px] text-muted-foreground sm:grid-cols-2">
+          <div className="rounded-lg border border-glass-border bg-background/35 px-3 py-2">
+            <div className="text-muted-foreground/60">Service</div>
+            <div className="mt-1 text-xs text-foreground">{serviceLabel}</div>
+          </div>
+          <div className="rounded-lg border border-glass-border bg-background/35 px-3 py-2">
+            <div className="text-muted-foreground/60">Connection</div>
+            <div className="mt-1 text-xs text-foreground">{connectionLabel}</div>
+          </div>
+          <div className="rounded-lg border border-glass-border bg-background/35 px-3 py-2">
+            <div className="text-muted-foreground/60">Machine</div>
+            <div className="mt-1 truncate text-xs text-foreground">{status?.hostname ?? "--"}</div>
+          </div>
+          <div className="rounded-lg border border-glass-border bg-background/35 px-3 py-2">
+            <div className="text-muted-foreground/60">Tailscale IP</div>
+            <div className="mt-1 truncate text-xs text-foreground">{status?.tailscaleIps[0] ?? "--"}</div>
+          </div>
+        </div>
+      </div>
 
       <div className={cn(SETTINGS_PANEL_INSET, "flex items-center justify-between px-4 py-2.5")}>
         <div className="text-[11px] text-muted-foreground/70">
-          Store a Tailscale API access token for tailnet automation and private-network integrations.
+          Activate installs the local Tailscale service if it is missing, then stores your tailnet name and API access token.
         </div>
         <a
           href="https://login.tailscale.com/admin/settings/keys"
@@ -356,14 +474,23 @@ function TailscaleConfig() {
         ) : (
           <span />
         )}
-        <button
-          onClick={handleSave}
-          disabled={!canSave || isBusy}
-          className="flex h-7 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {savedOk && <Check className="size-3" />}
-          {saveMutation.isPending ? "Saving…" : savedOk ? "Saved" : "Save credentials"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleSave}
+            disabled={!canSave || isBusy}
+            className="flex h-7 items-center gap-1.5 rounded-lg border border-glass-border bg-background/55 px-3 text-xs font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {savedOk && !activateMutation.isPending && <Check className="size-3" />}
+            {saveMutation.isPending ? "Saving…" : savedOk ? "Saved" : "Save credentials"}
+          </button>
+          <button
+            onClick={() => activateMutation.mutate()}
+            disabled={!canActivate || isBusy}
+            className="flex h-7 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {activateMutation.isPending ? "Activating…" : status?.installed ? "Activate" : "Install and activate"}
+          </button>
+        </div>
       </div>
     </div>
   );

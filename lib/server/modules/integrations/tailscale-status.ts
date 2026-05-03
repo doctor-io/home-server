@@ -2,7 +2,10 @@ import "server-only";
 
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import type { TailscaleStatusPublic } from "@/lib/shared/contracts/tailscale";
+import type {
+  TailscaleInstallResult,
+  TailscaleStatusPublic,
+} from "@/lib/shared/contracts/tailscale";
 
 const execFileAsync = promisify(execFile);
 
@@ -68,4 +71,29 @@ export async function getLocalTailscaleStatus(): Promise<TailscaleStatusPublic> 
       error: error instanceof Error ? error.message : "Unable to read Tailscale status.",
     };
   }
+}
+
+export async function installTailscale(): Promise<TailscaleInstallResult> {
+  const currentStatus = await getLocalTailscaleStatus();
+  if (currentStatus.installed) {
+    return {
+      installed: true,
+      stdout: "",
+      stderr: "Tailscale is already installed.",
+    };
+  }
+
+  const { stdout, stderr } = await execFileAsync("sh", [
+    "-c",
+    "curl -fsSL https://tailscale.com/install.sh | sh",
+  ], {
+    timeout: 120_000,
+    maxBuffer: 1024 * 1024,
+  });
+
+  return {
+    installed: true,
+    stdout,
+    stderr,
+  };
 }

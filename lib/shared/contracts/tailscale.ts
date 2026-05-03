@@ -8,6 +8,12 @@ export type TailscaleConfigSaveRequest = {
   apiKey: string;
 };
 
+export type TailscaleInstallResult = {
+  installed: boolean;
+  stdout: string;
+  stderr: string;
+};
+
 export type TailscaleStatusPublic = {
   installed: boolean;
   running: boolean;
