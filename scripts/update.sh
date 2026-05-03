@@ -275,10 +275,12 @@ stop_upload_server() {
 
 restart_upload_server_service() {
 	local unit_file="/etc/systemd/system/${UPLOAD_SERVICE_UNIT}"
+	local is_new=false
 
-	if [[ ! -f "${unit_file}" ]]; then
-		print_status "Installing ${UPLOAD_SERVICE_NAME} service for the first time..."
-		cat >"${unit_file}" <<EOF
+	[[ ! -f "${unit_file}" ]] && is_new=true
+
+	print_status "Writing ${UPLOAD_SERVICE_NAME} unit file..."
+	cat >"${unit_file}" <<EOF
 [Unit]
 Description=${APP_NAME} Upload Service
 After=network.target
@@ -301,7 +303,8 @@ SyslogIdentifier=${UPLOAD_SERVICE_NAME}
 [Install]
 WantedBy=multi-user.target
 EOF
-		systemctl daemon-reload
+	systemctl daemon-reload
+	if [[ "${is_new}" == "true" ]]; then
 		systemctl enable "${UPLOAD_SERVICE_UNIT}"
 	fi
 
