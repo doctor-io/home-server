@@ -43,6 +43,7 @@ type FileManagerDialogLayerProps = {
   trashItemCount: number;
   uploadPending: boolean;
   uploadProgress: { loaded: number; total: number } | null;
+  unzipPending: boolean;
   createPending: boolean;
   renamePending: boolean;
   onCloseContextMenu: () => void;
@@ -135,6 +136,7 @@ export function FileManagerDialogLayer({
   trashItemCount,
   uploadPending,
   uploadProgress,
+  unzipPending,
 }: FileManagerDialogLayerProps) {
   return (
     <>
@@ -209,7 +211,9 @@ export function FileManagerDialogLayer({
       ) : null}
 
       {uploadPending || uploadProgress ? (
-        <UploadProgressDialog progress={uploadProgress} onCancel={onCancelUpload} />
+        <UploadProgressDialog operation="upload" progress={uploadProgress} onCancel={onCancelUpload} />
+      ) : unzipPending ? (
+        <UploadProgressDialog operation="unzip" progress={null} />
       ) : null}
 
       {pasteConflict ? (

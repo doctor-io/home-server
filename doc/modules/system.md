@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The system module exposes metrics, Docker info/stats, server info, updates, backups, power controls, disk management, weather widgets, and status bar data.
+The system module exposes metrics, Docker info/stats, server info, updates, backups, power controls, disk management, thermal warnings, weather widgets, and status bar data.
 
 ## Locations
 
@@ -23,6 +23,7 @@ The system module exposes metrics, Docker info/stats, server info, updates, back
 | `modules/system/hooks/useSystemSse.ts` | Metrics SSE client |
 | `modules/system/components/monitor.tsx` | System monitor UI |
 | `modules/system/components/disk-manager.tsx` | Disk manager UI |
+| `modules/settings/components/panel/sections/server-info-section.tsx` | Server info settings view |
 
 ## Public API
 
@@ -30,7 +31,8 @@ The system module exposes metrics, Docker info/stats, server info, updates, back
 - `getSystemUpdateStatus()`, `scheduleSystemUpdate()`
 - `getSystemBackupsSnapshot()`, `runSystemBackupNow()`
 - `scheduleSystemReboot()`, `scheduleSystemShutdown()`, `scheduleFactoryReset()`
-- `listDisks()`, `formatPartition()`, `mountPartition()`, `unmountPartition()`
+- `getServerInfo()`
+- `listDisks()`, `formatPartition()`, `mountPartition()`, `unmountPartition()`, `createPartition()`, `deletePartition()`, `wipeDisk()`
 - Client hooks: `useSystemMetrics()`, `useSystemSse()`, `useDockerInfo()`, `useDockerStats()`, `useDisks()`, `useServerInfo()`
 
 ## Contracts
@@ -64,6 +66,7 @@ The system module exposes metrics, Docker info/stats, server info, updates, back
 
 - `app/api/v1/system/stream/route.ts` authenticates before opening the SSE stream.
 - Some metrics cache TTL constants are hardcoded in `lib/server/modules/system/service.ts`.
+- Server info reads Linux host files and command output where available; fields can be null on unsupported hosts or containers.
 - `modules/system/components/disk-manager.tsx` is over 500 lines.
 - Power and disk routes are high-risk because they perform destructive host actions.
 

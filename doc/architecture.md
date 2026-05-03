@@ -13,6 +13,8 @@ flowchart LR
   Services --> PG["PostgreSQL via Drizzle"]
   Services --> Docker["Docker daemon via socket/CLI"]
   Services --> FS["FILES_ROOT / DATA filesystem"]
+  Services --> UploadSidecar["Go upload-server"]
+  UploadSidecar -->|"Unix socket or TCP"| FS
   Services --> HelperClient["network helper client"]
   HelperClient -->|"Unix socket JSON protocol"| DbusHelper["services/dbus-helper/*.mjs"]
   DbusHelper -->|"D-Bus"| NetworkManager["NetworkManager / udisks2"]
@@ -26,6 +28,7 @@ flowchart LR
 | Main app production process | `dist-server/server.js` via `npm run start` | Compiled custom server | Same as dev |
 | Docker database | `postgres:16-alpine` in `docker-compose.yml` | PostgreSQL persistence | TCP through `DATABASE_URL` |
 | D-Bus helper sidecar | `services/dbus-helper/index.mjs` | NetworkManager/udisks2 bridge | Unix socket at `DBUS_HELPER_SOCKET_PATH`, then D-Bus |
+| Upload sidecar | `services/upload-server/main.go` | Bare-metal large upload writer | Unix socket at `UPLOAD_SERVER_ADDR` or TCP address |
 | Docker daemon | host daemon | Compose app lifecycle, stats, logs | `/var/run/docker.sock` and Docker CLI |
 
 `server.ts` wraps `next.getRequestHandler()` with `compression`, disables compression for stream paths, and attaches the terminal WebSocket server by importing `lib/server/modules/terminal/websocket-server.ts`.
@@ -63,6 +66,12 @@ sequenceDiagram
 ```
 
 Most routes return `{ data: ... }`, but current code is not fully uniform. Examples: `app/api/v1/files/route.ts` returns `{ data, meta }`; `app/api/v1/scheduled-tasks/route.ts` returns `{ tasks }`; auth routes use auth-specific shapes. New routes should prefer `{ data: ... }` and typed contracts in `lib/shared/contracts/`.
+
+### File Uploads
+
+`app/api/v1/files/upload/route.ts` authenticates with `requireApiSession()`, stream-parses multipart bodies with `busboy`, and pipes file streams into `lib/server/modules/files/service.ts` without buffering full file contents in memory. The client sends `path` and `includeHidden` fields before file parts; upload progress and cancellation are handled by the XHR helper in `modules/files/hooks/files-api.ts`.
+
+Bare-metal installs also build `services/upload-server/main.go` into `${INSTALL_DIR}/bin/upload-server`. The systemd unit listens on `UPLOAD_SERVER_ADDR=/run/home-server/upload.sock`, validates the same `homeio_session` HMAC cookie format with `AUTH_SESSION_SECRET`, applies its own `FILES_ROOT` path jail, writes files directly to disk, and exposes `/health`. Install/update scripts write the unit and report service status.
 
 ### SSE
 
@@ -130,12 +139,12 @@ Operations run in-process via `queueMicrotask()` in `lib/server/modules/apps/ope
 
 `dist-server/` is the compiled custom Node server used by `npm run start` and the Docker runner. `tsc-alias` rewrites `@/*` aliases after the server build.
 
-`next.config.mjs` sets both `experimental.serverActions.bodySizeLimit` and `experimental.proxyClientMaxBodySize` to `10gb`. The proxy setting is required for large `POST /api/v1/files/upload` route-handler requests; Server Actions use a separate limit.
+`next.config.mjs` sets both `experimental.serverActions.bodySizeLimit` and `experimental.proxyClientMaxBodySize` to `10gb`. The proxy setting is required for large `POST /api/v1/files/upload` route-handler requests; Server Actions use a separate limit. The route itself now streams multipart data, but upstream proxies can still reject requests before Homeio receives them.
 
 ## Deployment Topology
 
 - Docker Compose: `docker-compose.yml` runs `homeio` plus `db`; the app mounts `/var/run/docker.sock`, `/DATA`, and app stack storage.
-- Bare-metal: `scripts/install.sh` installs the app, Nginx, and sidecar dependencies for Debian/Ubuntu/Raspberry Pi OS. Network and USB features depend on host D-Bus services.
+- Bare-metal: `scripts/install.sh` installs the app, Nginx, upload sidecar, and sidecar dependencies for Debian/Ubuntu/Raspberry Pi OS. Network, USB, and disk features depend on host D-Bus/storage tools.
 - Development: `npm run dev` starts the custom server on `localhost:3000` unless overridden.
 
 ## Current Architecture Risks

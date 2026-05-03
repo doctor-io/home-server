@@ -71,12 +71,12 @@ Use this framing consistently:
 
 These are worth tightening before broad outreach because self-hosted communities inspect repos closely.
 
-- Create `CONTRIBUTING.md`
-  - README links to it, but the file is currently missing
-- Resolve versioning inconsistency
-  - `package.json` is `1.5.3`
-  - local git tags currently top out at `v1.4.8`
-  - `ROADMAP.md` still says current stable release is `v1.3.x`
+- Keep `CONTRIBUTING.md` current
+  - The file now exists; keep setup, branch, test, and PR expectations aligned with the codebase.
+- Keep versioning consistent
+  - `package.json` is in the `1.6.x` release line.
+  - `ROADMAP.md` now documents v1.6.x as the current line.
+  - Tags and GitHub releases should be checked before any broad launch push.
 - Make contribution entry points obvious
   - add `good first issue`, `help wanted`, and module-scoped labels
 - Publish one clear installation matrix

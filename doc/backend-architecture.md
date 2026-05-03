@@ -2,16 +2,18 @@
 
 ## Shape: Modular Monolith
 - Runtime: Next.js Node runtime.
-- Modules: `system`, `apps`, shared `db` and `cache` infrastructure.
+- Modules: `system`, `apps`, `files`, `network`, `notifications`, `scheduled-tasks`, shared `db` and `cache` infrastructure.
 - Realtime:
   - SSE at `/api/v1/system/stream` for one-way live metrics.
   - SSE at `/api/v1/network/events/stream` for live network state updates.
+  - SSE at `/api/v1/docker/stats/stream`, `/api/v1/store/operations/[operationId]/stream`, `/api/v1/notifications/stream`, and `/api/v1/files/usb/stream` for module-specific updates.
 
 ## Why this works on Pi 4
 - Single deployable process reduces memory and orchestration overhead.
 - Postgres handles durable state and future growth without immediate migration.
 - In-memory LRU cache absorbs hot reads and smooths CPU usage.
 - SSE is lightweight for dashboards and state updates.
+- Large file uploads stream through the Next route and, on bare-metal installs, can be handled by the Go upload sidecar over a local Unix socket.
 
 ## API Endpoints
 - `GET /api/health`
@@ -23,17 +25,22 @@
 - `GET /api/auth/status`
 - `GET /api/v1/system/metrics`
 - `GET /api/v1/system/stream` (SSE)
+- `GET /api/v1/system/info`
+- `GET/POST /api/v1/system/disks*`
 - `GET /api/v1/network/events/stream` (SSE)
 - `GET /api/v1/apps`
+- `GET/POST /api/v1/files*`
+- `GET/POST/PATCH/DELETE /api/v1/files/google-drive*`
+- `GET/PUT/DELETE /api/v1/settings/google-oauth`
 - `POST /api/v1/terminal/execute`
-- `POST /api/v1/logs` (ingests client/hook logs into server log file)
+- `GET /api/v1/logs`
 
 ## Auth Flow
 - Single-user flow with bootstrap redirect:
   - If no users in DB: `/register` is the entry route.
   - If users exist: `/login` is the entry route.
 - `users` and `sessions` are persisted in Postgres.
-- Middleware blocks access to `/` and protected APIs unless a valid signed session cookie is present.
+- App routes and protected API routes call shared auth helpers such as `requireApiSession()`; there is no central middleware auth layer for all `/api/v1/**` routes.
 - Lock screen uses the same authenticated session and validates password via `POST /api/auth/unlock`.
 
 ## Observability & Performance Logging

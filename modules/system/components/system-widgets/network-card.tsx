@@ -1,4 +1,4 @@
-import { Activity, ArrowDown, ArrowUp } from "@/components/icons/platform-icons";
+import { ArrowDown, ArrowUp, Network } from "@/components/icons/platform-icons";
 import type { NetworkWidgetData } from "@/modules/system/components/system-widgets/types";
 import { WidgetCard } from "@/modules/system/components/system-widgets/widget-card";
 
@@ -8,7 +8,7 @@ type NetworkCardProps = {
 
 export function NetworkCard({ network }: NetworkCardProps) {
   return (
-    <WidgetCard title="Network" icon={Activity}>
+    <WidgetCard title="Network" icon={Network}>
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">

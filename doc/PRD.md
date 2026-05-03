@@ -37,7 +37,7 @@ From `README.md` and `ROADMAP.md`:
 
 ## Roadmap Summary
 
-The canonical roadmap is [../ROADMAP.md](../ROADMAP.md). As of the current repo docs, v1.6 is active development for storage expansion and polish, including disk/partition management and Google Drive integration. v2.0 is planned around multi-user access, API tokens, 2FA, and audit logs.
+The canonical roadmap is [../ROADMAP.md](../ROADMAP.md). As of the current repo docs, v1.6.x is the current release line for storage expansion and polish, including disk/partition management, server information, safer uploads, Google Drive integration, and shell visual polish. v2.0 is planned around multi-user access, API tokens, 2FA, and audit logs.
 
 Do not duplicate roadmap detail in module docs; link to `ROADMAP.md` and document only current code behavior.
 

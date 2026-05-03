@@ -482,3 +482,14 @@ export function GenericFileIcon({ className }: IconProps) {
     />
   );
 }
+
+export function KoraFileIcon({ className, iconKey }: IconProps & { iconKey: string }) {
+  const src = MIMETYPE_ICONS[iconKey] ?? MIMETYPE_ICONS.generic;
+  return (
+    <OsIcon
+      src={src}
+      className={className}
+      fallback={<GenericFileIcon className={className} />}
+    />
+  );
+}

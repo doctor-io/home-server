@@ -25,7 +25,7 @@ export type DockItemDef = {
 };
 
 export const dockItemDefs: DockItemDef[] = [
-  { id: "apps",      name: "Apps",      icon: GridDotsRegular,      iconBg: "bg-blue-500/80" },
+  { id: "apps",      name: "Home",      icon: GridDotsRegular,      iconBg: "bg-blue-500/80" },
   { id: "terminal",  name: "Terminal",  icon: WindowConsoleRegular, iconBg: "bg-slate-700/90" },
   { id: "files",     name: "Files",     icon: OpenFolderRegular,    iconBg: "bg-amber-500/80" },
   { id: "monitor",   name: "Monitor",   icon: PulseRegular,         iconBg: "bg-emerald-600/80" },
@@ -53,12 +53,7 @@ export function Dock({
   const isVertical = position === "left" || position === "right";
 
   function getScale(index: number) {
-    if (hoveredIndex === null) return 1;
-    const distance = Math.abs(index - hoveredIndex);
-    if (distance === 0) return 1.35;
-    if (distance === 1) return 1.15;
-    if (distance === 2) return 1.05;
-    return 1;
+    return hoveredIndex === index ? 1.18 : 1;
   }
 
   const dockPositionClass =
@@ -109,7 +104,7 @@ export function Dock({
                     style={{
                       transform: `scale(${scale})`,
                       transition: animationsEnabled
-                        ? "transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)"
+                        ? "transform 0.16s ease-out"
                         : "none",
                     }}
                     className="relative size-11 rounded-2xl overflow-hidden cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary/60"

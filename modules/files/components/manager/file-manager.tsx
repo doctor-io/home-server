@@ -33,6 +33,8 @@ import { useNetworkShares } from "@/modules/files/hooks/useNetworkShares";
 import { useUsbDrives } from "@/modules/files/hooks/useUsbDrives";
 import { useGoogleDriveConnections } from "@/modules/files/hooks/useGoogleDrive";
 import { Cloud } from "@/components/icons/platform-icons";
+import { OsIcon } from "@/components/icons/OsIcon";
+import { FILE_SIDEBAR_ICONS } from "@/components/icons/icon-assets";
 import {
   useDeleteFromTrash,
   useEmptyTrash,
@@ -185,7 +187,13 @@ export function FileManager() {
         ? []
         : getDriveItems(googleDriveConnectionsQuery.data?.connections).map((item) => ({
             ...item,
-            icon: <Cloud className="size-4 text-sky-400" />,
+            icon: (
+              <OsIcon
+                src={FILE_SIDEBAR_ICONS.googleDrive}
+                className="size-4 object-contain"
+                fallback={<Cloud className="size-4 text-sky-400" />}
+              />
+            ),
             accountEmail: item.email,
           })),
     [isDemoMode, googleDriveConnectionsQuery.data],
@@ -430,6 +438,7 @@ export function FileManager() {
       uploadInputRef={uploadInputRef}
       uploadPending={uploadFilesMutation.isPending}
       uploadProgress={state.uploadProgress}
+      unzipPending={unzipFileMutation.isPending}
       viewMode={state.viewMode}
     />
   );

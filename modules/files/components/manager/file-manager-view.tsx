@@ -113,6 +113,7 @@ type FileManagerViewProps = {
   uploadInputRef: RefObject<HTMLInputElement | null>;
   uploadPending: boolean;
   uploadProgress: { loaded: number; total: number } | null;
+  unzipPending: boolean;
   viewMode: ViewMode;
 };
 
@@ -195,6 +196,7 @@ export function FileManagerView({
   uploadInputRef,
   uploadPending,
   uploadProgress,
+  unzipPending,
   viewMode,
 }: FileManagerViewProps) {
   return (
@@ -366,6 +368,7 @@ export function FileManagerView({
         trashItemCount={trashItemCount}
         uploadPending={uploadPending}
         uploadProgress={uploadProgress}
+        unzipPending={unzipPending}
         onCancelEmptyTrash={() => dispatch({ type: "HIDE_EMPTY_TRASH_CONFIRM" })}
         onCancelUpload={onCancelUpload}
         onChangeCreateEntryDialog={(value) => dispatch({ type: "UPDATE_CREATE_ENTRY_DIALOG", name: value, error: validateEntryName(value) })}

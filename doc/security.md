@@ -9,6 +9,7 @@ Defended:
 - Session cookie tampering through HMAC-SHA256 signatures.
 - Password disclosure through scrypt password hashing.
 - File traversal outside `FILES_ROOT` through `resolvePathWithinFilesRoot()`.
+- Large upload traversal in the Go upload sidecar through its own `FILES_ROOT` path jail and session-cookie HMAC validation.
 - PTY environment leakage through a terminal env allowlist.
 
 Not fully defended:
@@ -39,6 +40,14 @@ Passwords are hashed in `lib/server/modules/auth/password.ts` using Node `crypto
 
 Network and USB features use `services/dbus-helper/` over `DBUS_HELPER_SOCKET_PATH`. The sidecar talks to NetworkManager and udisks2 through D-Bus. It is a separate privilege boundary and must be tested separately when changed.
 
+## Upload Sidecar
+
+Bare-metal installs build `services/upload-server/main.go` and run it through systemd on `UPLOAD_SERVER_ADDR`, defaulting to `/run/home-server/upload.sock`. The sidecar validates the `homeio_session` cookie using `AUTH_SESSION_SECRET`, rejects unsafe filenames and paths, writes only under `FILES_ROOT`, and exposes a simple `/health` endpoint. The socket is chmod `0666` so the app process can reach it; do not expose a TCP `UPLOAD_SERVER_ADDR` outside a trusted local boundary.
+
+## Google OAuth Secrets
+
+Settings → Integrations stores Google OAuth client credentials in the singleton `settings` row. The client secret is encrypted with the existing file-secret encryption helper; the public settings API returns only client ID, redirect URI, and `hasSecret`. Connected Google Drive account access and refresh tokens are stored encrypted in `files_google_drive_tokens`.
+
 ## Known Gaps
 
 | Gap | Severity | Exploit scenario | Status |
@@ -48,6 +57,8 @@ Network and USB features use `services/dbus-helper/` over `DBUS_HELPER_SOCKET_PA
 | Unsafe production `AUTH_SESSION_SECRET` | High | Users who do not change it risk forged session tokens | Mitigated at runtime by `lib/server/env.ts`; development/test defaults still work |
 | Docker socket mounted | High | App compromise can become host compromise through Docker | Accepted deployment trade-off |
 | WebSocket terminal is full shell | High | Authenticated terminal access is host shell access, not command allowlist | Open documentation gap |
+| Upload sidecar socket is broad-permission | Medium | Local host users could try authenticated upload requests through the socket | Mitigated by session validation and path jail; keep socket local |
+| Disk manager destructive routes | High | Authenticated user can format, partition, or wipe host disks | Mitigated by single-user trust model and explicit UI confirmations |
 | `passwordHash` returned from session lookup | Low | Hash circulates in memory unnecessarily | Open |
 | `services/dbus-helper/` plain JS | Medium | Lower type safety for privileged sidecar protocol | Open |
 

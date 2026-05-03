@@ -2,12 +2,12 @@
 
 import Image from "next/image";
 import {
+  ArrowRight,
   Eye,
   EyeOff,
   Lock,
   UserRound,
 } from "@/components/icons/platform-icons";
-import { ArrowRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 

@@ -1,5 +1,7 @@
-import { createElement } from "react";
-import { Cloud, Folder, HardDrive, Home, StarFilled, Usb } from "@/components/icons/platform-icons";
+import { createElement, type ReactNode } from "react";
+import { Folder, HardDrive, Home, StarFilled, Usb } from "@/components/icons/platform-icons";
+import { OsIcon } from "@/components/icons/OsIcon";
+import { DEVICE_ICONS, FILE_SIDEBAR_ICONS, FOLDER_ICONS } from "@/components/icons/icon-assets";
 import type { FileListEntry, FileReadResponse } from "@/lib/shared/contracts/files";
 import type { FileManagerSidebarSection, RemovableSidebarItem } from "@/modules/files/components/chrome/file-manager-sidebar";
 import type { UsbDrive } from "@/lib/shared/contracts/usb";
@@ -19,38 +21,64 @@ export const STARRED_VIRTUAL_PATH = ["⭐Starred"] as const;
 
 export const DRIVE_PATH_PREFIX = "Drive" as const;
 
+function createKoraIcon(src: string, fallback: ReactNode) {
+  return createElement(OsIcon, {
+    src,
+    className: "size-4 object-contain",
+    fallback,
+  });
+}
+
 export const sidebarSections: FileManagerSidebarSection[] = [
   {
     title: "Favorites",
     items: [
       {
         name: "Home",
-        icon: createElement(Home, { className: "size-4 text-muted-foreground" }),
+        icon: createKoraIcon(
+          FILE_SIDEBAR_ICONS.home,
+          createElement(Home, { className: "size-4 text-muted-foreground" }),
+        ),
         path: [],
       },
       {
         name: "Starred",
-        icon: createElement(StarFilled, { className: "size-4 text-amber-400" }),
+        icon: createKoraIcon(
+          FILE_SIDEBAR_ICONS.starred,
+          createElement(StarFilled, { className: "size-4 text-amber-400" }),
+        ),
         path: [...STARRED_VIRTUAL_PATH],
       },
       {
         name: "Documents",
-        icon: createElement(Folder, { className: "size-4 text-sky-400" }),
+        icon: createKoraIcon(
+          FOLDER_ICONS.document,
+          createElement(Folder, { className: "size-4 text-sky-400" }),
+        ),
         path: ["Documents"],
       },
       {
         name: "Downloads",
-        icon: createElement(Folder, { className: "size-4 text-emerald-400" }),
+        icon: createKoraIcon(
+          FOLDER_ICONS.download,
+          createElement(Folder, { className: "size-4 text-emerald-400" }),
+        ),
         path: ["Downloads"],
       },
       {
         name: "Media",
-        icon: createElement(Folder, { className: "size-4 text-amber-400" }),
+        icon: createKoraIcon(
+          FOLDER_ICONS.video,
+          createElement(Folder, { className: "size-4 text-amber-400" }),
+        ),
         path: ["Media"],
       },
       {
         name: "Apps",
-        icon: createElement(Folder, { className: "size-4 text-violet-400" }),
+        icon: createKoraIcon(
+          FOLDER_ICONS.app,
+          createElement(Folder, { className: "size-4 text-violet-400" }),
+        ),
         path: ["AppData"],
       },
     ],
@@ -210,7 +238,10 @@ export function getLocationItems(
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([host, hostPath]) => ({
       name: host,
-      icon: createElement(HardDrive, { className: "size-4 text-cyan-400" }),
+      icon: createKoraIcon(
+        DEVICE_ICONS.network,
+        createElement(HardDrive, { className: "size-4 text-cyan-400" }),
+      ),
       path: hostPath,
     }));
 }
@@ -222,7 +253,10 @@ function usbPathSegment(label: string, id: string): string {
 export function getRemovableItems(drives: UsbDrive[]): RemovableSidebarItem[] {
   return drives.map((drive) => ({
     name: drive.label,
-    icon: createElement(Usb, { className: "size-4 text-amber-400" }),
+    icon: createKoraIcon(
+      DEVICE_ICONS.usb,
+      createElement(Usb, { className: "size-4 text-amber-400" }),
+    ),
     path: ["Removable", usbPathSegment(drive.label, drive.id)],
     driveId: drive.id,
     isMounted: drive.isMounted,

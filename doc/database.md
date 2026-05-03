@@ -17,7 +17,7 @@ Homeio uses PostgreSQL with Drizzle ORM. The schema lives in `lib/server/db/sche
 | `notifications` | `id text pk`, `title`, `body`, `kind default info`, `read default false`, `created_at` | `notifications_created_at_idx` |
 | `scheduled_tasks` | `id text pk`, `label`, `task_type`, `task_config jsonb`, `cron_expression`, `enabled`, `last_run_at`, `last_run_status`, `last_run_output`, `next_run_at`, `created_at`, `updated_at` | `scheduled_tasks_next_run_at_idx` |
 | `scheduled_task_executions` | `id text pk`, `task_id`, `status`, `output`, `started_at`, `duration_ms` | `task_id -> scheduled_tasks.id cascade`, task and started indexes |
-| `settings` | `id text pk default singleton`, `appearance_json jsonb`, `updated_at` | singleton row pattern |
+| `settings` | `id text pk default singleton`, `appearance_json jsonb`, encrypted Google OAuth client secret fields, `google_client_id`, `google_redirect_uri`, `updated_at` | singleton row pattern |
 | `files_google_drive_tokens` | `id text pk`, `email unique`, `display_name`, encrypted access/refresh token fields, `expires_at`, `created_at`, `updated_at` | unique email, created index |
 | `files_trash_entries` | `id text pk`, `trash_path`, `original_path`, `deleted_at` | unique trash path, deleted index |
 
@@ -94,4 +94,5 @@ npm run db:init
 - Database client helpers live in `lib/server/db/drizzle.ts`, `lib/server/db/postgres.ts`, and `lib/server/db/query.ts`.
 - Repository functions live under owning server modules, for example `lib/server/modules/apps/stacks-repository.ts` and `lib/server/modules/files/network-shares-repository.ts`.
 - JSON settings use `jsonb` fields such as `settings.appearance_json`, `app_stacks.env_json`, and `scheduled_tasks.task_config`.
+- Google Drive OAuth app credentials are stored on the singleton `settings` row. The client secret uses the same ciphertext/IV/tag pattern as other encrypted file credentials; connected account tokens live separately in `files_google_drive_tokens`.
 - The current codebase uses standard Drizzle query builders; no prepared-statement convention was found in the audited files.
