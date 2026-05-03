@@ -181,7 +181,7 @@ export function FileManager() {
     () =>
       isDemoMode
         ? []
-        : getDriveItems(googleDriveConnectionsQuery.data).map((item) => ({
+        : getDriveItems(googleDriveConnectionsQuery.data?.connections).map((item) => ({
             ...item,
             icon: <Cloud className="size-4 text-sky-400" />,
             accountEmail: item.email,
@@ -191,7 +191,7 @@ export function FileManager() {
   const activeDriveConnection = useMemo(() => {
     if (!viewFlags.isDriveView) return null;
     const connectionId = state.currentPath[1];
-    const conn = googleDriveConnectionsQuery.data?.find((c) => c.id === connectionId);
+    const conn = googleDriveConnectionsQuery.data?.connections.find((c) => c.id === connectionId);
     return conn ? { id: conn.id, email: conn.email } : null;
   }, [viewFlags.isDriveView, state.currentPath, googleDriveConnectionsQuery.data]);
   const counts = useMemo(() => getBrowserCounts(sortedEntries), [sortedEntries]);

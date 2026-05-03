@@ -10,6 +10,7 @@ import (
 	"log"
 	"mime"
 	"mime/multipart"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -26,7 +27,7 @@ var (
 func main() {
 	filesRoot = getEnv("FILES_ROOT", "/DATA")
 	sessionSecret = []byte(mustGetEnv("AUTH_SESSION_SECRET"))
-	addr := getEnv("UPLOAD_SERVER_ADDR", "127.0.0.1:3001")
+	addr := getEnv("UPLOAD_SERVER_ADDR", "/run/home-server/upload.sock")
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /upload", handleUpload)
@@ -34,10 +35,33 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 	})
 
+	ln, err := listen(addr)
+	if err != nil {
+		log.Fatalf("failed to bind %s: %v", addr, err)
+	}
 	log.Printf("upload-server listening on %s (FILES_ROOT=%s)", addr, filesRoot)
-	if err := http.ListenAndServe(addr, mux); err != nil {
+	if err := http.Serve(ln, mux); err != nil {
 		log.Fatalf("server error: %v", err)
 	}
+}
+
+func listen(addr string) (net.Listener, error) {
+	if strings.Contains(addr, ":") {
+		return net.Listen("tcp", addr)
+	}
+	// Unix socket: remove stale socket file from a previous run.
+	_ = os.Remove(addr)
+	if dir := filepath.Dir(addr); dir != "" && dir != "." {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return nil, fmt.Errorf("mkdir %s: %w", dir, err)
+		}
+	}
+	ln, err := net.Listen("unix", addr)
+	if err != nil {
+		return nil, err
+	}
+	_ = os.Chmod(addr, 0660)
+	return ln, nil
 }
 
 func getEnv(key, def string) string {

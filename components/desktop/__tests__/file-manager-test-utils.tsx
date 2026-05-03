@@ -1,5 +1,6 @@
 import { render } from "@testing-library/react";
 import { vi } from "vitest";
+import { FileManager } from "@/modules/files/components/file-manager";
 
 export const mockUseFilesDirectory = vi.fn();
 export const mockUseFileContent = vi.fn();
@@ -91,9 +92,8 @@ vi.mock("@/modules/files/components/dialogs/usb-storage-dialog", () => ({
   UsbStorageDialog: () => null,
 }));
 
-export async function renderFileManager() {
-  const { FileManager } = await import("@/modules/files/components/file-manager");
-  return render(<FileManager />);
+export function renderFileManager() {
+  return Promise.resolve(render(<FileManager />));
 }
 
 export function mockDirectory(entries: Array<{ name: string; path: string; type: "folder" | "file" }>) {
@@ -208,7 +208,7 @@ export function resetFileManagerMocks() {
     isUnmounting: false,
     isEjecting: false,
   });
-  mockUseGoogleDriveConnections.mockReturnValue({ data: [], isLoading: false, isError: false, error: null });
+  mockUseGoogleDriveConnections.mockReturnValue({ data: { connections: [], configured: true }, isLoading: false, isError: false, error: null });
   mockUseLocalFolderShares.mockReturnValue({ data: [], isLoading: false, isError: false, error: null });
   mockUseCreateLocalFolderShare.mockReturnValue({
     mutateAsync: vi.fn().mockResolvedValue({

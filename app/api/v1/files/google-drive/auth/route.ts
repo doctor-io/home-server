@@ -4,7 +4,8 @@ import { cookies } from "next/headers";
 
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(request: Request) {
+  const origin = new URL(request.url).origin;
   try {
     const state = generateState();
     const url = buildAuthUrl(state);
@@ -20,8 +21,8 @@ export async function GET() {
     return NextResponse.redirect(url);
   } catch (error) {
     if (error instanceof GoogleDriveError) {
-      return NextResponse.json({ error: error.message, code: error.code }, { status: error.statusCode });
+      return NextResponse.redirect(`${origin}/google-drive/connected?error=${encodeURIComponent(error.message)}`);
     }
-    return NextResponse.json({ error: "Failed to start Google Drive auth", code: "internal_error" }, { status: 500 });
+    return NextResponse.redirect(`${origin}/google-drive/connected?error=${encodeURIComponent("Failed to start Google Drive auth")}`);
   }
 }

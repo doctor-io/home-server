@@ -45,8 +45,8 @@ export function GoogleDriveDialog({ isOpen, onClose }: GoogleDriveDialogProps) {
     if (popup) popupRef.current = popup;
   }
 
-  const connections = connectionsQuery.data ?? [];
-  const isConfigured = !connectionsQuery.error?.message.includes("not configured");
+  const connections = connectionsQuery.data?.connections ?? [];
+  const isConfigured = connectionsQuery.data?.configured ?? true;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>

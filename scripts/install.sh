@@ -510,7 +510,9 @@ After=network.target
 Type=simple
 User=root
 EnvironmentFile=${ENV_FILE}
-Environment=UPLOAD_SERVER_ADDR=127.0.0.1:3001
+Environment=UPLOAD_SERVER_ADDR=/run/home-server/upload.sock
+RuntimeDirectory=home-server
+RuntimeDirectoryMode=0755
 ExecStart=${INSTALL_DIR}/bin/upload-server
 Restart=always
 RestartSec=5
@@ -1050,7 +1052,7 @@ server {
     # Route file uploads directly to the Go upload server, bypassing Next.js.
     # The Go binary streams multipart data straight to disk with minimal overhead.
     location = /api/v1/files/upload {
-        proxy_pass http://127.0.0.1:3001/upload;
+        proxy_pass http://unix:/run/home-server/upload.sock:/upload;
         proxy_http_version 1.1;
         proxy_request_buffering off;
         proxy_buffering off;

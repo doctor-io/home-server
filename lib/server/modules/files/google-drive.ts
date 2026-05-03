@@ -39,7 +39,7 @@ function getOAuthConfig() {
     throw new GoogleDriveError(
       "Google Drive is not configured. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to your environment.",
       "not_configured",
-      503,
+      501,
     );
   }
 
@@ -79,6 +79,10 @@ async function ensureTableOnce() {
     });
   }
   await ensureTablePromise;
+}
+
+export function isGoogleDriveConfigured(): boolean {
+  return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 }
 
 export function buildAuthUrl(state: string): string {
