@@ -42,9 +42,12 @@ export function TailscalePopover({ onClose }: TailscalePopoverProps) {
   const configured = Boolean(config?.tailnet && config.hasApiKey);
   const connected = Boolean(status?.connected);
   const installed = Boolean(status?.installed);
+  const missingTun = status?.issue === "missing_tun";
   const title = connected
     ? "Tailscale Connected"
-    : installed
+    : missingTun
+      ? "Tailscale Needs TUN"
+      : installed
       ? "Tailscale Not Connected"
       : "Tailscale Not Installed";
 
@@ -85,13 +88,24 @@ export function TailscalePopover({ onClose }: TailscalePopoverProps) {
             value={isLoading ? "Checking..." : connected ? "Connected" : "Disconnected"}
             ok={connected}
           />
+          <StatusRow
+            label="TUN"
+            value={status?.tunAvailable ? "Available" : "Missing"}
+            ok={status?.tunAvailable}
+          />
           <StatusRow label="State" value={status?.backendState ?? "--"} />
           <StatusRow label="Machine" value={status?.hostname ?? "--"} />
           <StatusRow label="DNS" value={status?.dnsName ?? "--"} />
           <StatusRow label="IP" value={status?.tailscaleIps[0] ?? "--"} />
         </div>
 
-        {(status?.error || error) && (
+        {missingTun && (
+          <div className="mt-4 rounded-lg border border-status-amber/25 bg-status-amber/10 px-3 py-2 text-xs text-status-amber">
+            Proxmox LXC must expose dev/net/tun before Tailscale can start.
+          </div>
+        )}
+
+        {(status?.error || error) && !missingTun && (
           <div className="mt-4 rounded-lg border border-status-amber/25 bg-status-amber/10 px-3 py-2 text-xs text-status-amber">
             {status?.error ?? (error instanceof Error ? error.message : "Unable to read Tailscale status.")}
           </div>

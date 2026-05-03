@@ -67,8 +67,12 @@ async function fetchTailscaleStatus(): Promise<TailscaleStatusPublic> {
   return json.data!;
 }
 
-async function installTailscaleService(): Promise<TailscaleInstallResult> {
-  const res = await fetch("/api/v1/system/tailscale/install", { method: "POST" });
+async function installTailscaleService(authKey: string): Promise<TailscaleInstallResult> {
+  const res = await fetch("/api/v1/system/tailscale/install", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ authKey }),
+  });
   const json = (await res.json()) as { data?: TailscaleInstallResult; error?: string };
   if (!res.ok) throw new Error(json.error ?? "Failed to install Tailscale");
   return json.data!;
@@ -314,9 +318,7 @@ function TailscaleConfig() {
           apiKey: apiKey.trim(),
         });
       }
-      if (!status?.installed) {
-        await installTailscaleService();
-      }
+      await installTailscaleService(apiKey.trim());
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.tailscaleConfig });
@@ -332,7 +334,7 @@ function TailscaleConfig() {
   const isBusy = saveMutation.isPending || clearMutation.isPending || activateMutation.isPending || isLoading;
   const effectiveTailnet = tailnet.trim() || saved?.tailnet || "";
   const canSave = effectiveTailnet.length > 0 && apiKey.trim().length > 0;
-  const canActivate = isConfigured || canSave;
+  const canActivate = canSave && status?.issue !== "missing_tun";
   const serviceLabel = isStatusLoading
     ? "Checking"
     : status?.installed
@@ -367,7 +369,13 @@ function TailscaleConfig() {
       {activateMutation.error && (
         <InfoBanner text={(activateMutation.error as Error).message} variant="warning" />
       )}
-      {status?.error && (
+      {status?.issue === "missing_tun" && (
+        <InfoBanner
+          text="Tailscale cannot activate because /dev/net/tun is missing. In Proxmox LXC, add Device Passthrough dev/net/tun, or run: pct set CTID --dev0 /dev/net/tun && pct set CTID --features keyctl=1,nesting=1"
+          variant="warning"
+        />
+      )}
+      {status?.error && status.issue !== "missing_tun" && (
         <InfoBanner text={status.error} variant="warning" />
       )}
 
@@ -383,7 +391,7 @@ function TailscaleConfig() {
             <div className="min-w-0">
               <div className="text-sm font-medium text-foreground">Tailscale</div>
               <div className="mt-0.5 text-[11px] text-muted-foreground/70">
-                Private mesh network access for this server.
+                Install the official Linux client and register this server with an auth key.
               </div>
             </div>
           </div>
@@ -403,6 +411,10 @@ function TailscaleConfig() {
             <div className="mt-1 text-xs text-foreground">{connectionLabel}</div>
           </div>
           <div className="rounded-lg border border-glass-border bg-background/35 px-3 py-2">
+            <div className="text-muted-foreground/60">TUN device</div>
+            <div className="mt-1 text-xs text-foreground">{status?.tunAvailable ? "Available" : "Missing"}</div>
+          </div>
+          <div className="rounded-lg border border-glass-border bg-background/35 px-3 py-2">
             <div className="text-muted-foreground/60">Machine</div>
             <div className="mt-1 truncate text-xs text-foreground">{status?.hostname ?? "--"}</div>
           </div>
@@ -415,7 +427,7 @@ function TailscaleConfig() {
 
       <div className={cn(SETTINGS_PANEL_INSET, "flex items-center justify-between px-4 py-2.5")}>
         <div className="text-[11px] text-muted-foreground/70">
-          Activate installs the local Tailscale service if it is missing, then stores your tailnet name and API access token.
+          Activate uses the official Linux install script, then runs tailscale up with your auth key.
         </div>
         <a
           href="https://login.tailscale.com/admin/settings/keys"
@@ -441,13 +453,13 @@ function TailscaleConfig() {
         />
       </InputRow>
 
-      <InputRow label="API access token" description="Kept encrypted in the database">
+      <InputRow label="Auth key" description="Generate an auth key in Tailscale Keys; kept encrypted until activation">
         <div className="relative">
           <input
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
             type={showApiKey ? "text" : "password"}
-            placeholder={saved?.hasApiKey ? "••••••••••••••••" : "tskey-api-..."}
+            placeholder={saved?.hasApiKey ? "••••••••••••••••" : "tskey-auth-..."}
             disabled={isBusy}
             className={cn(inputCls, "pr-9")}
           />
@@ -481,7 +493,7 @@ function TailscaleConfig() {
             className="flex h-7 items-center gap-1.5 rounded-lg border border-glass-border bg-background/55 px-3 text-xs font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-40"
           >
             {savedOk && !activateMutation.isPending && <Check className="size-3" />}
-            {saveMutation.isPending ? "Saving…" : savedOk ? "Saved" : "Save credentials"}
+            {saveMutation.isPending ? "Saving…" : savedOk ? "Saved" : "Save auth key"}
           </button>
           <button
             onClick={() => activateMutation.mutate()}

@@ -11,7 +11,9 @@ export async function POST(request: Request) {
 
   const requestId = createRequestId();
   try {
-    const result = await installTailscale();
+    const body = await request.json().catch(() => ({})) as { authKey?: unknown };
+    const authKey = typeof body.authKey === "string" ? body.authKey.trim() : "";
+    const result = await installTailscale(authKey || undefined);
     return NextResponse.json({ data: result });
   } catch (err) {
     logServerAction({ level: "error", layer: "api", action: "system.tailscale.install", status: "error", requestId, message: "Failed to install Tailscale", error: err });
