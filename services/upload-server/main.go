@@ -60,7 +60,7 @@ func listen(addr string) (net.Listener, error) {
 	if err != nil {
 		return nil, err
 	}
-	_ = os.Chmod(addr, 0660)
+	_ = os.Chmod(addr, 0666)
 	return ln, nil
 }
 
