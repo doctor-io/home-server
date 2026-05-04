@@ -67,11 +67,11 @@ async function fetchTailscaleStatus(): Promise<TailscaleStatusPublic> {
   return json.data!;
 }
 
-async function installTailscaleService(authKey: string): Promise<TailscaleInstallResult> {
+async function installTailscaleService(authKey?: string): Promise<TailscaleInstallResult> {
   const res = await fetch("/api/v1/system/tailscale/install", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ authKey }),
+    body: JSON.stringify({ authKey: authKey ?? "" }),
   });
   const json = (await res.json()) as { data?: TailscaleInstallResult; error?: string };
   if (!res.ok) throw new Error(json.error ?? "Failed to install Tailscale");
@@ -98,7 +98,7 @@ function StatusPill({ tone, label }: { tone: "ok" | "warn" | "muted"; label: str
       className={cn(
         "rounded-full border px-2 py-0.5 text-[10px] font-medium",
         tone === "ok" && "border-status-green/25 bg-status-green/10 text-status-green",
-        tone === "warn" && "border-status-yellow/25 bg-status-yellow/10 text-status-yellow",
+        tone === "warn" && "border-status-amber/25 bg-status-amber/10 text-status-amber",
         tone === "muted" && "border-glass-border bg-background/55 text-muted-foreground",
       )}
     >
@@ -318,7 +318,7 @@ function TailscaleConfig() {
           apiKey: apiKey.trim(),
         });
       }
-      await installTailscaleService(apiKey.trim());
+      await installTailscaleService(apiKey.trim() || undefined);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.tailscaleConfig });
@@ -334,7 +334,7 @@ function TailscaleConfig() {
   const isBusy = saveMutation.isPending || clearMutation.isPending || activateMutation.isPending || isLoading;
   const effectiveTailnet = tailnet.trim() || saved?.tailnet || "";
   const canSave = effectiveTailnet.length > 0 && apiKey.trim().length > 0;
-  const canActivate = canSave && status?.issue !== "missing_tun";
+  const canActivate = (isConfigured || canSave) && status?.issue !== "missing_tun";
   const serviceLabel = isStatusLoading
     ? "Checking"
     : status?.installed

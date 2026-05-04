@@ -1,7 +1,10 @@
 import "server-only";
 
 import { execFile } from "node:child_process";
-import { access } from "node:fs/promises";
+import { access, unlink, writeFile } from "node:fs/promises";
+import { randomBytes } from "node:crypto";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { promisify } from "node:util";
 import type {
   TailscaleInstallResult,
@@ -95,7 +98,21 @@ export async function getLocalTailscaleStatus(): Promise<TailscaleStatusPublic> 
   }
 }
 
+let installLock = false;
+
 export async function installTailscale(authKey?: string): Promise<TailscaleInstallResult> {
+  if (installLock) {
+    throw new Error("Tailscale installation already in progress. Please wait.");
+  }
+  installLock = true;
+  try {
+    return await runInstall(authKey);
+  } finally {
+    installLock = false;
+  }
+}
+
+async function runInstall(authKey?: string): Promise<TailscaleInstallResult> {
   const currentStatus = await getLocalTailscaleStatus();
   let stdout = "";
   let stderr = "";
@@ -129,16 +146,22 @@ export async function installTailscale(authKey?: string): Promise<TailscaleInsta
   await execFileAsync("systemctl", ["reset-failed", "tailscaled"], { timeout: 10_000 });
   await execFileAsync("systemctl", ["enable", "--now", "tailscaled"], { timeout: 30_000 });
 
-  const upResult = await execFileAsync("tailscale", [
-    "up",
-    `--auth-key=${authKey}`,
-    "--accept-dns=true",
-  ], {
-    timeout: 120_000,
-    maxBuffer: 1024 * 1024,
-  });
-  stdout += upResult.stdout;
-  stderr += upResult.stderr;
+  const tmpKeyFile = join(tmpdir(), `ts-key-${randomBytes(8).toString("hex")}`);
+  await writeFile(tmpKeyFile, authKey, { mode: 0o600 });
+  try {
+    const upResult = await execFileAsync("tailscale", [
+      "up",
+      `--auth-key=file:${tmpKeyFile}`,
+      "--accept-dns=true",
+    ], {
+      timeout: 120_000,
+      maxBuffer: 1024 * 1024,
+    });
+    stdout += upResult.stdout;
+    stderr += upResult.stderr;
+  } finally {
+    await unlink(tmpKeyFile).catch(() => {});
+  }
 
   return {
     installed: true,
