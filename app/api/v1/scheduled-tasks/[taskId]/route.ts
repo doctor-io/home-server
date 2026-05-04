@@ -9,6 +9,7 @@ import { getAuthCookieName } from "@/lib/server/modules/auth/cookies";
 import { authenticateSession } from "@/lib/server/modules/auth/service";
 import { createRequestId, logServerAction } from "@/lib/server/logging/logger";
 import { updateScheduledTaskSchema } from "@/lib/shared/contracts/scheduled-tasks";
+import { requireApiSession } from "@/lib/server/modules/auth/api";
 
 export const runtime = "nodejs";
 
@@ -30,6 +31,8 @@ async function authenticateRequest(request: NextRequest, requestId: string) {
 }
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ taskId: string }> }) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   const requestId = createRequestId();
   const session = await authenticateRequest(request, requestId);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -41,6 +44,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ taskId: string }> }) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   const requestId = createRequestId();
   const session = await authenticateRequest(request, requestId);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -86,6 +91,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ taskId: string }> }) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   const requestId = createRequestId();
   const session = await authenticateRequest(request, requestId);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

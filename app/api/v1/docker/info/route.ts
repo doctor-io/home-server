@@ -4,6 +4,7 @@ import {
   withServerTiming,
 } from "@/lib/server/logging/logger";
 import { getDockerInfo } from "@/lib/server/modules/docker/stats";
+import { requireApiSession } from "@/lib/server/modules/auth/api";
 
 export const runtime = "nodejs";
 
@@ -13,7 +14,9 @@ export const runtime = "nodejs";
  * Returns Docker engine metadata (version, storage driver, cgroup driver, image count).
  * Returns 503 when the Docker daemon socket is unreachable.
  */
-export async function GET() {
+export async function GET(request: Request) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   const requestId = createRequestId();
 
   return withServerTiming(

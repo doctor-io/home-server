@@ -1,24 +1,26 @@
 import {
-  AlertRegular,
-  ArrowSyncRegular,
-  BoxRegular,
-  CalendarClockRegular,
-  DatabaseRegular,
-  HardDriveRegular,
-  PaintBrushRegular,
-  PeopleRegular,
-  PowerRegular,
-  RouterRegular,
-  ServerRegular,
-  ShieldRegular,
-  WrenchRegular,
-} from "@fluentui/react-icons";
+  Bell         as AlertRegular,
+  RefreshCw    as ArrowSyncRegular,
+  Container    as BoxRegular,
+  CalendarClock as CalendarClockRegular,
+  Database     as DatabaseRegular,
+  HardDrive    as HardDriveRegular,
+  Paintbrush   as PaintBrushRegular,
+  Plug         as PlugRegular,
+  Users        as PeopleRegular,
+  Power        as PowerRegular,
+  Router       as RouterRegular,
+  Server       as ServerRegular,
+  Shield       as ShieldRegular,
+  Wrench       as WrenchRegular,
+} from "@/components/icons/platform-icons";
 import {
   AdvancedSection,
   AppearanceSection,
   BackupSection,
   DockerSection,
   GeneralSection,
+  IntegrationsSection,
   NetworkSection,
   NotificationsSection,
   PowerSection,
@@ -44,6 +46,8 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   { id: "network",          label: "Network",          icon: RouterRegular       },
   { id: "storage",          label: "Storage",          icon: HardDriveRegular    },
   { id: "docker",           label: "Docker",           icon: BoxRegular          },
+  // Integrations
+  { id: "integrations",     label: "Integrations",     icon: PlugRegular         },
   // Automation
   { id: "scheduled-tasks",  label: "Scheduled Tasks",  icon: CalendarClockRegular },
   { id: "backup",           label: "Backup & Restore", icon: DatabaseRegular     },
@@ -64,6 +68,7 @@ type SettingsRegistryContext = {
   wallpaperAccentColor: Parameters<typeof AppearanceSection>[0]["wallpaperAccentColor"];
   desktopPreferences: DesktopPreferencesApi;
   settingsBackend: SettingsBackend;
+  onOpenDiskManager?: () => void;
   generalController: {
     draft: { hostname: string; timezone: string };
     setHostname: (value: string) => void;
@@ -174,7 +179,7 @@ export function buildSettingsSectionDefinitions(
     },
     {
       ...SETTINGS_SECTIONS[4], // Storage
-      render: () => <StorageSection data={context.settingsBackend.storage} />,
+      render: () => <StorageSection data={context.settingsBackend.storage} onOpenDiskManager={context.onOpenDiskManager} />,
       save: getDefaultSaveConfig(context.settingsBackend, "storage"),
     },
     {
@@ -190,13 +195,19 @@ export function buildSettingsSectionDefinitions(
       save: getDefaultSaveConfig(context.settingsBackend, "docker"),
     },
 
+    // ── Integrations ─────────────────────────────────────────────────────
+    {
+      ...SETTINGS_SECTIONS[6], // Integrations
+      render: () => <IntegrationsSection />,
+    },
+
     // ── Automation ───────────────────────────────────────────────────────
     {
-      ...SETTINGS_SECTIONS[6], // Scheduled Tasks
+      ...SETTINGS_SECTIONS[7], // Scheduled Tasks
       render: () => <ScheduledTasksSection />,
     },
     {
-      ...SETTINGS_SECTIONS[7], // Backup & Restore
+      ...SETTINGS_SECTIONS[8], // Backup & Restore
       render: () => (
         <BackupSection
           data={context.settingsBackend.backup}
@@ -214,12 +225,12 @@ export function buildSettingsSectionDefinitions(
 
     // ── Access & Safety ──────────────────────────────────────────────────
     {
-      ...SETTINGS_SECTIONS[8], // Users & Access
+      ...SETTINGS_SECTIONS[9], // Users & Access
       render: () => <UsersSection username={context.settingsBackend.general.username} />,
       save: getDefaultSaveConfig(context.settingsBackend, "users"),
     },
     {
-      ...SETTINGS_SECTIONS[9], // Security
+      ...SETTINGS_SECTIONS[10], // Security
       render: () => (
         <SecuritySection
           data={context.settingsBackend.security}
@@ -232,7 +243,7 @@ export function buildSettingsSectionDefinitions(
         : getDefaultSaveConfig(context.settingsBackend, "security"),
     },
     {
-      ...SETTINGS_SECTIONS[10], // Notifications
+      ...SETTINGS_SECTIONS[11], // Notifications
       render: () => (
         <NotificationsSection
           draft={context.notificationController.draft}
@@ -246,7 +257,7 @@ export function buildSettingsSectionDefinitions(
 
     // ── Danger zone ──────────────────────────────────────────────────────
     {
-      ...SETTINGS_SECTIONS[11], // Power
+      ...SETTINGS_SECTIONS[12], // Power
       render: () => (
         <PowerSection
           power={context.settingsBackend.power}
@@ -259,7 +270,7 @@ export function buildSettingsSectionDefinitions(
       save: getDefaultSaveConfig(context.settingsBackend, "power"),
     },
     {
-      ...SETTINGS_SECTIONS[12], // Advanced
+      ...SETTINGS_SECTIONS[13], // Advanced
       render: () => <AdvancedSection />,
     },
   ];

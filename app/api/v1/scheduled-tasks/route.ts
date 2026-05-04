@@ -6,6 +6,7 @@ import { authenticateSession } from "@/lib/server/modules/auth/service";
 import { createRequestId, logServerAction } from "@/lib/server/logging/logger";
 import { z } from "zod";
 import { CRON_EXPRESSION_REGEX, createScheduledTaskSchema } from "@/lib/shared/contracts/scheduled-tasks";
+import { requireApiSession } from "@/lib/server/modules/auth/api";
 
 export const runtime = "nodejs";
 
@@ -27,6 +28,8 @@ async function authenticateRequest(request: NextRequest, requestId: string) {
 }
 
 export async function GET(request: NextRequest) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   const requestId = createRequestId();
   const session = await authenticateRequest(request, requestId);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -49,6 +52,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   const requestId = createRequestId();
   const session = await authenticateRequest(request, requestId);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

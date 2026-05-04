@@ -10,6 +10,12 @@ import {
   getSessionCookieOptions,
 } from "@/lib/server/modules/auth/cookies";
 import { AuthError, loginUser } from "@/lib/server/modules/auth/service";
+import {
+  clearLoginFailures,
+  getLoginRateLimitKey,
+  isLoginRateLimited,
+  recordLoginFailure,
+} from "@/lib/server/modules/auth/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -20,6 +26,7 @@ const loginSchema = z.object({
 
 export async function POST(request: Request) {
   const requestId = createRequestId();
+  let rateLimitKey: string | null = null;
 
   try {
     const body = await request.json();
@@ -31,6 +38,16 @@ export async function POST(request: Request) {
           error: "Invalid request payload",
         },
         { status: 400 },
+      );
+    }
+
+    rateLimitKey = getLoginRateLimitKey(request, parsed.data.username);
+    if (isLoginRateLimited(rateLimitKey)) {
+      return NextResponse.json(
+        {
+          error: "Too many login attempts",
+        },
+        { status: 429 },
       );
     }
 
@@ -56,9 +73,14 @@ export async function POST(request: Request) {
       getSessionCookieOptions(loginResult.expiresAt, request),
     );
 
+    clearLoginFailures(rateLimitKey);
+
     return response;
   } catch (error) {
     const statusCode = error instanceof AuthError ? error.statusCode : 500;
+    if (statusCode === 401 && rateLimitKey) {
+      recordLoginFailure(rateLimitKey);
+    }
 
     logServerAction({
       level: statusCode >= 500 ? "error" : "warn",

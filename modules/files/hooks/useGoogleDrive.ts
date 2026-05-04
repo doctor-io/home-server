@@ -10,20 +10,22 @@ export type GoogleDriveConnection = {
   connectedAt: string;
 };
 
-type ConnectionsApiResponse = { data: GoogleDriveConnection[] };
+type ConnectionsApiResponse = { data: GoogleDriveConnection[]; configured: boolean };
 
 function mapError(status: number, body: { error?: string; code?: string }) {
   return body.error ?? `Request failed (${status})${body.code ? ` [${body.code}]` : ""}`;
 }
 
-async function listConnections(): Promise<GoogleDriveConnection[]> {
+type ConnectionsResult = { connections: GoogleDriveConnection[]; configured: boolean };
+
+async function listConnections(): Promise<ConnectionsResult> {
   const res = await fetch("/api/v1/files/google-drive/connections", { cache: "no-store" });
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
     throw new Error(mapError(res.status, body));
   }
   const json = (await res.json()) as ConnectionsApiResponse;
-  return json.data;
+  return { connections: json.data, configured: json.configured };
 }
 
 async function removeConnection(id: string): Promise<void> {

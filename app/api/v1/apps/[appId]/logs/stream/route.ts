@@ -10,6 +10,7 @@ import {
 } from "@/lib/server/modules/docker/logs";
 import { toSseChunk } from "@/lib/server/realtime/sse";
 import { serverEnv } from "@/lib/server/env";
+import { requireApiSession } from "@/lib/server/modules/auth/api";
 
 export const runtime = "nodejs";
 
@@ -28,6 +29,8 @@ type Context = {
  * Each event: `event: log.line` with payload `{ timestamp, stream, level, message }`.
  */
 export async function GET(request: Request, context: Context) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   if (activeAppLogConnections >= MAX_APP_LOG_CONNECTIONS) {
     return new Response(
       JSON.stringify({ error: "Too many log stream connections", code: "rate_limited" }),

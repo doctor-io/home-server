@@ -11,6 +11,7 @@ import type {
   FileRenameResponse,
   FileRootResponse,
   FileToggleStarResponse,
+  FileUnzipResponse,
   FileWriteRequest,
   FileWriteResponse,
 } from "@/lib/shared/contracts/files";
@@ -54,6 +55,10 @@ type FileInfoApiResponse = {
 
 type FileToggleStarApiResponse = {
   data: FileToggleStarResponse;
+};
+
+type FileUnzipApiResponse = {
+  data: FileUnzipResponse;
 };
 
 export function buildListEndpoint(filePath: string, includeHidden = false) {
@@ -316,6 +321,25 @@ export async function toggleStar(pathValue: string) {
   return json.data;
 }
 
+export async function unzipFile(pathValue: string) {
+  const response = await fetch("/api/v1/files/ops", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "unzip", path: pathValue }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await getErrorBody(response);
+    throw new Error(
+      errorBody.error ??
+        `Failed to unzip (${response.status})${errorBody.code ? ` [${errorBody.code}]` : ""}`,
+    );
+  }
+
+  const json = (await response.json()) as FileUnzipApiResponse;
+  return json.data;
+}
+
 export async function fetchDirectory(filePath: string, includeHidden: boolean) {
   const endpoint = buildListEndpoint(filePath, includeHidden);
 
@@ -354,6 +378,7 @@ export async function uploadFilesToPath(payload: {
   files: File[];
   includeHidden?: boolean;
   onProgress?: (loaded: number, total: number) => void;
+  signal?: AbortSignal;
 }) {
   const formData = new FormData();
   formData.append("path", payload.destinationPath);
@@ -365,7 +390,36 @@ export async function uploadFilesToPath(payload: {
   return new Promise<{ uploaded: { name: string; path: string; sizeBytes: number }[]; skipped: string[] }>(
     (resolve, reject) => {
       const xhr = new XMLHttpRequest();
+      let settled = false;
+
+      function createAbortError() {
+        const error = new Error("Upload canceled");
+        error.name = "AbortError";
+        return error;
+      }
+
+      function cleanup() {
+        payload.signal?.removeEventListener("abort", abortUpload);
+      }
+
+      function settle(callback: () => void) {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        callback();
+      }
+
+      function abortUpload() {
+        xhr.abort();
+      }
+
+      if (payload.signal?.aborted) {
+        reject(createAbortError());
+        return;
+      }
+
       xhr.open("POST", "/api/v1/files/upload");
+      payload.signal?.addEventListener("abort", abortUpload, { once: true });
 
       if (payload.onProgress) {
         const cb = payload.onProgress;
@@ -376,22 +430,24 @@ export async function uploadFilesToPath(payload: {
 
       xhr.addEventListener("load", () => {
         if (xhr.status >= 200 && xhr.status < 300) {
-          const json = JSON.parse(xhr.responseText) as {
-            data: { uploaded: { name: string; path: string; sizeBytes: number }[]; skipped: string[] };
-          };
-          resolve(json.data);
+          settle(() => {
+            const json = JSON.parse(xhr.responseText) as {
+              data: { uploaded: { name: string; path: string; sizeBytes: number }[]; skipped: string[] };
+            };
+            resolve(json.data);
+          });
         } else {
           let errorMsg = `Upload failed (${xhr.status})`;
           try {
             const body = JSON.parse(xhr.responseText) as ErrorBody;
             if (body.error) errorMsg = body.error;
           } catch { /* ignore */ }
-          reject(new Error(errorMsg));
+          settle(() => reject(new Error(errorMsg)));
         }
       });
 
-      xhr.addEventListener("error", () => reject(new Error("Upload failed: network error")));
-      xhr.addEventListener("abort", () => reject(new Error("Upload aborted")));
+      xhr.addEventListener("error", () => settle(() => reject(new Error("Upload failed: network error"))));
+      xhr.addEventListener("abort", () => settle(() => reject(createAbortError())));
       xhr.send(formData);
     },
   );

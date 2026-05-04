@@ -21,6 +21,7 @@ import {
   useSearchFiles,
   useStarredFiles,
   useToggleFileStar,
+  useUnzipFile,
   useUploadFiles,
 } from "@/modules/files/hooks/useFiles";
 import {
@@ -30,6 +31,10 @@ import {
 } from "@/modules/files/hooks/useLocalFolderShares";
 import { useNetworkShares } from "@/modules/files/hooks/useNetworkShares";
 import { useUsbDrives } from "@/modules/files/hooks/useUsbDrives";
+import { useGoogleDriveConnections } from "@/modules/files/hooks/useGoogleDrive";
+import { Cloud } from "@/components/icons/platform-icons";
+import { OsIcon } from "@/components/icons/OsIcon";
+import { FILE_SIDEBAR_ICONS } from "@/components/icons/icon-assets";
 import {
   useDeleteFromTrash,
   useEmptyTrash,
@@ -43,6 +48,7 @@ import {
   getClipboardDisplayName,
   getCurrentEntries,
   getCurrentPathForDisplay,
+  getDriveItems,
   getLocalSharesByPath,
   getLocationItems,
   getOpenFileDetails,
@@ -63,6 +69,7 @@ export function FileManager() {
   const rootRef = useRef<HTMLDivElement>(null);
   const statusNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
+  const uploadAbortControllerRef = useRef<AbortController | null>(null);
   const [state, dispatch] = useReducer(fileManagerReducer, initialState);
   const currentUserQuery = useCurrentUser();
 
@@ -76,6 +83,7 @@ export function FileManager() {
   const networkSharesQuery = useNetworkShares();
   const localSharesQuery = useLocalFolderShares();
   const usbDrivesQuery = useUsbDrives();
+  const googleDriveConnectionsQuery = useGoogleDriveConnections();
   const createFolderMutation = useCreateFolder();
   const createFileMutation = useCreateFile();
   const pasteFileEntryMutation = usePasteFileEntry();
@@ -90,6 +98,7 @@ export function FileManager() {
   const getFileInfoMutation = useFileEntryInfo();
   const toggleStarMutation = useToggleFileStar();
   const uploadFilesMutation = useUploadFiles();
+  const unzipFileMutation = useUnzipFile();
 
   const openFilePath = state.openFile ? toFilePath(state.openFile.path) : null;
   const fileContentQuery = useFileContent(openFilePath);
@@ -172,6 +181,29 @@ export function FileManager() {
     () => (isDemoMode ? [] : getRemovableItems(usbDrivesQuery.drives)),
     [isDemoMode, usbDrivesQuery.drives],
   );
+  const driveItems = useMemo(
+    () =>
+      isDemoMode
+        ? []
+        : getDriveItems(googleDriveConnectionsQuery.data?.connections).map((item) => ({
+            ...item,
+            icon: (
+              <OsIcon
+                src={FILE_SIDEBAR_ICONS.googleDrive}
+                className="size-4 object-contain"
+                fallback={<Cloud className="size-4 text-sky-400" />}
+              />
+            ),
+            accountEmail: item.email,
+          })),
+    [isDemoMode, googleDriveConnectionsQuery.data],
+  );
+  const activeDriveConnection = useMemo(() => {
+    if (!viewFlags.isDriveView) return null;
+    const connectionId = state.currentPath[1];
+    const conn = googleDriveConnectionsQuery.data?.connections.find((c) => c.id === connectionId);
+    return conn ? { id: conn.id, email: conn.email } : null;
+  }, [viewFlags.isDriveView, state.currentPath, googleDriveConnectionsQuery.data]);
   const counts = useMemo(() => getBrowserCounts(sortedEntries), [sortedEntries]);
   const clipboardDisplayName = getClipboardDisplayName(state.clipboardState);
   const contextShare =
@@ -226,7 +258,9 @@ export function FileManager() {
     systemHostname: systemMetricsQuery.data?.hostname ?? "",
     systemNetworkAddress: systemMetricsQuery.data?.wifi?.ipv4 ?? "",
     toggleStarMutation,
+    uploadAbortControllerRef,
     uploadFilesMutation,
+    unzipFileMutation,
   });
 
   useEffect(() => {
@@ -347,9 +381,12 @@ export function FileManager() {
       isStarredView={viewFlags.isStarredView}
       isTrashView={viewFlags.isTrashView}
       locationItems={locationItems}
+      cloudItems={driveItems}
+      activeDriveConnection={activeDriveConnection}
       removableItems={removableItems}
       onMountDrive={usbDrivesQuery.mount}
       onEjectDrive={usbDrivesQuery.eject}
+      onCancelUpload={() => uploadAbortControllerRef.current?.abort()}
       navigateTo={navigateTo}
       navigateToPath={navigateToPath}
       onEntryClick={handleEntryClick}
@@ -401,6 +438,7 @@ export function FileManager() {
       uploadInputRef={uploadInputRef}
       uploadPending={uploadFilesMutation.isPending}
       uploadProgress={state.uploadProgress}
+      unzipPending={unzipFileMutation.isPending}
       viewMode={state.viewMode}
     />
   );

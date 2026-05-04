@@ -5,10 +5,13 @@ import {
   withServerTiming,
 } from "@/lib/server/logging/logger";
 import { getStoreCatalogView } from "@/lib/server/modules/store/service";
+import { requireApiSession } from "@/lib/server/modules/auth/api";
 
 export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   const requestId = createRequestId();
 
   try {

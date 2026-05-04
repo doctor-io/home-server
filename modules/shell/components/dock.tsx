@@ -1,35 +1,36 @@
 "use client";
 
 import {
-  AppStore24Regular,
-  GridDotsRegular,
-  OpenFolderRegular,
-  PulseRegular,
-  SettingsRegular,
-  WindowConsoleRegular,
-} from "@fluentui/react-icons";
+  ShoppingBag   as AppStore24Regular,
+  LayoutGrid    as GridDotsRegular,
+  FolderOpen    as OpenFolderRegular,
+  Cpu           as PulseRegular,
+  Settings      as SettingsRegular,
+  TerminalSquare as WindowConsoleRegular,
+} from "@/components/icons/platform-icons";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { OsIcon } from "@/components/icons/OsIcon";
+import { APP_ICONS } from "@/components/icons/icon-assets";
 import { useRef, useState } from "react";
 
 export type DockItemDef = {
   id: string;
   name: string;
   icon: React.ComponentType<{ className?: string }>;
+  iconBg: string;
 };
 
 export const dockItemDefs: DockItemDef[] = [
-  { id: "apps", name: "Apps", icon: GridDotsRegular },
-  { id: "terminal", name: "Terminal", icon: WindowConsoleRegular },
-  { id: "files", name: "Files", icon: OpenFolderRegular },
-  { id: "monitor", name: "Monitor", icon: PulseRegular },
-  // { id: "firewall", name: "Firewall", icon: Shield },
-  // { id: "browser", name: "Browser", icon: Globe },
-  { id: "app-store", name: "App Store", icon: AppStore24Regular },
-  { id: "settings", name: "Settings", icon: SettingsRegular },
+  { id: "apps",      name: "Home",      icon: GridDotsRegular,      iconBg: "bg-blue-500/80" },
+  { id: "terminal",  name: "Terminal",  icon: WindowConsoleRegular, iconBg: "bg-slate-700/90" },
+  { id: "files",     name: "Files",     icon: OpenFolderRegular,    iconBg: "bg-amber-500/80" },
+  { id: "monitor",   name: "Monitor",   icon: PulseRegular,         iconBg: "bg-emerald-600/80" },
+  { id: "app-store", name: "App Store", icon: AppStore24Regular,    iconBg: "bg-purple-600/80" },
+  { id: "settings",  name: "Settings",  icon: SettingsRegular,      iconBg: "bg-zinc-600/80" },
 ];
 
 type DockProps = {
@@ -52,12 +53,7 @@ export function Dock({
   const isVertical = position === "left" || position === "right";
 
   function getScale(index: number) {
-    if (hoveredIndex === null) return 1;
-    const distance = Math.abs(index - hoveredIndex);
-    if (distance === 0) return 1.35;
-    if (distance === 1) return 1.15;
-    if (distance === 2) return 1.05;
-    return 1;
+    return hoveredIndex === index ? 1.18 : 1;
   }
 
   const dockPositionClass =
@@ -88,6 +84,16 @@ export function Dock({
           const scale = animationsEnabled ? getScale(index) : 1;
           const isRunning = activeWindows.includes(item.id);
           const isFocused = focusedWindow === item.id;
+          const osSrc = APP_ICONS[item.id];
+
+          const iconFallback = (
+            <div
+              className={`size-full rounded-2xl flex items-center justify-center ${item.iconBg}`}
+            >
+              <item.icon className="size-5 text-white" />
+            </div>
+          );
+
           return (
             <div key={item.id} className="flex flex-col items-center gap-1">
               <Tooltip>
@@ -98,25 +104,25 @@ export function Dock({
                     style={{
                       transform: `scale(${scale})`,
                       transition: animationsEnabled
-                        ? "transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94), background-color 0.15s, color 0.15s, box-shadow 0.15s"
+                        ? "transform 0.16s ease-out"
                         : "none",
-                      boxShadow: isFocused
-                        ? "inset 0 1px 0 rgba(255,255,255,0.15), 0 2px 8px rgba(0,0,0,0.25)"
-                        : isRunning
-                          ? "inset 0 1px 0 rgba(255,255,255,0.08)"
-                          : undefined,
                     }}
-                    className={`relative size-11 rounded-2xl flex items-center justify-center cursor-pointer ${
-                      isFocused
-                        ? "bg-primary/18 text-primary"
-                        : isRunning
-                          ? "bg-white/[0.09] text-foreground/90 hover:bg-white/[0.13] hover:text-foreground"
-                          : "text-foreground/45 hover:bg-white/[0.06] hover:text-foreground/80"
-                    }`}
+                    className="relative size-11 rounded-2xl overflow-hidden cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
                     aria-label={item.name}
                     aria-pressed={isFocused}
                   >
-                    <item.icon className="size-5" />
+                    <OsIcon
+                      src={osSrc}
+                      alt={item.name}
+                      className={`size-full rounded-2xl object-contain transition-[box-shadow] duration-150 ${
+                        isFocused
+                          ? "shadow-[0_0_0_2px_hsl(var(--primary)/0.5),0_2px_8px_rgba(0,0,0,0.3)]"
+                          : isRunning
+                            ? "shadow-[0_1px_4px_rgba(0,0,0,0.2)]"
+                            : "opacity-90 hover:opacity-100"
+                      }`}
+                      fallback={iconFallback}
+                    />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side={isVertical ? (position === "left" ? "right" : "left") : "top"} sideOffset={8}>
@@ -136,32 +142,6 @@ export function Dock({
             </div>
           );
         })}
-
-        {/* Separator */}
-        {/* <div
-          className={`bg-border ${
-            isVertical ? "h-px w-8 my-1" : "w-px h-8 mx-1"
-          }`}
-        /> */}
-
-        {/* Add button */}
-        {/* <div className="flex flex-col items-center gap-1">
-          <button
-            onMouseEnter={() => setHoveredIndex(dockItemDefs.length)}
-            className="size-11 rounded-xl flex items-center justify-center cursor-pointer bg-glass-highlight border border-dashed border-glass-border text-muted-foreground hover:text-foreground hover:border-primary/30 transition-colors"
-            aria-label="Add to dock"
-            style={{
-              transform: `scale(${
-                animationsEnabled ? getScale(dockItemDefs.length) : 1
-              })`,
-              transition: animationsEnabled
-                ? "transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)"
-                : "none",
-            }}
-          >
-            <AddRegular className="size-4" />
-          </button>
-        </div>*/}
       </nav>
     </div>
   );

@@ -8,10 +8,13 @@ import {
 import { getAuthCookieName } from "@/lib/server/modules/auth/cookies";
 import { authenticateSession } from "@/lib/server/modules/auth/service";
 import { scheduleSystemShutdown } from "@/lib/server/modules/system/power-service";
+import { requireApiSession } from "@/lib/server/modules/auth/api";
 
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   const requestId = createRequestId();
   const sessionToken = request.cookies.get(getAuthCookieName())?.value;
 

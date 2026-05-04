@@ -13,6 +13,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { createWriteStream } from "node:fs";
+import { spawn } from "node:child_process";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import path from "node:path";
@@ -40,6 +41,7 @@ import type {
   FileRenameResponse,
   FileServiceErrorCode,
   FileToggleStarResponse,
+  FileUnzipResponse,
   FileUploadResponse,
   FileWriteResponse,
 } from "@/lib/shared/contracts/files";
@@ -1429,6 +1431,67 @@ export type UploadFilesParams = {
   files: { name: string; size: number; stream: () => ReadableStream }[];
   includeHidden?: boolean;
 };
+
+type UnzipEntryParams = {
+  path: string;
+  includeHidden?: boolean;
+};
+
+export async function unzipEntry(params: UnzipEntryParams): Promise<FileUnzipResponse> {
+  return withServerTiming(
+    { level: "debug", layer: "service", action: "files.unzipEntry" },
+    async () => {
+      const includeHidden = Boolean(params.includeHidden);
+      let resolved: ResolvedFilesPath;
+
+      try {
+        resolved = await resolveFilePath(params.path, includeHidden);
+        const info = await lstat(resolved.absolutePath);
+        if (info.isSymbolicLink()) {
+          throw new FileServiceError("Symlinks are not allowed", {
+            code: "symlink_blocked",
+            statusCode: 403,
+          });
+        }
+        if (!info.isFile()) {
+          throw new FileServiceError("Path is not a file", {
+            code: "not_a_file",
+            statusCode: 400,
+          });
+        }
+      } catch (error) {
+        if (error instanceof FileServiceError) throw error;
+        throw mapFsError(error, "Failed to access zip file");
+      }
+
+      const fileName = resolved.segments[resolved.segments.length - 1] ?? "";
+      if (getExtension(fileName) !== "zip") {
+        throw new FileServiceError("File is not a zip archive", {
+          code: "unsupported_file",
+          statusCode: 400,
+        });
+      }
+
+      const parentAbsolutePath = path.dirname(resolved.absolutePath);
+      const destinationPath =
+        resolved.segments.length > 1 ? resolved.segments.slice(0, -1).join("/") : "";
+
+      await new Promise<void>((resolve, reject) => {
+        const proc = spawn("unzip", ["-o", resolved.absolutePath, "-d", parentAbsolutePath]);
+        proc.on("close", (code) => {
+          // unzip exit code 1 = warnings only (acceptable)
+          if (code === 0 || code === 1) resolve();
+          else reject(new FileServiceError(`unzip exited with code ${String(code)}`, { code: "internal_error", statusCode: 500 }));
+        });
+        proc.on("error", (err) => {
+          reject(new FileServiceError("Failed to run unzip", { code: "internal_error", statusCode: 500, cause: err }));
+        });
+      });
+
+      return { destinationPath };
+    },
+  );
+}
 
 export async function uploadFiles(params: UploadFilesParams): Promise<FileUploadResponse> {
   const includeHidden = Boolean(params.includeHidden);

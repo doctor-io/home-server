@@ -5,6 +5,7 @@ import { asc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/server/db/drizzle";
 import { filesGoogleDriveTokens } from "@/lib/server/db/schema";
 import { encryptSecret, decryptSecret } from "@/lib/server/modules/files/secrets";
+import { getGoogleOAuthConfig } from "@/lib/server/modules/files/google-oauth-config";
 
 const SCOPES = [
   "https://www.googleapis.com/auth/drive.readonly",
@@ -30,16 +31,19 @@ export class GoogleDriveError extends Error {
   }
 }
 
-function getOAuthConfig() {
+async function getOAuthConfig() {
+  const dbConfig = await getGoogleOAuthConfig();
+  if (dbConfig) return dbConfig;
+
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   const redirectUri = process.env.GOOGLE_DRIVE_REDIRECT_URI ?? "http://localhost:3000/api/v1/files/google-drive/callback";
 
   if (!clientId || !clientSecret) {
     throw new GoogleDriveError(
-      "Google Drive is not configured. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to your environment.",
+      "Google Drive is not configured. Set up your OAuth credentials in Settings → Integrations.",
       "not_configured",
-      503,
+      501,
     );
   }
 
@@ -81,8 +85,14 @@ async function ensureTableOnce() {
   await ensureTablePromise;
 }
 
-export function buildAuthUrl(state: string): string {
-  const { clientId, redirectUri } = getOAuthConfig();
+export async function isGoogleDriveConfigured(): Promise<boolean> {
+  const dbConfig = await getGoogleOAuthConfig();
+  if (dbConfig) return true;
+  return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+}
+
+export async function buildAuthUrl(state: string): Promise<string> {
+  const { clientId, redirectUri } = await getOAuthConfig();
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: redirectUri,
@@ -112,7 +122,7 @@ type UserInfo = {
 };
 
 async function exchangeCodeForTokens(code: string): Promise<TokenResponse> {
-  const { clientId, clientSecret, redirectUri } = getOAuthConfig();
+  const { clientId, clientSecret, redirectUri } = await getOAuthConfig();
 
   const response = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
@@ -266,7 +276,7 @@ export async function getAccessToken(connectionId: string): Promise<string> {
     tag: row.refreshTokenTag,
   });
 
-  const { clientId, clientSecret } = getOAuthConfig();
+  const { clientId, clientSecret } = await getOAuthConfig();
   const response = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },

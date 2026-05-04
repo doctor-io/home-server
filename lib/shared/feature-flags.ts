@@ -1,3 +1,3 @@
 export const FEATURE_FLAGS = {
-  GOOGLE_DRIVE: false,
+  GOOGLE_DRIVE: true,
 } as const;

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireApiSession } from "@/lib/server/modules/auth/api";
 import {
   createRequestId,
   logServerAction,
@@ -15,7 +16,9 @@ type RouteContext = {
   params: Promise<{ sourceId: string }>;
 };
 
-export async function POST(_request: Request, context: RouteContext) {
+export async function POST(request: Request, context: RouteContext) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   const requestId = createRequestId();
   const { sourceId } = await context.params;
 

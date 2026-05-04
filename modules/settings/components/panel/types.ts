@@ -16,6 +16,7 @@ export type SettingsSectionId =
   | "network"
   | "storage"
   | "docker"
+  | "integrations"
   | "users"
   | "security"
   | "notifications"
@@ -96,6 +97,7 @@ export type SettingsPanelProps = {
   onAppearanceChange: (patch: Partial<AppearanceSettings>) => void;
   wallpaperAccentColor: string | null;
   selectedSection?: string | null;
+  onOpenDiskManager?: () => void;
 };
 
 export type SettingsSectionSaveConfig = {

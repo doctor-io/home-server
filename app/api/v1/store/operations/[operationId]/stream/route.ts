@@ -12,6 +12,7 @@ import {
   subscribeToStoreOperation,
 } from "@/lib/server/modules/apps/operations";
 import type { StoreOperationEvent } from "@/lib/shared/contracts/apps";
+import { requireApiSession } from "@/lib/server/modules/auth/api";
 
 export const runtime = "nodejs";
 
@@ -43,6 +44,8 @@ function operationSnapshotToEvent(operation: NonNullable<Awaited<ReturnType<type
 }
 
 export async function GET(request: Request, context: Context) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   const requestId = createRequestId();
   const { operationId } = await context.params;
 

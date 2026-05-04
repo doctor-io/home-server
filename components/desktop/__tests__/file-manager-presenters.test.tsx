@@ -70,6 +70,6 @@ describe("file-manager presenters", () => {
       }),
     );
 
-    expect(container.querySelector("svg")).not.toBeNull();
+    expect(container.querySelector("svg, img")).not.toBeNull();
   });
 });

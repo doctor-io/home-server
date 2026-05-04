@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { serverEnv } from "@/lib/server/env";
+import { requireApiSession } from "@/lib/server/modules/auth/api";
 import {
   createRequestId,
   logServerAction,
@@ -21,6 +22,8 @@ const writeSchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   const requestId = createRequestId();
 
   try {
@@ -95,6 +98,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PUT(request: Request) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   const requestId = createRequestId();
 
   try {

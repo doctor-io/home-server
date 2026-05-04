@@ -7,6 +7,7 @@ import {
   type AppearanceSettings,
 } from "@/lib/desktop/appearance";
 import { eq } from "drizzle-orm";
+import { requireApiSession } from "@/lib/server/modules/auth/api";
 
 export const runtime = "nodejs";
 
@@ -18,7 +19,9 @@ async function getAppearance(): Promise<AppearanceSettings> {
   return sanitizeAppearanceSettings(rows[0].appearanceJson);
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   try {
     const appearance = await getAppearance();
     return NextResponse.json({ data: appearance });
@@ -28,6 +31,8 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   try {
     const body = await request.json();
     const appearance = sanitizeAppearanceSettings(body);

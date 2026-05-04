@@ -1,4 +1,6 @@
 #!/usr/bin/env sh
+# Run tests
+npm run test:watch
 # Bump package version without creating a git tag or commit (force to allow dirty tree during commit)
 npm version patch --no-git-tag-version --force
 

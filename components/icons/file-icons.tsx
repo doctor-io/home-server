@@ -1,5 +1,8 @@
 "use client";
 
+import { OsIcon } from "./OsIcon";
+import { FOLDER_ICONS, MIMETYPE_ICONS } from "./icon-assets";
+
 type IconProps = { className?: string };
 
 // Shared paper body used by every file-type icon.
@@ -42,7 +45,7 @@ type BadgeType =
   | "music"    | "video"  | "image"
   | "document" | "code"   | "archive"
   | "network"  | "backup" | "share"
-  | "desktop"  | "trash";
+  | "desktop"  | "trash"  | "app";
 
 const FOLDER_BADGE_MAP: Record<string, BadgeType> = {
   // Downloads
@@ -69,6 +72,8 @@ const FOLDER_BADGE_MAP: Record<string, BadgeType> = {
   backup: "backup", backups: "backup",
   // Desktop
   desktop: "desktop",
+  // Apps / AppData
+  apps: "app", appdata: "app",
   // Trash
   trash: "trash", ".trash": "trash",
 };
@@ -195,6 +200,15 @@ function FolderBadgeOverlay({ type }: { type: BadgeType }) {
           <line x1="38.5" y1="36" x2="38.5" y2="42" />
         </g>
       )}
+
+      {type === "app" && (
+        <g {...s}>
+          <rect x="29.5" y="30.5" width="5.5" height="5.5" rx="1" />
+          <rect x="37"   y="30.5" width="5.5" height="5.5" rx="1" />
+          <rect x="29.5" y="38"   width="5.5" height="5.5" rx="1" />
+          <rect x="37"   y="38"   width="5.5" height="5.5" rx="1" />
+        </g>
+      )}
     </g>
   );
 }
@@ -205,7 +219,7 @@ function getFolderBadge(name: string): BadgeType | null {
 
 // ─── Folder (closed) ─────────────────────────────────────────────────────────
 
-export function FolderIcon({ className, name }: IconProps & { name?: string }) {
+function FolderSvg({ className, name }: IconProps & { name?: string }) {
   const badge = name ? getFolderBadge(name) : null;
   return (
     <svg
@@ -227,9 +241,21 @@ export function FolderIcon({ className, name }: IconProps & { name?: string }) {
   );
 }
 
+export function FolderIcon({ className, name }: IconProps & { name?: string }) {
+  const badge = name ? getFolderBadge(name) : null;
+  const osSrc = FOLDER_ICONS[badge ?? "default"] ?? FOLDER_ICONS.default;
+  return (
+    <OsIcon
+      src={osSrc}
+      className={className}
+      fallback={<FolderSvg className={className} name={name} />}
+    />
+  );
+}
+
 // ─── Folder (open) ────────────────────────────────────────────────────────────
 
-export function OpenFolderIcon({ className, name }: IconProps & { name?: string }) {
+function OpenFolderSvg({ className, name }: IconProps & { name?: string }) {
   const badge = name ? getFolderBadge(name) : null;
   return (
     <svg
@@ -251,20 +277,36 @@ export function OpenFolderIcon({ className, name }: IconProps & { name?: string 
   );
 }
 
+export function OpenFolderIcon({ className, name }: IconProps & { name?: string }) {
+  const badge = name ? getFolderBadge(name) : null;
+  const osSrc = FOLDER_ICONS[badge ?? "default"] ?? FOLDER_ICONS.default;
+  return (
+    <OsIcon
+      src={osSrc}
+      className={className}
+      fallback={<OpenFolderSvg className={className} name={name} />}
+    />
+  );
+}
+
 // ─── Image ────────────────────────────────────────────────────────────────────
 
 export function ImageFileIcon({ className }: IconProps) {
   const c = "#f472b6";
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <PaperBase c={c}>
-        {/* Sun */}
-        <circle cx="8" cy="11.5" r="2" fill={c} />
-        {/* Two mountain peaks */}
-        <path d="M5 18L9.5 13L13.5 18H5Z" fill={c} fillOpacity="0.7" />
-        <path d="M11 18L15.5 11.5L20 18H11Z" fill={c} />
-      </PaperBase>
-    </svg>
+    <OsIcon
+      src={MIMETYPE_ICONS.image}
+      className={className}
+      fallback={
+        <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <PaperBase c={c}>
+            <circle cx="8" cy="11.5" r="2" fill={c} />
+            <path d="M5 18L9.5 13L13.5 18H5Z" fill={c} fillOpacity="0.7" />
+            <path d="M11 18L15.5 11.5L20 18H11Z" fill={c} />
+          </PaperBase>
+        </svg>
+      }
+    />
   );
 }
 
@@ -273,20 +315,25 @@ export function ImageFileIcon({ className }: IconProps) {
 export function AudioFileIcon({ className }: IconProps) {
   const c = "#c084fc";
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <PaperBase c={c}>
-        {/* Double eighth-note */}
-        <circle cx="8" cy="17" r="2" fill={c} />
-        <circle cx="14" cy="16.5" r="2" fill={c} />
-        <path
-          d="M10 17V10M16 16.5V9.5M10 10L16 9.5"
-          stroke={c}
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </PaperBase>
-    </svg>
+    <OsIcon
+      src={MIMETYPE_ICONS.audio}
+      className={className}
+      fallback={
+        <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <PaperBase c={c}>
+            <circle cx="8" cy="17" r="2" fill={c} />
+            <circle cx="14" cy="16.5" r="2" fill={c} />
+            <path
+              d="M10 17V10M16 16.5V9.5M10 10L16 9.5"
+              stroke={c}
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </PaperBase>
+        </svg>
+      }
+    />
   );
 }
 
@@ -295,12 +342,17 @@ export function AudioFileIcon({ className }: IconProps) {
 export function VideoFileIcon({ className }: IconProps) {
   const c = "#fbbf24";
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <PaperBase c={c}>
-        {/* Play triangle */}
-        <path d="M9.5 10.5V18.5L17.5 14.5L9.5 10.5Z" fill={c} />
-      </PaperBase>
-    </svg>
+    <OsIcon
+      src={MIMETYPE_ICONS.video}
+      className={className}
+      fallback={
+        <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <PaperBase c={c}>
+            <path d="M9.5 10.5V18.5L17.5 14.5L9.5 10.5Z" fill={c} />
+          </PaperBase>
+        </svg>
+      }
+    />
   );
 }
 
@@ -309,25 +361,28 @@ export function VideoFileIcon({ className }: IconProps) {
 export function ArchiveFileIcon({ className }: IconProps) {
   const c = "#a78bfa";
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <PaperBase c={c}>
-        {/* Lid */}
-        <rect x="5.5" y="10" width="13" height="2.5" rx="0.5" fill={c} fillOpacity="0.9" />
-        {/* Box body */}
-        <rect
-          x="5.5" y="13" width="13" height="6.5" rx="0.5"
-          fill={c} fillOpacity="0.15"
-          stroke={c} strokeOpacity="0.5" strokeWidth="0.75"
-        />
-        {/* Zipper teeth on lid */}
-        <path
-          d="M10 10V12.5M14 10V12.5"
-          stroke={c}
-          strokeWidth="1.5"
-          strokeLinecap="round"
-        />
-      </PaperBase>
-    </svg>
+    <OsIcon
+      src={MIMETYPE_ICONS.archive}
+      className={className}
+      fallback={
+        <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <PaperBase c={c}>
+            <rect x="5.5" y="10" width="13" height="2.5" rx="0.5" fill={c} fillOpacity="0.9" />
+            <rect
+              x="5.5" y="13" width="13" height="6.5" rx="0.5"
+              fill={c} fillOpacity="0.15"
+              stroke={c} strokeOpacity="0.5" strokeWidth="0.75"
+            />
+            <path
+              d="M10 10V12.5M14 10V12.5"
+              stroke={c}
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            />
+          </PaperBase>
+        </svg>
+      }
+    />
   );
 }
 
@@ -336,18 +391,23 @@ export function ArchiveFileIcon({ className }: IconProps) {
 export function CodeFileIcon({ className }: IconProps) {
   const c = "#34d399";
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <PaperBase c={c}>
-        {/* < /> */}
-        <path
-          d="M9 11L6.5 14L9 17M15 11L17.5 14L15 17M13.5 10.5L10.5 18"
-          stroke={c}
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </PaperBase>
-    </svg>
+    <OsIcon
+      src={MIMETYPE_ICONS.code}
+      className={className}
+      fallback={
+        <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <PaperBase c={c}>
+            <path
+              d="M9 11L6.5 14L9 17M15 11L17.5 14L15 17M13.5 10.5L10.5 18"
+              stroke={c}
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </PaperBase>
+        </svg>
+      }
+    />
   );
 }
 
@@ -356,16 +416,22 @@ export function CodeFileIcon({ className }: IconProps) {
 export function DocumentFileIcon({ className }: IconProps) {
   const c = "#60a5fa";
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <PaperBase c={c}>
-        <path
-          d="M7 10.5H17M7 13.5H17M7 16.5H13"
-          stroke={c}
-          strokeWidth="1.5"
-          strokeLinecap="round"
-        />
-      </PaperBase>
-    </svg>
+    <OsIcon
+      src={MIMETYPE_ICONS.document}
+      className={className}
+      fallback={
+        <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <PaperBase c={c}>
+            <path
+              d="M7 10.5H17M7 13.5H17M7 16.5H13"
+              stroke={c}
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            />
+          </PaperBase>
+        </svg>
+      }
+    />
   );
 }
 
@@ -374,16 +440,22 @@ export function DocumentFileIcon({ className }: IconProps) {
 export function TextFileIcon({ className }: IconProps) {
   const c = "#94a3b8";
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <PaperBase c={c}>
-        <path
-          d="M7 10.5H17M7 13H17M7 15.5H14.5M7 18H11"
-          stroke={c}
-          strokeWidth="1.5"
-          strokeLinecap="round"
-        />
-      </PaperBase>
-    </svg>
+    <OsIcon
+      src={MIMETYPE_ICONS.text}
+      className={className}
+      fallback={
+        <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <PaperBase c={c}>
+            <path
+              d="M7 10.5H17M7 13H17M7 15.5H14.5M7 18H11"
+              stroke={c}
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            />
+          </PaperBase>
+        </svg>
+      }
+    />
   );
 }
 
@@ -392,15 +464,32 @@ export function TextFileIcon({ className }: IconProps) {
 export function GenericFileIcon({ className }: IconProps) {
   const c = "#6b7280";
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <PaperBase c={c}>
-        <path
-          d="M7 11H17M7 14H14M7 17H11"
-          stroke={c}
-          strokeWidth="1.5"
-          strokeLinecap="round"
-        />
-      </PaperBase>
-    </svg>
+    <OsIcon
+      src={MIMETYPE_ICONS.generic}
+      className={className}
+      fallback={
+        <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <PaperBase c={c}>
+            <path
+              d="M7 11H17M7 14H14M7 17H11"
+              stroke={c}
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            />
+          </PaperBase>
+        </svg>
+      }
+    />
+  );
+}
+
+export function KoraFileIcon({ className, iconKey }: IconProps & { iconKey: string }) {
+  const src = MIMETYPE_ICONS[iconKey] ?? MIMETYPE_ICONS.generic;
+  return (
+    <OsIcon
+      src={src}
+      className={className}
+      fallback={<GenericFileIcon className={className} />}
+    />
   );
 }

@@ -104,4 +104,81 @@ describe("POST /api/auth/login", () => {
 
     expect(response.status).toBe(401);
   });
+
+  it("rate limits repeated failed attempts by username and client ip", async () => {
+    const { POST, loginUser, AuthError } = await loadRoute();
+    loginUser.mockRejectedValue(new AuthError("Invalid username or password", 401));
+
+    for (let index = 0; index < 5; index += 1) {
+      const response = await POST(
+        new Request("http://localhost/api/auth/login", {
+          method: "POST",
+          headers: { "x-real-ip": "192.0.2.10" },
+          body: JSON.stringify({ username: "admin", password: "bad-pass" }),
+        }),
+      );
+      expect(response.status).toBe(401);
+    }
+
+    const limited = await POST(
+      new Request("http://localhost/api/auth/login", {
+        method: "POST",
+        headers: { "x-real-ip": "192.0.2.10" },
+        body: JSON.stringify({ username: "admin", password: "bad-pass" }),
+      }),
+    );
+
+    expect(limited.status).toBe(429);
+    await expect(limited.json()).resolves.toEqual({
+      error: "Too many login attempts",
+    });
+  });
+
+  it("does not share rate limits across client ips", async () => {
+    const { POST, loginUser, AuthError } = await loadRoute();
+    loginUser.mockRejectedValue(new AuthError("Invalid username or password", 401));
+
+    for (let index = 0; index < 5; index += 1) {
+      await POST(
+        new Request("http://localhost/api/auth/login", {
+          method: "POST",
+          headers: { "x-real-ip": "192.0.2.10" },
+          body: JSON.stringify({ username: "admin", password: "bad-pass" }),
+        }),
+      );
+    }
+
+    const response = await POST(
+      new Request("http://localhost/api/auth/login", {
+        method: "POST",
+        headers: { "x-real-ip": "192.0.2.11" },
+        body: JSON.stringify({ username: "admin", password: "bad-pass" }),
+      }),
+    );
+
+    expect(response.status).toBe(401);
+  });
+
+  it("clears failed attempts after a successful login", async () => {
+    const { POST, loginUser, AuthError } = await loadRoute();
+    loginUser
+      .mockRejectedValueOnce(new AuthError("Invalid username or password", 401))
+      .mockResolvedValueOnce({
+        token: "session-token",
+        expiresAt: new Date(Date.now() + 3600_000),
+        user: { id: "u1", username: "admin" },
+      })
+      .mockRejectedValueOnce(new AuthError("Invalid username or password", 401));
+
+    const makeRequest = (password: string) =>
+      new Request("http://localhost/api/auth/login", {
+        method: "POST",
+        headers: { "x-real-ip": "192.0.2.12" },
+        body: JSON.stringify({ username: "admin", password }),
+      });
+
+    expect((await POST(makeRequest("bad-pass"))).status).toBe(401);
+    expect((await POST(makeRequest("StrongPass123"))).status).toBe(200);
+    expect((await POST(makeRequest("bad-pass"))).status).toBe(401);
+  });
 });

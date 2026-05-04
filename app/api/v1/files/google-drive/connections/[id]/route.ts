@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
 import { removeGoogleDriveConnection, GoogleDriveError } from "@/lib/server/modules/files/google-drive";
 import { createRequestId, logServerAction } from "@/lib/server/logging/logger";
+import { requireApiSession } from "@/lib/server/modules/auth/api";
 
 export const runtime = "nodejs";
 
 type Context = { params: Promise<{ id: string }> };
 
-export async function DELETE(_request: Request, context: Context) {
+export async function DELETE(request: Request, context: Context) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   const requestId = createRequestId();
   const { id } = await context.params;
 

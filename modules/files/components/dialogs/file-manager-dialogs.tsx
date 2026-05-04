@@ -8,7 +8,7 @@ import {
 import { cn } from "@/lib/utils";
 import { formatBytesCompact } from "@/lib/client/format";
 import type { FileInfoResponse } from "@/lib/shared/contracts/files";
-import { File, Folder, Trash2, X } from "@/components/icons/platform-icons";
+import { File, FileArchive, Folder, Trash2, Upload, X } from "@/components/icons/platform-icons";
 
 const cancelBtn = "rounded-lg px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50";
 const inputField = "mt-1 h-8 w-full rounded-lg border border-glass-border bg-background/55 px-2 text-xs text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-primary/40 focus:bg-background/70";
@@ -190,6 +190,102 @@ export function EmptyTrashConfirmDialog({
           >
             Empty Trash
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function getUploadPercent(progress: { loaded: number; total: number } | null) {
+  if (!progress || progress.total <= 0) return 0;
+  return Math.min(100, Math.max(0, Math.round((progress.loaded / progress.total) * 100)));
+}
+
+export function UploadProgressDialog({
+  operation = "upload",
+  progress,
+  onCancel,
+}: {
+  operation?: "upload" | "unzip";
+  progress: { loaded: number; total: number } | null;
+  onCancel?: () => void;
+}) {
+  const isUpload = operation === "upload";
+  const progressPercent = getUploadPercent(progress);
+  const progressText = progress
+    ? `${formatBytesCompact(progress.loaded)} of ${formatBytesCompact(progress.total)}`
+    : isUpload
+      ? "Preparing upload"
+      : "Extracting archive";
+  const title = isUpload ? "Uploading files" : "Unzipping file";
+  const status = isUpload ? "Uploading" : "Unzipping";
+  const progressLabel = isUpload ? "Upload progress" : "Unzip progress";
+
+  return (
+    <div className={overlay}>
+      <div
+        className={cn("w-full max-w-sm overflow-hidden p-0", FILES_MENU_SHELL)}
+        role="dialog"
+        aria-modal="true"
+        aria-label={progressLabel}
+      >
+        <div className="flex h-11 shrink-0 select-none items-center border-b border-glass-border/50 bg-popover/70 backdrop-blur-2xl">
+          <div className="flex items-center gap-1.5 px-4">
+            {onCancel ? (
+              <button
+                onClick={onCancel}
+                aria-label={`Cancel ${operation}`}
+                title={`Cancel ${operation}`}
+                className="group flex size-3 cursor-pointer items-center justify-center rounded-full bg-[#ff5f57] ring-1 ring-inset ring-black/10"
+              >
+                <X className="size-[7px] text-[#6a0002] opacity-0 transition-opacity group-hover:opacity-100" />
+              </button>
+            ) : (
+              <span className="size-3 rounded-full bg-white/10" />
+            )}
+            <span className="size-3 rounded-full bg-white/10" />
+            <span className="size-3 rounded-full bg-white/10" />
+          </div>
+          <div className="flex flex-1 items-center justify-center gap-1.5">
+            {isUpload ? (
+              <Upload className="size-3.5 text-primary/70" />
+            ) : (
+              <FileArchive className="size-3.5 text-primary/70" />
+            )}
+            <span className="text-xs font-medium text-foreground/80">{title}</span>
+          </div>
+          <div className="w-[76px]" />
+        </div>
+
+        <div className="p-4">
+          <div className="mb-3 text-xs tabular-nums text-muted-foreground">{progressText}</div>
+          <div
+            className="overflow-hidden rounded-full bg-white/10"
+            role="progressbar"
+            aria-label={progressLabel}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={progress ? progressPercent : undefined}
+          >
+            <div
+              className={cn(
+                "h-2 rounded-full bg-primary transition-all duration-150",
+                !progress && !isUpload && "w-1/2 animate-pulse",
+              )}
+              style={progress || isUpload ? { width: `${progressPercent}%` } : undefined}
+            />
+          </div>
+          <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+            <span>{status}</span>
+            <span className="tabular-nums">{progress ? `${progressPercent}%` : isUpload ? "0%" : "Working"}</span>
+          </div>
+          {onCancel ? (
+            <div className="mt-4 flex justify-end">
+              <button onClick={onCancel} className={cancelBtn}>
+                Cancel {operation}
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

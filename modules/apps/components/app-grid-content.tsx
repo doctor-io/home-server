@@ -146,6 +146,7 @@ export function AppGridContent({
                         ? `transition-transform duration-200 group-hover:scale-110 ${animatedContainerClass}`
                         : ""
                     }`}
+                    style={{ transform: "translateZ(0)" }}
                   >
                     {app.logoUrl ? (
                       <>
@@ -160,7 +161,7 @@ export function AppGridContent({
                         <img
                           src={app.logoUrl}
                           alt={`${app.name} logo`}
-                          className={`h-full w-full rounded-xl object-contain p-1.5 ${visualState.imageClass}`}
+                          className={`absolute inset-0 h-full w-full object-contain p-1.5 ${visualState.imageClass}`}
                           loading="lazy"
                           decoding="async"
                           onLoad={() => {

@@ -45,6 +45,7 @@ const envSchema = z.object({
     .int()
     .min(5_000)
     .default(6 * 60 * 60_000), // 6 hours
+  STORE_MAX_CONCURRENT_OPERATIONS: z.coerce.number().int().min(1).max(20).default(3),
   STORE_STACKS_ROOT: z.string().optional(),
   STORE_APP_DATA_ROOT: z.string().optional(),
   FILES_ROOT: z.string().optional(),
@@ -103,6 +104,26 @@ if (!parsedEnv.success) {
     .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
     .join("; ");
   throw new Error(`Invalid server environment: ${issues}`);
+}
+
+const unsafeProductionSessionSecrets = new Set([
+  "dev-session-secret-change-me",
+  "change-me-to-a-random-32-char-secret",
+]);
+
+const isNextProductionBuild =
+  process.env.NEXT_PHASE === "phase-production-build" ||
+  process.env.npm_lifecycle_event === "build";
+
+if (parsedEnv.data.NODE_ENV === "production" && !isNextProductionBuild) {
+  if (
+    parsedEnv.data.AUTH_SESSION_SECRET.length < 32 ||
+    unsafeProductionSessionSecrets.has(parsedEnv.data.AUTH_SESSION_SECRET)
+  ) {
+    throw new Error(
+      "Invalid server environment: AUTH_SESSION_SECRET must be a non-default value with at least 32 characters in production",
+    );
+  }
 }
 
 const defaultStacksRoot =

@@ -144,7 +144,7 @@ export function useStatusNotifications({
       }
 
       const maybeCreateAlert = (
-        type: "cpu-warning" | "memory-warning",
+        type: "cpu-warning" | "memory-warning" | "disk-warning" | "temperature-warning",
         isActive: boolean,
         title: string,
         message: string,

@@ -200,6 +200,15 @@ export const settings = pgTable("settings", {
   id: text("id").primaryKey().default("singleton"),
   appearanceJson: jsonb("appearance_json").notNull().default({}),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  googleClientId: text("google_client_id"),
+  googleClientSecretCiphertext: text("google_client_secret_ciphertext"),
+  googleClientSecretIv: text("google_client_secret_iv"),
+  googleClientSecretTag: text("google_client_secret_tag"),
+  googleRedirectUri: text("google_redirect_uri"),
+  tailscaleTailnet: text("tailscale_tailnet"),
+  tailscaleApiKeyCiphertext: text("tailscale_api_key_ciphertext"),
+  tailscaleApiKeyIv: text("tailscale_api_key_iv"),
+  tailscaleApiKeyTag: text("tailscale_api_key_tag"),
 });
 
 export const filesGoogleDriveTokens = pgTable(

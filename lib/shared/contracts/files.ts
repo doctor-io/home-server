@@ -229,3 +229,7 @@ export type TrashDeleteRequest = {
 export type TrashEmptyResponse = {
   deletedCount: number;
 };
+
+export type FileUnzipResponse = {
+  destinationPath: string;
+};

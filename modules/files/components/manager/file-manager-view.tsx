@@ -1,10 +1,11 @@
 "use client";
 
-import { FileManagerSidebar, FileManagerStatusBar, FileManagerToolbar, type FileManagerSidebarItem, type FileManagerSidebarSection, type RemovableSidebarItem } from "@/modules/files/components/file-manager-chrome";
+import { FileManagerSidebar, FileManagerStatusBar, FileManagerToolbar, type FileManagerSidebarItem, type FileManagerSidebarSection, type RemovableSidebarItem, type CloudSidebarItem } from "@/modules/files/components/file-manager-chrome";
 import { FileManagerFileArea } from "@/modules/files/components/content/file-manager-content";
 import { FILES_PANEL_SHELL } from "@/modules/files/components/file-manager-surface";
 import { FileManagerDialogLayer } from "@/modules/files/components/manager/file-manager-dialog-layer";
 import { validateEntryName } from "@/modules/files/components/manager/file-manager-derived";
+import { GoogleDrivePanel } from "@/modules/files/components/panels/google-drive-panel";
 import { buildAssetUrl, toFilePath } from "@/modules/files/hooks/useFiles";
 import type { MouseEvent, RefObject, SetStateAction } from "react";
 import type { FileEntry } from "@/modules/files/components/file-manager-presenters";
@@ -19,6 +20,7 @@ type FileManagerViewProps = {
     handleCopyEntryPath: (entry: FileEntry) => Promise<void>;
     handleDeleteFromTrash: (entry: FileEntry) => Promise<void>;
     handleDownloadEntry: (entry: FileEntry) => void;
+    handleUnzipEntry: (entry: FileEntry) => Promise<void>;
     handleEmptyTrash: () => void;
     handleGetInfo: (entry: FileEntry) => Promise<void>;
     handleMoveSelectedToTrash: (entry: FileEntry) => Promise<void>;
@@ -67,9 +69,12 @@ type FileManagerViewProps = {
   isStarredView: boolean;
   isTrashView: boolean;
   locationItems: FileManagerSidebarItem[];
+  cloudItems: CloudSidebarItem[];
+  activeDriveConnection: { id: string; email: string } | null;
   removableItems: RemovableSidebarItem[];
   onMountDrive: (driveId: string) => void;
   onEjectDrive: (driveId: string) => void;
+  onCancelUpload: () => void;
   navigateTo: (entry: FileEntry) => void;
   navigateToPath: (pathSegments: string[]) => void;
   onEntryClick: (event: MouseEvent, entry: FileEntry) => void;
@@ -108,6 +113,7 @@ type FileManagerViewProps = {
   uploadInputRef: RefObject<HTMLInputElement | null>;
   uploadPending: boolean;
   uploadProgress: { loaded: number; total: number } | null;
+  unzipPending: boolean;
   viewMode: ViewMode;
 };
 
@@ -147,9 +153,12 @@ export function FileManagerView({
   isStarredView,
   isTrashView,
   locationItems,
+  cloudItems,
+  activeDriveConnection,
   removableItems,
   onMountDrive,
   onEjectDrive,
+  onCancelUpload,
   navigateTo,
   navigateToPath,
   onEntryClick,
@@ -187,6 +196,7 @@ export function FileManagerView({
   uploadInputRef,
   uploadPending,
   uploadProgress,
+  unzipPending,
   viewMode,
 }: FileManagerViewProps) {
   return (
@@ -203,6 +213,7 @@ export function FileManagerView({
         isSharedView={isSharedView}
         isTrashView={isTrashView}
         locationItems={locationItems}
+        cloudItems={cloudItems}
         removableItems={removableItems}
         sidebarSections={sidebarSections}
         storageUsagePercent={storageUsagePercent}
@@ -214,6 +225,14 @@ export function FileManagerView({
         onMountDrive={onMountDrive}
         onEjectDrive={onEjectDrive}
       />
+      {activeDriveConnection ? (
+        <div className={`m-2 min-w-0 flex-1 overflow-hidden ${FILES_PANEL_SHELL}`}>
+          <GoogleDrivePanel
+            connectionId={activeDriveConnection.id}
+            accountEmail={activeDriveConnection.email}
+          />
+        </div>
+      ) : (
       <div className={`m-2 flex min-w-0 flex-1 flex-col ${FILES_PANEL_SHELL}`}>
         <FileManagerToolbar
           canNavigateUp={currentPath.length > 0}
@@ -233,7 +252,6 @@ export function FileManagerView({
           sortDir={sortDir}
           uploadFilesPending={uploadPending}
           uploadInputRef={uploadInputRef}
-          uploadProgress={uploadProgress}
           viewMode={viewMode}
           onCycleSortBy={() => dispatch({ type: "SET_SORT_BY", by: sortBy === "name" ? "modified" : sortBy === "modified" ? "size" : "name" })}
           onEmptyTrash={actions.handleEmptyTrash}
@@ -329,6 +347,7 @@ export function FileManagerView({
           }}
         />
       </div>
+      )}
       <FileManagerDialogLayer
         clipboardState={clipboardState}
         contextShare={contextShare}
@@ -347,7 +366,11 @@ export function FileManagerView({
         showGoogleDriveDialog={showGoogleDriveDialog}
         showUsbDialog={showUsbDialog}
         trashItemCount={trashItemCount}
+        uploadPending={uploadPending}
+        uploadProgress={uploadProgress}
+        unzipPending={unzipPending}
         onCancelEmptyTrash={() => dispatch({ type: "HIDE_EMPTY_TRASH_CONFIRM" })}
+        onCancelUpload={onCancelUpload}
         onChangeCreateEntryDialog={(value) => dispatch({ type: "UPDATE_CREATE_ENTRY_DIALOG", name: value, error: validateEntryName(value) })}
         onChangeRenameDialog={(value) => dispatch({ type: "UPDATE_RENAME_DIALOG", name: value, error: validateEntryName(value) })}
         onCloseBackgroundContextMenu={() => dispatch({ type: "HIDE_BACKGROUND_CONTEXT_MENU" })}
@@ -369,6 +392,7 @@ export function FileManagerView({
         onCutContextEntry={() => showContextMenu && actions.setClipboardFromEntries([showContextMenu.entry], "move")}
         onDeleteContextEntry={() => showContextMenu && void actions.handleDeleteFromTrash(showContextMenu.entry)}
         onDownloadContextEntry={() => showContextMenu && actions.handleDownloadEntry(showContextMenu.entry)}
+        onUnzipContextEntry={() => showContextMenu && void actions.handleUnzipEntry(showContextMenu.entry)}
         onGetInfoContextEntry={() => showContextMenu && void actions.handleGetInfo(showContextMenu.entry)}
         onMoveContextEntryToTrash={() => showContextMenu && void actions.handleMoveSelectedToTrash(showContextMenu.entry)}
         onNavigateToNetwork={() => {

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
+import { parseEnvFileContent } from "@/lib/shared/env-file";
 
 const MIGRATIONS_FOLDER = join(process.cwd(), "drizzle");
 
@@ -12,16 +13,8 @@ function getDatabaseUrl(): string {
   for (const envFile of [".env.local", ".env"]) {
     const envPath = join(process.cwd(), envFile);
     if (!existsSync(envPath)) continue;
-    const lines = readFileSync(envPath, "utf8").split(/\r?\n/);
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("#")) continue;
-      const sep = trimmed.indexOf("=");
-      if (sep <= 0) continue;
-      if (trimmed.slice(0, sep).trim() !== "DATABASE_URL") continue;
-      const val = trimmed.slice(sep + 1).trim().replace(/^["']|["']$/g, "");
-      if (val) return val;
-    }
+    const env = parseEnvFileContent(readFileSync(envPath, "utf8"));
+    if (env.DATABASE_URL) return env.DATABASE_URL;
   }
 
   return "postgresql://postgres:postgres@127.0.0.1:5432/home_server";

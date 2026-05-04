@@ -14,6 +14,7 @@ import {
   parseComposeFile,
 } from "@/lib/server/modules/docker/compose-parser";
 import { resolveStoreStacksRoot } from "@/lib/server/storage/data-root";
+import { requireApiSession } from "@/lib/server/modules/auth/api";
 
 export const runtime = "nodejs";
 
@@ -63,6 +64,8 @@ function interpolateComposeEnv(content: string, env: Record<string, string>) {
 }
 
 export async function GET(request: Request, context: RouteContext) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   const requestId = createRequestId();
   const { appId } = await context.params;
   const url = new URL(request.url);

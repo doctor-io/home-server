@@ -8,6 +8,7 @@ import {
 } from "@/lib/client/monitor-utils";
 import { useDockerStats } from "@/modules/system/hooks/useDockerStats";
 import { useSystemMetrics } from "@/modules/system/hooks/useSystemMetrics";
+import { DiskManager } from "@/modules/system/components/disk-manager";
 import {
   Activity,
   AlertTriangle,
@@ -25,12 +26,13 @@ import { PANEL_INSET } from "@/lib/ui/surface-tokens";
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 
-type MonitorTab = "processes" | "network";
+type MonitorTab = "processes" | "network" | "disks";
 type SortKey = "cpu" | "memory" | "network" | "disk";
 
 const TABS: { id: MonitorTab; label: string }[] = [
   { id: "processes", label: "Processes" },
   { id: "network", label: "Network" },
+  { id: "disks", label: "Disks" },
 ];
 
 // ── Metric card ───────────────────────────────────────────────────────────────
@@ -401,6 +403,9 @@ export function Monitor() {
           </div>
         </div>
       )}
+
+      {/* ── Disks tab ── */}
+      {tab === "disks" && <DiskManager />}
 
       {/* ── Network tab ── */}
       {tab === "network" && (

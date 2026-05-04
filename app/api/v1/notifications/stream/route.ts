@@ -1,9 +1,12 @@
 import { toSseChunk } from "@/lib/server/realtime/sse";
 import { subscribeToNotifications } from "@/lib/server/modules/notifications/emitter";
+import { requireApiSession } from "@/lib/server/modules/auth/api";
 
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream<Uint8Array>({

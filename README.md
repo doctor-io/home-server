@@ -16,13 +16,16 @@ A self-hosted server manager with a desktop-style UI. Alternative to CasaOS, Umb
 
 - Desktop shell UI with dock, windows, command palette (`⌘K`), widgets, and lock screen
 - Real-time system metrics (CPU, memory, disk, network) via SSE
+- Server information dashboard with host, OS, CPU, memory, thermal, filesystem, and network-interface details
 - App Store: install, update, uninstall Docker Compose apps — compatible with CasaOS store archives
 - Container log viewer: real-time streaming, log-level badges, keyword filter, download
-- File manager: browse, upload (with progress), download, multi-select copy/move, conflict resolution, audio/video/image/PDF preview, Monaco code editor
+- File manager: browse, streaming upload with progress/cancel, download, unzip archives, multi-select copy/move, conflict resolution, audio/video/image/PDF preview, Monaco code editor
 - Scheduled tasks: built-in cron runner for shell commands, app restarts, backups, and image pulls — no SSH required
 - Notification system: real-time alerts for app events, container crashes, disk warnings, and task failures
 - USB drive support: auto-detect, mount, browse, and eject removable drives from the file manager
 - Local folder sharing over Samba and SMB network mount/unmount
+- Google Drive integration: configure OAuth credentials, connect multiple accounts, browse, preview, upload, download, create folders, move, and delete Drive files from the file manager
+- Disk and partition manager: list block devices, format, mount/unmount, create/delete partitions, and wipe disks with explicit confirmations
 - Terminal with command allowlist (ls, cat, docker, df, ping, and more)
 - Docker container stats in real time
 - Network manager: WiFi and Ethernet via NetworkManager
@@ -97,6 +100,8 @@ curl -fsSL https://raw.githubusercontent.com/doctor-io/homeio/main/scripts/unins
 - **Linux only** — the install script targets Debian/Ubuntu/Raspberry Pi OS; Docker works on any platform
 - **Network manager** — WiFi/Ethernet management requires NetworkManager with D-Bus
 - **USB drive support** — requires `udisks2` and `udev` on the host; not available inside Docker without extra configuration
+- **Disk manager** — destructive storage operations require bare-metal Linux tools (`parted`, `e2fsprogs`, `gdisk`) and should not be exposed to untrusted users
+- **Google Drive** — requires a Google Cloud OAuth client configured in Settings → Integrations before accounts can connect
 - **App Store hardware compatibility** — some templates require specific hardware (e.g. Raspberry Pi GPU); edit the compose file to remove optional hardware requirements
 
 ---
@@ -105,6 +110,7 @@ curl -fsSL https://raw.githubusercontent.com/doctor-io/homeio/main/scripts/unins
 
 - **Shutdown** — shuts down the OS from the UI; requires physical power-on to recover
 - **Factory reset** — wipes all Homeio data; irreversible
+- **Disk wipe / format / partition changes** — irreversible host storage actions; every action requires explicit confirmation
 - **Self-update rollback** — restores previous version on failed update; not tested under all failure scenarios
 
 ---
@@ -147,7 +153,7 @@ To opt out, set `HOMEIO_TELEMETRY=false` in your environment.
 
 ## Roadmap
 
-See [ROADMAP.md](./ROADMAP.md) — currently shipping v1.5.
+See [ROADMAP.md](./ROADMAP.md) — current 1.6.x work focuses on storage expansion, Google Drive, safer uploads, and system visibility.
 
 ## Contributing
 

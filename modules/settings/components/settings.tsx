@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 const SIDEBAR_GROUPS: { label: string; ids: SettingsSectionId[] }[] = [
   { label: "System",         ids: ["general", "appearance", "updates"] },
   { label: "Infrastructure", ids: ["network", "storage", "docker"] },
+  { label: "Integrations",  ids: ["integrations"] },
   { label: "Automation",     ids: ["scheduled-tasks", "backup"] },
   { label: "Access",         ids: ["users", "security", "notifications"] },
   { label: "Danger Zone",    ids: ["power", "advanced"] },
@@ -36,6 +37,7 @@ export function SettingsPanel({
   onAppearanceChange,
   wallpaperAccentColor,
   selectedSection,
+  onOpenDiskManager,
 }: SettingsPanelProps) {
   const settingsBackend = useSettingsBackend();
   const desktopPreferences = useDesktopPreferences();
@@ -78,6 +80,7 @@ export function SettingsPanel({
     securityController,
     notificationController,
     backupController,
+    onOpenDiskManager,
   });
   const activeDefinition =
     sectionDefinitions.find((section) => section.id === activeSection) ??

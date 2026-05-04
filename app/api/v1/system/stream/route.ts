@@ -6,10 +6,13 @@ import {
 } from "@/lib/server/logging/logger";
 import { getSystemMetricsSnapshot } from "@/lib/server/modules/system/service";
 import { toSseChunk } from "@/lib/server/realtime/sse";
+import { requireApiSession } from "@/lib/server/modules/auth/api";
 
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   const encoder = new TextEncoder();
   const requestId = createRequestId();
 

@@ -11,7 +11,7 @@ export default defineConfig([
       "prefer-const": "warn",
       "react-hooks/set-state-in-effect": "off",
       "react-hooks/purity": "off",
-      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/consistent-type-imports": [
         "warn",
         {

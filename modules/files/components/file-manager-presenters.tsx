@@ -8,6 +8,7 @@ import {
   FolderIcon,
   GenericFileIcon,
   ImageFileIcon,
+  KoraFileIcon,
   TextFileIcon,
   VideoFileIcon,
 } from "@/components/icons/file-icons";
@@ -33,6 +34,38 @@ const PATH_ALIAS_MAP: Record<string, string> = {
 
 const DISPLAY_PATH_ALIAS_MAP: Record<string, string> = {
   Download: "Downloads",
+};
+
+const EXTENSION_ICON_MAP: Record<string, string> = {
+  "7z": "zip",
+  bash: "shell",
+  cjs: "javascript",
+  css: "css",
+  db: "database",
+  gz: "archive",
+  htm: "html",
+  html: "html",
+  iso: "archive",
+  js: "javascript",
+  json: "json",
+  jsx: "jsx",
+  mjs: "javascript",
+  md: "markdown",
+  pdf: "pdf",
+  py: "python",
+  rar: "archive",
+  sh: "shell",
+  sql: "sql",
+  sqlite: "database",
+  tar: "archive",
+  toml: "toml",
+  ts: "typescript",
+  tsx: "tsx",
+  xml: "xml",
+  yaml: "yaml",
+  yml: "yaml",
+  zip: "zip",
+  zsh: "shell",
 };
 
 export function normalizePathForBackend(pathSegments: string[]) {
@@ -87,17 +120,21 @@ function getFileIconForSize(entry: FileEntry, sizeClass: string) {
   if (["mp4", "mkv", "avi", "mov", "webm"].includes(ext)) {
     return <VideoFileIcon className={sizeClass} />;
   }
-  if (["gz", "tar", "zip", "rar", "7z", "deb", "iso"].includes(ext)) {
-    return <ArchiveFileIcon className={sizeClass} />;
-  }
-  if (["js", "ts", "tsx", "jsx", "py", "sh", "json", "yml", "yaml", "conf", "env", "md", "css", "html"].includes(ext)) {
-    return <CodeFileIcon className={sizeClass} />;
+  const iconKey = EXTENSION_ICON_MAP[ext];
+  if (iconKey) {
+    return <KoraFileIcon className={sizeClass} iconKey={iconKey} />;
   }
   if (["txt", "log", "csv"].includes(ext)) {
     return <TextFileIcon className={sizeClass} />;
   }
-  if (["pdf", "doc", "docx"].includes(ext)) {
+  if (["doc", "docx"].includes(ext)) {
     return <DocumentFileIcon className={sizeClass} />;
+  }
+  if (["gz", "tar", "rar", "7z", "deb", "iso"].includes(ext)) {
+    return <ArchiveFileIcon className={sizeClass} />;
+  }
+  if (["conf", "env"].includes(ext)) {
+    return <CodeFileIcon className={sizeClass} />;
   }
   return <GenericFileIcon className={sizeClass} />;
 }

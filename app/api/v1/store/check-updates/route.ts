@@ -5,6 +5,7 @@ import {
   withServerTiming,
 } from "@/lib/server/logging/logger";
 import { checkAllAppsForUpdates } from "@/lib/server/modules/store/service";
+import { requireApiSession } from "@/lib/server/modules/auth/api";
 
 export const runtime = "nodejs";
 
@@ -19,7 +20,9 @@ export const runtime = "nodejs";
  * - Manually via a "Check for Updates" button
  * - Optionally in background every 6-12 hours
  */
-export async function POST() {
+export async function POST(request: Request) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   const requestId = createRequestId();
 
   try {

@@ -58,21 +58,33 @@ function loadMonacoFromCdn(): Promise<MonacoNamespace> {
   if (monacoLoaderPromise) return monacoLoaderPromise;
 
   monacoLoaderPromise = new Promise((resolve, reject) => {
-    const fail = (err: Error) => {
+    const fail = (err: unknown) => {
       monacoLoaderPromise = null;
-      reject(err);
+      reject(err instanceof Error ? err : new Error(String(err)));
     };
 
     const boot = () => {
-      if (!win.require) {
+      const monacoRequire = win.require;
+      if (!monacoRequire) {
         fail(new Error("Monaco loader is unavailable"));
         return;
       }
-      win.require.config({ paths: { vs: `${MONACO_CDN_BASE}/vs` } });
-      win.require(["vs/editor/editor.main"], () => resolve(win.monaco), fail);
+      monacoRequire.config({ paths: { vs: `${MONACO_CDN_BASE}/vs` } });
+      monacoRequire(
+        ["vs/editor/editor.main"],
+        () => {
+          if (!win.monaco) {
+            fail(new Error("Monaco editor did not initialize"));
+            return;
+          }
+          resolve(win.monaco);
+        },
+        fail,
+      );
     };
 
-    if (win.require) {
+    const existingRequire = win.require as MonacoRequire | undefined;
+    if (existingRequire) {
       boot();
       return;
     }
@@ -136,7 +148,7 @@ export function MonacoEditorPane({
       .then((monaco) => {
         if (!mounted || !containerRef.current) return;
         const model = monaco.editor.createModel(value, language);
-        editor = monaco.editor.create(containerRef.current, {
+        const currentEditor = monaco.editor.create(containerRef.current, {
           model,
           theme: getMonacoTheme(),
           minimap: { enabled: false },
@@ -147,19 +159,20 @@ export function MonacoEditorPane({
           roundedSelection: false,
           padding: { top: 12, bottom: 12 },
         });
+        editor = currentEditor;
 
-        const changeSub = editor.onDidChangeModelContent(() => {
-          onChangeRef.current(editor.getValue());
+        const changeSub = currentEditor.onDidChangeModelContent(() => {
+          onChangeRef.current(currentEditor.getValue());
         });
 
         // KeyMod.CtrlCmd | KeyCode.KeyS = 2048 | 49 = 2097 (platform-aware Cmd/Ctrl+S)
-        editor.addCommand(2097, () => {
+        currentEditor.addCommand(2097, () => {
           onSaveRef.current?.();
         });
 
         if (typeof ResizeObserver !== "undefined" && containerRef.current) {
           resizeObserver = new ResizeObserver(() => {
-            editor.layout();
+            currentEditor.layout();
           });
           resizeObserver.observe(containerRef.current);
         }
@@ -172,7 +185,7 @@ export function MonacoEditorPane({
           attributeFilter: ["data-desktop-theme"],
         });
 
-        editor.__changeSub = changeSub;
+        currentEditor.__changeSub = changeSub;
       })
       .catch(() => {
         if (mounted) setFallbackMode(true);
@@ -183,7 +196,8 @@ export function MonacoEditorPane({
       resizeObserver?.disconnect();
       themeObserver?.disconnect();
       if (editor?.__changeSub) editor.__changeSub.dispose();
-      if (editor?.getModel?.()) editor.getModel().dispose();
+      const model = editor?.getModel?.();
+      if (model) model.dispose();
       if (editor?.dispose) editor.dispose();
     };
     // Monaco model is initialized once per language to avoid recreating editor per keystroke.

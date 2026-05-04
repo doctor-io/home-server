@@ -63,6 +63,7 @@ describe("network service", () => {
       timestamp: "2026-02-23T00:00:00.000Z",
       hostname: "homeio",
       platform: "linux",
+      architecture: "x64",
       uptimeSeconds: 1_000,
       cpu: {
         oneMinute: 0,
@@ -139,6 +140,7 @@ describe("network service", () => {
       timestamp: "2026-02-23T00:00:00.000Z",
       hostname: "homeio",
       platform: "linux",
+      architecture: "x64",
       uptimeSeconds: 1_000,
       cpu: {
         oneMinute: 0,

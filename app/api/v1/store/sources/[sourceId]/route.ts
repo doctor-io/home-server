@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { requireApiSession } from "@/lib/server/modules/auth/api";
 import {
   createRequestId,
   logServerAction,
@@ -22,6 +23,8 @@ const updateSourceSchema = z.object({
 });
 
 export async function PATCH(request: Request, context: RouteContext) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   const requestId = createRequestId();
   const { sourceId } = await context.params;
 
@@ -79,7 +82,9 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 }
 
-export async function DELETE(_request: Request, context: RouteContext) {
+export async function DELETE(request: Request, context: RouteContext) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   const requestId = createRequestId();
   const { sourceId } = await context.params;
 

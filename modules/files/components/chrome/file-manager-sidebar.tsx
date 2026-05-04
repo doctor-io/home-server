@@ -1,11 +1,13 @@
 "use client";
 
 import { Cloud, HardDrive, Plus } from "@/components/icons/platform-icons";
+import { OsIcon } from "@/components/icons/OsIcon";
+import { DEVICE_ICONS, FILE_SIDEBAR_ICONS } from "@/components/icons/icon-assets";
 import { cn } from "@/lib/utils";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { normalizePathForBackend } from "@/modules/files/components/file-manager-presenters";
 import { FILES_MENU_SHELL, FILES_PANEL_SHELL } from "@/modules/files/components/file-manager-surface";
-import { PeopleRegular, DeleteRegular, ArrowEjectRegular } from "@fluentui/react-icons";
+import { Users, Trash2, EjectIcon } from "@/components/icons/platform-icons";
 import { useRef, useState, useEffect, type ReactNode } from "react";
 import { FEATURE_FLAGS } from "@/lib/shared/feature-flags";
 
@@ -25,11 +27,14 @@ export type FileManagerSidebarSection = {
   items: FileManagerSidebarItem[];
 };
 
+export type CloudSidebarItem = FileManagerSidebarItem & { accountEmail: string };
+
 type SidebarProps = {
   currentPath: string[];
   isSharedView: boolean;
   isTrashView: boolean;
   locationItems: FileManagerSidebarItem[];
+  cloudItems: CloudSidebarItem[];
   removableItems: RemovableSidebarItem[];
   sidebarSections: FileManagerSidebarSection[];
   storageUsagePercent: number;
@@ -51,6 +56,7 @@ export function FileManagerSidebar({
   isSharedView,
   isTrashView,
   locationItems,
+  cloudItems,
   removableItems,
   sidebarSections,
   storageUsagePercent,
@@ -79,14 +85,17 @@ export function FileManagerSidebar({
   }, [addMenuOpen]);
 
   return (
-    <aside className={cn("m-2 flex w-48 shrink-0 flex-col", FILES_PANEL_SHELL)}>
-      <div className="flex-1 overflow-y-auto px-2 py-3">
+    <aside className={cn("m-2 flex w-60 shrink-0 flex-col", FILES_PANEL_SHELL)}>
+      <div className="flex-1 overflow-y-auto px-3 py-3.5">
         {sidebarSections.map((section) => {
-          const items = section.title === "Locations" ? locationItems : section.items;
+          const isCloud = section.title === "Cloud";
+          const items =
+            section.title === "Locations" ? locationItems : isCloud ? cloudItems : section.items;
+          if (isCloud && cloudItems.length === 0) return null;
           return (
             <div key={section.title} className="mb-3">
-              <div className="mb-1 flex items-center justify-between px-3">
-                <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/50">
+              <div className="mb-1.5 flex items-center justify-between px-3">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/65">
                   {section.title}
                 </span>
                 {section.title === "Locations" && !isDemoMode && (
@@ -95,32 +104,44 @@ export function FileManagerSidebar({
                       onClick={() => setAddMenuOpen((v) => !v)}
                       title="Add location"
                       aria-label="Add location"
-                      className="rounded-md p-0.5 text-muted-foreground/50 transition-colors hover:bg-background/50 hover:text-foreground"
+                      className="flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground/50 transition-colors hover:bg-background/60 hover:text-foreground"
                     >
                       <Plus className="size-3" />
                     </button>
                     {addMenuOpen && (
-                      <div className={cn("absolute right-0 top-full z-50 mt-1 w-44 py-1", FILES_MENU_SHELL)}>
+                      <div className={cn("absolute right-0 top-full z-50 mt-1.5 w-44 overflow-hidden py-1", FILES_MENU_SHELL)}>
                         <button
                           onClick={() => { setAddMenuOpen(false); onOpenNetworkDialog(); }}
-                          className="flex w-full items-center gap-2.5 px-3 py-2 text-[13px] text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground"
+                          className="flex w-full items-center gap-3 px-3 py-2 text-[13px] text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground"
                         >
-                          <HardDrive className="size-3.5 shrink-0 text-muted-foreground/60" />
+                          <OsIcon
+                            src={FILE_SIDEBAR_ICONS.networkStorage}
+                            className="size-4 shrink-0 object-contain"
+                            fallback={<HardDrive className="size-3.5 shrink-0 text-muted-foreground/60" />}
+                          />
                           Network Storage
                         </button>
                         <button
                           onClick={() => { setAddMenuOpen(false); onOpenUsbDialog(); }}
-                          className="flex w-full items-center gap-2.5 px-3 py-2 text-[13px] text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground"
+                          className="flex w-full items-center gap-3 px-3 py-2 text-[13px] text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground"
                         >
-                          <HardDrive className="size-3.5 shrink-0 text-amber-400/70" />
+                          <OsIcon
+                            src={DEVICE_ICONS.usb}
+                            className="size-4 shrink-0 object-contain"
+                            fallback={<HardDrive className="size-3.5 shrink-0 text-amber-400/70" />}
+                          />
                           USB Drives
                         </button>
                         {FEATURE_FLAGS.GOOGLE_DRIVE && (
                           <button
                             onClick={() => { setAddMenuOpen(false); onOpenGoogleDriveDialog(); }}
-                            className="flex w-full items-center gap-2.5 px-3 py-2 text-[13px] text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground"
+                            className="flex w-full items-center gap-3 px-3 py-2 text-[13px] text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground"
                           >
-                            <Cloud className="size-3.5 shrink-0 text-sky-400/70" />
+                            <OsIcon
+                              src={FILE_SIDEBAR_ICONS.googleDrive}
+                              className="size-4 shrink-0 object-contain"
+                              fallback={<Cloud className="size-3.5 shrink-0 text-sky-400/70" />}
+                            />
                             Google Drive
                           </button>
                         )}
@@ -138,23 +159,23 @@ export function FileManagerSidebar({
                       key={item.name}
                       onClick={() => onNavigateToPath(item.path)}
                       className={cn(
-                        "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
+                        "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
                         isActive
                           ? "bg-primary/15 text-foreground"
                           : "text-muted-foreground hover:bg-background/50 hover:text-foreground",
                       )}
                     >
-                      <span className={cn("size-4 shrink-0", isActive ? "text-primary" : "text-muted-foreground/60")}>
+                      <span className={cn("size-5 shrink-0", isActive ? "text-primary" : "text-muted-foreground/70")}>
                         {item.icon}
                       </span>
-                      <span className="flex-1 truncate text-left text-[13px] font-medium">{item.name}</span>
+                      <span className="flex-1 truncate text-left text-[14px] font-medium leading-5">{item.name}</span>
                     </button>
                   );
                 })}
 
                 {section.title === "Locations" && removableItems.length > 0 && (
                   <>
-                    <div className="mb-0.5 mt-2 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/40">
+                    <div className="mb-1 mt-2.5 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/55">
                       Removable
                     </div>
                     {removableItems.map((item) => {
@@ -164,7 +185,7 @@ export function FileManagerSidebar({
                           <button
                             onClick={() => item.isMounted ? onNavigateToPath(item.path) : onMountDrive(item.driveId)}
                             className={cn(
-                              "flex flex-1 items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
+                              "flex flex-1 items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
                               isActive
                                 ? "bg-primary/15 text-foreground"
                                 : item.isMounted
@@ -172,10 +193,10 @@ export function FileManagerSidebar({
                                   : "text-muted-foreground/40 hover:text-muted-foreground",
                             )}
                           >
-                            <span className={cn("size-4 shrink-0", isActive ? "text-primary" : "text-muted-foreground/40")}>
+                            <span className={cn("size-5 shrink-0", isActive ? "text-primary" : "text-muted-foreground/55")}>
                               {item.icon}
                             </span>
-                            <span className="flex-1 truncate text-left text-[13px] font-medium">{item.name}</span>
+                            <span className="flex-1 truncate text-left text-[14px] font-medium leading-5">{item.name}</span>
                             {!item.isMounted && (
                               <span className="ml-auto shrink-0 text-[10px] text-muted-foreground/40">mount</span>
                             )}
@@ -186,7 +207,7 @@ export function FileManagerSidebar({
                               title="Eject"
                               className="rounded-md p-1 text-muted-foreground/40 transition-colors hover:bg-background/50 hover:text-foreground"
                             >
-                              <ArrowEjectRegular className="size-3.5" />
+                              <EjectIcon className="size-3.5" />
                             </button>
                           )}
                         </div>
@@ -200,37 +221,45 @@ export function FileManagerSidebar({
         })}
       </div>
 
-      <div className="shrink-0 border-t border-glass-border/60 px-3 py-3">
-        <div className="mb-2.5 flex flex-col gap-0.5">
+      <div className="shrink-0 border-t border-glass-border/60 px-4 py-3.5">
+        <div className="mb-3 flex flex-col gap-0.5">
           <button
             onClick={() => onNavigateToPath(["Shared"])}
             className={cn(
-              "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
+              "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
               isSharedView
                 ? "bg-primary/15 text-foreground"
                 : "text-muted-foreground hover:bg-background/50 hover:text-foreground",
             )}
           >
-            <PeopleRegular className={cn("size-4 shrink-0", isSharedView ? "text-primary" : "text-sky-400/70")} />
-            <span className="text-[13px] font-medium">Shared</span>
+            <OsIcon
+              src={FILE_SIDEBAR_ICONS.shared}
+              className="size-5 shrink-0 object-contain"
+              fallback={<Users className={cn("size-4 shrink-0", isSharedView ? "text-primary" : "text-sky-400/70")} />}
+            />
+            <span className="text-[14px] font-medium leading-5">Shared</span>
           </button>
           <button
             onClick={() => onNavigateToPath(["Trash"])}
             className={cn(
-              "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
+              "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
               isTrashView
                 ? "bg-primary/15 text-foreground"
                 : "text-muted-foreground hover:bg-background/50 hover:text-foreground",
             )}
           >
-            <DeleteRegular className={cn("size-4 shrink-0", isTrashView ? "text-primary" : "text-status-red/60")} />
-            <span className="text-[13px] font-medium">Trash</span>
+            <OsIcon
+              src={FILE_SIDEBAR_ICONS.trash}
+              className="size-5 shrink-0 object-contain"
+              fallback={<Trash2 className={cn("size-4 shrink-0", isTrashView ? "text-primary" : "text-status-red/60")} />}
+            />
+            <span className="text-[14px] font-medium leading-5">Trash</span>
           </button>
         </div>
 
         <div className="mb-1.5 flex items-center justify-between">
-          <span className="text-[11px] font-medium text-muted-foreground/70">Storage</span>
-          <span className="text-[11px] text-muted-foreground/50">{storageUsageText}</span>
+          <span className="text-[12px] font-medium text-muted-foreground/75">Storage</span>
+          <span className="text-[12px] text-muted-foreground/60">{storageUsageText}</span>
         </div>
         <div className="h-1 overflow-hidden rounded-full bg-background/65">
           <div

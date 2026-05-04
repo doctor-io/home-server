@@ -76,6 +76,7 @@ import {
   getLatestStoreOperationEvent,
   startStoreOperation,
 } from "@/lib/server/modules/apps/operations";
+import type { StoreOperationError } from "@/lib/server/modules/apps/operations";
 
 async function waitForLatestEventType(operationId: string, expectedType: string) {
   for (let index = 0; index < 50; index += 1) {
@@ -131,6 +132,40 @@ describe("store operations", () => {
       containerNames: ["app"],
       primaryContainerName: "app",
     });
+  });
+
+  it("rejects a second active operation for the same app", async () => {
+    vi.mocked(createStoreOperation).mockResolvedValue(undefined);
+
+    await startStoreOperation({
+      appId: "example",
+      action: "install",
+    });
+
+    await expect(
+      startStoreOperation({
+        appId: "example",
+        action: "update",
+      }),
+    ).rejects.toMatchObject({
+      code: "operation_conflict",
+      statusCode: 409,
+    } satisfies Partial<StoreOperationError>);
+  });
+
+  it("rejects new operations when the global concurrency cap is reached", async () => {
+    vi.mocked(createStoreOperation).mockResolvedValue(undefined);
+
+    await startStoreOperation({ appId: "one", action: "install" });
+    await startStoreOperation({ appId: "two", action: "install" });
+    await startStoreOperation({ appId: "three", action: "install" });
+
+    await expect(
+      startStoreOperation({ appId: "four", action: "install" }),
+    ).rejects.toMatchObject({
+      code: "operation_limit_reached",
+      statusCode: 429,
+    } satisfies Partial<StoreOperationError>);
   });
 
   it("runs install flow and completes with progress updates", async () => {

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireApiSession } from "@/lib/server/modules/auth/api";
 import {
   createRequestId,
   logServerAction,
@@ -45,6 +46,8 @@ function isRateLimited(ip: string): boolean {
 // ── Route handler ────────────────────────────────────────────────────────────
 
 export async function POST(request: Request) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   const requestId = createRequestId();
 
   const ip = getClientIp(request);

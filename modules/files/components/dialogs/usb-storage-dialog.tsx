@@ -7,8 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ArrowEjectRegular } from "@fluentui/react-icons";
-import { Loader2, RefreshCw, X, HardDrive, Plug } from "@/components/icons/platform-icons";
+import { Loader2, RefreshCw, X, HardDrive, Plug, EjectIcon } from "@/components/icons/platform-icons";
 import { useUsbDrives } from "@/modules/files/hooks/useUsbDrives";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/shared/query-keys";
@@ -154,7 +153,7 @@ export function UsbStorageDialog({ isOpen, onClose, onNavigateToUsb }: UsbStorag
                           title="Eject"
                           className="flex size-7 items-center justify-center rounded-lg text-muted-foreground/40 transition-colors hover:bg-background/50 hover:text-foreground"
                         >
-                          <ArrowEjectRegular className="size-3.5" />
+                          <EjectIcon className="size-3.5" />
                         </button>
                       </>
                     ) : (

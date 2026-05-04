@@ -14,10 +14,10 @@ import {
   SortAsc,
   SortDesc,
   Upload,
+  Trash2,
 } from "@/components/icons/platform-icons";
 import { cn } from "@/lib/utils";
 import { FILES_PANEL_SHELL } from "@/modules/files/components/file-manager-surface";
-import { DeleteRegular } from "@fluentui/react-icons";
 import type { RefObject } from "react";
 
 type ToolbarProps = {
@@ -38,7 +38,6 @@ type ToolbarProps = {
   sortDir: "asc" | "desc";
   uploadFilesPending: boolean;
   uploadInputRef: RefObject<HTMLInputElement | null>;
-  uploadProgress: { loaded: number; total: number } | null;
   viewMode: "grid" | "list";
   onCycleSortBy: () => void;
   onEmptyTrash: () => void;
@@ -73,7 +72,6 @@ export function FileManagerToolbar({
   sortDir,
   uploadFilesPending,
   uploadInputRef,
-  uploadProgress,
   viewMode,
   onCycleSortBy,
   onEmptyTrash,
@@ -123,31 +121,20 @@ export function FileManagerToolbar({
 
       {/* Upload */}
       {!isTrashView && !isStarredView && (
-        <div className="relative">
+        <div className="shrink-0">
           <button
             onClick={() => uploadInputRef.current?.click()}
             disabled={uploadFilesPending}
             aria-label="Upload files"
-            title="Upload files"
-            className={cn(iconBtn, iconBtnIdle, "disabled:cursor-not-allowed disabled:opacity-50")}
+            title={uploadFilesPending ? "Upload in progress" : "Upload files"}
+            className={cn(iconBtn, iconBtnIdle, "disabled:cursor-not-allowed disabled:opacity-45")}
           >
-            {uploadFilesPending && uploadProgress ? (
-              <Loader2 className="size-3.5 animate-spin text-primary" />
+            {uploadFilesPending ? (
+              <Loader2 className="size-3.5 animate-spin" />
             ) : (
               <Upload className="size-3.5" />
             )}
           </button>
-          {uploadProgress && uploadProgress.total > 0 && (
-            <div
-              className="absolute -bottom-1 left-0 right-0 h-0.5 overflow-hidden rounded-full bg-white/10"
-              title={`${Math.round((uploadProgress.loaded / uploadProgress.total) * 100)}%`}
-            >
-              <div
-                className="h-full bg-primary transition-all duration-150"
-                style={{ width: `${Math.min(100, Math.round((uploadProgress.loaded / uploadProgress.total) * 100))}%` }}
-              />
-            </div>
-          )}
           <input
             ref={uploadInputRef}
             type="file"
@@ -203,7 +190,7 @@ export function FileManagerToolbar({
             title="Permanently delete all items in Trash"
             className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-status-red transition-colors hover:bg-status-red/10 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <DeleteRegular className="size-3.5" />
+            <Trash2 className="size-3.5" />
             <span className="hidden xl:inline">Empty Trash</span>
           </button>
         )}

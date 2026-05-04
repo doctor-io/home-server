@@ -8,6 +8,7 @@ import {
 import { getAuthCookieName } from "@/lib/server/modules/auth/cookies";
 import { authenticateSession } from "@/lib/server/modules/auth/service";
 import { deleteScheduledRebootArtifacts } from "@/lib/server/modules/system/power-schedule";
+import { requireApiSession } from "@/lib/server/modules/auth/api";
 import {
   deleteFactoryResetArtifacts,
   scheduleFactoryReset,
@@ -16,6 +17,8 @@ import {
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   const requestId = createRequestId();
   const sessionToken = request.cookies.get(getAuthCookieName())?.value;
 
@@ -45,7 +48,7 @@ export async function POST(request: NextRequest) {
         logServerAction({
           layer: "api",
           action: "system.power.factory-reset.post.accepted",
-          status: "warn",
+          status: "success",
           requestId,
           message: "Authenticated factory reset request accepted",
           meta: {

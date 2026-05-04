@@ -20,7 +20,7 @@ type AsyncMutation<TArgs, TResult = unknown> = {
   mutateAsync: (args: TArgs) => Promise<TResult>;
 };
 
-type UseFileManagerEntryActionsArgs = {
+export type UseFileManagerEntryActionsArgs = {
   createEntryDialog: CreateEntryDialogState | null;
   createFileMutation: AsyncMutation<{ parentPath: string; name: string }, { path: string }>;
   createFolderMutation: AsyncMutation<{ parentPath: string; name: string }, { path: string }>;
@@ -51,12 +51,15 @@ type UseFileManagerEntryActionsArgs = {
   systemHostname: string;
   systemNetworkAddress: string;
   toggleStarMutation: AsyncMutation<string, { starred: boolean }>;
+  uploadAbortControllerRef: { current: AbortController | null };
   uploadFilesMutation: AsyncMutation<{
     destinationPath: string;
     files: File[];
     includeHidden: boolean;
     onProgress: (loaded: number, total: number) => void;
+    signal: AbortSignal;
   }, { uploaded: unknown[]; skipped: unknown[] }>;
+  unzipFileMutation: AsyncMutation<string, { destinationPath: string }>;
 };
 
 export function useFileManagerEntryActions({
@@ -90,7 +93,9 @@ export function useFileManagerEntryActions({
   systemHostname,
   systemNetworkAddress,
   toggleStarMutation,
+  uploadAbortControllerRef,
   uploadFilesMutation,
+  unzipFileMutation,
 }: UseFileManagerEntryActionsArgs) {
   return useMemo(() => {
     async function handleTrashSelected() {
@@ -244,6 +249,11 @@ export function useFileManagerEntryActions({
     async function handleUploadFiles(files: File[]) {
       if (files.length === 0 || isTrashView || isStarredView) return;
       const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+      uploadAbortControllerRef.current?.abort();
+      const controller = new AbortController();
+      uploadAbortControllerRef.current = controller;
+      dispatch({ type: "SET_UPLOAD_PROGRESS", loaded: 0, total: totalSize });
+      const isCurrentUpload = () => uploadAbortControllerRef.current === controller;
       try {
         const result = await uploadFilesMutation.mutateAsync({
           destinationPath: toFilePath(currentPath),
@@ -252,7 +262,9 @@ export function useFileManagerEntryActions({
           onProgress: (loaded, total) => {
             dispatch({ type: "SET_UPLOAD_PROGRESS", loaded, total: total || totalSize });
           },
+          signal: controller.signal,
         });
+        if (!isCurrentUpload()) return;
         dispatch({ type: "CLEAR_UPLOAD_PROGRESS" });
         const uploaded = result.uploaded.length;
         const skipped = result.skipped.length;
@@ -260,13 +272,31 @@ export function useFileManagerEntryActions({
         else if (uploaded > 0) setStatusNotice(`Uploaded ${uploaded}, skipped ${skipped} (already exist)`);
         else setStatusNotice(`Skipped ${skipped} file${skipped !== 1 ? "s" : ""} (already exist)`);
       } catch (error) {
+        if (!isCurrentUpload()) return;
         dispatch({ type: "CLEAR_UPLOAD_PROGRESS" });
-        setStatusNotice(error instanceof Error ? error.message : "Upload failed");
+        if (error instanceof Error && error.name === "AbortError") {
+          setStatusNotice("Upload canceled");
+        } else {
+          setStatusNotice(error instanceof Error ? error.message : "Upload failed");
+        }
+      } finally {
+        if (uploadAbortControllerRef.current === controller) {
+          uploadAbortControllerRef.current = null;
+        }
       }
     }
 
     function handleDownloadEntry(entry: FileEntry) {
       window.open(entry.type === "folder" ? buildZipUrl(entry.path) : buildDownloadUrl(entry.path), "_blank", "noopener,noreferrer");
+    }
+
+    async function handleUnzipEntry(entry: FileEntry) {
+      try {
+        await unzipFileMutation.mutateAsync(entry.path);
+        setStatusNotice("Unzipped successfully");
+      } catch (error) {
+        setStatusNotice(error instanceof Error ? error.message : "Failed to unzip");
+      }
     }
 
     async function handleShareFolder(entry: FileEntry) {
@@ -359,6 +389,7 @@ export function useFileManagerEntryActions({
       handleToggleStar,
       handleTrashSelected,
       handleUnshareFolder,
+      handleUnzipEntry,
       handleUploadFiles,
       submitCreateEntryDialog,
       submitRenameDialog,
@@ -394,6 +425,8 @@ export function useFileManagerEntryActions({
     systemHostname,
     systemNetworkAddress,
     toggleStarMutation,
+    uploadAbortControllerRef,
     uploadFilesMutation,
+    unzipFileMutation,
   ]);
 }

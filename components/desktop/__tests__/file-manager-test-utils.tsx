@@ -1,5 +1,6 @@
 import { render } from "@testing-library/react";
 import { vi } from "vitest";
+import { FileManager } from "@/modules/files/components/file-manager";
 
 export const mockUseFilesDirectory = vi.fn();
 export const mockUseFileContent = vi.fn();
@@ -25,6 +26,8 @@ export const mockUseDeleteLocalFolderShare = vi.fn();
 export const mockUseSystemMetrics = vi.fn();
 export const mockUseCurrentUser = vi.fn();
 export const mockUseUsbDrives = vi.fn();
+export const mockUseGoogleDriveConnections = vi.fn();
+export const mockUseUnzipFile = vi.fn();
 
 vi.mock("@/modules/files/hooks/useFiles", () => ({
   buildAssetUrl: (filePath: string) => `/api/v1/files/asset?path=${encodeURIComponent(filePath)}`,
@@ -43,6 +46,7 @@ vi.mock("@/modules/files/hooks/useFiles", () => ({
   useStarredFiles: (...args: unknown[]) => mockUseStarredFiles(...args),
   useSearchFiles: (...args: unknown[]) => mockUseSearchFiles(...args),
   useUploadFiles: (...args: unknown[]) => mockUseUploadFiles(...args),
+  useUnzipFile: (...args: unknown[]) => mockUseUnzipFile(...args),
 }));
 
 vi.mock("@/modules/files/hooks/useTrashActions", () => ({
@@ -62,6 +66,10 @@ vi.mock("@/modules/system/hooks/useSystemMetrics", () => ({
 
 vi.mock("@/modules/files/hooks/useUsbDrives", () => ({
   useUsbDrives: (...args: unknown[]) => mockUseUsbDrives(...args),
+}));
+
+vi.mock("@/modules/files/hooks/useGoogleDrive", () => ({
+  useGoogleDriveConnections: (...args: unknown[]) => mockUseGoogleDriveConnections(...args),
 }));
 
 vi.mock("@/hooks/useCurrentUser", () => ({
@@ -86,9 +94,8 @@ vi.mock("@/modules/files/components/dialogs/usb-storage-dialog", () => ({
   UsbStorageDialog: () => null,
 }));
 
-export async function renderFileManager() {
-  const { FileManager } = await import("@/modules/files/components/file-manager");
-  return render(<FileManager />);
+export function renderFileManager() {
+  return Promise.resolve(render(<FileManager />));
 }
 
 export function mockDirectory(entries: Array<{ name: string; path: string; type: "folder" | "file" }>) {
@@ -135,6 +142,8 @@ export function resetFileManagerMocks() {
   mockUseSystemMetrics.mockReset();
   mockUseCurrentUser.mockReset();
   mockUseUsbDrives.mockReset();
+  mockUseGoogleDriveConnections.mockReset();
+  mockUseUnzipFile.mockReset();
 
   mockUseFilesDirectory.mockReturnValue(mockDirectory([]));
   mockUseFilesRoot.mockReturnValue({
@@ -202,6 +211,7 @@ export function resetFileManagerMocks() {
     isUnmounting: false,
     isEjecting: false,
   });
+  mockUseGoogleDriveConnections.mockReturnValue({ data: { connections: [], configured: true }, isLoading: false, isError: false, error: null });
   mockUseLocalFolderShares.mockReturnValue({ data: [], isLoading: false, isError: false, error: null });
   mockUseCreateLocalFolderShare.mockReturnValue({
     mutateAsync: vi.fn().mockResolvedValue({
@@ -217,6 +227,7 @@ export function resetFileManagerMocks() {
     mutateAsync: vi.fn().mockResolvedValue({ removed: true, id: "local-1" }),
   });
   mockUseUploadFiles.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+  mockUseUnzipFile.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
   mockUseSearchFiles.mockReturnValue({
     data: { entries: [] },
     isLoading: false,

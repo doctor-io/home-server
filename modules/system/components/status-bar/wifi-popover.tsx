@@ -62,7 +62,7 @@ export function WifiPopover({ metrics, networkStatus, isDemoMode = false, onClos
   const hasStatus = Boolean(networkStatus || metrics);
   const isEthernet = Boolean(status.connected && !status.ssid);
 
-  const networks = (networksFromApi?.length ?? 0) > 0 ? networksFromApi : fallbackNetworks;
+  const networks = (networksFromApi?.length ?? 0) > 0 ? (networksFromApi ?? []) : fallbackNetworks;
   const hasNetworks = networks.length > 0;
 
   async function handleConnect(network: WifiAccessPoint) {

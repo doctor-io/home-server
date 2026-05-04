@@ -8,6 +8,7 @@ import {
 import { getAuthCookieName } from "@/lib/server/modules/auth/cookies";
 import { authenticateSession } from "@/lib/server/modules/auth/service";
 import { pruneDockerImages } from "@/lib/server/modules/docker/maintenance-service";
+import { requireApiSession } from "@/lib/server/modules/auth/api";
 
 export const runtime = "nodejs";
 
@@ -31,6 +32,8 @@ async function authenticateRequest(request: NextRequest, requestId: string) {
 }
 
 export async function POST(request: NextRequest) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   const requestId = createRequestId();
 
   try {

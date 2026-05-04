@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { serverEnv } from "@/lib/server/env";
+import { requireApiSession } from "@/lib/server/modules/auth/api";
 import {
   createRequestId,
   logServerAction,
@@ -14,6 +15,7 @@ import {
   pasteEntry,
   renameEntry,
   toggleStarEntry,
+  unzipEntry,
 } from "@/lib/server/modules/files/service";
 
 export const runtime = "nodejs";
@@ -49,9 +51,15 @@ const opsSchema = z.discriminatedUnion("action", [
     action: z.literal("toggle_star"),
     path: z.string().trim().min(1),
   }),
+  z.object({
+    action: z.literal("unzip"),
+    path: z.string().trim().min(1),
+  }),
 ]);
 
 export async function POST(request: Request) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   const requestId = createRequestId();
 
   try {
@@ -140,6 +148,21 @@ export async function POST(request: Request) {
 
         if (parsed.data.action === "toggle_star") {
           const data = await toggleStarEntry({
+            path: parsed.data.path,
+            includeHidden,
+          });
+          return NextResponse.json(
+            { data },
+            {
+              headers: {
+                "Cache-Control": "no-store",
+              },
+            },
+          );
+        }
+
+        if (parsed.data.action === "unzip") {
+          const data = await unzipEntry({
             path: parsed.data.path,
             includeHidden,
           });

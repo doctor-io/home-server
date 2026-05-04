@@ -9,6 +9,8 @@ import {
   upsertCustomStoreTemplate,
 } from "@/lib/server/modules/store/custom-apps";
 import { startAppLifecycleAction } from "@/lib/server/modules/store/service";
+import { requireApiSession } from "@/lib/server/modules/auth/api";
+import { StoreOperationError } from "@/lib/server/modules/apps/operations";
 
 export const runtime = "nodejs";
 
@@ -34,6 +36,8 @@ function isCustomAppRequestError(error: unknown) {
 }
 
 export async function POST(request: Request) {
+  const apiSession = await requireApiSession(request);
+  if (apiSession.response) return apiSession.response;
   const requestId = createRequestId();
 
   try {
@@ -79,6 +83,16 @@ export async function POST(request: Request) {
       },
     );
   } catch (error) {
+    if (error instanceof StoreOperationError) {
+      return NextResponse.json(
+        {
+          error: error.message,
+          code: error.code,
+        },
+        { status: error.statusCode },
+      );
+    }
+
     const status = isCustomAppRequestError(error) ? 400 : 500;
     const message =
       error instanceof Error && isCustomAppRequestError(error)
@@ -89,7 +103,7 @@ export async function POST(request: Request) {
       level: status === 400 ? "warn" : "error",
       layer: "api",
       action: "store.customApps.install.post.response",
-      status: status === 400 ? "warn" : "error",
+      status: "error",
       requestId,
       message,
       error,

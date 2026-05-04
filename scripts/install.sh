@@ -20,10 +20,12 @@ REPO_BRANCH="${HOMEIO_REPO_BRANCH:-main}"
 HOMEIO_RELEASE_TAG="${HOMEIO_RELEASE_TAG:-}"
 
 NODE_VERSION="${NODE_VERSION:-22.14.0}"
+GO_VERSION="${GO_VERSION:-1.23.4}"
 YQ_VERSION="${YQ_VERSION:-4.45.4}"
 DOCKER_VERSION="${DOCKER_VERSION:-}"   # empty = always install latest
 DOCKER_INSTALL_SCRIPT_COMMIT="${DOCKER_INSTALL_SCRIPT_COMMIT:-master}"
 
+UPLOAD_SERVICE_NAME="${HOMEIO_UPLOAD_SERVICE_NAME:-home-server-upload}"
 HOMEIO_INSTALL_YQ="${HOMEIO_INSTALL_YQ:-false}"
 HOMEIO_HOSTNAME="${HOMEIO_HOSTNAME:-}"
 HOMEIO_ALLOW_OTHER_NODE="${HOMEIO_ALLOW_OTHER_NODE:-false}"
@@ -439,6 +441,102 @@ install_node() {
 	fi
 	tar -xzf "/tmp/${node_tar}" -C /usr/local --strip-components=1
 	rm -f "/tmp/${node_tar}" /tmp/SHASUMS256.txt
+}
+
+install_go() {
+	local arch go_arch
+	arch="$(detect_arch)"
+	go_arch="amd64"
+	[[ "${arch}" == "arm64" ]] && go_arch="arm64"
+
+	if command_exists go; then
+		local current
+		current="$(go version 2>/dev/null | awk '{print $3}' | sed 's/^go//')"
+		if [[ "${current}" == "${GO_VERSION}" ]]; then
+			print_status "Go ${GO_VERSION} already installed."
+			export PATH="/usr/local/go/bin:${PATH}"
+			return
+		fi
+		print_status "Existing Go ${current} detected; installing Go ${GO_VERSION}."
+	fi
+
+	print_status "Installing Go ${GO_VERSION}..."
+	local tarball="go${GO_VERSION}.linux-${go_arch}.tar.gz"
+	curl -fsSL "https://go.dev/dl/${tarball}" -o "/tmp/${tarball}"
+	rm -rf /usr/local/go
+	tar -C /usr/local -xzf "/tmp/${tarball}"
+	rm -f "/tmp/${tarball}"
+
+	if [[ ! -f /etc/profile.d/go.sh ]]; then
+		echo 'export PATH="/usr/local/go/bin:$PATH"' > /etc/profile.d/go.sh
+	fi
+	export PATH="/usr/local/go/bin:${PATH}"
+	print_status "Go ${GO_VERSION} installed."
+}
+
+build_upload_server() {
+	print_status "Building upload server (Go)..."
+	export PATH="/usr/local/go/bin:${PATH}"
+
+	local src="${INSTALL_DIR}/services/upload-server"
+	[[ -d "${src}" ]] || { print_error "Upload server source not found at ${src}"; exit 1; }
+
+	mkdir -p "${INSTALL_DIR}/bin"
+
+	if [[ "${HOMEIO_VERBOSE}" == "true" ]]; then
+		(cd "${src}" && go build -o "${INSTALL_DIR}/bin/upload-server" .)
+	else
+		if ! (cd "${src}" && go build -o "${INSTALL_DIR}/bin/upload-server" .) >/dev/null 2>&1; then
+			print_error "Failed to build upload server. Re-run with HOMEIO_VERBOSE=true for details."
+			exit 1
+		fi
+	fi
+
+	print_status "Upload server built: ${INSTALL_DIR}/bin/upload-server"
+}
+
+install_upload_server_service() {
+	command_exists systemctl || { print_error "systemd is required but systemctl is not available."; exit 1; }
+
+	local unit_file="/etc/systemd/system/${UPLOAD_SERVICE_NAME}.service"
+	print_status "Installing systemd unit ${UPLOAD_SERVICE_NAME}.service..."
+
+	cat >"${unit_file}" <<EOF
+[Unit]
+Description=${APP_NAME} Upload Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+EnvironmentFile=${ENV_FILE}
+Environment=UPLOAD_SERVER_ADDR=/run/home-server/upload.sock
+RuntimeDirectory=home-server
+RuntimeDirectoryMode=0755
+ExecStart=${INSTALL_DIR}/bin/upload-server
+Restart=always
+RestartSec=5
+KillMode=process
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=${UPLOAD_SERVICE_NAME}
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+	systemctl daemon-reload
+	systemctl enable "${UPLOAD_SERVICE_NAME}.service"
+	systemctl start "${UPLOAD_SERVICE_NAME}.service"
+
+	sleep 1
+
+	if systemctl is-active --quiet "${UPLOAD_SERVICE_NAME}"; then
+		print_status "Upload server service started successfully!"
+	else
+		print_error "Upload server service failed to start. Check logs with: journalctl -u ${UPLOAD_SERVICE_NAME} -n 50"
+		exit 1
+	fi
 }
 
 install_yq() {
@@ -939,27 +1037,45 @@ server {
     listen [::]:${PUBLIC_PORT};
     server_name _;
 
-    client_max_body_size 32m;
+    client_max_body_size 10G;
+    client_body_timeout 3600s;
+    client_header_timeout 3600s;
+    client_body_buffer_size 128k;
+    client_body_temp_path /var/lib/nginx/body;
+
     proxy_read_timeout 3600s;
     proxy_send_timeout 3600s;
     proxy_intercept_errors on;
+
     error_page 502 503 504 /__homeio_unavailable.html;
 
-    location = /__homeio_unavailable.html {
-        root ${maintenance_root};
-        default_type text/html;
-        add_header Cache-Control "no-store, no-cache, must-revalidate" always;
+    # Route file uploads directly to the Go upload server, bypassing Next.js.
+    # The Go binary streams multipart data straight to disk with minimal overhead.
+    location = /api/v1/files/upload {
+        proxy_pass http://unix:/run/home-server/upload.sock:/upload;
+        proxy_http_version 1.1;
+        proxy_request_buffering off;
+        proxy_buffering off;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     }
 
     location / {
         proxy_pass http://homeio_backend;
         proxy_http_version 1.1;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_set_header Connection "";
+
+        proxy_request_buffering off;
         proxy_buffering off;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "";
+
         gzip off;
     }
 }
@@ -1116,6 +1232,7 @@ main() {
 	run_step "Ensuring security dependencies..." ensure_security_dependencies
 	run_step "Installing Docker..." install_docker
 	run_step "Installing Node.js..." install_node
+	run_step "Installing Go..." install_go
 	run_step "Installing yq (optional)..." install_yq
 	run_step "Ensuring directories..." ensure_directories
 	run_step "Syncing repository..." clone_or_update_repo
@@ -1123,7 +1240,9 @@ main() {
 	run_step "Creating environment file..." create_env_file
 	run_step "Configuring PostgreSQL..." configure_local_postgres
 	run_step "Installing application..." install_homeio
+	run_step "Building upload server..." build_upload_server
 	run_step "Installing app systemd service..." install_systemd_service
+	run_step "Installing upload server service..." install_upload_server_service
 	run_step "Configuring reverse proxy..." install_reverse_proxy
 	run_step "Installing DBus helper service..." install_dbus_helper_service
 	print_summary

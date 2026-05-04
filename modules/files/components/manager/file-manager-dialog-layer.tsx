@@ -7,6 +7,7 @@ import {
   FileInfoDialogOverlay,
   PasteConflictDialog,
   RenameEntryDialog,
+  UploadProgressDialog,
 } from "@/modules/files/components/dialogs/file-manager-dialogs";
 import { NetworkStorageDialog } from "@/modules/files/components/dialogs/network-storage-dialog";
 import { GoogleDriveDialog } from "@/modules/files/components/dialogs/google-drive-dialog";
@@ -40,6 +41,9 @@ type FileManagerDialogLayerProps = {
   showGoogleDriveDialog: boolean;
   showUsbDialog: boolean;
   trashItemCount: number;
+  uploadPending: boolean;
+  uploadProgress: { loaded: number; total: number } | null;
+  unzipPending: boolean;
   createPending: boolean;
   renamePending: boolean;
   onCloseContextMenu: () => void;
@@ -52,6 +56,7 @@ type FileManagerDialogLayerProps = {
   onChangeRenameDialog: (value: string) => void;
   onSubmitRenameDialog: () => void;
   onCancelEmptyTrash: () => void;
+  onCancelUpload: () => void;
   onConfirmEmptyTrash: () => void;
   onCloseFileInfoDialog: () => void;
   onConflictResolution: (choice: "replace" | "keep-both" | "skip" | "skip-all") => void;
@@ -65,6 +70,7 @@ type FileManagerDialogLayerProps = {
   onCutContextEntry: () => void;
   onDeleteContextEntry: () => void;
   onDownloadContextEntry: () => void;
+  onUnzipContextEntry: () => void;
   onGetInfoContextEntry: () => void;
   onMoveContextEntryToTrash: () => void;
   onOpenContextEntry: () => void;
@@ -84,6 +90,7 @@ export function FileManagerDialogLayer({
   fileInfoDialog,
   isTrashView,
   onCancelEmptyTrash,
+  onCancelUpload,
   onChangeCreateEntryDialog,
   onChangeRenameDialog,
   onCloseBackgroundContextMenu,
@@ -101,6 +108,7 @@ export function FileManagerDialogLayer({
   onCutContextEntry,
   onDeleteContextEntry,
   onDownloadContextEntry,
+  onUnzipContextEntry,
   onGetInfoContextEntry,
   onMoveContextEntryToTrash,
   onNavigateToNetwork,
@@ -126,6 +134,9 @@ export function FileManagerDialogLayer({
   showGoogleDriveDialog,
   showUsbDialog,
   trashItemCount,
+  uploadPending,
+  uploadProgress,
+  unzipPending,
 }: FileManagerDialogLayerProps) {
   return (
     <>
@@ -143,6 +154,7 @@ export function FileManagerDialogLayer({
           onCut={onCutContextEntry}
           onDeletePermanently={onDeleteContextEntry}
           onDownload={onDownloadContextEntry}
+          onUnzip={onUnzipContextEntry}
           onGetInfo={onGetInfoContextEntry}
           onMoveToTrash={onMoveContextEntryToTrash}
           onOpen={onOpenContextEntry}
@@ -196,6 +208,12 @@ export function FileManagerDialogLayer({
 
       {fileInfoDialog ? (
         <FileInfoDialogOverlay fileInfo={fileInfoDialog} onClose={onCloseFileInfoDialog} />
+      ) : null}
+
+      {uploadPending || uploadProgress ? (
+        <UploadProgressDialog operation="upload" progress={uploadProgress} onCancel={onCancelUpload} />
+      ) : unzipPending ? (
+        <UploadProgressDialog operation="unzip" progress={null} />
       ) : null}
 
       {pasteConflict ? (
