@@ -118,15 +118,21 @@ async function runInstall(authKey?: string): Promise<TailscaleInstallResult> {
   let stderr = "";
 
   if (!currentStatus.installed) {
-    const installResult = await execFileAsync("sh", [
-      "-c",
-      "curl -fsSL https://tailscale.com/install.sh | sh",
-    ], {
-      timeout: 120_000,
-      maxBuffer: 1024 * 1024,
-    });
-    stdout += installResult.stdout;
-    stderr += installResult.stderr;
+    try {
+      const installResult = await execFileAsync("sh", [
+        "-c",
+        "curl -fsSL https://tailscale.com/install.sh | sh",
+      ], {
+        timeout: 120_000,
+        maxBuffer: 4 * 1024 * 1024,
+      });
+      stdout += installResult.stdout;
+      stderr += installResult.stderr;
+    } catch (err) {
+      const e = err as { stderr?: string; stdout?: string; message?: string };
+      const detail = (e.stderr || e.stdout || e.message || "Unknown error").slice(0, 3000);
+      throw new Error(`Tailscale install script failed:\n${detail}`);
+    }
   }
 
   const nextStatus = await getLocalTailscaleStatus();

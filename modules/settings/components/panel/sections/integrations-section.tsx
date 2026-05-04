@@ -120,7 +120,10 @@ function GoogleDriveConfig() {
   const [showSecret, setShowSecret] = useState(false);
   const [savedOk, setSavedOk] = useState(false);
 
-  const effectiveRedirectUri = redirectUri || saved?.redirectUri || "http://localhost:3000/api/v1/files/google-drive/callback";
+  const originDefault = typeof window !== "undefined"
+    ? `${window.location.origin}/api/v1/files/google-drive/callback`
+    : "http://localhost:3000/api/v1/files/google-drive/callback";
+  const effectiveRedirectUri = redirectUri || saved?.redirectUri || originDefault;
 
   const saveMutation = useMutation({
     mutationFn: saveGoogleOAuthConfig,
@@ -201,75 +204,78 @@ function GoogleDriveConfig() {
         </code>
       </div>
 
-      {/* Custom redirect URI override */}
-      <InputRow
-        label="Custom redirect URI"
-        description="Override if your server uses a public domain instead of localhost"
-      >
-        <input
-          value={redirectUri}
-          onChange={(e) => setRedirectUri(e.target.value)}
-          placeholder={saved?.redirectUri ?? "http://localhost:3000/api/v1/files/google-drive/callback"}
-          disabled={isBusy}
-          className={inputCls}
-        />
-      </InputRow>
-
-      {/* Client ID */}
-      <InputRow label="Client ID" description="From Google Cloud Console → OAuth 2.0 Client IDs">
-        <input
-          value={clientId}
-          onChange={(e) => setClientId(e.target.value)}
-          placeholder={saved?.clientId ? `${saved.clientId.slice(0, 24)}…` : "1234567890-abc...apps.googleusercontent.com"}
-          disabled={isBusy}
-          className={inputCls}
-        />
-      </InputRow>
-
-      {/* Client Secret */}
-      <InputRow label="Client secret" description="Kept encrypted in the database">
-        <div className="relative">
+      <form onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
+        {/* Custom redirect URI override */}
+        <InputRow
+          label="Custom redirect URI"
+          description="Override only if you need a different URL than the one shown above"
+        >
           <input
-            value={clientSecret}
-            onChange={(e) => setClientSecret(e.target.value)}
-            type={showSecret ? "text" : "password"}
-            placeholder={saved?.hasSecret ? "••••••••••••••••" : "GOCSPX-..."}
+            value={redirectUri}
+            onChange={(e) => setRedirectUri(e.target.value)}
+            placeholder={saved?.redirectUri ?? originDefault}
             disabled={isBusy}
-            className={cn(inputCls, "pr-9")}
+            className={inputCls}
           />
+        </InputRow>
+
+        {/* Client ID */}
+        <InputRow label="Client ID" description="From Google Cloud Console → OAuth 2.0 Client IDs">
+          <input
+            value={clientId}
+            onChange={(e) => setClientId(e.target.value)}
+            placeholder={saved?.clientId ? `${saved.clientId.slice(0, 24)}…` : "1234567890-abc...apps.googleusercontent.com"}
+            disabled={isBusy}
+            className={inputCls}
+          />
+        </InputRow>
+
+        {/* Client Secret */}
+        <InputRow label="Client secret" description="Kept encrypted in the database">
+          <div className="relative">
+            <input
+              value={clientSecret}
+              onChange={(e) => setClientSecret(e.target.value)}
+              type={showSecret ? "text" : "password"}
+              placeholder={saved?.hasSecret ? "••••••••••••••••" : "GOCSPX-..."}
+              disabled={isBusy}
+              className={cn(inputCls, "pr-9")}
+            />
+            <button
+              type="button"
+              onClick={() => setShowSecret((v) => !v)}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground"
+              tabIndex={-1}
+            >
+              {showSecret ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+            </button>
+          </div>
+        </InputRow>
+
+        {/* Actions */}
+        <div className={cn(SETTINGS_PANEL_INSET, "flex items-center justify-between px-4 py-2.5")}>
+          {isConfigured ? (
+            <button
+              type="button"
+              onClick={() => clearMutation.mutate()}
+              disabled={isBusy}
+              className="text-[11px] text-status-red hover:underline disabled:opacity-50"
+            >
+              {clearMutation.isPending ? "Removing…" : "Remove credentials"}
+            </button>
+          ) : (
+            <span />
+          )}
           <button
-            type="button"
-            onClick={() => setShowSecret((v) => !v)}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground"
-            tabIndex={-1}
+            type="submit"
+            disabled={!canSave || isBusy}
+            className="flex h-7 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {showSecret ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+            {savedOk && <Check className="size-3" />}
+            {saveMutation.isPending ? "Saving…" : savedOk ? "Saved" : "Save credentials"}
           </button>
         </div>
-      </InputRow>
-
-      {/* Actions */}
-      <div className={cn(SETTINGS_PANEL_INSET, "flex items-center justify-between px-4 py-2.5")}>
-        {isConfigured ? (
-          <button
-            onClick={() => clearMutation.mutate()}
-            disabled={isBusy}
-            className="text-[11px] text-status-red hover:underline disabled:opacity-50"
-          >
-            {clearMutation.isPending ? "Removing…" : "Remove credentials"}
-          </button>
-        ) : (
-          <span />
-        )}
-        <button
-          onClick={handleSave}
-          disabled={!canSave || isBusy}
-          className="flex h-7 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {savedOk && <Check className="size-3" />}
-          {saveMutation.isPending ? "Saving…" : savedOk ? "Saved" : "Save credentials"}
-        </button>
-      </div>
+      </form>
     </div>
   );
 }
@@ -440,70 +446,74 @@ function TailscaleConfig() {
         </a>
       </div>
 
-      <InputRow
-        label="Tailnet"
-        description="Use the tailnet name from the Tailscale admin console"
-      >
-        <input
-          value={tailnet}
-          onChange={(e) => setTailnet(e.target.value)}
-          placeholder={saved?.tailnet || "example.com"}
-          disabled={isBusy}
-          className={inputCls}
-        />
-      </InputRow>
-
-      <InputRow label="Auth key" description="Generate an auth key in Tailscale Keys; kept encrypted until activation">
-        <div className="relative">
+      <form onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
+        <InputRow
+          label="Tailnet"
+          description="Use the tailnet name from the Tailscale admin console"
+        >
           <input
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            type={showApiKey ? "text" : "password"}
-            placeholder={saved?.hasApiKey ? "••••••••••••••••" : "tskey-auth-..."}
+            value={tailnet}
+            onChange={(e) => setTailnet(e.target.value)}
+            placeholder={saved?.tailnet || "example.com"}
             disabled={isBusy}
-            className={cn(inputCls, "pr-9")}
+            className={inputCls}
           />
-          <button
-            type="button"
-            onClick={() => setShowApiKey((v) => !v)}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground"
-            tabIndex={-1}
-          >
-            {showApiKey ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
-          </button>
-        </div>
-      </InputRow>
+        </InputRow>
 
-      <div className={cn(SETTINGS_PANEL_INSET, "flex items-center justify-between px-4 py-2.5")}>
-        {isConfigured ? (
-          <button
-            onClick={() => clearMutation.mutate()}
-            disabled={isBusy}
-            className="text-[11px] text-status-red hover:underline disabled:opacity-50"
-          >
-            {clearMutation.isPending ? "Removing…" : "Remove credentials"}
-          </button>
-        ) : (
-          <span />
-        )}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleSave}
-            disabled={!canSave || isBusy}
-            className="flex h-7 items-center gap-1.5 rounded-lg border border-glass-border bg-background/55 px-3 text-xs font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {savedOk && !activateMutation.isPending && <Check className="size-3" />}
-            {saveMutation.isPending ? "Saving…" : savedOk ? "Saved" : "Save auth key"}
-          </button>
-          <button
-            onClick={() => activateMutation.mutate()}
-            disabled={!canActivate || isBusy}
-            className="flex h-7 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {activateMutation.isPending ? "Activating…" : status?.installed ? "Activate" : "Install and activate"}
-          </button>
+        <InputRow label="Auth key" description="Generate an auth key in Tailscale Keys; kept encrypted until activation">
+          <div className="relative">
+            <input
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              type={showApiKey ? "text" : "password"}
+              placeholder={saved?.hasApiKey ? "••••••••••••••••" : "tskey-auth-..."}
+              disabled={isBusy}
+              className={cn(inputCls, "pr-9")}
+            />
+            <button
+              type="button"
+              onClick={() => setShowApiKey((v) => !v)}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground"
+              tabIndex={-1}
+            >
+              {showApiKey ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+            </button>
+          </div>
+        </InputRow>
+
+        <div className={cn(SETTINGS_PANEL_INSET, "flex items-center justify-between px-4 py-2.5")}>
+          {isConfigured ? (
+            <button
+              type="button"
+              onClick={() => clearMutation.mutate()}
+              disabled={isBusy}
+              className="text-[11px] text-status-red hover:underline disabled:opacity-50"
+            >
+              {clearMutation.isPending ? "Removing…" : "Remove credentials"}
+            </button>
+          ) : (
+            <span />
+          )}
+          <div className="flex items-center gap-2">
+            <button
+              type="submit"
+              disabled={!canSave || isBusy}
+              className="flex h-7 items-center gap-1.5 rounded-lg border border-glass-border bg-background/55 px-3 text-xs font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {savedOk && !activateMutation.isPending && <Check className="size-3" />}
+              {saveMutation.isPending ? "Saving…" : savedOk ? "Saved" : "Save auth key"}
+            </button>
+            <button
+              type="button"
+              onClick={() => activateMutation.mutate()}
+              disabled={!canActivate || isBusy}
+              className="flex h-7 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {activateMutation.isPending ? "Activating…" : status?.installed ? "Activate" : "Install and activate"}
+            </button>
+          </div>
         </div>
-      </div>
+      </form>
     </div>
   );
 }
