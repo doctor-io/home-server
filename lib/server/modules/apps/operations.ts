@@ -73,6 +73,16 @@ const latestOperationEvent = new Map<string, StoreOperationEvent>();
 const IS_TEST_ENV = process.env.NODE_ENV === "test" || process.env.VITEST === "true";
 
 /**
+ * How long after a terminal event we keep the cached payload in
+ * `latestOperationEvent` so SSE clients that connect right after
+ * completion still receive it without a DB round-trip. After this
+ * window the entry is dropped to keep memory bounded on long-lived
+ * servers (especially Pi). The timeout is unref'd so it never blocks
+ * graceful shutdown.
+ */
+const FINISHED_EVENT_TTL_MS = IS_TEST_ENV ? 1_000 : 60_000;
+
+/**
  * In-memory guard for concurrent operations on the same app.
  * Prevents two simultaneous requests from launching duplicate operations.
  * Cleared on operation completion (success or error).
@@ -1216,6 +1226,14 @@ async function executeStoreOperation(operationId: string, params: OperationParam
   } finally {
     // Always release the guard so future operations on this app can proceed.
     activeOperationsByApp.delete(params.appId);
+    // Drop the cached terminal event after a short grace window so any
+    // SSE client that connects right at completion still sees it from
+    // memory. After the TTL, the entry is purged to keep memory bounded
+    // on long-lived servers (Pi).
+    const purgeTimer = setTimeout(() => {
+      latestOperationEvent.delete(operationId);
+    }, FINISHED_EVENT_TTL_MS);
+    purgeTimer.unref?.();
   }
 }
 
