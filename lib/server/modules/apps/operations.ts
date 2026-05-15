@@ -140,6 +140,10 @@ async function pullImagesWithProgress(
     currentPercent = Math.min(cap, currentPercent + 1);
     void opts.onProgress(currentPercent);
   }, IS_TEST_ENV ? 1 : 2_000);
+  // unref so an in-flight pull doesn't keep the Node.js event loop
+  // alive during graceful shutdown (SIGTERM). clearInterval still runs
+  // in the finally block below.
+  interval.unref?.();
 
   try {
     await runComposePull(composeInput);
