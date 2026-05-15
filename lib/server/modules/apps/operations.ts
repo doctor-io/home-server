@@ -1031,10 +1031,6 @@ async function runUninstallOperation(operationId: string, params: OperationParam
 }
 
 function resolveEnvPathFromComposePath(composePath: string) {
-  const composeFileName = path.basename(composePath).toLowerCase();
-  if (composeFileName === "docker-compose.yml" || composeFileName === "docker-compose.yaml") {
-    return path.join(path.dirname(composePath), ".env");
-  }
   return path.join(path.dirname(composePath), ".env");
 }
 
