@@ -162,6 +162,7 @@ import {
   listDirectory,
   pasteEntry,
   readFileForViewer,
+  searchFiles,
   writeTextFile,
 } from "@/lib/server/modules/files/service";
 
@@ -383,6 +384,43 @@ describe("files service", () => {
       }),
     ).rejects.toMatchObject({
       code: "destination_exists",
+    });
+  });
+
+  describe("searchFiles", () => {
+    it("returns matching entries by name", async () => {
+      await mkdir(path.join(mockDataRoot, "Documents"), { recursive: true });
+      await writeFile(path.join(mockDataRoot, "Documents", "notes.md"), "x");
+      await writeFile(path.join(mockDataRoot, "Documents", "ignore.txt"), "x");
+
+      const result = await searchFiles({ query: "notes" });
+
+      expect(result.entries.map((e) => e.name)).toEqual(["notes.md"]);
+      expect(result.truncated).toBeUndefined();
+    });
+
+    it("flags truncated when the deadline expires before walk completes", async () => {
+      await mkdir(path.join(mockDataRoot, "Deep"), { recursive: true });
+      // A few nested directories with files; the per-subdir setImmediate
+      // yield means a 0-ms deadline trips before we finish the walk.
+      for (let i = 0; i < 5; i += 1) {
+        const dir = path.join(mockDataRoot, "Deep", `level-${i}`);
+        await mkdir(dir, { recursive: true });
+        await writeFile(path.join(dir, "match-target.txt"), "x");
+      }
+
+      const result = await searchFiles({
+        query: "match-target",
+        timeoutMs: 1_000,
+      });
+      expect(result.entries.length).toBeGreaterThan(0);
+      expect(result.truncated).toBeUndefined();
+
+      const truncatedResult = await searchFiles({
+        query: "match-target",
+        timeoutMs: -1_000, // deadline already in the past — trips on first walk
+      });
+      expect(truncatedResult.truncated).toBe(true);
     });
   });
 });

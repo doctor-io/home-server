@@ -93,6 +93,11 @@ const envSchema = z.object({
     .int()
     .min(30_000)
     .default(300_000),
+  FILES_SEARCH_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .min(1_000)
+    .default(10_000),
   DBUS_HELPER_SOCKET_PATH: z
     .string()
     .default("/run/home-server/dbus-helper.sock"),

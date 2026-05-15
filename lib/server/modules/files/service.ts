@@ -17,6 +17,8 @@ import { spawn } from "node:child_process";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import path from "node:path";
+import { setImmediate as setImmediatePromise } from "node:timers/promises";
+import { serverEnv } from "@/lib/server/env";
 import { withServerTiming } from "@/lib/server/logging/logger";
 import {
   FilesPathError,
@@ -1314,6 +1316,13 @@ export type SearchFilesParams = {
   includeHidden?: boolean;
   /** Maximum results to return (default: 200) */
   limit?: number;
+  /**
+   * Wall-clock budget for the recursive walk. Defaults to
+   * FILES_SEARCH_TIMEOUT_MS so we never block the event loop on large
+   * NAS mounts. When the deadline expires the response is returned
+   * with `truncated: true` instead of throwing.
+   */
+  timeoutMs?: number;
 };
 
 export async function searchFiles(params: SearchFilesParams): Promise<FileListResponse> {
@@ -1336,6 +1345,8 @@ export async function searchFiles(params: SearchFilesParams): Promise<FileListRe
       const includeHidden = Boolean(params.includeHidden);
       const query = params.query.trim().toLowerCase();
       const limit = params.limit ?? 200;
+      const timeoutMs = params.timeoutMs ?? serverEnv.FILES_SEARCH_TIMEOUT_MS;
+      const deadline = Date.now() + timeoutMs;
 
       if (query.length === 0) {
         throw new FileServiceError("Search query is empty", {
@@ -1359,9 +1370,14 @@ export async function searchFiles(params: SearchFilesParams): Promise<FileListRe
       }
 
       const output: FileListEntry[] = [];
+      let truncated = false;
 
       async function walk(absoluteDir: string, relativeDir: string) {
         if (output.length >= limit) return;
+        if (Date.now() > deadline) {
+          truncated = true;
+          return;
+        }
 
         let dirEntries: { name: string; isDirectory(): boolean; isFile(): boolean; isSymbolicLink(): boolean }[];
         try {
@@ -1377,6 +1393,10 @@ export async function searchFiles(params: SearchFilesParams): Promise<FileListRe
 
         for (const entry of dirEntries) {
           if (output.length >= limit) return;
+          if (Date.now() > deadline) {
+            truncated = true;
+            return;
+          }
 
           if (!includeHidden && isHiddenName(entry.name)) continue;
           if (relativeDir === "" && entry.name === "Trash") continue;
@@ -1408,6 +1428,10 @@ export async function searchFiles(params: SearchFilesParams): Promise<FileListRe
           }
 
           if (type === "folder") {
+            // Yield to the event loop between subdirectory walks so the
+            // system metrics SSE heartbeat (and other request handlers)
+            // don't starve while we recurse a large tree on a Pi.
+            await setImmediatePromise();
             await walk(absoluteEntryPath, entryRelativePath);
           }
         }
@@ -1416,11 +1440,15 @@ export async function searchFiles(params: SearchFilesParams): Promise<FileListRe
       await walk(baseResolved.absolutePath, baseResolved.relativePath);
       output.sort((a, b) => a.name.localeCompare(b.name));
 
-      return {
+      const response: FileListResponse = {
         root: baseResolved.rootPath,
         cwd: baseResolved.relativePath,
         entries: output,
       };
+      if (truncated) {
+        response.truncated = true;
+      }
+      return response;
     },
   );
 }
