@@ -88,6 +88,11 @@ const envSchema = z.object({
   FILES_NETWORK_MOUNT_UID: z.coerce.number().int().min(0).optional(),
   FILES_NETWORK_MOUNT_GID: z.coerce.number().int().min(0).optional(),
   DOCKER_SOCKET_PATH: z.string().default("/var/run/docker.sock"),
+  DOCKER_COMPOSE_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .min(30_000)
+    .default(300_000),
   DBUS_HELPER_SOCKET_PATH: z
     .string()
     .default("/run/home-server/dbus-helper.sock"),

@@ -4,6 +4,7 @@ import { execFile } from "node:child_process";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
+import { serverEnv } from "@/lib/server/env";
 import { logServerAction, withServerTiming } from "@/lib/server/logging/logger";
 import {
   applyBindMountOwnershipOverrides,
@@ -1059,13 +1060,38 @@ async function runComposeCommand(input: ComposeCommandInput) {
         ...input.args,
       ];
 
+      const timeoutMs = serverEnv.DOCKER_COMPOSE_TIMEOUT_MS;
       const { stdout } = await execFileAsync("docker", args, {
         cwd: path.dirname(input.composePath),
+        timeout: timeoutMs,
+        // Buffer cap protects against runaway compose output on Pi where
+        // a stuck `docker compose logs` could exhaust memory.
+        maxBuffer: 10 * 1024 * 1024,
       }).catch((err: unknown) => {
+        // Detect Node's child_process timeout (SIGTERM + killed) before
+        // anything else so the user sees a clear "timed out" message
+        // instead of a truncated stderr.
+        const errorObject = err as {
+          killed?: boolean;
+          signal?: string;
+          code?: string | number;
+          stderr?: string;
+        };
+        const timedOut =
+          errorObject?.killed === true ||
+          errorObject?.signal === "SIGTERM" ||
+          errorObject?.code === "ETIMEDOUT";
+        if (timedOut) {
+          throw new Error(
+            `Docker compose command timed out after ${Math.round(timeoutMs / 1000)}s. ` +
+              `Check Docker daemon status and network connectivity, then retry.`,
+          );
+        }
+
         // Extract Docker's stderr for a more meaningful error message.
         const stderr =
-          typeof (err as { stderr?: string }).stderr === "string"
-            ? (err as { stderr: string }).stderr.trim()
+          typeof errorObject.stderr === "string"
+            ? errorObject.stderr.trim()
             : "";
 
         // Detect hardware device requirements not present on this host
