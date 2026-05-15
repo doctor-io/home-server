@@ -145,4 +145,117 @@ describe("module boundaries", () => {
 
     expect(offenders).toEqual([]);
   });
+
+  /**
+   * Snapshot of api/v1 route files that, as of v1.7, do not call
+   * authenticateSession. These pre-exist this guard and are intentionally
+   * left for incremental hardening in later versions. Adding a NEW route
+   * without auth must fail the test below; the allowlist should only ever
+   * shrink — never grow.
+   */
+  const V1_AUTH_ALLOWLIST = new Set<string>([
+    "app/api/v1/apps/[appId]/check-updates/route.ts",
+    "app/api/v1/apps/[appId]/logs/stream/route.ts",
+    "app/api/v1/apps/[appId]/restart/route.ts",
+    "app/api/v1/apps/[appId]/start/route.ts",
+    "app/api/v1/apps/[appId]/stop/route.ts",
+    "app/api/v1/apps/route.ts",
+    "app/api/v1/docker/info/route.ts",
+    "app/api/v1/docker/stats/route.ts",
+    "app/api/v1/files/asset/route.ts",
+    "app/api/v1/files/content/route.ts",
+    "app/api/v1/files/download/route.ts",
+    "app/api/v1/files/google-drive/auth/route.ts",
+    "app/api/v1/files/google-drive/callback/route.ts",
+    "app/api/v1/files/google-drive/connections/[id]/route.ts",
+    "app/api/v1/files/google-drive/connections/route.ts",
+    "app/api/v1/files/network/discover/servers/route.ts",
+    "app/api/v1/files/network/discover/shares/route.ts",
+    "app/api/v1/files/network/shares/[shareId]/mount/route.ts",
+    "app/api/v1/files/network/shares/[shareId]/route.ts",
+    "app/api/v1/files/network/shares/[shareId]/unmount/route.ts",
+    "app/api/v1/files/network/shares/route.ts",
+    "app/api/v1/files/ops/route.ts",
+    "app/api/v1/files/root/route.ts",
+    "app/api/v1/files/route.ts",
+    "app/api/v1/files/search/route.ts",
+    "app/api/v1/files/shared/folders/[shareId]/route.ts",
+    "app/api/v1/files/shared/folders/route.ts",
+    "app/api/v1/files/starred/route.ts",
+    "app/api/v1/files/trash/delete/route.ts",
+    "app/api/v1/files/trash/empty/route.ts",
+    "app/api/v1/files/trash/move/route.ts",
+    "app/api/v1/files/trash/restore/route.ts",
+    "app/api/v1/files/upload/route.ts",
+    "app/api/v1/files/usb/[driveId]/eject/route.ts",
+    "app/api/v1/files/usb/[driveId]/mount/route.ts",
+    "app/api/v1/files/usb/[driveId]/unmount/route.ts",
+    "app/api/v1/files/usb/route.ts",
+    "app/api/v1/files/usb/stream/route.ts",
+    "app/api/v1/files/zip/route.ts",
+    "app/api/v1/logs/route.ts",
+    "app/api/v1/network/connect/route.ts",
+    "app/api/v1/network/disconnect/route.ts",
+    "app/api/v1/network/events/stream/route.ts",
+    "app/api/v1/network/networks/route.ts",
+    "app/api/v1/network/status/route.ts",
+    "app/api/v1/notifications/read-all/route.ts",
+    "app/api/v1/notifications/route.ts",
+    "app/api/v1/notifications/stream/route.ts",
+    "app/api/v1/settings/appearance/route.ts",
+    "app/api/v1/store/apps/[appId]/compose/route.ts",
+    "app/api/v1/store/apps/[appId]/install/route.ts",
+    "app/api/v1/store/apps/[appId]/redeploy/route.ts",
+    "app/api/v1/store/apps/[appId]/route.ts",
+    "app/api/v1/store/apps/[appId]/settings/route.ts",
+    "app/api/v1/store/apps/[appId]/uninstall/route.ts",
+    "app/api/v1/store/apps/[appId]/update/route.ts",
+    "app/api/v1/store/apps/route.ts",
+    "app/api/v1/store/check-updates/route.ts",
+    "app/api/v1/store/custom-apps/install/route.ts",
+    "app/api/v1/store/operations/[operationId]/route.ts",
+    "app/api/v1/store/sources/[sourceId]/refresh/route.ts",
+    "app/api/v1/store/sources/[sourceId]/route.ts",
+    "app/api/v1/store/sources/route.ts",
+    "app/api/v1/system/metrics/route.ts",
+    "app/api/v1/terminal/execute/route.ts",
+  ]);
+
+  const HTTP_HANDLER_PATTERN =
+    /export\s+(?:async\s+)?function\s+(GET|POST|PUT|PATCH|DELETE)\s*\(/;
+
+  it("requires authenticateSession in every new app/api/v1/** route handler", () => {
+    const v1Root = join(REPO_ROOT, "app", "api", "v1");
+    const routeFiles = listSourceFiles(v1Root)
+      .filter((filePath) => !isTestFile(filePath))
+      .filter((filePath) => filePath.endsWith("/route.ts"));
+
+    const offenders: string[] = [];
+    const staleAllowlistEntries: string[] = [];
+
+    for (const filePath of routeFiles) {
+      const source = readImports(filePath);
+      if (!HTTP_HANDLER_PATTERN.test(source)) continue;
+
+      const relativePath = filePath.slice(REPO_ROOT.length + 1);
+      const hasAuth = source.includes("authenticateSession");
+      const allowlisted = V1_AUTH_ALLOWLIST.has(relativePath);
+
+      if (!hasAuth && !allowlisted) {
+        offenders.push(relativePath);
+      }
+      if (hasAuth && allowlisted) {
+        // A previously-unauthenticated route now calls authenticateSession;
+        // it should be removed from V1_AUTH_ALLOWLIST so the snapshot keeps
+        // shrinking.
+        staleAllowlistEntries.push(relativePath);
+      }
+    }
+
+    expect(offenders, "new v1 routes must call authenticateSession").toEqual([]);
+    expect(
+      staleAllowlistEntries,
+      "remove these from V1_AUTH_ALLOWLIST — they now authenticate",
+    ).toEqual([]);
+  });
 });
