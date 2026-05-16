@@ -2,8 +2,8 @@
 
 This document outlines what's shipping now and what's planned for future releases. It's a living document — priorities shift based on community feedback. If something here matters to you, open an issue or leave a 👍 on the relevant discussion.
 
-**Current release line:** v1.6.x  
-**Package version in this branch:** v1.6.13
+**Current stable release:** [v1.4.x](https://github.com/doctor-io/homeio/releases)  
+**In active development:** v1.7
 
 ---
 
@@ -16,11 +16,13 @@ This document outlines what's shipping now and what's planned for future release
 
 ---
 
-## v1.5 — Productivity ✅ Released
+## v1.5 — Productivity
 
 > *Features that reduce the need to SSH in.*
 
-### Monaco File Editor
+**Status: active development**
+
+### Monaco File Editor ✅
 
 The text preview is now a full code editor:
 
@@ -30,7 +32,7 @@ The text preview is now a full code editor:
 - Unsaved-changes indicator with discard confirmation
 - Edit Docker Compose files, `.env` configs, and shell scripts from the file manager without SSH
 
-### Notification System
+### Notification System ✅
 
 - Persistent `notifications` table in PostgreSQL
 - Event sources: app install/update/uninstall, container crash, disk above 85%, backup result, scheduled task failure, system update available
@@ -38,7 +40,7 @@ The text preview is now a full code editor:
 - Mark as read, clear all
 - Notification preferences per category in Settings
 
-### Scheduled Tasks
+### Scheduled Tasks ✅
 
 A built-in cron job runner — no SSH, no crontab editing:
 
@@ -48,7 +50,7 @@ A built-in cron job runner — no SSH, no crontab editing:
 - Enable / disable without deleting
 - Failure notifications via the notification system
 
-### USB Drive Support
+### USB Drive Support 🚧
 
 Detect, mount, and browse USB drives from the file manager:
 
@@ -60,16 +62,9 @@ Detect, mount, and browse USB drives from the file manager:
 
 ---
 
-## v1.6 — Storage Expansion & Polish ✅ Current
+## v1.6 — Storage Expansion
 
 > *Homeio as the central hub for all your data.*
-
-**Status: shipping in the 1.6.x line**
-
-### Bug Fixes & Cross-Browser Compatibility 🚧
-
-- Firefox: blur overlay appearing over flyout popovers and the status bar when open
-- Firefox: app grid icons not centered / incorrect rendering inside rounded containers
 
 ### Disk & Partition Manager
 
@@ -82,40 +77,147 @@ Homeio already installs `parted`, `e2fsprogs`, and `gdisk` on bare-metal setups 
 - Wipe a disk
 - Clear warnings before any destructive action — every dangerous operation requires explicit confirmation
 
-### Server Information
-
-The Settings app now includes a server information view:
-
-- Hostname, OS, kernel, uptime, CPU, memory, and filesystem details
-- Network interface inventory with address, speed, and traffic fields where available
-- Thermal readings where the host exposes sensor data
-- Disk and temperature warnings feed recent actions and notifications
-
 ### Google Drive Integration
 
-Use Google Drive accounts as file manager locations:
+Mount a Google Drive account as a location in the file manager:
 
-- OAuth2 setup from Settings → Integrations, with encrypted client secret storage
-- OAuth2 flow for connecting accounts once the Google Cloud credentials are configured
+- OAuth2 flow — connect an account from Settings → Storage → Cloud Accounts
 - Google Drive appears in the file manager sidebar alongside local and network locations
-- Browse folders, preview files, upload, download, create folders, move, and delete within Drive
+- Browse folders, preview files, upload, download, move within Drive
 - Multiple accounts supported
-- OAuth tokens stored encrypted in the database
+- OAuth tokens stored encrypted in the database (same pattern as SMB credentials)
 - Files are not synced locally — accessed on demand via the Drive API
 
-### Safer Large Uploads
+---
 
-- Next.js upload route now stream-parses multipart requests with `busboy` instead of buffering complete uploads in memory
-- Bare-metal installs include a Go upload sidecar that listens on `/run/home-server/upload.sock`
-- Install and update scripts build the sidecar, write the systemd unit, and report service/unit-file status
-- Upload socket permissions are set so the app process can read and write through the socket
-- Upload progress and cancellation remain available in the file manager UI
+## v1.7 — Stability, Pi Hardening, Reverse Proxy & Security
 
-### Shell & Visual Polish
+> *Make it solid everywhere it runs, close the loop from container to HTTPS URL, and add a second lock on the door.*
 
-- Dock and file-type icons now use bundled Kora-style assets with platform icon fallbacks
-- File manager supports archive extraction through the existing file operation route
-- Cross-browser visual fixes continue for Firefox blur and icon rendering issues
+**Status: active development**
+
+### Stability & Raspberry Pi Hardening
+
+A focused pass on reliability issues that surface most on low-memory ARM hardware:
+
+- **SSE stream authentication** — three unauthenticated streams (`/system`, `/docker/stats`, `/store/operations`) are secured; unauthenticated requests now return HTTP 401
+- **Docker compose timeout** — all subprocess calls to `docker compose` are capped at a configurable `DOCKER_COMPOSE_TIMEOUT_MS` (default 5 min) to prevent hung operations from locking the queue permanently
+- **In-memory leak fix** — `latestOperationEvent` map is pruned when operations complete, preventing unbounded heap growth on long-running instances
+- **Node.js heap cap** — `NODE_OPTIONS=--max-old-space-size=768` honoured via `docker-entrypoint.sh`; prevents OOM kills on Pi 3 (1 GB RAM)
+- **Multi-arch Docker image** — release image now includes `linux/amd64` and `linux/arm64` manifests; Pi 4/5 users no longer receive an emulated amd64 image
+- **Search file timeout** — `searchFiles` yields the event loop between directory levels and stops after a configurable deadline; large NFS mounts no longer block SSE heartbeats
+- **Graceful shutdown fix** — progress `setInterval` in `pullImagesWithProgress` is `unref()`'d so SIGTERM during an active image pull exits cleanly within the 8-second window
+- **Architecture test guard** — automated test added to prevent unauthenticated `/api/v1/**` route handlers from slipping through code review
+
+### Reverse Proxy & SSL Certificate Management
+
+The biggest missing piece for any home server: expose your services over HTTPS with custom domains — without touching nginx config files.
+
+**Proxy rules**
+
+- Add a proxy rule from within Homeio: pick an app (its exposed port is auto-detected from the compose file), enter a domain name, and Homeio writes and reloads the nginx configuration
+- Rules are stored in the database and survive restarts; nginx config is regenerated on startup
+- Each app card gets an "Expose" button — one click to create a proxy rule for that container
+- Support wildcard subdomains (`*.homelab.local`) for local setups and named domains for internet-facing installs
+
+**SSL / Let's Encrypt**
+
+- Automated certificate provisioning via ACME (Let's Encrypt or ZeroSSL) for any domain pointed at your server
+- Self-signed certificate generation for local/LAN domains that cannot use ACME
+- Certificate status, expiry date, and next renewal shown in the proxy rule list
+- Auto-renewal runs on Homeio's existing scheduled task engine; failure triggers a notification
+- HTTP → HTTPS redirect enforced automatically for any rule with a valid certificate
+
+**Dynamic DNS (DDNS)**
+
+- Connect a DDNS provider (Cloudflare, DuckDNS, No-IP) from Settings → Network → DDNS
+- Homeio polls your WAN IP and updates DNS records when it changes — runs as a scheduled task
+- Status and last-updated timestamp visible in Settings
+
+**Why this matters:** today every Homeio user who wants HTTPS must install Nginx Proxy Manager alongside Homeio and configure it separately. This release closes that loop — Homeio already knows every container's ports, and now it can manage the path from domain name to HTTPS endpoint in the same UI.
+
+### SMART Disk Health Monitoring
+
+Disk failure is the most common reason a home server loses data. v1.7 surfaces the early warning signs before failure hits:
+
+- Read SMART attributes for every physical drive via `smartctl`: reallocated sectors, pending sectors, uncorrectable errors, power-on hours, and drive temperature
+- Overall health status per disk (Passed / Warning / Failed) shown in the System module
+- Drive temperature included in the real-time system metrics panel
+- Notification triggered when any SMART attribute crosses a failure threshold — same notification pipeline as container crashes and task failures
+- Schedule short and long SMART self-tests from the Scheduled Tasks module
+
+### Hardware Sensor Monitoring
+
+A home server running 24/7 needs thermal visibility — Homeio now exposes it:
+
+- CPU die temperature and per-core temperature via `/sys/class/thermal` and `lm-sensors`
+- NVMe and SSD temperatures via `smartctl -A` (shares the SMART integration above — no extra dependency)
+- Fan RPM for chassis and CPU fans where the kernel exposes them
+- All sensors displayed in the System module alongside existing CPU %, RAM, and disk usage
+
+### Two-Factor Authentication (TOTP)
+
+Once your server is exposed via the reverse proxy in this same release, a second factor becomes critical. v1.7 ships TOTP for the single-user account:
+
+- Set up an authenticator app (Google Authenticator, Authy, 1Password, Bitwarden) via QR code from Settings → Security
+- TOTP is required on every login once enabled; there is no grace period
+- 10 one-time backup codes generated at setup — store them offline; each code can only be used once
+- Disable 2FA only by providing the current TOTP code or a backup code — cannot be bypassed from the login screen
+
+> Multi-user 2FA enforcement (requiring all users to enrol) ships in v2.0 alongside the multi-user model itself.
+
+---
+
+## v1.8 — Observability & Docker Power Tools
+
+> *See deeper into what your server is doing — and take more direct control of it.*
+
+### Metrics History
+
+System and container metrics have always been real-time only. v1.8 persists them:
+
+- CPU, memory, disk I/O, and network throughput sampled every 30 seconds and stored in PostgreSQL with configurable retention (default 30 days)
+- Per-container CPU and memory history alongside existing real-time stats
+- CPU temperature and drive temperatures (from v1.7's sensor and SMART integration) included in the time-series — spot thermal spikes correlated with load
+- Time-range selector on all monitor graphs: Last 1 h / 6 h / 24 h / 7 d / 30 d
+- Automatic data pruning — a scheduled task trims rows older than the retention window; no manual cleanup needed
+
+### Docker Image Manager
+
+Today Homeio manages apps at the compose level. v1.8 adds direct image control:
+
+- Browse all locally pulled Docker images: name, tag, size, creation date, and which compose apps reference them
+- Pull an image by name and tag without writing a compose file
+- Remove unused images individually or prune all dangling images in one click (with a size-reclaim preview)
+- Inspect image layers and exposed ports
+- Images that belong to installed apps are clearly labelled — the UI warns before removing a referenced image
+
+### Webhooks
+
+Send outbound HTTP notifications to external services when Homeio events fire:
+
+- Configure webhook endpoints from Settings → Integrations: URL, HTTP method, optional secret for HMAC signing
+- Trigger on any notification category: app installed/updated/crashed, disk warning, task failure, certificate renewed, SMART alert
+- Payload is a JSON object matching the existing notification schema — the same shape used by the SSE notification stream
+- Delivery log with status code, response time, and retry history per endpoint
+- Manual "Test" button sends a sample payload immediately without waiting for a real event
+
+### ARMv7 (32-bit Pi 2/3) Support
+
+Carried over from v1.7 scope:
+
+- Investigate and resolve `@lydell/node-pty` prebuilt availability for `linux/arm/v7`
+- Add `linux/arm/v7` to the release workflow multi-arch build if prebuilts exist; otherwise document a build-from-source path for Pi 2/3 users
+- End-to-end smoke test on ARMv7 hardware or QEMU
+
+### File Manager Enhancements
+
+Smaller quality-of-life additions deferred from earlier releases:
+
+- **Zip / unzip** — compress a selection of files or folders into a `.zip` archive; extract `.zip`, `.tar.gz`, and `.tar` archives in place
+- **Bulk rename** — rename multiple selected files with a find-and-replace pattern or sequential numbering
+- **Batch delete** — multi-select delete with a single confirmation prompt instead of one confirmation per file
+- **3-part Docker port spec fix** — `applyWebUiPortOverride` now handles `IP:HOST:CONTAINER` mappings (e.g. `0.0.0.0:8080:80`) correctly instead of silently leaving them unchanged
 
 ---
 
@@ -148,12 +250,14 @@ Token-based authentication for programmatic access — integrations with Home As
 - Scoped permissions: read-only, app management, file access, system control
 - Token usage log — last used timestamp and source IP
 
-### Two-Factor Authentication (TOTP)
+### Two-Factor Authentication — Admin Enforcement
 
-- Authenticator app setup (QR code) from Settings → Security
-- Required on next login once enabled
-- Backup codes generated at setup
-- Admin can enforce 2FA for all users
+Single-user TOTP ships in v1.7. v2.0 extends it for teams:
+
+- Admins can mark 2FA as required for all user roles or specific roles only
+- Users who have not enrolled are prompted to set up TOTP on next login; they cannot proceed until they do
+- Admin dashboard shows 2FA enrolment status per user
+- Admins can reset a user's 2FA (e.g. lost authenticator) and issue a temporary bypass code valid for one login
 
 ### Audit Log
 
@@ -172,12 +276,12 @@ Every action recorded with user, timestamp, and result:
 
 These are not scheduled yet. Community interest will determine if and when they move to a release.
 
-- **SSL / Let's Encrypt** — automated certificate management and Nginx HTTPS configuration from within the UI
-- **Metrics history** — store system and per-container metrics in PostgreSQL and add time-range selectors (1h / 24h / 7d) to the monitor graphs
-- **Portainer-style container control** — create containers from images directly, not just from Compose templates
-- **Reverse proxy manager** — manage Nginx proxy rules for apps without editing config files
-- **Webhooks** — send outbound HTTP notifications to external services on Homeio events
 - **Mobile-optimised layout** — the current UI is desktop-first; a responsive layout for phone access to the most common actions
+- **WebSocket / SSE multiplexing** — consolidate multiple SSE streams into a single connection to reduce per-client overhead on low-memory devices
+- **Portainer-style container control** — create containers from images directly, not just from Compose templates; inspect and exec into running containers
+- **Observability stack** — Prometheus metrics endpoint and optional Grafana dashboard sidecar for users who want long-term time-series beyond the built-in 30-day retention
+- **External secret management** — Vault, Docker secrets, or `.env` file encryption for sensitive app credentials
+- **Terminal multi-pane** — split terminal into multiple panes; tabs with named sessions
 
 ---
 
