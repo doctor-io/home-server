@@ -31,7 +31,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN apk add --no-cache git && \
     addgroup --system --gid 1001 homeio && \
-    adduser --system --uid 1001 homeio
+    adduser --system --uid 1001 homeio && \
+    mkdir -p /DATA && \
+    chown homeio:homeio /app /DATA
 
 # Next.js standalone output
 COPY --from=builder --chown=homeio:homeio /app/.next/standalone ./
