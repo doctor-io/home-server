@@ -29,7 +29,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN addgroup --system --gid 1001 homeio && \
+RUN apk add --no-cache git && \
+    addgroup --system --gid 1001 homeio && \
     adduser --system --uid 1001 homeio
 
 # Next.js standalone output

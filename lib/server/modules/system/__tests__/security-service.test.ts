@@ -100,6 +100,60 @@ describe("security-service", () => {
     expect(settings.fail2banBanDurationSeconds).toBe(3600);
   });
 
+  it("returns defaults when UFW is not installed", async () => {
+    execFileMock.mockImplementation((command: string, args: string[], ...rest: unknown[]) => {
+      const callback = resolveExecFileCallback(rest);
+
+      if (command === "ufw") {
+        const error = Object.assign(new Error("spawn ufw ENOENT"), { code: "ENOENT" });
+        callback(error as Error, "", "");
+        return;
+      }
+
+      if (command === "systemctl") {
+        callback(null, "enabled\n", "");
+        return;
+      }
+
+      callback(null, "", "");
+    });
+
+    const settings = await getSystemSecuritySettings();
+
+    expect(settings.firewallEnabled).toBe(false);
+    expect(settings.firewallIncomingPolicy).toBe("deny");
+    expect(settings.firewallOutgoingPolicy).toBe("allow");
+    expect(settings.fail2banEnabled).toBe(true);
+  });
+
+  it("returns defaults when systemctl is not available (non-systemd host)", async () => {
+    execFileMock.mockImplementation((command: string, args: string[], ...rest: unknown[]) => {
+      const callback = resolveExecFileCallback(rest);
+
+      if (command === "ufw") {
+        callback(
+          null,
+          "Status: active\nDefault: deny (incoming), allow (outgoing), disabled (routed)\n",
+          "",
+        );
+        return;
+      }
+
+      if (command === "systemctl") {
+        const error = Object.assign(new Error("spawn systemctl ENOENT"), { code: "ENOENT" });
+        callback(error as Error, "", "");
+        return;
+      }
+
+      callback(null, "", "");
+    });
+
+    const settings = await getSystemSecuritySettings();
+
+    expect(settings.firewallEnabled).toBe(true);
+    expect(settings.fail2banEnabled).toBe(false);
+  });
+
   it("writes managed Fail2Ban override config correctly", async () => {
     const content = buildFail2BanOverrideContent({
       maxRetries: 7,

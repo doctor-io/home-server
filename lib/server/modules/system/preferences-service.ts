@@ -51,6 +51,12 @@ function resolveHostsFilePath() {
   return process.env.HOMEIO_HOSTS_FILE_PATH ?? "/etc/hosts";
 }
 
+function isCommandUnavailable(error: unknown) {
+  if (!(error instanceof Error)) return false;
+  const message = error.message.toLowerCase();
+  return message.includes("enoent") || message.includes("no such file");
+}
+
 function isIgnorableAvahiError(error: unknown) {
   if (!(error instanceof Error)) return false;
   const stdout = (error as Error & { stdout?: string }).stdout ?? "";
@@ -142,13 +148,23 @@ export async function updateSystemPreferences(input: SystemPreferences) {
   }
 
   if (hostname !== current.hostname) {
-    await execFileAsync("hostnamectl", ["set-hostname", hostname]);
+    try {
+      await execFileAsync("hostnamectl", ["set-hostname", hostname]);
+    } catch (error) {
+      if (!isCommandUnavailable(error)) throw error;
+      await execFileAsync("hostname", [hostname]);
+    }
     await syncHostsFile(hostname);
     await restartAvahiDaemon();
   }
 
   if (timezone !== current.timezone) {
-    await execFileAsync("timedatectl", ["set-timezone", timezone]);
+    try {
+      await execFileAsync("timedatectl", ["set-timezone", timezone]);
+    } catch (error) {
+      if (!isCommandUnavailable(error)) throw error;
+      await writeFile(resolveTimezoneFilePath(), `${timezone}\n`, "utf8");
+    }
   }
 
   return getSystemPreferences();

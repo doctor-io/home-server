@@ -91,6 +91,93 @@ describe("preferences-service", () => {
     expect(hostsContent).toContain("127.0.1.1 homeai homeai.local");
   });
 
+  it("falls back to the hostname command when hostnamectl is unavailable", async () => {
+    let currentHostname = "homeio";
+    const calls: Array<{ command: string; args: string[] }> = [];
+
+    execFileMock.mockImplementation((command: string, args: string[], ...rest: unknown[]) => {
+      calls.push({ command, args });
+      const callback = resolveExecFileCallback(rest);
+
+      if (command === "hostnamectl" && args[0] === "--static") {
+        const error = Object.assign(new Error("spawn hostnamectl ENOENT"), { code: "ENOENT" });
+        callback(error as Error, "", "");
+        return;
+      }
+
+      if (command === "hostname" && args.length === 0) {
+        callback(null, `${currentHostname}\n`, "");
+        return;
+      }
+
+      if (command === "hostname" && args.length === 1) {
+        currentHostname = args[0] ?? currentHostname;
+        callback(null, "", "");
+        return;
+      }
+
+      if (command === "timedatectl" && args[0] === "show") {
+        callback(null, "Etc/UTC\n", "");
+        return;
+      }
+
+      if (command === "hostnamectl" && args[0] === "set-hostname") {
+        const error = Object.assign(new Error("spawn hostnamectl ENOENT"), { code: "ENOENT" });
+        callback(error as Error, "", "");
+        return;
+      }
+
+      if (command === "systemctl" && args[0] === "restart") {
+        callback(null, "", "");
+        return;
+      }
+
+      callback(null, "", "");
+    });
+
+    const preferences = await updateSystemPreferences({
+      hostname: "homeai",
+      timezone: "Etc/UTC",
+    });
+
+    expect(preferences.hostname).toBe("homeai");
+    expect(calls).toEqual(
+      expect.arrayContaining([{ command: "hostname", args: ["homeai"] }]),
+    );
+  });
+
+  it("falls back to writing the timezone file when timedatectl is unavailable", async () => {
+    execFileMock.mockImplementation((command: string, args: string[], ...rest: unknown[]) => {
+      const callback = resolveExecFileCallback(rest);
+
+      if (command === "hostnamectl" && args[0] === "--static") {
+        callback(null, "homeio\n", "");
+        return;
+      }
+
+      if (command === "timedatectl" && args[0] === "show") {
+        callback(null, "Etc/UTC\n", "");
+        return;
+      }
+
+      if (command === "timedatectl" && args[0] === "set-timezone") {
+        const error = Object.assign(new Error("spawn timedatectl ENOENT"), { code: "ENOENT" });
+        callback(error as Error, "", "");
+        return;
+      }
+
+      callback(null, "", "");
+    });
+
+    await updateSystemPreferences({
+      hostname: "homeio",
+      timezone: "Europe/Paris",
+    });
+
+    const timezoneContent = await readFile(process.env.HOMEIO_TIMEZONE_FILE_PATH!, "utf8");
+    expect(timezoneContent.trim()).toBe("Europe/Paris");
+  });
+
   it("does not fail the hostname update when avahi-daemon is unavailable", async () => {
     let currentHostname = "homeio";
 
