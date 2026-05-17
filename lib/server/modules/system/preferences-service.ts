@@ -51,6 +51,18 @@ function resolveHostsFilePath() {
   return process.env.HOMEIO_HOSTS_FILE_PATH ?? "/etc/hosts";
 }
 
+function isCommandUnavailable(error: unknown) {
+  if (!(error instanceof Error)) return false;
+  const message = error.message.toLowerCase();
+  return message.includes("enoent") || message.includes("no such file");
+}
+
+function isOperationNotPermitted(error: unknown) {
+  if (!(error instanceof Error)) return false;
+  const message = error.message.toLowerCase();
+  return message.includes("operation not permitted") || message.includes("eperm");
+}
+
 function isIgnorableAvahiError(error: unknown) {
   if (!(error instanceof Error)) return false;
   const stdout = (error as Error & { stdout?: string }).stdout ?? "";
@@ -111,9 +123,15 @@ async function syncHostsFile(hostname: string) {
     nextHosts = currentHosts.replace(/^127\.0\.1\.1.*$/m, hostsEntry);
   } else {
     nextHosts = `${currentHosts.trimEnd()}\n${hostsEntry}\n`;
+
   }
 
-  await writeFile(hostsFilePath, nextHosts, "utf8");
+  try {
+    await writeFile(hostsFilePath, nextHosts, "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EACCES") throw error;
+    // /etc/hosts is root-owned in containers — skip silently
+  }
 }
 
 async function restartAvahiDaemon() {
@@ -142,13 +160,33 @@ export async function updateSystemPreferences(input: SystemPreferences) {
   }
 
   if (hostname !== current.hostname) {
-    await execFileAsync("hostnamectl", ["set-hostname", hostname]);
+    try {
+      await execFileAsync("hostnamectl", ["set-hostname", hostname]);
+    } catch (error) {
+      if (!isCommandUnavailable(error)) throw error;
+      try {
+        await execFileAsync("hostname", [hostname]);
+      } catch (fallbackError) {
+        if (!isOperationNotPermitted(fallbackError)) throw fallbackError;
+        // container without SYS_ADMIN — system hostname unchanged, hosts file still updated below
+      }
+    }
     await syncHostsFile(hostname);
     await restartAvahiDaemon();
   }
 
   if (timezone !== current.timezone) {
-    await execFileAsync("timedatectl", ["set-timezone", timezone]);
+    try {
+      await execFileAsync("timedatectl", ["set-timezone", timezone]);
+    } catch (error) {
+      if (!isCommandUnavailable(error)) throw error;
+      try {
+        await writeFile(resolveTimezoneFilePath(), `${timezone}\n`, "utf8");
+      } catch (writeError) {
+        if ((writeError as NodeJS.ErrnoException).code !== "EACCES") throw writeError;
+        // /etc/timezone is root-owned in containers — skip silently
+      }
+    }
   }
 
   return getSystemPreferences();

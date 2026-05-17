@@ -65,6 +65,15 @@ export async function ensureDataRootDirectories() {
   const primaryDataRoot = resolvePrimaryDataRoot();
   const fallbackDataRoot = path.resolve(process.cwd(), "DATA");
 
+  if (primaryDataRoot === "/") {
+    console.warn(
+      `[Storage] STORE_STACKS_ROOT is set to "${serverEnv.STORE_STACKS_ROOT}" — its parent directory ` +
+        `resolves to "/", which is the filesystem root and is not a valid data root. ` +
+        `STORE_STACKS_ROOT must be nested at least one level inside a writable volume mount ` +
+        `(e.g. /DATA/stacks instead of /stacks). Falling back to ${fallbackDataRoot}.`,
+    );
+  }
+
   let dataRoot = primaryDataRoot;
 
   try {

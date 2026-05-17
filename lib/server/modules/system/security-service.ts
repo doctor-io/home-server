@@ -102,7 +102,7 @@ async function readUfwStatus() {
     stdout = await readCommandOutput("ufw", ["status", "verbose"]);
   } catch (error) {
     if (isToolUnavailable(error)) {
-      throw new Error("UFW is not installed or unavailable on this host.");
+      return null;
     }
     throw error;
   }
@@ -137,7 +137,7 @@ async function readFail2BanEnabled() {
     }
 
     if (isToolUnavailable(error)) {
-      throw new Error("Fail2Ban is not installed or unavailable on this host.");
+      return false; // systemctl not available (e.g. Alpine / non-systemd host)
     }
 
     throw error;
@@ -280,9 +280,9 @@ export async function getSystemSecuritySettings(): Promise<SystemSecuritySetting
   const [firewall, fail2ban] = await Promise.all([readUfwStatus(), readFail2BanSettings()]);
 
   return {
-    firewallEnabled: firewall.enabled,
-    firewallIncomingPolicy: firewall.incomingPolicy,
-    firewallOutgoingPolicy: firewall.outgoingPolicy,
+    firewallEnabled: firewall?.enabled ?? false,
+    firewallIncomingPolicy: firewall?.incomingPolicy ?? DEFAULT_FIREWALL_INCOMING_POLICY,
+    firewallOutgoingPolicy: firewall?.outgoingPolicy ?? DEFAULT_FIREWALL_OUTGOING_POLICY,
     fail2banEnabled: fail2ban.enabled,
     fail2banMaxRetries: fail2ban.maxRetries,
     fail2banBanDurationSeconds: fail2ban.banDuration,
