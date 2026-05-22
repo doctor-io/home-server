@@ -1,18 +1,10 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/server/env", () => ({
   serverEnv: {
     SSE_HEARTBEAT_MS: 60_000,
   },
-}));
-
-vi.mock("@/lib/server/modules/auth/service", () => ({
-  authenticateSession: vi.fn(),
-}));
-
-vi.mock("@/lib/server/modules/auth/cookies", () => ({
-  getAuthCookieName: () => "homeio_session",
 }));
 
 vi.mock("@/lib/server/modules/apps/operations", () => ({
@@ -22,7 +14,7 @@ vi.mock("@/lib/server/modules/apps/operations", () => ({
 }));
 
 import { GET } from "@/app/api/v1/store/operations/[operationId]/stream/route";
-import { authenticateSession } from "@/lib/server/modules/auth/service";
+import { requireApiSession } from "@/lib/server/modules/auth/api";
 import {
   getLatestStoreOperationEvent,
   getStoreOperation,
@@ -30,17 +22,12 @@ import {
 } from "@/lib/server/modules/apps/operations";
 import type { StoreOperationEvent } from "@/lib/shared/contracts/apps";
 
-const validSession = {
-  sessionId: "s1",
-  userId: "u1",
-  username: "ahmed",
-  passwordHash: "hash",
-  expiresAt: new Date(Date.now() + 60_000),
-};
-
 describe("GET /api/v1/store/operations/:operationId/stream", () => {
   it("returns 401 for unauthenticated requests", async () => {
-    vi.mocked(authenticateSession).mockResolvedValueOnce(null);
+    vi.mocked(requireApiSession).mockResolvedValueOnce({
+      session: null,
+      response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    });
 
     const response = await GET(new NextRequest("http://localhost"), {
       params: Promise.resolve({ operationId: "op-1" }),
@@ -50,7 +37,6 @@ describe("GET /api/v1/store/operations/:operationId/stream", () => {
   });
 
   it("streams operation events as SSE for authenticated user", async () => {
-    vi.mocked(authenticateSession).mockResolvedValueOnce(validSession);
     vi.mocked(getStoreOperation).mockResolvedValueOnce({
       id: "op-1",
       appId: "homepage",
