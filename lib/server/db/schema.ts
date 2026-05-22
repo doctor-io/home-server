@@ -27,6 +27,10 @@ export const users = pgTable(
     username: text("username").notNull().unique(),
     passwordHash: text("password_hash").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    totpSecret: text("totp_secret"),
+    totpEnabled: boolean("totp_enabled").notNull().default(false),
+    totpBackupCodes: text("totp_backup_codes"),
+    totpEnrolledAt: timestamp("totp_enrolled_at", { withTimezone: true }),
   },
   (table) => [index("users_username_idx").on(table.username)],
 );

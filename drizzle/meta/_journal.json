@@ -50,6 +50,13 @@
       "when": 1777838400000,
       "tag": "0007_tailscale_integration",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1779105874716,
+      "tag": "0008_sparkling_freak",
+      "breakpoints": true
     }
   ]
 }
