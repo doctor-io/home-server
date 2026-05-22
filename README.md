@@ -2,6 +2,12 @@
 
 A self-hosted server manager with a desktop-style UI. Alternative to CasaOS, Umbrel, and Portainer — focused on a modern interface, real-time system visibility, and Docker app management.
 
+<p align="center">
+  <a href="https://github.com/sponsors/doctor-io">
+    <img src="https://img.shields.io/github/sponsors/doctor-io?style=for-the-badge" alt="GitHub Sponsors" />
+  </a>
+</p>
+
 ## Screenshots
 
 | Desktop | App Store |
@@ -164,6 +170,18 @@ See [ROADMAP.md](./ROADMAP.md) — currently shipping v1.7.
 - Docker image manager — browse, pull, inspect, and remove images directly without compose files
 - Webhooks — outbound HTTP notifications to Home Assistant, n8n, and other services
 - File manager enhancements — zip/unzip, bulk rename, batch delete
+
+## Support Homeio
+
+Homeio is open-source and built for the homelab and self-hosting community. If you find it useful:
+
+- [Sponsor on GitHub](https://github.com/sponsors/doctor-io)
+- Contribute code or ideas — see [CONTRIBUTING.md](./CONTRIBUTING.md)
+- Share Homeio with others in the homelab community
+
+Your support helps fund ongoing development: real-time infrastructure tooling, Docker management, documentation, and long-term maintenance.
+
+---
 
 ## Contributing
 
