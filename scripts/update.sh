@@ -247,6 +247,13 @@ install_go() {
 build_upload_server() {
 	print_status "Building upload server (Go)..."
 	export PATH="/usr/local/go/bin:${PATH}"
+	# systemd-run starts the updater in a sparse environment with no $HOME.
+	# `go build` refuses to run without GOCACHE/XDG_CACHE_HOME/HOME, so set
+	# sane defaults here. Keeps build_upload_server safe regardless of how
+	# update.sh was invoked.
+	export HOME="${HOME:-/root}"
+	export GOCACHE="${GOCACHE:-${HOME}/.cache/go-build}"
+	export GOPATH="${GOPATH:-${HOME}/go}"
 
 	local src="${INSTALL_DIR}/services/upload-server"
 	[[ -d "${src}" ]] || { print_warn "Upload server source not found at ${src}; skipping."; return; }

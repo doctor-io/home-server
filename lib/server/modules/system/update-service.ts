@@ -188,6 +188,11 @@ export async function scheduleSystemUpdate(): Promise<SystemUpdateApplyAcceptedR
     },
   });
 
+  // systemd-run starts a transient unit with a minimal environment. Without
+  // HOME, `go build` fails ("GOCACHE is not defined and neither $XDG_CACHE_HOME
+  // nor $HOME are defined"); without /usr/local/go on PATH the build can't find
+  // the toolchain at all. Set both explicitly so update.sh runs the same way it
+  // would in an interactive root shell.
   await execFileAsync("systemd-run", [
     "--quiet",
     "--no-block",
@@ -197,6 +202,8 @@ export async function scheduleSystemUpdate(): Promise<SystemUpdateApplyAcceptedR
     "--property=KillMode=control-group",
     "--property=TimeoutStopSec=30s",
     "--property=SendSIGKILL=yes",
+    "--setenv=HOME=/root",
+    "--setenv=PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
     "bash",
     "-lc",
     command,
