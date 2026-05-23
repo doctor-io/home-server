@@ -168,6 +168,22 @@ export async function completeTotpEnrollment(params: {
 }
 
 /**
+ * Replaces the encrypted backup-codes blob in place. Used when a backup
+ * code is consumed during a TOTP-required login — the matched hash is
+ * removed from the array and the shrunken list is re-encrypted and
+ * persisted. Leaves all other TOTP columns untouched.
+ */
+export async function updateTotpBackupCodes(
+  userId: string,
+  encryptedBackupCodes: string,
+) {
+  await db
+    .update(users)
+    .set({ totpBackupCodes: encryptedBackupCodes })
+    .where(eq(users.id, userId));
+}
+
+/**
  * Reverses {@link completeTotpEnrollment} in a single statement: drops the
  * secret, backup codes, enrolment timestamp, and flips `totp_enabled` off.
  * Used by the disable flow once the user has proven possession with a valid

@@ -5,6 +5,22 @@ vi.mock("@/lib/server/modules/auth/repository", () => ({
   setPendingTotpSecret: vi.fn(),
   completeTotpEnrollment: vi.fn(),
   clearTotpEnrollment: vi.fn(),
+  updateTotpBackupCodes: vi.fn(),
+  createSession: vi.fn(),
+}));
+
+vi.mock("@/lib/server/modules/auth/partial-auth-token", () => ({
+  verifyPartialAuthToken: vi.fn(),
+}));
+
+vi.mock("@/lib/server/modules/auth/session-token", () => ({
+  createSessionToken: vi.fn(
+    (sessionId: string, exp: number) => `sess.${sessionId}.${exp}.sig`,
+  ),
+}));
+
+vi.mock("@/lib/server/env", () => ({
+  serverEnv: { AUTH_SESSION_HOURS: 168 },
 }));
 
 vi.mock("@/lib/server/modules/auth/totp-crypto", () => ({
@@ -38,14 +54,19 @@ import {
   TotpServiceError,
   beginTotpEnrollment,
   completeTotpEnrollment,
+  completeTotpLogin,
   disableTotp,
 } from "@/lib/server/modules/auth/totp-service";
 import {
   clearTotpEnrollment as persistClearedTotp,
   completeTotpEnrollment as persistEnrolledTotp,
+  createSession,
   findUserWithTotpById,
   setPendingTotpSecret,
+  updateTotpBackupCodes,
 } from "@/lib/server/modules/auth/repository";
+import { verifyPartialAuthToken } from "@/lib/server/modules/auth/partial-auth-token";
+import { createSessionToken } from "@/lib/server/modules/auth/session-token";
 import {
   isTotpCodeReplayed,
   markTotpCodeUsed,
@@ -86,6 +107,8 @@ beforeEach(() => {
   vi.mocked(setPendingTotpSecret).mockReset();
   vi.mocked(persistEnrolledTotp).mockReset();
   vi.mocked(persistClearedTotp).mockReset();
+  vi.mocked(updateTotpBackupCodes).mockReset();
+  vi.mocked(createSession).mockReset();
   vi.mocked(encryptSecret).mockClear();
   vi.mocked(decryptSecret).mockClear();
   vi.mocked(verifyTotp).mockReset();
@@ -94,6 +117,8 @@ beforeEach(() => {
     .mockResolvedValue({ matchedHash: null });
   vi.mocked(isTotpCodeReplayed).mockReset().mockReturnValue(false);
   vi.mocked(markTotpCodeUsed).mockReset();
+  vi.mocked(verifyPartialAuthToken).mockReset();
+  vi.mocked(createSessionToken).mockClear();
 });
 
 describe("beginTotpEnrollment", () => {
@@ -413,5 +438,161 @@ describe("disableTotp", () => {
     });
     expect(vi.mocked(verifyBackupCode)).not.toHaveBeenCalled();
     expect(vi.mocked(persistClearedTotp)).not.toHaveBeenCalled();
+  });
+});
+
+describe("completeTotpLogin", () => {
+  it("issues a session on a valid TOTP code", async () => {
+    vi.mocked(verifyPartialAuthToken).mockReturnValueOnce({
+      userId: "user-1",
+      expiresAtEpochSeconds: Math.floor(Date.now() / 1000) + 60,
+    });
+    vi.mocked(findUserWithTotpById).mockResolvedValueOnce({ ...ENROLLED_USER });
+    vi.mocked(verifyTotp).mockReturnValueOnce(true);
+
+    const result = await completeTotpLogin({
+      partialAuthToken: "partial.user-1.99999999.sig",
+      code: "123456",
+    });
+
+    expect(result.sessionToken).toMatch(/^sess\./);
+    expect(result.user).toEqual({ id: "user-1", username: "admin" });
+    expect(vi.mocked(createSession)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(createSessionToken)).toHaveBeenCalledTimes(1);
+    // No backup code consumed on the TOTP path.
+    expect(vi.mocked(updateTotpBackupCodes)).not.toHaveBeenCalled();
+    expect(vi.mocked(markTotpCodeUsed)).toHaveBeenCalledWith(
+      "user-1",
+      "123456",
+    );
+  });
+
+  it("issues a session AND prunes the matched hash when a backup code is used", async () => {
+    vi.mocked(verifyPartialAuthToken).mockReturnValueOnce({
+      userId: "user-1",
+      expiresAtEpochSeconds: Math.floor(Date.now() / 1000) + 60,
+    });
+    vi.mocked(findUserWithTotpById).mockResolvedValueOnce({ ...ENROLLED_USER });
+    vi.mocked(verifyBackupCode).mockResolvedValueOnce({
+      matchedHash: "salt-a:hash-a",
+    });
+
+    const result = await completeTotpLogin({
+      partialAuthToken: "partial.user-1.99999999.sig",
+      code: "AAAA-AAAA-AA",
+    });
+
+    expect(result.sessionToken).toMatch(/^sess\./);
+
+    expect(vi.mocked(updateTotpBackupCodes)).toHaveBeenCalledTimes(1);
+    const [userId, encryptedBlob] =
+      vi.mocked(updateTotpBackupCodes).mock.calls[0];
+    expect(userId).toBe("user-1");
+    // The new blob is the JSON array minus the consumed hash, re-encrypted
+    // via our `enc:` prefix mock.
+    expect(encryptedBlob).toBe(`enc:${JSON.stringify(["salt-b:hash-b"])}`);
+  });
+
+  it("rejects with partial_auth_expired when the token is missing or invalid", async () => {
+    vi.mocked(verifyPartialAuthToken).mockReturnValueOnce(null);
+
+    await expect(
+      completeTotpLogin({
+        partialAuthToken: "garbage",
+        code: "123456",
+      }),
+    ).rejects.toMatchObject({
+      code: "partial_auth_expired",
+      statusCode: 401,
+    });
+
+    expect(vi.mocked(findUserWithTotpById)).not.toHaveBeenCalled();
+    expect(vi.mocked(createSession)).not.toHaveBeenCalled();
+  });
+
+  it("rejects with invalid_totp (401) when the user vanished between A7 and A8", async () => {
+    vi.mocked(verifyPartialAuthToken).mockReturnValueOnce({
+      userId: "ghost",
+      expiresAtEpochSeconds: Math.floor(Date.now() / 1000) + 60,
+    });
+    vi.mocked(findUserWithTotpById).mockResolvedValueOnce(null);
+
+    await expect(
+      completeTotpLogin({
+        partialAuthToken: "partial.ghost.99999999.sig",
+        code: "123456",
+      }),
+    ).rejects.toMatchObject({
+      code: "invalid_totp",
+      statusCode: 401,
+    });
+    expect(vi.mocked(createSession)).not.toHaveBeenCalled();
+  });
+
+  it("rejects with invalid_totp when TOTP was disabled between A7 and A8", async () => {
+    vi.mocked(verifyPartialAuthToken).mockReturnValueOnce({
+      userId: "user-1",
+      expiresAtEpochSeconds: Math.floor(Date.now() / 1000) + 60,
+    });
+    vi.mocked(findUserWithTotpById).mockResolvedValueOnce({
+      ...ENROLLED_USER,
+      totpEnabled: false,
+    });
+
+    await expect(
+      completeTotpLogin({
+        partialAuthToken: "partial.user-1.99999999.sig",
+        code: "123456",
+      }),
+    ).rejects.toMatchObject({
+      code: "invalid_totp",
+      statusCode: 401,
+    });
+    expect(vi.mocked(verifyTotp)).not.toHaveBeenCalled();
+    expect(vi.mocked(createSession)).not.toHaveBeenCalled();
+  });
+
+  it("rejects with invalid_totp on a wrong code without consuming anything", async () => {
+    vi.mocked(verifyPartialAuthToken).mockReturnValueOnce({
+      userId: "user-1",
+      expiresAtEpochSeconds: Math.floor(Date.now() / 1000) + 60,
+    });
+    vi.mocked(findUserWithTotpById).mockResolvedValueOnce({ ...ENROLLED_USER });
+    vi.mocked(verifyTotp).mockReturnValueOnce(false);
+    vi.mocked(verifyBackupCode).mockResolvedValueOnce({ matchedHash: null });
+
+    await expect(
+      completeTotpLogin({
+        partialAuthToken: "partial.user-1.99999999.sig",
+        code: "999999",
+      }),
+    ).rejects.toMatchObject({
+      code: "invalid_totp",
+      statusCode: 401,
+    });
+    expect(vi.mocked(createSession)).not.toHaveBeenCalled();
+    expect(vi.mocked(updateTotpBackupCodes)).not.toHaveBeenCalled();
+    expect(vi.mocked(markTotpCodeUsed)).not.toHaveBeenCalled();
+  });
+
+  it("rejects with invalid_totp on a replay", async () => {
+    vi.mocked(verifyPartialAuthToken).mockReturnValueOnce({
+      userId: "user-1",
+      expiresAtEpochSeconds: Math.floor(Date.now() / 1000) + 60,
+    });
+    vi.mocked(findUserWithTotpById).mockResolvedValueOnce({ ...ENROLLED_USER });
+    vi.mocked(isTotpCodeReplayed).mockReturnValueOnce(true);
+
+    await expect(
+      completeTotpLogin({
+        partialAuthToken: "partial.user-1.99999999.sig",
+        code: "123456",
+      }),
+    ).rejects.toMatchObject({
+      code: "invalid_totp",
+      statusCode: 401,
+    });
+    expect(vi.mocked(verifyTotp)).not.toHaveBeenCalled();
+    expect(vi.mocked(createSession)).not.toHaveBeenCalled();
   });
 });

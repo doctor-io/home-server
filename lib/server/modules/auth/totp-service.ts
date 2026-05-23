@@ -1,5 +1,6 @@
 import "server-only";
 
+import { randomUUID } from "node:crypto";
 import { toString as qrCodeToString } from "qrcode";
 
 import type {
@@ -8,16 +9,21 @@ import type {
   TwoFactorSetupResponse,
   TwoFactorVerifyResponse,
 } from "@/lib/shared/contracts/auth";
+import { serverEnv } from "@/lib/server/env";
 import {
   clearTotpEnrollment as persistClearedTotp,
   completeTotpEnrollment as persistEnrolledTotp,
+  createSession,
   findUserWithTotpById,
   setPendingTotpSecret,
+  updateTotpBackupCodes,
 } from "@/lib/server/modules/auth/repository";
+import { verifyPartialAuthToken } from "@/lib/server/modules/auth/partial-auth-token";
 import {
   isTotpCodeReplayed,
   markTotpCodeUsed,
 } from "@/lib/server/modules/auth/rate-limit";
+import { createSessionToken } from "@/lib/server/modules/auth/session-token";
 import {
   decryptSecret,
   encryptSecret,
@@ -281,4 +287,140 @@ export async function disableTotp(params: {
   markTotpCodeUsed(user.id, params.code);
 
   return { enabled: false };
+}
+
+export type CompleteTotpLoginResult = {
+  sessionToken: string;
+  sessionExpiresAt: Date;
+  user: { id: string; username: string };
+};
+
+/**
+ * Finishes a two-step login: exchanges a valid partial-auth token + valid
+ * TOTP (or unused backup) code for a real session cookie. On success a
+ * session row is written, a session token is returned for the caller to
+ * set as a cookie, and a consumed backup code (if that path was taken) is
+ * pruned from the encrypted blob.
+ *
+ * Error mapping is intentionally narrow: every failure mode the caller can
+ * surface to a user is 401, so an attacker probing this endpoint can't tell
+ * whether they have the wrong token, the wrong code, or a stale enrolment.
+ *
+ * - 401 `partial_auth_expired` — token missing, malformed, tampered with,
+ *   or past its 5-minute lifetime. Client must re-enter the password.
+ * - 401 `invalid_totp` — token was valid but the code didn't match TOTP
+ *   or any stored backup hash, was a replay, the stored ciphertext is
+ *   unreadable, the user row vanished, or TOTP was disabled between A7
+ *   and A8 (don't expose the state — the client should re-login).
+ */
+export async function completeTotpLogin(params: {
+  partialAuthToken: string;
+  code: string;
+}): Promise<CompleteTotpLoginResult> {
+  const verified = verifyPartialAuthToken(params.partialAuthToken);
+  if (!verified) {
+    throw new TotpServiceError("Partial-auth token is invalid or expired", {
+      code: "partial_auth_expired",
+      statusCode: 401,
+    });
+  }
+
+  const user = await findUserWithTotpById(verified.userId);
+  if (!user || !user.totpEnabled || !user.totpSecret) {
+    throw new TotpServiceError("Invalid verification code", {
+      code: "invalid_totp",
+      statusCode: 401,
+    });
+  }
+
+  if (isTotpCodeReplayed(user.id, params.code)) {
+    throw new TotpServiceError("Invalid verification code", {
+      code: "invalid_totp",
+      statusCode: 401,
+    });
+  }
+
+  const stripped = params.code.replace(/[\s-]+/g, "");
+  let codeValid = false;
+  let consumedBackupHash: string | null = null;
+  let backupHashes: string[] | null = null;
+
+  if (TOTP_CODE_PATTERN.test(stripped)) {
+    let plaintextSecret: string;
+    try {
+      plaintextSecret = decryptSecret(user.totpSecret);
+    } catch (cause) {
+      throw new TotpServiceError("Stored TOTP secret is unreadable", {
+        code: "invalid_totp",
+        statusCode: 401,
+        cause,
+      });
+    }
+    codeValid = verifyTotp(plaintextSecret, params.code);
+  }
+
+  if (!codeValid && user.totpBackupCodes) {
+    try {
+      const parsed: unknown = JSON.parse(decryptSecret(user.totpBackupCodes));
+      if (
+        !Array.isArray(parsed) ||
+        !parsed.every((entry): entry is string => typeof entry === "string")
+      ) {
+        throw new Error("Backup-code blob is not a string array");
+      }
+      backupHashes = parsed;
+    } catch (cause) {
+      throw new TotpServiceError("Stored backup codes are unreadable", {
+        code: "invalid_totp",
+        statusCode: 401,
+        cause,
+      });
+    }
+
+    const result = await verifyBackupCode(backupHashes, params.code);
+    if (result.matchedHash !== null) {
+      codeValid = true;
+      consumedBackupHash = result.matchedHash;
+    }
+  }
+
+  if (!codeValid) {
+    throw new TotpServiceError("Invalid verification code", {
+      code: "invalid_totp",
+      statusCode: 401,
+    });
+  }
+
+  if (consumedBackupHash !== null && backupHashes !== null) {
+    const remaining = backupHashes.filter(
+      (hash) => hash !== consumedBackupHash,
+    );
+    await updateTotpBackupCodes(
+      user.id,
+      encryptSecret(JSON.stringify(remaining)),
+    );
+  }
+
+  const sessionExpiresAt = new Date(
+    Date.now() + serverEnv.AUTH_SESSION_HOURS * 60 * 60 * 1000,
+  );
+  const sessionId = randomUUID();
+  await createSession({
+    id: sessionId,
+    userId: user.id,
+    expiresAt: sessionExpiresAt,
+  });
+
+  const sessionToken = createSessionToken(
+    sessionId,
+    Math.floor(sessionExpiresAt.getTime() / 1000),
+  );
+
+  markTotpCodeUsed(user.id, params.code);
+
+  return {
+    sessionToken,
+    sessionExpiresAt,
+    user: { id: user.id, username: user.username },
+  };
 }
