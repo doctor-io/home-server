@@ -10,6 +10,13 @@ export type AuthUser = {
   passwordHash: string;
 };
 
+export type AuthUserWithTotp = AuthUser & {
+  totpSecret: string | null;
+  totpEnabled: boolean;
+  totpBackupCodes: string | null;
+  totpEnrolledAt: Date | null;
+};
+
 export type AuthSessionWithUser = {
   sessionId: string;
   userId: string;
@@ -50,6 +57,55 @@ export async function createUser(params: {
     username: params.username,
     passwordHash: params.passwordHash,
   });
+}
+
+export async function findUserWithTotpById(
+  userId: string,
+): Promise<AuthUserWithTotp | null> {
+  const rows = await db
+    .select({
+      id: users.id,
+      username: users.username,
+      passwordHash: users.passwordHash,
+      totpSecret: users.totpSecret,
+      totpEnabled: users.totpEnabled,
+      totpBackupCodes: users.totpBackupCodes,
+      totpEnrolledAt: users.totpEnrolledAt,
+    })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  const row = rows[0];
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    username: row.username,
+    passwordHash: row.passwordHash,
+    totpSecret: row.totpSecret,
+    totpEnabled: row.totpEnabled,
+    totpBackupCodes: row.totpBackupCodes,
+    totpEnrolledAt:
+      row.totpEnrolledAt instanceof Date || row.totpEnrolledAt === null
+        ? row.totpEnrolledAt
+        : new Date(row.totpEnrolledAt),
+  } satisfies AuthUserWithTotp;
+}
+
+/**
+ * Persists a freshly-generated (but not yet confirmed) TOTP secret on the
+ * user row. Leaves `totp_enabled` untouched — the user must complete
+ * verification before that flips to true.
+ */
+export async function setPendingTotpSecret(
+  userId: string,
+  encryptedSecret: string,
+) {
+  await db
+    .update(users)
+    .set({ totpSecret: encryptedSecret })
+    .where(eq(users.id, userId));
 }
 
 export async function createSession(params: {
