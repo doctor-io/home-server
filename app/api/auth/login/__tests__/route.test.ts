@@ -47,6 +47,7 @@ describe("POST /api/auth/login", () => {
     const { POST, loginUser } = await loadRoute();
 
     loginUser.mockResolvedValueOnce({
+      kind: "session",
       token: "session-token",
       expiresAt: new Date(Date.now() + 3600_000),
       user: { id: "u1", username: "admin" },
@@ -69,6 +70,7 @@ describe("POST /api/auth/login", () => {
     const { POST, loginUser } = await loadRoute();
 
     loginUser.mockResolvedValueOnce({
+      kind: "session",
       token: "session-token",
       expiresAt: new Date(Date.now() + 3600_000),
       user: { id: "u1", username: "admin" },
@@ -164,6 +166,7 @@ describe("POST /api/auth/login", () => {
     loginUser
       .mockRejectedValueOnce(new AuthError("Invalid username or password", 401))
       .mockResolvedValueOnce({
+        kind: "session",
         token: "session-token",
         expiresAt: new Date(Date.now() + 3600_000),
         user: { id: "u1", username: "admin" },
@@ -180,5 +183,69 @@ describe("POST /api/auth/login", () => {
     expect((await POST(makeRequest("bad-pass"))).status).toBe(401);
     expect((await POST(makeRequest("StrongPass123"))).status).toBe(200);
     expect((await POST(makeRequest("bad-pass"))).status).toBe(401);
+  });
+
+  it("returns requiresTotp + partial token (no cookie) for TOTP-enabled users", async () => {
+    const { POST, loginUser } = await loadRoute();
+
+    loginUser.mockResolvedValueOnce({
+      kind: "partial",
+      partialAuthToken: "partial.u1.99999999.deadbeef",
+      partialAuthExpiresAt: new Date(99999999_000),
+      user: { id: "u1", username: "admin" },
+    });
+
+    const request = new Request("http://localhost/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ username: "admin", password: "StrongPass123" }),
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(200);
+
+    // Critical: no session cookie may be set on the TOTP branch.
+    expect(response.headers.get("set-cookie")).toBeNull();
+
+    const json = (await response.json()) as {
+      data: { requiresTotp: boolean; partialAuthToken: string };
+    };
+    expect(json.data).toEqual({
+      requiresTotp: true,
+      partialAuthToken: "partial.u1.99999999.deadbeef",
+    });
+  });
+
+  it("clears rate-limit failures even on the partial-auth branch", async () => {
+    const { POST, loginUser, AuthError } = await loadRoute();
+
+    // Three failed attempts followed by a successful password (TOTP branch)
+    // then another failure must NOT trip the 5-strike rate limit, because
+    // the successful password should have reset the counter.
+    loginUser
+      .mockRejectedValueOnce(new AuthError("Invalid username or password", 401))
+      .mockRejectedValueOnce(new AuthError("Invalid username or password", 401))
+      .mockRejectedValueOnce(new AuthError("Invalid username or password", 401))
+      .mockResolvedValueOnce({
+        kind: "partial",
+        partialAuthToken: "partial.u1.99999999.deadbeef",
+        partialAuthExpiresAt: new Date(99999999_000),
+        user: { id: "u1", username: "admin" },
+      })
+      .mockRejectedValueOnce(
+        new AuthError("Invalid username or password", 401),
+      );
+
+    const makeRequest = (password: string) =>
+      new Request("http://localhost/api/auth/login", {
+        method: "POST",
+        headers: { "x-real-ip": "192.0.2.99" },
+        body: JSON.stringify({ username: "admin", password }),
+      });
+
+    expect((await POST(makeRequest("bad-1"))).status).toBe(401);
+    expect((await POST(makeRequest("bad-2"))).status).toBe(401);
+    expect((await POST(makeRequest("bad-3"))).status).toBe(401);
+    expect((await POST(makeRequest("StrongPass123"))).status).toBe(200);
+    expect((await POST(makeRequest("bad-4"))).status).toBe(401);
   });
 });

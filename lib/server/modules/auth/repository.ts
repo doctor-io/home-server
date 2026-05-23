@@ -42,6 +42,45 @@ export async function findUserByUsername(username: string) {
   return row satisfies AuthUser;
 }
 
+/**
+ * Like {@link findUserByUsername} but also pulls the TOTP columns. Used by
+ * the login flow so a single DB round-trip can both verify the password
+ * and decide whether to issue a real session or a partial-auth token.
+ */
+export async function findUserWithTotpByUsername(
+  username: string,
+): Promise<AuthUserWithTotp | null> {
+  const rows = await db
+    .select({
+      id: users.id,
+      username: users.username,
+      passwordHash: users.passwordHash,
+      totpSecret: users.totpSecret,
+      totpEnabled: users.totpEnabled,
+      totpBackupCodes: users.totpBackupCodes,
+      totpEnrolledAt: users.totpEnrolledAt,
+    })
+    .from(users)
+    .where(eq(users.username, username))
+    .limit(1);
+
+  const row = rows[0];
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    username: row.username,
+    passwordHash: row.passwordHash,
+    totpSecret: row.totpSecret,
+    totpEnabled: row.totpEnabled,
+    totpBackupCodes: row.totpBackupCodes,
+    totpEnrolledAt:
+      row.totpEnrolledAt instanceof Date || row.totpEnrolledAt === null
+        ? row.totpEnrolledAt
+        : new Date(row.totpEnrolledAt),
+  } satisfies AuthUserWithTotp;
+}
+
 export async function hasAnyUsers() {
   const result = await db.select({ total: count() }).from(users).limit(1);
   return (result[0]?.total ?? 0) > 0;

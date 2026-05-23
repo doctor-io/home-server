@@ -8,8 +8,10 @@ import {
   deleteSessionById,
   findSessionWithUser,
   findUserByUsername,
+  findUserWithTotpByUsername,
 } from "@/lib/server/modules/auth/repository";
 import { hashPassword, verifyPassword } from "@/lib/server/modules/auth/password";
+import { createPartialAuthToken } from "@/lib/server/modules/auth/partial-auth-token";
 import {
   createSessionToken,
   verifySessionToken,
@@ -83,13 +85,27 @@ export async function registerUser(params: {
   };
 }
 
+export type LoginResult =
+  | {
+      kind: "session";
+      token: string;
+      expiresAt: Date;
+      user: { id: string; username: string };
+    }
+  | {
+      kind: "partial";
+      partialAuthToken: string;
+      partialAuthExpiresAt: Date;
+      user: { id: string; username: string };
+    };
+
 export async function loginUser(params: {
   username: string;
   password: string;
-}) {
+}): Promise<LoginResult> {
   const username = normalizeUsername(params.username);
 
-  const user = await findUserByUsername(username);
+  const user = await findUserWithTotpByUsername(username);
 
   if (!user) {
     throw new AuthError("Invalid username or password", 401);
@@ -99,6 +115,22 @@ export async function loginUser(params: {
 
   if (!isPasswordValid) {
     throw new AuthError("Invalid username or password", 401);
+  }
+
+  if (user.totpEnabled) {
+    // Password verified but the user has 2FA on — issue a stateless,
+    // short-lived partial-auth token instead of a full session. The caller
+    // must complete A8 to convert it into a real session cookie.
+    const { token, expiresAtEpochSeconds } = createPartialAuthToken(user.id);
+    return {
+      kind: "partial",
+      partialAuthToken: token,
+      partialAuthExpiresAt: new Date(expiresAtEpochSeconds * 1000),
+      user: {
+        id: user.id,
+        username: user.username,
+      },
+    };
   }
 
   const expiresAt = getSessionExpiryDate();
@@ -116,6 +148,7 @@ export async function loginUser(params: {
   );
 
   return {
+    kind: "session",
     token,
     expiresAt,
     user: {

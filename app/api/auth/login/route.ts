@@ -60,6 +60,20 @@ export async function POST(request: Request) {
       async () => loginUser(parsed.data),
     );
 
+    // Password was valid regardless of branch — clear the rate-limit counter
+    // so a TOTP-required user who later fat-fingers their code on A8 isn't
+    // locked out of /api/auth/login itself.
+    clearLoginFailures(rateLimitKey);
+
+    if (loginResult.kind === "partial") {
+      return NextResponse.json({
+        data: {
+          requiresTotp: true,
+          partialAuthToken: loginResult.partialAuthToken,
+        },
+      });
+    }
+
     const response = NextResponse.json({
       data: {
         id: loginResult.user.id,
@@ -72,8 +86,6 @@ export async function POST(request: Request) {
       loginResult.token,
       getSessionCookieOptions(loginResult.expiresAt, request),
     );
-
-    clearLoginFailures(rateLimitKey);
 
     return response;
   } catch (error) {

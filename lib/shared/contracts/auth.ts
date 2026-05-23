@@ -50,3 +50,25 @@ export type TwoFactorStatus = {
   enabled: boolean;
   enrolledAt: string | null;
 };
+
+/**
+ * Response shape for `POST /api/auth/login`.
+ *
+ * Non-TOTP users see the original `{ id, username }` payload bit-for-bit;
+ * existing clients keep working without any code change. Users with TOTP
+ * enabled get the second branch instead — no session cookie is issued and
+ * the caller must finish the flow at `/api/v1/auth/login/totp` (A8) using
+ * the short-lived `partialAuthToken`. Clients discriminate by the presence
+ * of `requiresTotp`.
+ */
+export type LoginSuccessData = {
+  id: string;
+  username: string;
+};
+
+export type LoginRequiresTotpData = {
+  requiresTotp: true;
+  partialAuthToken: string;
+};
+
+export type LoginResponseData = LoginSuccessData | LoginRequiresTotpData;
