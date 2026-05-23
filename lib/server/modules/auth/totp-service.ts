@@ -2,13 +2,29 @@ import "server-only";
 
 import { toString as qrCodeToString } from "qrcode";
 
-import type { TwoFactorErrorCode, TwoFactorSetupResponse } from "@/lib/shared/contracts/auth";
+import type {
+  TwoFactorErrorCode,
+  TwoFactorSetupResponse,
+  TwoFactorVerifyResponse,
+} from "@/lib/shared/contracts/auth";
 import {
+  completeTotpEnrollment as persistEnrolledTotp,
   findUserWithTotpById,
   setPendingTotpSecret,
 } from "@/lib/server/modules/auth/repository";
-import { encryptSecret } from "@/lib/server/modules/auth/totp-crypto";
-import { generateTotpSecret } from "@/lib/server/modules/auth/totp";
+import {
+  isTotpCodeReplayed,
+  markTotpCodeUsed,
+} from "@/lib/server/modules/auth/rate-limit";
+import {
+  decryptSecret,
+  encryptSecret,
+} from "@/lib/server/modules/auth/totp-crypto";
+import {
+  generateBackupCodes,
+  generateTotpSecret,
+  verifyTotp,
+} from "@/lib/server/modules/auth/totp";
 
 export class TotpServiceError extends Error {
   readonly code: TwoFactorErrorCode;
@@ -69,4 +85,95 @@ export async function beginTotpEnrollment(
   const qrCodeSvg = await qrCodeToString(otpAuthUrl, QR_OPTIONS);
 
   return { secret, otpAuthUrl, qrCodeSvg };
+}
+
+/**
+ * Confirms a pending enrolment: validates the first TOTP code, generates
+ * ten single-use backup codes, and flips `totp_enabled` on. Returns the
+ * plaintext backup codes — the caller MUST surface them to the user
+ * exactly once; only their hashes are persisted.
+ *
+ * Error mapping:
+ * - 401 `not_enrolled` — session points at a non-existent user (shouldn't
+ *   happen in practice, but we surface it explicitly).
+ * - 409 `already_enabled` — verify called after enrolment is complete.
+ * - 409 `no_pending_enrollment` — no `totp_secret` stored; caller must
+ *   hit `/2fa/setup` first.
+ * - 400 `invalid_totp` — code did not match (also covers replays of the
+ *   most recently accepted code within the drift window).
+ */
+export async function completeTotpEnrollment(params: {
+  userId: string;
+  code: string;
+}): Promise<TwoFactorVerifyResponse> {
+  const user = await findUserWithTotpById(params.userId);
+  if (!user) {
+    throw new TotpServiceError("User not found", {
+      code: "not_enrolled",
+      statusCode: 401,
+    });
+  }
+
+  if (user.totpEnabled) {
+    throw new TotpServiceError(
+      "Two-factor authentication is already enabled.",
+      { code: "already_enabled", statusCode: 409 },
+    );
+  }
+
+  if (!user.totpSecret) {
+    throw new TotpServiceError(
+      "No pending two-factor enrolment. Start setup first.",
+      { code: "no_pending_enrollment", statusCode: 409 },
+    );
+  }
+
+  // Replay check runs before HMAC verification so a leaked-and-reused code
+  // is rejected with the same shape as a wrong code (no oracle for the
+  // attacker about whether a code was ever valid).
+  if (isTotpCodeReplayed(user.id, params.code)) {
+    throw new TotpServiceError("Invalid verification code", {
+      code: "invalid_totp",
+      statusCode: 400,
+    });
+  }
+
+  let plaintextSecret: string;
+  try {
+    plaintextSecret = decryptSecret(user.totpSecret);
+  } catch (cause) {
+    // Corrupt or wrong-key ciphertext: surface as invalid_totp so we do
+    // not leak details, but log via the thrown cause for operators.
+    throw new TotpServiceError("Stored TOTP secret is unreadable", {
+      code: "invalid_totp",
+      statusCode: 400,
+      cause,
+    });
+  }
+
+  if (!verifyTotp(plaintextSecret, params.code)) {
+    throw new TotpServiceError("Invalid verification code", {
+      code: "invalid_totp",
+      statusCode: 400,
+    });
+  }
+
+  // Generate + persist backup codes BEFORE returning so a transient DB
+  // failure doesn't leave the user thinking 2FA is enabled while the DB
+  // still says otherwise.
+  const { plaintext, hashes } = await generateBackupCodes();
+  const enrolledAt = new Date();
+  await persistEnrolledTotp({
+    userId: user.id,
+    encryptedBackupCodes: encryptSecret(JSON.stringify(hashes)),
+    enrolledAt,
+  });
+
+  markTotpCodeUsed(user.id, params.code);
+
+  return {
+    enabled: true,
+    enrolledAt: enrolledAt.toISOString(),
+    backupCodes: plaintext,
+  };
 }

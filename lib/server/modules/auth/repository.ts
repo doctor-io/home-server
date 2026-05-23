@@ -108,6 +108,26 @@ export async function setPendingTotpSecret(
     .where(eq(users.id, userId));
 }
 
+/**
+ * Flips the user from "secret stored, awaiting first valid code" to fully
+ * enrolled: writes the encrypted backup-code hashes JSON and the enrolment
+ * timestamp atomically with `totp_enabled = true`.
+ */
+export async function completeTotpEnrollment(params: {
+  userId: string;
+  encryptedBackupCodes: string;
+  enrolledAt: Date;
+}) {
+  await db
+    .update(users)
+    .set({
+      totpEnabled: true,
+      totpBackupCodes: params.encryptedBackupCodes,
+      totpEnrolledAt: params.enrolledAt,
+    })
+    .where(eq(users.id, params.userId));
+}
+
 export async function createSession(params: {
   id: string;
   userId: string;
