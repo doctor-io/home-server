@@ -128,6 +128,24 @@ export async function completeTotpEnrollment(params: {
     .where(eq(users.id, params.userId));
 }
 
+/**
+ * Reverses {@link completeTotpEnrollment} in a single statement: drops the
+ * secret, backup codes, enrolment timestamp, and flips `totp_enabled` off.
+ * Used by the disable flow once the user has proven possession with a valid
+ * TOTP or backup code.
+ */
+export async function clearTotpEnrollment(userId: string) {
+  await db
+    .update(users)
+    .set({
+      totpSecret: null,
+      totpEnabled: false,
+      totpBackupCodes: null,
+      totpEnrolledAt: null,
+    })
+    .where(eq(users.id, userId));
+}
+
 export async function createSession(params: {
   id: string;
   userId: string;

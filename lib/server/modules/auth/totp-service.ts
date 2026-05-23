@@ -3,11 +3,13 @@ import "server-only";
 import { toString as qrCodeToString } from "qrcode";
 
 import type {
+  TwoFactorDisableResponse,
   TwoFactorErrorCode,
   TwoFactorSetupResponse,
   TwoFactorVerifyResponse,
 } from "@/lib/shared/contracts/auth";
 import {
+  clearTotpEnrollment as persistClearedTotp,
   completeTotpEnrollment as persistEnrolledTotp,
   findUserWithTotpById,
   setPendingTotpSecret,
@@ -23,6 +25,7 @@ import {
 import {
   generateBackupCodes,
   generateTotpSecret,
+  verifyBackupCode,
   verifyTotp,
 } from "@/lib/server/modules/auth/totp";
 
@@ -176,4 +179,106 @@ export async function completeTotpEnrollment(params: {
     enrolledAt: enrolledAt.toISOString(),
     backupCodes: plaintext,
   };
+}
+
+const TOTP_CODE_PATTERN = /^\d{6}$/;
+
+/**
+ * Turns 2FA off for an already-enrolled user. The caller must prove
+ * possession of the second factor with either a current TOTP code or one of
+ * their unused backup codes. On success the entire enrolment is cleared
+ * (`totp_secret`, `totp_enabled`, `totp_backup_codes`, `totp_enrolled_at`)
+ * — there's no point preserving the consumed backup code separately because
+ * everything goes back to null.
+ *
+ * Error mapping:
+ * - 401 `not_enrolled` — session points at a non-existent user row.
+ * - 409 `not_enabled` — TOTP isn't currently turned on for this user.
+ * - 400 `invalid_totp` — code didn't match TOTP or any stored backup,
+ *   was a replay, or the stored ciphertext is unreadable. We return one
+ *   shape regardless of which path failed so the response doesn't leak
+ *   whether a TOTP or backup-code attempt was closer.
+ */
+export async function disableTotp(params: {
+  userId: string;
+  code: string;
+}): Promise<TwoFactorDisableResponse> {
+  const user = await findUserWithTotpById(params.userId);
+  if (!user) {
+    throw new TotpServiceError("User not found", {
+      code: "not_enrolled",
+      statusCode: 401,
+    });
+  }
+
+  if (!user.totpEnabled) {
+    throw new TotpServiceError(
+      "Two-factor authentication is not enabled.",
+      { code: "not_enabled", statusCode: 409 },
+    );
+  }
+
+  if (isTotpCodeReplayed(user.id, params.code)) {
+    throw new TotpServiceError("Invalid verification code", {
+      code: "invalid_totp",
+      statusCode: 400,
+    });
+  }
+
+  // Route by shape: a stripped 6-digit string is a TOTP attempt; anything
+  // else falls through to backup-code verification (which is heavier — scrypt
+  // per stored hash — so we avoid running it on TOTP-shaped input).
+  const stripped = params.code.replace(/[\s-]+/g, "");
+  let codeValid = false;
+
+  if (TOTP_CODE_PATTERN.test(stripped) && user.totpSecret) {
+    let plaintextSecret: string;
+    try {
+      plaintextSecret = decryptSecret(user.totpSecret);
+    } catch (cause) {
+      throw new TotpServiceError("Stored TOTP secret is unreadable", {
+        code: "invalid_totp",
+        statusCode: 400,
+        cause,
+      });
+    }
+    codeValid = verifyTotp(plaintextSecret, params.code);
+  }
+
+  if (!codeValid && user.totpBackupCodes) {
+    let hashes: string[];
+    try {
+      const parsed: unknown = JSON.parse(decryptSecret(user.totpBackupCodes));
+      if (
+        !Array.isArray(parsed) ||
+        !parsed.every((entry): entry is string => typeof entry === "string")
+      ) {
+        throw new Error("Backup-code blob is not a string array");
+      }
+      hashes = parsed;
+    } catch (cause) {
+      throw new TotpServiceError("Stored backup codes are unreadable", {
+        code: "invalid_totp",
+        statusCode: 400,
+        cause,
+      });
+    }
+
+    const result = await verifyBackupCode(hashes, params.code);
+    if (result.matchedHash !== null) {
+      codeValid = true;
+    }
+  }
+
+  if (!codeValid) {
+    throw new TotpServiceError("Invalid verification code", {
+      code: "invalid_totp",
+      statusCode: 400,
+    });
+  }
+
+  await persistClearedTotp(user.id);
+  markTotpCodeUsed(user.id, params.code);
+
+  return { enabled: false };
 }

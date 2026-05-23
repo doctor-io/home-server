@@ -4,6 +4,7 @@ vi.mock("@/lib/server/modules/auth/repository", () => ({
   findUserWithTotpById: vi.fn(),
   setPendingTotpSecret: vi.fn(),
   completeTotpEnrollment: vi.fn(),
+  clearTotpEnrollment: vi.fn(),
 }));
 
 vi.mock("@/lib/server/modules/auth/totp-crypto", () => ({
@@ -22,6 +23,7 @@ vi.mock("@/lib/server/modules/auth/totp", () => ({
     otpAuthUrl: `otpauth://totp/Homeio%3A${encodeURIComponent(username)}?secret=JBSWY3DPEHPK3PXP&issuer=Homeio&algorithm=SHA1&digits=6&period=30`,
   })),
   verifyTotp: vi.fn(),
+  verifyBackupCode: vi.fn(async () => ({ matchedHash: null })),
   generateBackupCodes: vi.fn(async () => ({
     plaintext: ["AAAAAAAAAA", "BBBBBBBBBB"],
     hashes: ["salt-a:hash-a", "salt-b:hash-b"],
@@ -36,8 +38,10 @@ import {
   TotpServiceError,
   beginTotpEnrollment,
   completeTotpEnrollment,
+  disableTotp,
 } from "@/lib/server/modules/auth/totp-service";
 import {
+  clearTotpEnrollment as persistClearedTotp,
   completeTotpEnrollment as persistEnrolledTotp,
   findUserWithTotpById,
   setPendingTotpSecret,
@@ -50,7 +54,10 @@ import {
   decryptSecret,
   encryptSecret,
 } from "@/lib/server/modules/auth/totp-crypto";
-import { verifyTotp } from "@/lib/server/modules/auth/totp";
+import {
+  verifyBackupCode,
+  verifyTotp,
+} from "@/lib/server/modules/auth/totp";
 
 const PENDING_USER = {
   id: "user-1",
@@ -67,13 +74,24 @@ const FRESH_USER = {
   totpSecret: null,
 };
 
+const ENROLLED_USER = {
+  ...PENDING_USER,
+  totpEnabled: true,
+  totpBackupCodes: "enc:" + JSON.stringify(["salt-a:hash-a", "salt-b:hash-b"]),
+  totpEnrolledAt: new Date("2026-05-20T00:00:00.000Z"),
+};
+
 beforeEach(() => {
   vi.mocked(findUserWithTotpById).mockReset();
   vi.mocked(setPendingTotpSecret).mockReset();
   vi.mocked(persistEnrolledTotp).mockReset();
+  vi.mocked(persistClearedTotp).mockReset();
   vi.mocked(encryptSecret).mockClear();
   vi.mocked(decryptSecret).mockClear();
   vi.mocked(verifyTotp).mockReset();
+  vi.mocked(verifyBackupCode)
+    .mockReset()
+    .mockResolvedValue({ matchedHash: null });
   vi.mocked(isTotpCodeReplayed).mockReset().mockReturnValue(false);
   vi.mocked(markTotpCodeUsed).mockReset();
 });
@@ -244,5 +262,156 @@ describe("completeTotpEnrollment", () => {
       code: "not_enrolled",
       statusCode: 401,
     });
+  });
+});
+
+describe("disableTotp", () => {
+  it("clears the enrolment when the TOTP code is valid", async () => {
+    vi.mocked(findUserWithTotpById).mockResolvedValueOnce({ ...ENROLLED_USER });
+    vi.mocked(verifyTotp).mockReturnValueOnce(true);
+
+    const result = await disableTotp({ userId: "user-1", code: "123456" });
+
+    expect(result).toEqual({ enabled: false });
+    expect(vi.mocked(verifyTotp)).toHaveBeenCalledWith(
+      "JBSWY3DPEHPK3PXP",
+      "123456",
+    );
+    // Backup-code path must not run when TOTP already matched.
+    expect(vi.mocked(verifyBackupCode)).not.toHaveBeenCalled();
+    expect(vi.mocked(persistClearedTotp)).toHaveBeenCalledWith("user-1");
+    expect(vi.mocked(markTotpCodeUsed)).toHaveBeenCalledWith(
+      "user-1",
+      "123456",
+    );
+  });
+
+  it("clears the enrolment when a backup code is valid", async () => {
+    vi.mocked(findUserWithTotpById).mockResolvedValueOnce({ ...ENROLLED_USER });
+    vi.mocked(verifyBackupCode).mockResolvedValueOnce({
+      matchedHash: "salt-a:hash-a",
+    });
+
+    const result = await disableTotp({
+      userId: "user-1",
+      code: "AAAA-AAAA-AA",
+    });
+
+    expect(result).toEqual({ enabled: false });
+    // TOTP path is shape-gated so a non-digit code must skip verifyTotp.
+    expect(vi.mocked(verifyTotp)).not.toHaveBeenCalled();
+    expect(vi.mocked(verifyBackupCode)).toHaveBeenCalledWith(
+      ["salt-a:hash-a", "salt-b:hash-b"],
+      "AAAA-AAAA-AA",
+    );
+    expect(vi.mocked(persistClearedTotp)).toHaveBeenCalledWith("user-1");
+  });
+
+  it("falls back to the backup-code path when the TOTP code is wrong", async () => {
+    vi.mocked(findUserWithTotpById).mockResolvedValueOnce({ ...ENROLLED_USER });
+    vi.mocked(verifyTotp).mockReturnValueOnce(false);
+    vi.mocked(verifyBackupCode).mockResolvedValueOnce({
+      matchedHash: "salt-b:hash-b",
+    });
+
+    const result = await disableTotp({ userId: "user-1", code: "000000" });
+
+    expect(result).toEqual({ enabled: false });
+    expect(vi.mocked(verifyTotp)).toHaveBeenCalled();
+    expect(vi.mocked(verifyBackupCode)).toHaveBeenCalled();
+    expect(vi.mocked(persistClearedTotp)).toHaveBeenCalledWith("user-1");
+  });
+
+  it("rejects with invalid_totp (400) when neither path matches", async () => {
+    vi.mocked(findUserWithTotpById).mockResolvedValueOnce({ ...ENROLLED_USER });
+    vi.mocked(verifyTotp).mockReturnValueOnce(false);
+    vi.mocked(verifyBackupCode).mockResolvedValueOnce({ matchedHash: null });
+
+    await expect(
+      disableTotp({ userId: "user-1", code: "999999" }),
+    ).rejects.toMatchObject({
+      code: "invalid_totp",
+      statusCode: 400,
+    });
+
+    expect(vi.mocked(persistClearedTotp)).not.toHaveBeenCalled();
+    expect(vi.mocked(markTotpCodeUsed)).not.toHaveBeenCalled();
+  });
+
+  it("rejects with not_enabled (409) when TOTP is not currently on", async () => {
+    vi.mocked(findUserWithTotpById).mockResolvedValueOnce({ ...PENDING_USER });
+
+    await expect(
+      disableTotp({ userId: "user-1", code: "123456" }),
+    ).rejects.toMatchObject({
+      code: "not_enabled",
+      statusCode: 409,
+    });
+
+    expect(vi.mocked(verifyTotp)).not.toHaveBeenCalled();
+    expect(vi.mocked(verifyBackupCode)).not.toHaveBeenCalled();
+    expect(vi.mocked(persistClearedTotp)).not.toHaveBeenCalled();
+  });
+
+  it("rejects replays with invalid_totp before doing any HMAC work", async () => {
+    vi.mocked(findUserWithTotpById).mockResolvedValueOnce({ ...ENROLLED_USER });
+    vi.mocked(isTotpCodeReplayed).mockReturnValueOnce(true);
+
+    await expect(
+      disableTotp({ userId: "user-1", code: "123456" }),
+    ).rejects.toMatchObject({
+      code: "invalid_totp",
+      statusCode: 400,
+    });
+
+    expect(vi.mocked(verifyTotp)).not.toHaveBeenCalled();
+    expect(vi.mocked(verifyBackupCode)).not.toHaveBeenCalled();
+    expect(vi.mocked(persistClearedTotp)).not.toHaveBeenCalled();
+  });
+
+  it("returns 401 when the user row is missing", async () => {
+    vi.mocked(findUserWithTotpById).mockResolvedValueOnce(null);
+
+    await expect(
+      disableTotp({ userId: "ghost", code: "123456" }),
+    ).rejects.toMatchObject({
+      code: "not_enrolled",
+      statusCode: 401,
+    });
+    expect(vi.mocked(persistClearedTotp)).not.toHaveBeenCalled();
+  });
+
+  it("maps a corrupt TOTP ciphertext to invalid_totp", async () => {
+    vi.mocked(findUserWithTotpById).mockResolvedValueOnce({ ...ENROLLED_USER });
+    vi.mocked(decryptSecret).mockImplementationOnce(() => {
+      throw new Error("auth tag mismatch");
+    });
+
+    await expect(
+      disableTotp({ userId: "user-1", code: "123456" }),
+    ).rejects.toMatchObject({
+      code: "invalid_totp",
+      statusCode: 400,
+    });
+    expect(vi.mocked(persistClearedTotp)).not.toHaveBeenCalled();
+  });
+
+  it("maps a corrupt backup-code ciphertext to invalid_totp", async () => {
+    vi.mocked(findUserWithTotpById).mockResolvedValueOnce({ ...ENROLLED_USER });
+    // First decryptSecret call is for totpSecret (succeeds); second is for
+    // backup-codes blob (throws). Only triggered if TOTP path fails and we
+    // try backup — use a non-digit code to skip TOTP entirely.
+    vi.mocked(decryptSecret).mockImplementationOnce(() => {
+      throw new Error("auth tag mismatch");
+    });
+
+    await expect(
+      disableTotp({ userId: "user-1", code: "AAAAAAAAAA" }),
+    ).rejects.toMatchObject({
+      code: "invalid_totp",
+      statusCode: 400,
+    });
+    expect(vi.mocked(verifyBackupCode)).not.toHaveBeenCalled();
+    expect(vi.mocked(persistClearedTotp)).not.toHaveBeenCalled();
   });
 });

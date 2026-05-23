@@ -6,6 +6,7 @@
 
 export type TwoFactorErrorCode =
   | "already_enabled"
+  | "not_enabled"
   | "not_enrolled"
   | "no_pending_enrollment"
   | "invalid_totp"
