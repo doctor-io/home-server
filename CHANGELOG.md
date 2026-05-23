@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.6.28] - 2026-05-23
+
+### Fixed
+
+#### In-app updater
+
+- **Bug**: in-app updates from 1.6.22+ left the server stuck on "Applying Homeio update…" because `go build` aborted with `GOCACHE is not defined and neither $XDG_CACHE_HOME nor $HOME are defined`. The updater is scheduled via `systemd-run --no-block`, which starts a transient unit with a minimal environment — `$HOME` and `/usr/local/go/bin` were missing. `build_upload_server` exited hard before `start_service` ran, so the recovery screen polled `/api/health` forever.
+- Fix: pass `HOME=/root` and an explicit `PATH` (including `/usr/local/go/bin`) to the `systemd-run` invocation in `scheduleSystemUpdate`, and defensively export `HOME`/`GOCACHE`/`GOPATH` inside `build_upload_server` so the script is safe regardless of how it is invoked.
+
+> **Manual recovery for servers already stuck** (the fix can only protect *future* updates):
+>
+> ```bash
+> sudo systemctl start home-server
+> sudo bash -c 'export HOME=/root && cd /opt/home-server/services/upload-server && \
+>   /usr/local/go/bin/go build -o /opt/home-server/bin/upload-server . && \
+>   systemctl restart home-server-upload'
+> ```
+
+---
+
 ## [1.6.0] - 2026-05-04
 
 ### Added

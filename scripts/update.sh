@@ -259,10 +259,11 @@ build_upload_server() {
 	[[ -d "${src}" ]] || { print_warn "Upload server source not found at ${src}; skipping."; return; }
 
 	mkdir -p "${INSTALL_DIR}/bin"
+	mkdir -p "${GOCACHE}" "${GOPATH}"
 
 	local build_log
 	build_log="$(mktemp)"
-	if ! (cd "${src}" && go build -o "${INSTALL_DIR}/bin/upload-server" .) >"${build_log}" 2>&1; then
+	if ! (cd "${src}" && env HOME="${HOME}" GOCACHE="${GOCACHE}" GOPATH="${GOPATH}" go build -o "${INSTALL_DIR}/bin/upload-server" .) >"${build_log}" 2>&1; then
 		print_error "Failed to build upload server."
 		print_error "Last output:"
 		tail -10 "${build_log}" >&2
