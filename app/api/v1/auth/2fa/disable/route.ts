@@ -8,6 +8,10 @@ import {
 } from "@/lib/server/logging/logger";
 import { requireApiSession } from "@/lib/server/modules/auth/api";
 import {
+  getAuthCookieName,
+  getExpiredSessionCookieOptions,
+} from "@/lib/server/modules/auth/cookies";
+import {
   TotpServiceError,
   disableTotp,
 } from "@/lib/server/modules/auth/totp-service";
@@ -57,7 +61,16 @@ export async function POST(request: Request) {
         }),
     );
 
-    return NextResponse.json({ data });
+    // Service revoked every session row for this user; clear the caller's
+    // cookie too so the browser doesn't keep presenting a token that's now
+    // unbacked. Client must re-authenticate from scratch.
+    const response = NextResponse.json({ data });
+    response.cookies.set(
+      getAuthCookieName(),
+      "",
+      getExpiredSessionCookieOptions(request),
+    );
+    return response;
   } catch (error) {
     if (error instanceof TotpServiceError) {
       logServerAction({
@@ -70,7 +83,7 @@ export async function POST(request: Request) {
         meta: { code: error.code },
       });
       return NextResponse.json(
-        { error: error.message, code: error.code },
+        { error: error.publicMessage, code: error.code },
         { status: error.statusCode },
       );
     }

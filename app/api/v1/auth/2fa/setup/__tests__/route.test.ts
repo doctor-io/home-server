@@ -2,18 +2,27 @@ import { NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/server/modules/auth/totp-service", () => ({
+  // Mirror the real TotpServiceError shape including publicMessage — the
+  // route returns publicMessage to the client, not message, so the test
+  // class must expose both.
   TotpServiceError: class TotpServiceError extends Error {
     code: string;
     statusCode: number;
+    publicMessage: string;
 
     constructor(
       message: string,
-      options: { code: string; statusCode: number },
+      options: {
+        code: string;
+        statusCode: number;
+        publicMessage?: string;
+      },
     ) {
       super(message);
       this.name = "TotpServiceError";
       this.code = options.code;
       this.statusCode = options.statusCode;
+      this.publicMessage = options.publicMessage ?? message;
     }
   },
   beginTotpEnrollment: vi.fn(),

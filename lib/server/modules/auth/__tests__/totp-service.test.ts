@@ -7,6 +7,7 @@ vi.mock("@/lib/server/modules/auth/repository", () => ({
   clearTotpEnrollment: vi.fn(),
   updateTotpBackupCodes: vi.fn(),
   createSession: vi.fn(),
+  deleteSessionsForUser: vi.fn(),
 }));
 
 vi.mock("@/lib/server/modules/auth/partial-auth-token", () => ({
@@ -31,6 +32,10 @@ vi.mock("@/lib/server/modules/auth/totp-crypto", () => ({
 vi.mock("@/lib/server/modules/auth/rate-limit", () => ({
   isTotpCodeReplayed: vi.fn(() => false),
   markTotpCodeUsed: vi.fn(),
+  isPartialAuthTokenBlocked: vi.fn(() => false),
+  isPartialAuthTokenConsumed: vi.fn(() => false),
+  markPartialAuthTokenConsumed: vi.fn(),
+  recordPartialAuthFailure: vi.fn(),
 }));
 
 vi.mock("@/lib/server/modules/auth/totp", () => ({
@@ -61,6 +66,7 @@ import {
   clearTotpEnrollment as persistClearedTotp,
   completeTotpEnrollment as persistEnrolledTotp,
   createSession,
+  deleteSessionsForUser,
   findUserWithTotpById,
   setPendingTotpSecret,
   updateTotpBackupCodes,
@@ -68,8 +74,12 @@ import {
 import { verifyPartialAuthToken } from "@/lib/server/modules/auth/partial-auth-token";
 import { createSessionToken } from "@/lib/server/modules/auth/session-token";
 import {
+  isPartialAuthTokenBlocked,
+  isPartialAuthTokenConsumed,
   isTotpCodeReplayed,
+  markPartialAuthTokenConsumed,
   markTotpCodeUsed,
+  recordPartialAuthFailure,
 } from "@/lib/server/modules/auth/rate-limit";
 import {
   decryptSecret,
@@ -104,11 +114,14 @@ const ENROLLED_USER = {
 
 beforeEach(() => {
   vi.mocked(findUserWithTotpById).mockReset();
-  vi.mocked(setPendingTotpSecret).mockReset();
-  vi.mocked(persistEnrolledTotp).mockReset();
+  // CAS-style helpers return true by default so the happy path keeps working;
+  // tests covering CAS-loss override with mockResolvedValueOnce(false).
+  vi.mocked(setPendingTotpSecret).mockReset().mockResolvedValue(true);
+  vi.mocked(persistEnrolledTotp).mockReset().mockResolvedValue(true);
   vi.mocked(persistClearedTotp).mockReset();
-  vi.mocked(updateTotpBackupCodes).mockReset();
+  vi.mocked(updateTotpBackupCodes).mockReset().mockResolvedValue(true);
   vi.mocked(createSession).mockReset();
+  vi.mocked(deleteSessionsForUser).mockReset();
   vi.mocked(encryptSecret).mockClear();
   vi.mocked(decryptSecret).mockClear();
   vi.mocked(verifyTotp).mockReset();
@@ -119,6 +132,10 @@ beforeEach(() => {
   vi.mocked(markTotpCodeUsed).mockReset();
   vi.mocked(verifyPartialAuthToken).mockReset();
   vi.mocked(createSessionToken).mockClear();
+  vi.mocked(isPartialAuthTokenBlocked).mockReset().mockReturnValue(false);
+  vi.mocked(isPartialAuthTokenConsumed).mockReset().mockReturnValue(false);
+  vi.mocked(markPartialAuthTokenConsumed).mockReset();
+  vi.mocked(recordPartialAuthFailure).mockReset();
 });
 
 describe("beginTotpEnrollment", () => {
@@ -162,6 +179,19 @@ describe("beginTotpEnrollment", () => {
     expect(error).toBeInstanceOf(TotpServiceError);
     expect(error.statusCode).toBe(401);
     expect(vi.mocked(setPendingTotpSecret)).not.toHaveBeenCalled();
+  });
+
+  it("maps a CAS loss on setPendingTotpSecret to already_enabled (409)", async () => {
+    // Concurrent /verify completed enrolment between our read and our write,
+    // so the conditional UPDATE matched zero rows. We must not return a QR
+    // for a secret the DB will never accept.
+    vi.mocked(findUserWithTotpById).mockResolvedValueOnce({ ...FRESH_USER });
+    vi.mocked(setPendingTotpSecret).mockResolvedValueOnce(false);
+
+    await expect(beginTotpEnrollment("user-1")).rejects.toMatchObject({
+      code: "already_enabled",
+      statusCode: 409,
+    });
   });
 });
 
@@ -288,6 +318,26 @@ describe("completeTotpEnrollment", () => {
       statusCode: 401,
     });
   });
+
+  it("maps a CAS loss on completeTotpEnrollment to already_enabled (409)", async () => {
+    // Two near-simultaneous /verify calls (e.g., a UI double-click): the
+    // first flipped totp_enabled on with its backup codes; ours matched zero
+    // rows. Must NOT return our locally-generated backup codes because they
+    // do not exist in the DB — the user would be locked out of recovery.
+    vi.mocked(findUserWithTotpById).mockResolvedValueOnce({ ...PENDING_USER });
+    vi.mocked(verifyTotp).mockReturnValueOnce(true);
+    vi.mocked(persistEnrolledTotp).mockResolvedValueOnce(false);
+
+    await expect(
+      completeTotpEnrollment({ userId: "user-1", code: "123456" }),
+    ).rejects.toMatchObject({
+      code: "already_enabled",
+      statusCode: 409,
+    });
+    // Replay guard must not register a successful use either, since the
+    // outcome to the caller is "already enabled, retry path".
+    expect(vi.mocked(markTotpCodeUsed)).not.toHaveBeenCalled();
+  });
 });
 
 describe("disableTotp", () => {
@@ -305,6 +355,9 @@ describe("disableTotp", () => {
     // Backup-code path must not run when TOTP already matched.
     expect(vi.mocked(verifyBackupCode)).not.toHaveBeenCalled();
     expect(vi.mocked(persistClearedTotp)).toHaveBeenCalledWith("user-1");
+    // Every session for the user is revoked — disabling 2FA is a credential-
+    // grade change and we force a fresh login on every device.
+    expect(vi.mocked(deleteSessionsForUser)).toHaveBeenCalledWith("user-1");
     expect(vi.mocked(markTotpCodeUsed)).toHaveBeenCalledWith(
       "user-1",
       "123456",
@@ -465,6 +518,110 @@ describe("completeTotpLogin", () => {
       "user-1",
       "123456",
     );
+    // Successful exchange burns the partial token so it cannot be reused.
+    expect(vi.mocked(markPartialAuthTokenConsumed)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(recordPartialAuthFailure)).not.toHaveBeenCalled();
+  });
+
+  it("rejects with too_many_attempts (429) when the partial token is blocked", async () => {
+    vi.mocked(verifyPartialAuthToken).mockReturnValueOnce({
+      userId: "user-1",
+      expiresAtEpochSeconds: Math.floor(Date.now() / 1000) + 60,
+    });
+    vi.mocked(isPartialAuthTokenBlocked).mockReturnValueOnce(true);
+
+    await expect(
+      completeTotpLogin({
+        partialAuthToken: "partial.user-1.99999999.sig",
+        code: "123456",
+      }),
+    ).rejects.toMatchObject({
+      code: "too_many_attempts",
+      statusCode: 429,
+    });
+
+    expect(vi.mocked(findUserWithTotpById)).not.toHaveBeenCalled();
+    expect(vi.mocked(createSession)).not.toHaveBeenCalled();
+  });
+
+  it("rejects with partial_auth_consumed (401) once the token has been used", async () => {
+    vi.mocked(verifyPartialAuthToken).mockReturnValueOnce({
+      userId: "user-1",
+      expiresAtEpochSeconds: Math.floor(Date.now() / 1000) + 60,
+    });
+    vi.mocked(isPartialAuthTokenConsumed).mockReturnValueOnce(true);
+
+    await expect(
+      completeTotpLogin({
+        partialAuthToken: "partial.user-1.99999999.sig",
+        code: "123456",
+      }),
+    ).rejects.toMatchObject({
+      code: "partial_auth_consumed",
+      statusCode: 401,
+    });
+
+    expect(vi.mocked(findUserWithTotpById)).not.toHaveBeenCalled();
+    expect(vi.mocked(createSession)).not.toHaveBeenCalled();
+  });
+
+  it("records a partial-auth failure on an invalid_totp result", async () => {
+    vi.mocked(verifyPartialAuthToken).mockReturnValueOnce({
+      userId: "user-1",
+      expiresAtEpochSeconds: Math.floor(Date.now() / 1000) + 60,
+    });
+    vi.mocked(findUserWithTotpById).mockResolvedValueOnce({ ...ENROLLED_USER });
+    vi.mocked(verifyTotp).mockReturnValueOnce(false);
+    vi.mocked(verifyBackupCode).mockResolvedValueOnce({ matchedHash: null });
+
+    await expect(
+      completeTotpLogin({
+        partialAuthToken: "partial.user-1.99999999.sig",
+        code: "999999",
+      }),
+    ).rejects.toMatchObject({
+      code: "invalid_totp",
+      statusCode: 401,
+    });
+
+    // Failure is counted against the brute-force budget for this partial
+    // token; the token itself is not invalidated (still valid until expiry).
+    expect(vi.mocked(recordPartialAuthFailure)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(markPartialAuthTokenConsumed)).not.toHaveBeenCalled();
+  });
+
+  it("refuses a backup code whose hash was consumed concurrently (CAS loss)", async () => {
+    // Two concurrent /login/totp calls with different backup codes both read
+    // the same blob; the first one already wrote the pruned version, so our
+    // CAS update returns false and we can't decode the same hash a second
+    // time. Refuse the login — single-use means single-use.
+    vi.mocked(verifyPartialAuthToken).mockReturnValueOnce({
+      userId: "user-1",
+      expiresAtEpochSeconds: Math.floor(Date.now() / 1000) + 60,
+    });
+    vi.mocked(findUserWithTotpById)
+      .mockResolvedValueOnce({ ...ENROLLED_USER })
+      // CAS retry: refetch returns the already-pruned blob without our hash.
+      .mockResolvedValueOnce({
+        ...ENROLLED_USER,
+        totpBackupCodes: "enc:" + JSON.stringify(["salt-b:hash-b"]),
+      });
+    vi.mocked(verifyBackupCode).mockResolvedValueOnce({
+      matchedHash: "salt-a:hash-a",
+    });
+    vi.mocked(updateTotpBackupCodes).mockResolvedValueOnce(false);
+
+    await expect(
+      completeTotpLogin({
+        partialAuthToken: "partial.user-1.99999999.sig",
+        code: "AAAA-AAAA-AA",
+      }),
+    ).rejects.toMatchObject({
+      code: "invalid_totp",
+      statusCode: 401,
+    });
+
+    expect(vi.mocked(createSession)).not.toHaveBeenCalled();
   });
 
   it("issues a session AND prunes the matched hash when a backup code is used", async () => {
@@ -485,12 +642,14 @@ describe("completeTotpLogin", () => {
     expect(result.sessionToken).toMatch(/^sess\./);
 
     expect(vi.mocked(updateTotpBackupCodes)).toHaveBeenCalledTimes(1);
-    const [userId, encryptedBlob] =
-      vi.mocked(updateTotpBackupCodes).mock.calls[0];
-    expect(userId).toBe("user-1");
-    // The new blob is the JSON array minus the consumed hash, re-encrypted
-    // via our `enc:` prefix mock.
-    expect(encryptedBlob).toBe(`enc:${JSON.stringify(["salt-b:hash-b"])}`);
+    const params = vi.mocked(updateTotpBackupCodes).mock.calls[0][0];
+    expect(params.userId).toBe("user-1");
+    // CAS: the previous blob must equal what we read; the next blob is the
+    // JSON array minus the consumed hash, re-encrypted via our `enc:` mock.
+    expect(params.previousBackupCodes).toBe(ENROLLED_USER.totpBackupCodes);
+    expect(params.nextBackupCodes).toBe(
+      `enc:${JSON.stringify(["salt-b:hash-b"])}`,
+    );
   });
 
   it("rejects with partial_auth_expired when the token is missing or invalid", async () => {

@@ -14,14 +14,19 @@ import {
   clearTotpEnrollment as persistClearedTotp,
   completeTotpEnrollment as persistEnrolledTotp,
   createSession,
+  deleteSessionsForUser,
   findUserWithTotpById,
   setPendingTotpSecret,
   updateTotpBackupCodes,
 } from "@/lib/server/modules/auth/repository";
 import { verifyPartialAuthToken } from "@/lib/server/modules/auth/partial-auth-token";
 import {
+  isPartialAuthTokenBlocked,
+  isPartialAuthTokenConsumed,
   isTotpCodeReplayed,
+  markPartialAuthTokenConsumed,
   markTotpCodeUsed,
+  recordPartialAuthFailure,
 } from "@/lib/server/modules/auth/rate-limit";
 import { createSessionToken } from "@/lib/server/modules/auth/session-token";
 import {
@@ -35,6 +40,25 @@ import {
   verifyTotp,
 } from "@/lib/server/modules/auth/totp";
 
+/**
+ * Short, code-driven strings returned in the response body. Kept narrow on
+ * purpose — operational detail like "stored backup codes are unreadable"
+ * should never leak to a probing attacker; that goes to logs only.
+ */
+const TOTP_PUBLIC_MESSAGES: Record<TwoFactorErrorCode, string> = {
+  invalid_totp: "Invalid verification code",
+  invalid_backup_code: "Invalid backup code",
+  already_enabled: "Two-factor authentication is already enabled",
+  not_enabled: "Two-factor authentication is not enabled",
+  not_enrolled: "Two-factor authentication is not enrolled",
+  no_pending_enrollment: "No pending two-factor enrolment",
+  partial_auth_expired:
+    "Two-factor login session expired. Please sign in again.",
+  partial_auth_consumed:
+    "Two-factor login session already used. Please sign in again.",
+  too_many_attempts: "Too many failed attempts. Try again shortly.",
+};
+
 export class TotpServiceError extends Error {
   readonly code: TwoFactorErrorCode;
   readonly statusCode: number;
@@ -47,6 +71,15 @@ export class TotpServiceError extends Error {
     this.name = "TotpServiceError";
     this.code = options.code;
     this.statusCode = options.statusCode;
+  }
+
+  /**
+   * The string that's safe to return to API callers. Routes should prefer
+   * this over `error.message`, which may carry operational detail intended
+   * for logs only.
+   */
+  get publicMessage(): string {
+    return TOTP_PUBLIC_MESSAGES[this.code];
   }
 }
 
@@ -89,7 +122,17 @@ export async function beginTotpEnrollment(
   }
 
   const { secret, otpAuthUrl } = generateTotpSecret(user.username);
-  await setPendingTotpSecret(user.id, encryptSecret(secret));
+  const stored = await setPendingTotpSecret(user.id, encryptSecret(secret));
+  if (!stored) {
+    // CAS failed: a concurrent /verify completed enrolment between our read
+    // above and our write here. Treat as already_enabled; the caller can
+    // disable and retry. Prevents handing out a QR for a secret the DB will
+    // never accept.
+    throw new TotpServiceError(
+      "Two-factor authentication is already enabled. Disable it first.",
+      { code: "already_enabled", statusCode: 409 },
+    );
+  }
 
   const qrCodeSvg = await qrCodeToString(otpAuthUrl, QR_OPTIONS);
 
@@ -172,11 +215,22 @@ export async function completeTotpEnrollment(params: {
   // still says otherwise.
   const { plaintext, hashes } = await generateBackupCodes();
   const enrolledAt = new Date();
-  await persistEnrolledTotp({
+  const persisted = await persistEnrolledTotp({
     userId: user.id,
     encryptedBackupCodes: encryptSecret(JSON.stringify(hashes)),
     enrolledAt,
   });
+  if (!persisted) {
+    // CAS lost: a concurrent /verify (e.g., double-click in the UI) flipped
+    // totp_enabled to true between our read and our write. The other request
+    // already returned its own backup codes to a client. We must NOT return
+    // OUR plaintext codes here — those codes do not exist in the DB, so the
+    // user would be locked out of recovery. Fail closed.
+    throw new TotpServiceError(
+      "Two-factor authentication is already enabled.",
+      { code: "already_enabled", statusCode: 409 },
+    );
+  }
 
   markTotpCodeUsed(user.id, params.code);
 
@@ -284,6 +338,11 @@ export async function disableTotp(params: {
   }
 
   await persistClearedTotp(user.id);
+  // Revoke every session for this user. Disabling 2FA is a credential-grade
+  // change; the caller proved current possession via TOTP/backup, and we
+  // force a fresh login on every device so an old captured cookie can't ride
+  // the disable. The route is responsible for clearing the caller's cookie.
+  await deleteSessionsForUser(user.id);
   markTotpCodeUsed(user.id, params.code);
 
   return { enabled: false };
@@ -313,19 +372,76 @@ export type CompleteTotpLoginResult = {
  *   unreadable, the user row vanished, or TOTP was disabled between A7
  *   and A8 (don't expose the state — the client should re-login).
  */
-export async function completeTotpLogin(params: {
-  partialAuthToken: string;
+const BACKUP_CODE_CAS_RETRIES = 3;
+
+function decodeBackupHashes(encrypted: string): string[] | null {
+  try {
+    const parsed: unknown = JSON.parse(decryptSecret(encrypted));
+    if (
+      !Array.isArray(parsed) ||
+      !parsed.every((entry): entry is string => typeof entry === "string")
+    ) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Removes `matchedHash` from the user's encrypted backup-codes blob using a
+ * compare-and-swap UPDATE, retrying on contention. Returns true if a slot
+ * was consumed; false means another concurrent login already burned this
+ * same hash (so the caller must reject the attempt as invalid_totp).
+ *
+ * The CAS closes the race where two concurrent /login/totp calls with
+ * different backup codes both read the same blob and write back interleaved
+ * versions — without it the second writer would silently lose the first's
+ * consumption and a single backup code could be used twice.
+ */
+async function consumeBackupCodeHash(
+  userId: string,
+  matchedHash: string,
+  initialBlob: string,
+): Promise<boolean> {
+  let currentBlob = initialBlob;
+  for (let attempt = 0; attempt < BACKUP_CODE_CAS_RETRIES; attempt++) {
+    const hashes = decodeBackupHashes(currentBlob);
+    if (hashes === null) return false;
+    if (!hashes.includes(matchedHash)) {
+      // Same backup code was just consumed by a concurrent login. We MUST
+      // refuse — single-use means single-use.
+      return false;
+    }
+
+    const remaining = hashes.filter((hash) => hash !== matchedHash);
+    const ok = await updateTotpBackupCodes({
+      userId,
+      previousBackupCodes: currentBlob,
+      nextBackupCodes: encryptSecret(JSON.stringify(remaining)),
+    });
+    if (ok) return true;
+
+    // Lost the CAS to a different code's consumer. Reload and try once more.
+    const fresh = await findUserWithTotpById(userId);
+    if (!fresh || !fresh.totpEnabled || !fresh.totpBackupCodes) return false;
+    currentBlob = fresh.totpBackupCodes;
+  }
+  return false;
+}
+
+/**
+ * Internal core of {@link completeTotpLogin}. Encapsulated so the outer
+ * function can wrap it in the brute-force + single-use guards and convert
+ * every invalid_totp failure into a recorded attempt against the partial
+ * token.
+ */
+async function attemptTotpLogin(params: {
+  userId: string;
   code: string;
 }): Promise<CompleteTotpLoginResult> {
-  const verified = verifyPartialAuthToken(params.partialAuthToken);
-  if (!verified) {
-    throw new TotpServiceError("Partial-auth token is invalid or expired", {
-      code: "partial_auth_expired",
-      statusCode: 401,
-    });
-  }
-
-  const user = await findUserWithTotpById(verified.userId);
+  const user = await findUserWithTotpById(params.userId);
   if (!user || !user.totpEnabled || !user.totpSecret) {
     throw new TotpServiceError("Invalid verification code", {
       code: "invalid_totp",
@@ -343,7 +459,6 @@ export async function completeTotpLogin(params: {
   const stripped = params.code.replace(/[\s-]+/g, "");
   let codeValid = false;
   let consumedBackupHash: string | null = null;
-  let backupHashes: string[] | null = null;
 
   if (TOTP_CODE_PATTERN.test(stripped)) {
     let plaintextSecret: string;
@@ -360,24 +475,14 @@ export async function completeTotpLogin(params: {
   }
 
   if (!codeValid && user.totpBackupCodes) {
-    try {
-      const parsed: unknown = JSON.parse(decryptSecret(user.totpBackupCodes));
-      if (
-        !Array.isArray(parsed) ||
-        !parsed.every((entry): entry is string => typeof entry === "string")
-      ) {
-        throw new Error("Backup-code blob is not a string array");
-      }
-      backupHashes = parsed;
-    } catch (cause) {
+    const hashes = decodeBackupHashes(user.totpBackupCodes);
+    if (hashes === null) {
       throw new TotpServiceError("Stored backup codes are unreadable", {
         code: "invalid_totp",
         statusCode: 401,
-        cause,
       });
     }
-
-    const result = await verifyBackupCode(backupHashes, params.code);
+    const result = await verifyBackupCode(hashes, params.code);
     if (result.matchedHash !== null) {
       codeValid = true;
       consumedBackupHash = result.matchedHash;
@@ -391,14 +496,18 @@ export async function completeTotpLogin(params: {
     });
   }
 
-  if (consumedBackupHash !== null && backupHashes !== null) {
-    const remaining = backupHashes.filter(
-      (hash) => hash !== consumedBackupHash,
-    );
-    await updateTotpBackupCodes(
+  if (consumedBackupHash !== null && user.totpBackupCodes) {
+    const consumed = await consumeBackupCodeHash(
       user.id,
-      encryptSecret(JSON.stringify(remaining)),
+      consumedBackupHash,
+      user.totpBackupCodes,
     );
+    if (!consumed) {
+      throw new TotpServiceError("Invalid verification code", {
+        code: "invalid_totp",
+        statusCode: 401,
+      });
+    }
   }
 
   const sessionExpiresAt = new Date(
@@ -423,4 +532,60 @@ export async function completeTotpLogin(params: {
     sessionExpiresAt,
     user: { id: user.id, username: user.username },
   };
+}
+
+export async function completeTotpLogin(params: {
+  partialAuthToken: string;
+  code: string;
+}): Promise<CompleteTotpLoginResult> {
+  const verified = verifyPartialAuthToken(params.partialAuthToken);
+  if (!verified) {
+    throw new TotpServiceError("Partial-auth token is invalid or expired", {
+      code: "partial_auth_expired",
+      statusCode: 401,
+    });
+  }
+
+  // Single-use: once a partial token has been redeemed for a real session,
+  // refuse to redeem it again even if still cryptographically valid. Defends
+  // against an attacker who captures the partial token within its 5-minute
+  // TTL after the legitimate user has already completed login.
+  if (isPartialAuthTokenConsumed(params.partialAuthToken)) {
+    throw new TotpServiceError("Partial-auth token already used", {
+      code: "partial_auth_consumed",
+      statusCode: 401,
+    });
+  }
+
+  // Brute-force gate: 5 wrong-code attempts against the same partial token
+  // trip a 429 for the rest of the token's lifetime. We do NOT invalidate
+  // the token (per the A8 spec — "allow retry until token expires"); we
+  // throttle instead. Attempts that exceed the cap during the legitimate
+  // user's window just force them to re-enter the password.
+  if (isPartialAuthTokenBlocked(params.partialAuthToken)) {
+    throw new TotpServiceError(
+      "Too many failed two-factor attempts for this login session",
+      { code: "too_many_attempts", statusCode: 429 },
+    );
+  }
+
+  try {
+    const result = await attemptTotpLogin({
+      userId: verified.userId,
+      code: params.code,
+    });
+    markPartialAuthTokenConsumed(
+      params.partialAuthToken,
+      verified.expiresAtEpochSeconds,
+    );
+    return result;
+  } catch (error) {
+    if (error instanceof TotpServiceError && error.code === "invalid_totp") {
+      recordPartialAuthFailure(
+        params.partialAuthToken,
+        verified.expiresAtEpochSeconds,
+      );
+    }
+    throw error;
+  }
 }

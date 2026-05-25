@@ -10,7 +10,10 @@ vi.mock("@/lib/server/modules/auth/repository", () => ({
 }));
 
 vi.mock("@/lib/server/modules/auth/password", () => ({
-  hashPassword: vi.fn(),
+  // Default to an async resolution so the service module's load-time
+  // DUMMY_PASSWORD_HASH_PROMISE.hashPassword() call (equal-time defence on
+  // the user-missing path) doesn't crash before any test runs.
+  hashPassword: vi.fn(async () => "dummy-salt:dummy-hash"),
   verifyPassword: vi.fn(),
 }));
 
@@ -138,6 +141,30 @@ describe("auth service", () => {
     expect(createSession).not.toHaveBeenCalled();
     expect(createSessionToken).not.toHaveBeenCalled();
     expect(createPartialAuthToken).toHaveBeenCalledWith("u1");
+  });
+
+  it("rejects with 401 and still runs verifyPassword on an unknown username (equal-time)", async () => {
+    // Equal-time defence: without the dummy-hash branch, the user-missing
+    // path skips scrypt entirely and finishes in ~0 ms, while the user-
+    // exists path runs a full verifyPassword (~tens of ms). An attacker
+    // could enumerate usernames by timing alone. The service must call
+    // verifyPassword against a fixed dummy hash on the miss path so the
+    // wall-clock cost is comparable.
+    vi.mocked(findUserWithTotpByUsername).mockResolvedValueOnce(null);
+    vi.mocked(verifyPassword).mockResolvedValueOnce(false);
+
+    await expect(
+      loginUser({ username: "no-such-user", password: "anything" }),
+    ).rejects.toBeInstanceOf(AuthError);
+
+    expect(verifyPassword).toHaveBeenCalledTimes(1);
+    // The dummy hash is what was generated at module load; we don't pin its
+    // exact value, but it must NOT be undefined / empty / the supplied
+    // password's hash (since no user row was found).
+    const [pwArg, hashArg] = vi.mocked(verifyPassword).mock.calls[0];
+    expect(pwArg).toBe("anything");
+    expect(typeof hashArg).toBe("string");
+    expect(hashArg.length).toBeGreaterThan(0);
   });
 
   it("rejects invalid login", async () => {

@@ -4,15 +4,21 @@ vi.mock("@/lib/server/modules/auth/totp-service", () => ({
   TotpServiceError: class TotpServiceError extends Error {
     code: string;
     statusCode: number;
+    publicMessage: string;
 
     constructor(
       message: string,
-      options: { code: string; statusCode: number },
+      options: {
+        code: string;
+        statusCode: number;
+        publicMessage?: string;
+      },
     ) {
       super(message);
       this.name = "TotpServiceError";
       this.code = options.code;
       this.statusCode = options.statusCode;
+      this.publicMessage = options.publicMessage ?? message;
     }
   },
   completeTotpLogin: vi.fn(),
@@ -124,6 +130,38 @@ describe("POST /api/v1/auth/login/totp", () => {
 
     const json = (await response.json()) as { code: string };
     expect(json.code).toBe("invalid_totp");
+  });
+
+  it("maps too_many_attempts to 429 (brute-force guard tripped)", async () => {
+    vi.mocked(completeTotpLogin).mockRejectedValueOnce(
+      new TotpServiceError("Too many failed attempts", {
+        code: "too_many_attempts",
+        statusCode: 429,
+      }),
+    );
+
+    const response = await POST(buildRequest(VALID_BODY));
+    expect(response.status).toBe(429);
+    expect(response.headers.get("set-cookie")).toBeNull();
+
+    const json = (await response.json()) as { code: string };
+    expect(json.code).toBe("too_many_attempts");
+  });
+
+  it("maps partial_auth_consumed to 401 (token already used)", async () => {
+    vi.mocked(completeTotpLogin).mockRejectedValueOnce(
+      new TotpServiceError("Partial-auth token already used", {
+        code: "partial_auth_consumed",
+        statusCode: 401,
+      }),
+    );
+
+    const response = await POST(buildRequest(VALID_BODY));
+    expect(response.status).toBe(401);
+    expect(response.headers.get("set-cookie")).toBeNull();
+
+    const json = (await response.json()) as { code: string };
+    expect(json.code).toBe("partial_auth_consumed");
   });
 
   it("returns 500 with a generic message for unexpected errors", async () => {

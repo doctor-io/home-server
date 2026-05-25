@@ -5,15 +5,21 @@ vi.mock("@/lib/server/modules/auth/totp-service", () => ({
   TotpServiceError: class TotpServiceError extends Error {
     code: string;
     statusCode: number;
+    publicMessage: string;
 
     constructor(
       message: string,
-      options: { code: string; statusCode: number },
+      options: {
+        code: string;
+        statusCode: number;
+        publicMessage?: string;
+      },
     ) {
       super(message);
       this.name = "TotpServiceError";
       this.code = options.code;
       this.statusCode = options.statusCode;
+      this.publicMessage = options.publicMessage ?? message;
     }
   },
   disableTotp: vi.fn(),
@@ -86,6 +92,20 @@ describe("POST /api/v1/auth/2fa/disable", () => {
       userId: "test-user",
       code: "123456",
     });
+  });
+
+  it("clears the session cookie on success so the caller cannot ride the disable", async () => {
+    vi.mocked(disableTotp).mockResolvedValueOnce({ enabled: false });
+
+    const response = await POST(buildRequest(VALID_BODY));
+    expect(response.status).toBe(200);
+
+    // The service revoked every session row for the user; the route must
+    // also strip the caller's cookie so the browser stops presenting a token
+    // the server no longer recognises.
+    const setCookie = response.headers.get("set-cookie") ?? "";
+    expect(setCookie).toMatch(/Expires=Thu, 01 Jan 1970/);
+    expect(setCookie).toMatch(/^[^=]+=;/);
   });
 
   it("passes a backup-code style payload straight through to the service", async () => {

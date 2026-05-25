@@ -168,7 +168,10 @@ export function verifyTotp(
   const step = options.step ?? TOTP_STEP_SECONDS;
   const now = options.now ?? Math.floor(Date.now() / 1000);
 
-  const trimmed = code.replace(/\s+/g, "");
+  // Strip whitespace AND dashes so a user pasting `123-456` (or `123 456`)
+  // is accepted everywhere. Matches the input handling in totp-service.ts
+  // so the shape gate there cannot disagree with this final check.
+  const trimmed = code.replace(/[\s-]+/g, "");
   if (!new RegExp(`^\\d{${digits}}$`).test(trimmed)) {
     return false;
   }

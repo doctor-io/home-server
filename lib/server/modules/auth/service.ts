@@ -27,6 +27,24 @@ export class AuthError extends Error {
   }
 }
 
+/**
+ * Equal-time defence for the user-not-found branch of {@link loginUser}.
+ * Without this, the response time on an unknown username is noticeably
+ * shorter (one DB miss, no scrypt) than on a known one (DB hit plus a full
+ * password verification), letting an attacker enumerate valid usernames.
+ *
+ * Computed once at module load so first-call latency stays in line with
+ * subsequent calls; the verifyPassword on the miss path then re-runs scrypt
+ * against this fixed hash for the same shape of work as a real check.
+ */
+const DUMMY_PASSWORD_HASH_PROMISE: Promise<string> = hashPassword(
+  "__nonexistent_user_password__",
+);
+DUMMY_PASSWORD_HASH_PROMISE.catch(() => {
+  // Swallow to prevent an unhandled rejection if scrypt ever throws at
+  // import time; loginUser awaits the same promise and will surface it.
+});
+
 function normalizeUsername(username: string) {
   return username.trim().toLowerCase();
 }
@@ -108,6 +126,11 @@ export async function loginUser(params: {
   const user = await findUserWithTotpByUsername(username);
 
   if (!user) {
+    // Run a full scrypt verification against a fixed dummy hash so the miss
+    // path takes the same wall-clock time as the user-exists / wrong-password
+    // path. Without this the timing delta leaks username existence.
+    const dummyHash = await DUMMY_PASSWORD_HASH_PROMISE;
+    await verifyPassword(params.password, dummyHash);
     throw new AuthError("Invalid username or password", 401);
   }
 

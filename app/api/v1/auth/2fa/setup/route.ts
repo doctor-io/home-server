@@ -41,7 +41,7 @@ export async function POST(request: Request) {
         meta: { code: error.code },
       });
       return NextResponse.json(
-        { error: error.message, code: error.code },
+        { error: error.publicMessage, code: error.code },
         { status: error.statusCode },
       );
     }

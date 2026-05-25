@@ -11,7 +11,9 @@ export type TwoFactorErrorCode =
   | "no_pending_enrollment"
   | "invalid_totp"
   | "invalid_backup_code"
-  | "partial_auth_expired";
+  | "partial_auth_expired"
+  | "partial_auth_consumed"
+  | "too_many_attempts";
 
 /**
  * Response from `POST /api/v1/auth/2fa/setup`. The server has persisted an

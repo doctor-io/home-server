@@ -134,53 +134,70 @@ export async function findUserWithTotpById(
 
 /**
  * Persists a freshly-generated (but not yet confirmed) TOTP secret on the
- * user row. Leaves `totp_enabled` untouched — the user must complete
- * verification before that flips to true.
+ * user row. Refuses to overwrite if `totp_enabled` is already true — the
+ * caller must disable first. Returns true iff the row was updated; callers
+ * should treat false as "already enrolled" to close the setup race where
+ * two concurrent /setup calls both pass the in-memory check.
  */
 export async function setPendingTotpSecret(
   userId: string,
   encryptedSecret: string,
-) {
-  await db
+): Promise<boolean> {
+  const result = await db
     .update(users)
     .set({ totpSecret: encryptedSecret })
-    .where(eq(users.id, userId));
+    .where(and(eq(users.id, userId), eq(users.totpEnabled, false)))
+    .returning({ id: users.id });
+  return result.length === 1;
 }
 
 /**
  * Flips the user from "secret stored, awaiting first valid code" to fully
- * enrolled: writes the encrypted backup-code hashes JSON and the enrolment
- * timestamp atomically with `totp_enabled = true`.
+ * enrolled. Conditional on `totp_enabled = false` so that two near-
+ * simultaneous /verify calls cannot both succeed and overwrite each other's
+ * backup-code blob — the second one returns false and the service maps it
+ * to `already_enabled`. Returns true iff the row was updated.
  */
 export async function completeTotpEnrollment(params: {
   userId: string;
   encryptedBackupCodes: string;
   enrolledAt: Date;
-}) {
-  await db
+}): Promise<boolean> {
+  const result = await db
     .update(users)
     .set({
       totpEnabled: true,
       totpBackupCodes: params.encryptedBackupCodes,
       totpEnrolledAt: params.enrolledAt,
     })
-    .where(eq(users.id, params.userId));
+    .where(and(eq(users.id, params.userId), eq(users.totpEnabled, false)))
+    .returning({ id: users.id });
+  return result.length === 1;
 }
 
 /**
- * Replaces the encrypted backup-codes blob in place. Used when a backup
- * code is consumed during a TOTP-required login — the matched hash is
- * removed from the array and the shrunken list is re-encrypted and
- * persisted. Leaves all other TOTP columns untouched.
+ * Compare-and-swap update of the encrypted backup-codes blob. Closes the
+ * race where two concurrent /login/totp calls with different backup codes
+ * read the same blob and write back interleaved versions — without the
+ * CAS, the second writer would lose the first's consumption and the same
+ * code could be used twice. Returns true iff the previous value matched.
  */
-export async function updateTotpBackupCodes(
-  userId: string,
-  encryptedBackupCodes: string,
-) {
-  await db
+export async function updateTotpBackupCodes(params: {
+  userId: string;
+  previousBackupCodes: string;
+  nextBackupCodes: string;
+}): Promise<boolean> {
+  const result = await db
     .update(users)
-    .set({ totpBackupCodes: encryptedBackupCodes })
-    .where(eq(users.id, userId));
+    .set({ totpBackupCodes: params.nextBackupCodes })
+    .where(
+      and(
+        eq(users.id, params.userId),
+        eq(users.totpBackupCodes, params.previousBackupCodes),
+      ),
+    )
+    .returning({ id: users.id });
+  return result.length === 1;
 }
 
 /**
@@ -215,6 +232,16 @@ export async function createSession(params: {
 
 export async function deleteSessionById(sessionId: string) {
   await db.delete(sessions).where(eq(sessions.id, sessionId));
+}
+
+/**
+ * Wipes every session row belonging to a user. Called from the /2fa/disable
+ * flow so that disabling a second factor immediately revokes every active
+ * device — a passive attacker who captured a session cookie pre-disable
+ * cannot ride the disable through.
+ */
+export async function deleteSessionsForUser(userId: string) {
+  await db.delete(sessions).where(eq(sessions.userId, userId));
 }
 
 export async function findSessionWithUser(sessionId: string) {
