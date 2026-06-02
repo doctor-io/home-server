@@ -477,16 +477,22 @@ install_go() {
 build_upload_server() {
 	print_status "Building upload server (Go)..."
 	export PATH="/usr/local/go/bin:${PATH}"
+	# Go requires a build cache. Some install/update entrypoints run with a
+	# minimal environment, so provide explicit cache defaults for the compiler.
+	export HOME="${HOME:-/root}"
+	export GOCACHE="${GOCACHE:-${HOME}/.cache/go-build}"
+	export GOPATH="${GOPATH:-${HOME}/go}"
 
 	local src="${INSTALL_DIR}/services/upload-server"
 	[[ -d "${src}" ]] || { print_error "Upload server source not found at ${src}"; exit 1; }
 
 	mkdir -p "${INSTALL_DIR}/bin"
+	mkdir -p "${GOCACHE}" "${GOPATH}"
 
 	if [[ "${HOMEIO_VERBOSE}" == "true" ]]; then
-		(cd "${src}" && go build -o "${INSTALL_DIR}/bin/upload-server" .)
+		(cd "${src}" && env HOME="${HOME}" GOCACHE="${GOCACHE}" GOPATH="${GOPATH}" go build -o "${INSTALL_DIR}/bin/upload-server" .)
 	else
-		if ! (cd "${src}" && go build -o "${INSTALL_DIR}/bin/upload-server" .) >/dev/null 2>&1; then
+		if ! (cd "${src}" && env HOME="${HOME}" GOCACHE="${GOCACHE}" GOPATH="${GOPATH}" go build -o "${INSTALL_DIR}/bin/upload-server" .) >/dev/null 2>&1; then
 			print_error "Failed to build upload server. Re-run with HOMEIO_VERBOSE=true for details."
 			exit 1
 		fi
