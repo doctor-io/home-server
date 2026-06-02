@@ -2,10 +2,22 @@
 
 import { InfoBanner, SectionDivider } from "@/modules/settings/components/panel/controls";
 import { SETTINGS_PANEL_INSET } from "@/modules/settings/components/panel/surface";
+import { TwoFactorCard } from "@/modules/settings/components/panel/sections/two-factor-card";
 import { Plus } from "@/components/icons/platform-icons";
+import type { TwoFactorStatus } from "@/lib/shared/contracts/auth";
 import { cn } from "@/lib/utils";
 
-export function UsersSection({ username }: { username: string }) {
+type UsersSectionProps = {
+  username: string;
+  twoFactor: TwoFactorStatus;
+  isDemoMode?: boolean;
+};
+
+export function UsersSection({
+  username,
+  twoFactor,
+  isDemoMode = false,
+}: UsersSectionProps) {
   const initial = username.charAt(0).toUpperCase();
 
   return (
@@ -35,6 +47,8 @@ export function UsersSection({ username }: { username: string }) {
           </div>
         </div>
       </div>
+
+      <TwoFactorCard status={twoFactor} isDemoMode={isDemoMode} />
 
       <SectionDivider title="Access" />
       <div className={cn(SETTINGS_PANEL_INSET, "flex items-center justify-between gap-4 px-4 py-3")}>

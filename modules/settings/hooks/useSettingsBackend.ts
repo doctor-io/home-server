@@ -300,6 +300,8 @@ export function useSettingsBackend() {
       uptime: formatUptime(metrics?.uptimeSeconds),
       appVersion: process.env.NEXT_PUBLIC_APP_VERSION ?? "--",
       username: currentUserQuery.data?.username ?? "--",
+      twoFactor: currentUserQuery.data?.twoFactor ?? { enabled: false, enrolledAt: null },
+      isDemoMode: currentUserQuery.data?.isDemoMode ?? false,
       cpuSummary:
         metrics?.cpu.normalizedPercent !== undefined
           ? `${metrics.cpu.normalizedPercent.toFixed(0)}% load`
@@ -329,6 +331,8 @@ export function useSettingsBackend() {
     };
   }, [
     currentUserQuery.data?.username,
+    currentUserQuery.data?.twoFactor,
+    currentUserQuery.data?.isDemoMode,
     currentUserQuery.error,
     currentUserQuery.isLoading,
     systemPreferencesQuery.data,

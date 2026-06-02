@@ -74,3 +74,14 @@ export type LoginRequiresTotpData = {
 };
 
 export type LoginResponseData = LoginSuccessData | LoginRequiresTotpData;
+
+/**
+ * Payload returned by `GET /api/auth/me`. Embeds the 2FA status so the
+ * settings UI can render the enrolment badge without an extra round-trip.
+ */
+export type CurrentUserData = {
+  id: string;
+  username: string;
+  isDemoMode?: boolean;
+  twoFactor: TwoFactorStatus;
+};

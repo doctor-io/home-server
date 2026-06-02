@@ -21,6 +21,22 @@ vi.mock("@/hooks/useDesktopPreferences", () => ({
   useDesktopPreferences: () => mockUseDesktopPreferences(),
 }));
 
+const inertMutation = () => ({
+  mutateAsync: vi.fn(),
+  mutate: vi.fn(),
+  reset: vi.fn(),
+  isPending: false,
+  error: null,
+  data: undefined,
+});
+
+vi.mock("@/modules/settings/hooks/useTwoFactor", () => ({
+  TwoFactorApiError: class TwoFactorApiError extends Error {},
+  useStartTwoFactorSetup: () => inertMutation(),
+  useVerifyTwoFactor: () => inertMutation(),
+  useDisableTwoFactor: () => inertMutation(),
+}));
+
 import { SettingsPanel } from "@/modules/settings/components/settings";
 
 const appearance: AppearanceSettings = {
@@ -49,6 +65,8 @@ function createBackendMock() {
       memorySummary: "2.0 GB / 8.0 GB",
       temperatureSummary: "44.5 C",
       processUptime: "2 hours",
+      twoFactor: { enabled: false, enrolledAt: null },
+      isDemoMode: false,
       isLoading: false,
       unavailable: false,
       warning: null,
