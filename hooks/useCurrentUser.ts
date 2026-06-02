@@ -1,16 +1,11 @@
 "use client";
 
+import type { CurrentUserData } from "@/lib/shared/contracts/auth";
 import { queryKeys } from "@/lib/shared/query-keys";
 import { useQuery } from "@tanstack/react-query";
 
-type CurrentUser = {
-  id: string;
-  username: string;
-  isDemoMode?: boolean;
-};
-
 type CurrentUserResponse = {
-  data: CurrentUser;
+  data: CurrentUserData;
 };
 
 export class CurrentUserError extends Error {

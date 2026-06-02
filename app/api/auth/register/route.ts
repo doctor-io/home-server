@@ -60,14 +60,31 @@ export async function POST(request: Request) {
       async () => ensureDataRootDirectories(),
     );
 
-    await withServerTiming(
-      {
-        layer: "system",
-        action: "store.catalog.bootstrap",
+    // Catalog bootstrap is best-effort during registration. A single broken
+    // upstream YAML used to throw here and turn the whole register call into
+    // a 500. The user can refresh the catalog later from Settings, and the
+    // per-entry parser now skips broken stacks, so this should rarely fail —
+    // but if it does, registration still succeeds.
+    try {
+      await withServerTiming(
+        {
+          layer: "system",
+          action: "store.catalog.bootstrap",
+          requestId,
+        },
+        async () => bootstrapDefaultCasaosCatalog(),
+      );
+    } catch (error) {
+      logServerAction({
+        level: "warn",
+        layer: "api",
+        action: "auth.register",
+        status: "error",
         requestId,
-      },
-      async () => bootstrapDefaultCasaosCatalog(),
-    );
+        error,
+        meta: { stage: "catalog_bootstrap_skipped" },
+      });
+    }
 
     const user = await withServerTiming(
       {

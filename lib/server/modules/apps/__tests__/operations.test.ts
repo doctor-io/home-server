@@ -19,6 +19,9 @@ vi.mock("@/lib/server/modules/docker/compose-runner", () => ({
   materializeInlineStackFiles: vi.fn(),
   runComposeDown: vi.fn(),
   runComposePull: vi.fn(),
+  runComposeRestart: vi.fn(),
+  runComposeStart: vi.fn(),
+  runComposeStop: vi.fn(),
   runComposeUp: vi.fn(),
   sanitizeStackName: vi.fn(() => "adguard-home"),
 }));
@@ -58,6 +61,7 @@ import {
   materializeInlineStackFiles,
   runComposeDown,
   runComposePull,
+  runComposeRestart,
   runComposeUp,
 } from "@/lib/server/modules/docker/compose-runner";
 import { findCustomStoreTemplateByAppId } from "@/lib/server/modules/store/custom-apps";
@@ -1483,5 +1487,42 @@ describe("store operations", () => {
     expect(runComposeUp).toHaveBeenCalledTimes(2);
 
     await rm(tempDir, { recursive: true, force: true });
+  });
+
+  it("purges latestOperationEvent after the terminal-event grace window", async () => {
+    vi.mocked(findInstalledStackByAppId).mockResolvedValue({
+      appId: "purge-me",
+      templateName: "purge-me",
+      stackName: "purge-me",
+      composePath: "/tmp/store/stacks/purge-me/docker-compose.yml",
+      status: "installed",
+      webUiPort: 4001,
+      env: {},
+      installedAt: new Date("2026-02-24T00:00:00.000Z"),
+      updatedAt: new Date("2026-02-24T00:00:00.000Z"),
+      isUpToDate: true,
+    });
+    vi.mocked(createStoreOperation).mockResolvedValue(undefined);
+    vi.mocked(updateStoreOperation).mockResolvedValue(undefined);
+    vi.mocked(getComposeRuntimeInfo).mockResolvedValue({
+      status: "running",
+      lifecycleStatus: "running",
+      containerNames: ["purge"],
+      primaryContainerName: "purge",
+    });
+    vi.mocked(runComposeRestart).mockResolvedValue(undefined);
+
+    const { operationId } = await startStoreOperation({
+      appId: "purge-me",
+      action: "restart",
+    });
+
+    const latest = await waitForLatestEventType(operationId, "operation.completed");
+    expect(latest?.status).toBe("success");
+
+    // Wait past the test TTL (1s) plus a margin so the unref'd timer fires.
+    await new Promise((resolve) => setTimeout(resolve, 1_200));
+
+    expect(getLatestStoreOperationEvent(operationId)).toBeNull();
   });
 });

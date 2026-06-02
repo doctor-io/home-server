@@ -34,6 +34,7 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((value) => value === "true"),
+  AUTH_TOTP_ENCRYPTION_KEY: z.string().optional(),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
   LOG_FILE_PATH: z.string().default("logs/home-server.log"),
   LOG_TO_FILE: z
@@ -88,6 +89,16 @@ const envSchema = z.object({
   FILES_NETWORK_MOUNT_UID: z.coerce.number().int().min(0).optional(),
   FILES_NETWORK_MOUNT_GID: z.coerce.number().int().min(0).optional(),
   DOCKER_SOCKET_PATH: z.string().default("/var/run/docker.sock"),
+  DOCKER_COMPOSE_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .min(30_000)
+    .default(300_000),
+  FILES_SEARCH_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .min(1_000)
+    .default(10_000),
   DBUS_HELPER_SOCKET_PATH: z
     .string()
     .default("/run/home-server/dbus-helper.sock"),

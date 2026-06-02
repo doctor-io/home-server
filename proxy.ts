@@ -28,6 +28,10 @@ function isPublicApiRoute(pathname: string) {
     pathname === "/api/auth/login" ||
     pathname === "/api/auth/register" ||
     pathname === "/api/auth/status" ||
+    // Second leg of the TOTP login flow. Caller has no session cookie yet —
+    // only a short-lived partial-auth token. Route handler validates that
+    // token itself; do not gate it on a session.
+    pathname === "/api/v1/auth/login/totp" ||
     pathname === "/api/v1/logs"
   );
 }

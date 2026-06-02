@@ -1,3 +1,4 @@
+import { NextRequest, NextResponse } from "next/server";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/server/env", () => ({
@@ -13,6 +14,7 @@ vi.mock("@/lib/server/modules/apps/operations", () => ({
 }));
 
 import { GET } from "@/app/api/v1/store/operations/[operationId]/stream/route";
+import { requireApiSession } from "@/lib/server/modules/auth/api";
 import {
   getLatestStoreOperationEvent,
   getStoreOperation,
@@ -21,7 +23,20 @@ import {
 import type { StoreOperationEvent } from "@/lib/shared/contracts/apps";
 
 describe("GET /api/v1/store/operations/:operationId/stream", () => {
-  it("streams operation events as SSE", async () => {
+  it("returns 401 for unauthenticated requests", async () => {
+    vi.mocked(requireApiSession).mockResolvedValueOnce({
+      session: null,
+      response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    });
+
+    const response = await GET(new NextRequest("http://localhost"), {
+      params: Promise.resolve({ operationId: "op-1" }),
+    });
+
+    expect(response.status).toBe(401);
+  });
+
+  it("streams operation events as SSE for authenticated user", async () => {
     vi.mocked(getStoreOperation).mockResolvedValueOnce({
       id: "op-1",
       appId: "homepage",
@@ -51,11 +66,16 @@ describe("GET /api/v1/store/operations/:operationId/stream", () => {
       return () => undefined;
     });
 
-    const response = await GET(new Request("http://localhost"), {
-      params: Promise.resolve({
-        operationId: "op-1",
+    const response = await GET(
+      new NextRequest("http://localhost", {
+        headers: { cookie: "homeio_session=session-token" },
       }),
-    });
+      {
+        params: Promise.resolve({
+          operationId: "op-1",
+        }),
+      },
+    );
 
     expect(response.status).toBe(200);
     expect(response.headers.get("Content-Type")).toBe("text/event-stream");

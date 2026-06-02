@@ -5,6 +5,10 @@ import path from "node:path";
 const publicRoutes = new Set([
   "files/google-drive/auth/route.ts",
   "files/google-drive/callback/route.ts",
+  // A8: second step of two-factor login. The caller has a valid partial-auth
+  // token (issued by /api/auth/login) but no session yet — that's the whole
+  // reason this endpoint exists.
+  "auth/login/totp/route.ts",
 ]);
 
 function findRouteFiles(dir: string, root = dir): string[] {

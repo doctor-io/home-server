@@ -15,6 +15,13 @@ services:
       STORE_APP_DATA_ROOT: /DATA/AppData
       FILES_ROOT: /DATA
       DOCKER_SOCKET_PATH: /var/run/docker.sock
+      # V8 heap cap. The entrypoint defaults to --max-old-space-size=768
+      # for Pi safety; lower (e.g. --max-old-space-size=384) on Pi 3 with
+      # other heavy containers, raise on amd64 hosts with plenty of RAM.
+      # NODE_OPTIONS: "--max-old-space-size=768"
+    # Soft container memory cap. Adjust to match your host. Helps the
+    # OOM killer hit homeio rather than randomly killing other apps.
+    mem_limit: 1g
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - homeio_stacks:/stacks

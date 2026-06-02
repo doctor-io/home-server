@@ -50,6 +50,11 @@ export type FileListResponse = {
   root: string;
   cwd: string;
   entries: FileListEntry[];
+  /**
+   * Set by searchFiles when traversal stopped early because the
+   * configured deadline was hit. Results may be incomplete.
+   */
+  truncated?: boolean;
 };
 
 export type FileRootResponse = {

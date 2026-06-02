@@ -226,7 +226,13 @@ export function buildSettingsSectionDefinitions(
     // ── Access & Safety ──────────────────────────────────────────────────
     {
       ...SETTINGS_SECTIONS[9], // Users & Access
-      render: () => <UsersSection username={context.settingsBackend.general.username} />,
+      render: () => (
+        <UsersSection
+          username={context.settingsBackend.general.username}
+          twoFactor={context.settingsBackend.general.twoFactor}
+          isDemoMode={context.settingsBackend.general.isDemoMode}
+        />
+      ),
       save: getDefaultSaveConfig(context.settingsBackend, "users"),
     },
     {

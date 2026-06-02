@@ -1,6 +1,6 @@
 {
   "name": "homeio",
-  "version": "1.6.29",
+  "version": "1.7.23",
   "description": "Self-hosted home server dashboard — desktop-style UI for managing Docker apps, files, terminal, and system resources.",
   "author": "doctor-io",
   "license": "MIT",
@@ -30,12 +30,13 @@
     "db:migrate": "drizzle-kit migrate"
   },
   "lint-staged": {
-    "*.{js, jsx,ts,tsx}": [
+    "*.{js,jsx,ts,tsx}": [
       "eslint --fix"
     ]
   },
   "dependencies": {
     "@dawudesign/node-hexa-cli": "^0.7.6",
+    "@fluentui/react-icons": "^2.0.321",
     "@hookform/resolvers": "^3.9.1",
     "@lydell/node-pty": "^1.2.0-beta.3",
     "@radix-ui/react-accordion": "1.2.12",
@@ -69,7 +70,6 @@
     "@types/js-yaml": "^4.0.9",
     "@vercel/analytics": "1.6.1",
     "autoprefixer": "^10.4.27",
-    "busboy": "^1.6.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "1.1.1",
@@ -112,10 +112,12 @@
     "@types/d3-path": "^3.1.1",
     "@types/node": "^22",
     "@types/pg": "^8.20.0",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@types/ws": "^8.18.1",
     "@vitest/coverage-v8": "^4.1.0",
+    "busboy": "^1.6.0",
     "drizzle-kit": "^0.31.10",
     "drizzle-seed": "^0.3.1",
     "eslint": "^9.39.4",
@@ -123,6 +125,7 @@
     "husky": "^9.1.7",
     "jsdom": "^28.1.0",
     "postcss": "^8.5",
+    "qrcode": "^1.5.4",
     "tailwindcss": "^4.2.2",
     "tsc-alias": "^1.8.16",
     "tsx": "^4.21.0",

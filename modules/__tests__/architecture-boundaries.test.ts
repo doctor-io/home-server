@@ -145,4 +145,53 @@ describe("module boundaries", () => {
 
     expect(offenders).toEqual([]);
   });
+
+  /**
+   * api/v1 routes that are intentionally exempt from requireApiSession.
+   * Currently limited to the Google Drive OAuth handshake: the browser is
+   * redirected through Google, and Google's redirect back to /callback may
+   * arrive without the homeio session cookie depending on SameSite behaviour.
+   * The allowlist must only ever shrink — never grow.
+   */
+  const V1_AUTH_ALLOWLIST = new Set<string>([
+    "app/api/v1/files/google-drive/auth/route.ts",
+    "app/api/v1/files/google-drive/callback/route.ts",
+  ]);
+
+  const HTTP_HANDLER_PATTERN =
+    /export\s+(?:async\s+)?function\s+(GET|POST|PUT|PATCH|DELETE)\s*\(/;
+
+  it("requires requireApiSession in every new app/api/v1/** route handler", () => {
+    const v1Root = join(REPO_ROOT, "app", "api", "v1");
+    const routeFiles = listSourceFiles(v1Root)
+      .filter((filePath) => !isTestFile(filePath))
+      .filter((filePath) => filePath.endsWith("/route.ts"));
+
+    const offenders: string[] = [];
+    const staleAllowlistEntries: string[] = [];
+
+    for (const filePath of routeFiles) {
+      const source = readImports(filePath);
+      if (!HTTP_HANDLER_PATTERN.test(source)) continue;
+
+      const relativePath = filePath.slice(REPO_ROOT.length + 1);
+      const hasAuth = source.includes("requireApiSession");
+      const allowlisted = V1_AUTH_ALLOWLIST.has(relativePath);
+
+      if (!hasAuth && !allowlisted) {
+        offenders.push(relativePath);
+      }
+      if (hasAuth && allowlisted) {
+        // A previously-unauthenticated route now calls requireApiSession;
+        // remove it from V1_AUTH_ALLOWLIST so the snapshot keeps shrinking.
+        staleAllowlistEntries.push(relativePath);
+      }
+    }
+
+    expect(offenders, "new v1 routes must call requireApiSession").toEqual([]);
+    expect(
+      staleAllowlistEntries,
+      "remove these from V1_AUTH_ALLOWLIST — they now authenticate",
+    ).toEqual([]);
+  });
 });
