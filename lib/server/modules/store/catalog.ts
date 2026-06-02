@@ -312,7 +312,26 @@ async function buildSourceSnapshot(
   ]);
 
   const apps = composePaths
-    .map((composePath) => mapCatalogApp(parseComposeToApp(composePath), repoPath, source))
+    .map((composePath) => {
+      try {
+        return mapCatalogApp(parseComposeToApp(composePath), repoPath, source);
+      } catch (error) {
+        // A single broken upstream YAML (duplicate keys, malformed indentation,
+        // etc.) used to crash the whole catalog bootstrap and take down
+        // /api/auth/register. Log it and skip the entry so the rest of the
+        // catalog still loads.
+        logServerAction({
+          level: "warn",
+          layer: "service",
+          action: "store.catalog.skip",
+          status: "error",
+          error,
+          meta: { composePath, sourceId: source.id },
+        });
+        return null;
+      }
+    })
+    .filter((app): app is NonNullable<typeof app> => app !== null)
     .sort((left, right) => left.name.localeCompare(right.name));
 
   const snapshot: SourceSnapshot = {
