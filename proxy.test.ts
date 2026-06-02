@@ -197,4 +197,19 @@ describe("middleware auth guard", () => {
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toContain("/register");
   });
+
+  it("allows unauthenticated calls to the TOTP login route through", async () => {
+    // Second leg of TOTP login: the caller has no session cookie yet, only a
+    // short-lived partial-auth token. The proxy must NOT short-circuit with
+    // a 401 — the route handler validates the token itself.
+    process.env.AUTH_SESSION_SECRET = secret;
+
+    const request = new NextRequest(
+      "http://localhost/api/v1/auth/login/totp",
+      { method: "POST" },
+    );
+    const response = await proxy(request);
+
+    expect(response.status).toBe(200);
+  });
 });
