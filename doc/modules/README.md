@@ -8,6 +8,7 @@ Homeio uses vertical feature modules for client UI and matching server modules f
 | [auth.md](./auth.md) | Login, registration, sessions, unlock flow |
 | [docker.md](./docker.md) | Compose parsing/running, Docker stats, Docker maintenance |
 | [files.md](./files.md) | File manager, uploads/downloads, trash, stars, SMB shares, USB, Google Drive |
+| [mobile-app.md](./mobile-app.md) | Capacitor mobile app (`apps/mobile/`), Tailscale access, Connect flow |
 | [network.md](./network.md) | WiFi/Ethernet, NetworkManager, D-Bus helper sidecar |
 | [notifications.md](./notifications.md) | Persistent notifications and notification SSE |
 | [shell.md](./shell.md) | Desktop shell, dock, windows, lock screen, terminal UI |

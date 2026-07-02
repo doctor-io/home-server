@@ -3,6 +3,13 @@
 A self-hosted server manager with a desktop-style UI. Alternative to CasaOS, Umbrel, and Portainer — focused on a modern interface, real-time system visibility, and Docker app management.
 
 <p align="center">
+  <img src="public/screenshots/demo.gif" alt="Homeio demo — desktop shell, command palette, file manager, and terminal" width="100%" />
+</p>
+
+<p align="center">
+  <a href="https://demo.homeio.app"><strong>🖥️ Live demo</strong></a> &nbsp;·&nbsp;
+  <code>homeio</code> / <code>homeio26</code>
+  &nbsp;·&nbsp;
   <a href="https://github.com/sponsors/doctor-io">
     <img src="https://img.shields.io/github/sponsors/doctor-io?style=for-the-badge" alt="GitHub Sponsors" />
   </a>

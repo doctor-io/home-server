@@ -34,10 +34,11 @@ From `README.md` and `ROADMAP.md`:
 | Network manager with D-Bus helper | [modules/network.md](./modules/network.md) |
 | Notifications | [modules/notifications.md](./modules/notifications.md) |
 | Scheduled tasks | [modules/tasks.md](./modules/tasks.md) |
+| Mobile app (Tailscale access) | [modules/mobile-app.md](./modules/mobile-app.md) |
 
 ## Roadmap Summary
 
-The canonical roadmap is [../ROADMAP.md](../ROADMAP.md). As of the current repo docs, v1.6.x is the current release line for storage expansion and polish, including disk/partition management, server information, safer uploads, Google Drive integration, and shell visual polish. v2.0 is planned around multi-user access, API tokens, 2FA, and audit logs.
+The canonical roadmap is [../ROADMAP.md](../ROADMAP.md). As of the current repo docs, v1.6.x is the current release line for storage expansion and polish, including disk/partition management, server information, safer uploads, Google Drive integration, and shell visual polish. v2.0 is planned around multi-user access, API tokens, 2FA, audit logs, and a dedicated mobile app that reaches the server over Tailscale ([modules/mobile-app.md](./modules/mobile-app.md)).
 
 Do not duplicate roadmap detail in module docs; link to `ROADMAP.md` and document only current code behavior.
 

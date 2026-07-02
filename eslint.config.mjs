@@ -31,6 +31,7 @@ export default defineConfig([
   },
   globalIgnores([
     ".next/**",
+    "apps/**",
     "out/**",
     "build/**",
     "dist/**",
