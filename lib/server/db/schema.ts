@@ -213,6 +213,15 @@ export const settings = pgTable("settings", {
   tailscaleApiKeyCiphertext: text("tailscale_api_key_ciphertext"),
   tailscaleApiKeyIv: text("tailscale_api_key_iv"),
   tailscaleApiKeyTag: text("tailscale_api_key_tag"),
+  // First-run wizard (v2.0 Track 1). Deliberately nullable with no default:
+  // a NULL onboardingState means "this install predates the wizard", so
+  // servers upgrading from 1.7 are never dropped into setup. Only the
+  // register flow flips it to "pending" — see modules/onboarding.
+  onboardingState: text("onboarding_state"),
+  onboardingStep: integer("onboarding_step"),
+  onboardingCompletedAt: timestamp("onboarding_completed_at", { withTimezone: true }),
+  timezone: text("timezone"),
+  defaultStorageRoot: text("default_storage_root"),
 });
 
 export const filesGoogleDriveTokens = pgTable(

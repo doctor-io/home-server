@@ -8,6 +8,7 @@ import {
 } from "@/lib/server/logging/logger";
 import { hasAnyUsers } from "@/lib/server/modules/auth/repository";
 import { AuthError, registerUser } from "@/lib/server/modules/auth/service";
+import { startOnboarding } from "@/lib/server/modules/onboarding/service";
 import { bootstrapDefaultCasaosCatalog } from "@/lib/server/modules/store/catalog";
 import {
   ensureDataRootDirectories,
@@ -94,6 +95,25 @@ export async function POST(request: Request) {
       },
       async () => registerUser(parsed.data),
     );
+
+    // Only the very first account opens the first-run wizard. Best-effort on
+    // purpose: an account that exists but skipped setup is a working install,
+    // so a failure here must never turn a successful registration into a 500.
+    if (!usersExist) {
+      try {
+        await startOnboarding();
+      } catch (error) {
+        logServerAction({
+          level: "warn",
+          layer: "api",
+          action: "auth.register",
+          status: "error",
+          requestId,
+          error,
+          meta: { stage: "onboarding_start_skipped" },
+        });
+      }
+    }
 
     return NextResponse.json(
       {
