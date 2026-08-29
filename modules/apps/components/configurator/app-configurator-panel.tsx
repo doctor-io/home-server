@@ -23,6 +23,7 @@ import {
 import { DockerRunView } from "@/modules/apps/components/configurator/docker-run-view";
 import { useAppCompose } from "@/modules/apps/hooks/useAppCompose";
 import {
+  ComposeConflictsError,
   ComposeRisksError,
   type ComposeRiskDetail,
   type ImportCustomAppInput,
@@ -449,6 +450,10 @@ export function AppConfiguratorPanel({
       // question to put to the user, with the list the server sent back.
       if (error instanceof ComposeRisksError) {
         setPendingRisks(error.risks);
+      } else if (error instanceof ComposeConflictsError) {
+        // Not acknowledgeable: the install would genuinely fail. Say which app
+        // owns the port rather than letting compose report it minutes later.
+        setSaveError(error.conflicts.map((conflict) => conflict.detail).join(" · "));
       } else {
         setSaveError(
           error instanceof Error
@@ -511,7 +516,7 @@ export function AppConfiguratorPanel({
           {activeView === "import_url" && context === "custom_install" ? (
             <ImportUrlView
               url={importState.url}
-              ref={importState.ref}
+              sourceRef={importState.ref}
               name={importState.name}
               onChange={(next) => {
                 setDidSave(false);

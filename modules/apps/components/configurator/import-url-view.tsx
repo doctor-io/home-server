@@ -2,9 +2,10 @@
 
 type ImportUrlViewProps = {
   url: string;
-  ref: string;
+  /** Named sourceRef, not ref: React reserves `ref` and would not pass it through. */
+  sourceRef: string;
   name: string;
-  onChange: (next: { url?: string; ref?: string; name?: string }) => void;
+  onChange: (next: { url?: string; sourceRef?: string; name?: string }) => void;
 };
 
 /**
@@ -12,7 +13,7 @@ type ImportUrlViewProps = {
  * (the browser cannot read most raw hosts directly, and the guards belong on
  * the server anyway) — this view only collects where to look.
  */
-export function ImportUrlView({ url, ref: sourceRef, name, onChange }: ImportUrlViewProps) {
+export function ImportUrlView({ url, sourceRef, name, onChange }: ImportUrlViewProps) {
   return (
     <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-3">
       <div className="flex flex-col gap-1.5">
@@ -53,7 +54,7 @@ export function ImportUrlView({ url, ref: sourceRef, name, onChange }: ImportUrl
         <input
           id="import-ref"
           value={sourceRef}
-          onChange={(event) => onChange({ ref: event.target.value })}
+          onChange={(event) => onChange({ sourceRef: event.target.value })}
           placeholder="9f2c1ab"
           spellCheck={false}
           className="rounded-lg border border-glass-border bg-black/20 px-2.5 py-2 text-xs text-foreground outline-none transition-colors focus:border-primary/50"

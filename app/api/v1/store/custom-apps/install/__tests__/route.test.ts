@@ -4,6 +4,10 @@ vi.mock("@/lib/server/modules/store/custom-apps", () => ({
   upsertCustomStoreTemplate: vi.fn(),
 }));
 
+vi.mock("@/lib/server/modules/apps/stacks-repository", () => ({
+  listInstalledStacksFromDb: vi.fn(async () => []),
+}));
+
 vi.mock("@/lib/server/modules/store/service", () => ({
   startAppLifecycleAction: vi.fn(),
 }));
@@ -13,6 +17,7 @@ import {
   upsertCustomStoreTemplate,
 } from "@/lib/server/modules/store/custom-apps";
 import { startAppLifecycleAction } from "@/lib/server/modules/store/service";
+import { listInstalledStacksFromDb } from "@/lib/server/modules/apps/stacks-repository";
 
 describe("POST /api/v1/store/custom-apps/install", () => {
   it("creates custom template and starts install operation", async () => {
@@ -102,6 +107,37 @@ describe("POST /api/v1/store/custom-apps/install", () => {
     expect(upsertCustomStoreTemplate).toHaveBeenCalledWith(
       expect.objectContaining({ acknowledgeRisks: false }),
     );
+  });
+
+  it("refuses before installing when a port belongs to another app", async () => {
+    vi.mocked(upsertCustomStoreTemplate).mockResolvedValueOnce({
+      appId: "custom-thing",
+      name: "Thing",
+      composeContent:
+        "services:\n  web:\n    image: nginx\n    ports:\n      - '8096:80'\n",
+    } as never);
+    vi.mocked(listInstalledStacksFromDb).mockResolvedValueOnce([
+      { appId: "jellyfin", stackName: "jellyfin", webUiPort: 8096 },
+    ] as never);
+
+    const response = await POST(
+      new Request("http://localhost/api/v1/store/custom-apps/install", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: "Thing",
+          sourceType: "docker-compose",
+          source: "services:\n  web:\n    image: nginx",
+        }),
+      }),
+    );
+    const json = (await response.json()) as { code: string; conflicts: { detail: string }[] };
+
+    expect(response.status).toBe(409);
+    expect(json.code).toBe("install_conflicts");
+    expect(json.conflicts[0].detail).toContain("jellyfin");
+    // The queue must never have been touched.
+    expect(startAppLifecycleAction).not.toHaveBeenCalled();
   });
 
   it("returns 400 when payload is invalid", async () => {

@@ -71,6 +71,24 @@ export type ComposeRiskDetail = {
  * Carries the list so the caller can show exactly what was asked for instead
  * of a flattened message.
  */
+export type ComposeConflictDetail = {
+  code: string;
+  service: string;
+  value: string;
+  detail: string;
+};
+
+/** Thrown when an install would collide with something already installed. */
+export class ComposeConflictsError extends Error {
+  readonly conflicts: ComposeConflictDetail[];
+
+  constructor(message: string, conflicts: ComposeConflictDetail[]) {
+    super(message);
+    this.name = "ComposeConflictsError";
+    this.conflicts = conflicts;
+  }
+}
+
 export class ComposeRisksError extends Error {
   readonly risks: ComposeRiskDetail[];
 
@@ -79,6 +97,15 @@ export class ComposeRisksError extends Error {
     this.name = "ComposeRisksError";
     this.risks = risks;
   }
+}
+
+function conflictErrorFrom(payload: ErrorResponsePayload | null) {
+  const conflicts = (payload as { conflicts?: ComposeConflictDetail[] } | null)?.conflicts;
+  if (!Array.isArray(conflicts) || conflicts.length === 0) return null;
+  return new ComposeConflictsError(
+    payload?.error?.trim() || "This app conflicts with something already installed",
+    conflicts,
+  );
 }
 
 function riskErrorFrom(payload: ErrorResponsePayload | null) {
@@ -601,6 +628,9 @@ export function useStoreActions(): StoreActionsHandle {
         const errorPayload = await parseErrorPayload(result);
         const riskError = riskErrorFrom(errorPayload);
         if (riskError) throw riskError;
+
+        const conflictError = conflictErrorFrom(errorPayload);
+        if (conflictError) throw conflictError;
 
         throw new Error(
           toStoreActionErrorMessage(

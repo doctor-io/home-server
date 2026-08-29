@@ -15,6 +15,8 @@ import {
   ComposeRiskError,
   ComposeValidationError,
 } from "@/lib/server/modules/store/compose-validation";
+import { detectComposeConflicts } from "@/lib/server/modules/store/compose-conflicts";
+import { listInstalledStacksFromDb } from "@/lib/server/modules/apps/stacks-repository";
 
 export const runtime = "nodejs";
 
@@ -77,6 +79,27 @@ export async function POST(request: Request) {
           // risks first; a script keeps its old behaviour.
           acknowledgeRisks: parsed.data.acknowledgeRisks ?? true,
         });
+
+        // Check before the operation queue starts. The runtime already refuses
+        // a webUiPort collision, but only that one port, and only once the
+        // install is underway — by which point the failure reads as a compose
+        // subprocess error rather than "port 8096 belongs to jellyfin".
+        const conflicts = detectComposeConflicts({
+          composeContent: customTemplate.composeContent,
+          appId: customTemplate.appId,
+          installedStacks: await listInstalledStacksFromDb(),
+        });
+
+        if (conflicts.length > 0) {
+          return NextResponse.json(
+            {
+              error: "This app conflicts with something already installed",
+              code: "install_conflicts",
+              conflicts,
+            },
+            { status: 409 },
+          );
+        }
 
         const operation = await startAppLifecycleAction({
           appId: customTemplate.appId,

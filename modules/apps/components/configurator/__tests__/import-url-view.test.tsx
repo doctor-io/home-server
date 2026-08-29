@@ -7,7 +7,7 @@ import { ImportUrlView } from "@/modules/apps/components/configurator/import-url
 describe("ImportUrlView", () => {
   it("reports each field independently", () => {
     const onChange = vi.fn();
-    render(<ImportUrlView url="" ref="" name="" onChange={onChange} />);
+    render(<ImportUrlView url="" sourceRef="" name="" onChange={onChange} />);
 
     fireEvent.change(screen.getByLabelText("Compose file URL"), {
       target: { value: "https://example.com/compose.yml" },
@@ -19,7 +19,7 @@ describe("ImportUrlView", () => {
   });
 
   it("says where private networks stand, since that refusal is otherwise puzzling", () => {
-    render(<ImportUrlView url="" ref="" name="" onChange={vi.fn()} />);
+    render(<ImportUrlView url="" sourceRef="" name="" onChange={vi.fn()} />);
 
     expect(screen.getByText(/Private networks are refused/)).toBeTruthy();
   });
@@ -28,7 +28,7 @@ describe("ImportUrlView", () => {
     render(
       <ImportUrlView
         url="https://example.com/c.yml"
-        ref="9f2c1ab"
+        sourceRef="9f2c1ab"
         name="Stack"
         onChange={vi.fn()}
       />,
