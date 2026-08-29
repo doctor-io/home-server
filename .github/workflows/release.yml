@@ -5,6 +5,12 @@ on:
     branches:
       - main
       - develop
+  # Validate work before it lands, not after. Without this, the first time a
+  # branch meets lint/test/build is the push to main — too late to be useful.
+  pull_request:
+    branches:
+      - main
+      - develop
   workflow_dispatch:
 
 permissions:

@@ -1,6 +1,9 @@
 {
   "name": "homeio",
   "version": "1.7.24",
+  "engines": {
+    "node": ">=22 <23"
+  },
   "description": "Self-hosted home server dashboard — desktop-style UI for managing Docker apps, files, terminal, and system resources.",
   "author": "doctor-io",
   "license": "MIT",
@@ -35,7 +38,6 @@
     ]
   },
   "dependencies": {
-    "@dawudesign/node-hexa-cli": "^0.7.6",
     "@fluentui/react-icons": "^2.0.321",
     "@hookform/resolvers": "^3.9.1",
     "@lydell/node-pty": "^1.2.0-beta.3",
@@ -68,7 +70,6 @@
     "@radix-ui/react-tooltip": "1.2.8",
     "@tanstack/react-query": "^5.95.0",
     "@types/js-yaml": "^4.0.9",
-    "@vercel/analytics": "1.6.1",
     "autoprefixer": "^10.4.27",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
