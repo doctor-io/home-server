@@ -54,9 +54,15 @@ type UpsertCustomStoreTemplateInput = {
 
 const CUSTOM_SOURCE_TYPES: CustomStoreSourceType[] = ["docker-compose", "docker-run", "url"];
 
-/** Detects an upstream change between imports without storing the whole body twice. */
+/**
+ * Detects an upstream change between imports without storing the whole body
+ * twice. Trims before hashing: the writer used to hash trimmed text while the
+ * update check hashed the raw body, so every imported app reported itself as
+ * changed. Normalising inside the function keeps the two sides from drifting
+ * apart again.
+ */
 export function checksumSource(sourceText: string) {
-  return createHash("sha256").update(sourceText).digest("hex");
+  return createHash("sha256").update(sourceText.trim()).digest("hex");
 }
 
 type ComposeLike = {
@@ -569,7 +575,7 @@ export async function upsertCustomStoreTemplate(input: UpsertCustomStoreTemplate
         ? {
             sourceUrl,
             sourceRef: normalize(input.sourceRef),
-            sourceChecksum: checksumSource(input.sourceText.trim()),
+            sourceChecksum: checksumSource(input.sourceText),
             lastImportedAt: new Date(),
           }
         : { sourceUrl: null, sourceRef: null, sourceChecksum: null, lastImportedAt: null };

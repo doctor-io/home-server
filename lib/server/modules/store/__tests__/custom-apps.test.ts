@@ -36,4 +36,11 @@ describe("custom store app provenance", () => {
     expect(a).not.toBe(c);
     expect(a).toHaveLength(64);
   });
+
+  it("ignores surrounding whitespace, so the writer and the update check agree", () => {
+    // These hashed differently once, which made every imported app report
+    // itself as changed the moment it was checked.
+    const raw = "services:\n  web:\n    image: nginx\n";
+    expect(checksumSource(raw)).toBe(checksumSource(`\n${raw}   `));
+  });
 });
