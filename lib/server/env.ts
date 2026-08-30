@@ -103,6 +103,14 @@ const envSchema = z.object({
   FILES_NETWORK_MOUNT_UID: z.coerce.number().int().min(0).optional(),
   FILES_NETWORK_MOUNT_GID: z.coerce.number().int().min(0).optional(),
   DOCKER_SOCKET_PATH: z.string().default("/var/run/docker.sock"),
+  // Auto-heal watches container events and can restart apps. Off by default,
+  // and this flag is the kill switch when a policy misbehaves in the field.
+  HOMEIO_AUTOHEAL: z
+    .string()
+    .optional()
+    .transform((value) => value === "true"),
+  // Fallback cadence when the Docker event stream is unavailable.
+  AUTOHEAL_POLL_INTERVAL_MS: z.coerce.number().int().min(5_000).max(300_000).default(30_000),
   DOCKER_COMPOSE_TIMEOUT_MS: z.coerce
     .number()
     .int()
