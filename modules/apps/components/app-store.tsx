@@ -6,6 +6,7 @@ import type { StoreAppDetail, StoreAppSummary } from "@/lib/shared/contracts/app
 import { queryKeys } from "@/lib/shared/query-keys";
 import { getStoreOperationLabel, isStoreOperationActiveStatus } from "@/lib/shared/store-operations";
 import { AppStoreInstallMenu } from "@/modules/apps/components/app-store-install-menu";
+import { CustomAppSourceActions } from "@/modules/apps/components/custom-app-source-actions";
 import { AppStoreSourcesDialog } from "@/modules/apps/components/app-store-sources-dialog";
 import { AppConfiguratorPanel } from "@/modules/apps/components/configurator/app-configurator-panel";
 import { UninstallAppDialog } from "@/modules/apps/components/uninstall-app-dialog";
@@ -477,6 +478,10 @@ function AppStoreDetailPanel({
                 >
                   <Wrench className="size-3.5" /> Custom
                 </button>
+
+                {detail.sourceKind === "custom" && (
+                  <CustomAppSourceActions appId={detail.id} disabled={busy} />
+                )}
 
                 {detail.status !== "not_installed" && (
                   <button
