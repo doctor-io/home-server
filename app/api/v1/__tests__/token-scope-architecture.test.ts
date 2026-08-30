@@ -12,6 +12,7 @@ import path from "node:path";
  */
 const TOKEN_ACCESSIBLE_ROUTES: Record<string, string> = {
   "system/metrics/route.ts": "read:metrics",
+  "system/summary/route.ts": "read:metrics",
   "apps/route.ts": "read:apps",
   "apps/[appId]/start/route.ts": "write:apps",
   "apps/[appId]/stop/route.ts": "write:apps",
