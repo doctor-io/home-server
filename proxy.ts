@@ -36,6 +36,15 @@ function isPublicApiRoute(pathname: string) {
   );
 }
 
+/**
+ * Only the presence of a bearer credential, not its validity. The route decides
+ * whether the token is real, unrevoked, unexpired and scoped for what it asks.
+ */
+function hasBearerToken(request: NextRequest) {
+  const header = request.headers.get("authorization");
+  return Boolean(header && /^bearer\s+\S/i.test(header.trim()));
+}
+
 function isStaticRoute(pathname: string) {
   return (
     pathname.startsWith("/_next/") ||
@@ -163,6 +172,14 @@ export async function proxy(request: NextRequest) {
       { error: "This action is not available in demo mode." },
       { status: 403 },
     );
+  }
+
+  // A bearer-carrying API request is handed to the route, which validates the
+  // token and the scope it requires. The proxy cannot do that check — it has
+  // no database access — and refusing here would mean tokens never reach the
+  // handlers that were written to accept them.
+  if (pathname.startsWith("/api/v1/") && hasBearerToken(request)) {
+    return NextResponse.next();
   }
 
   const sessionToken = request.cookies.get(AUTH_SESSION_COOKIE_NAME)?.value;
