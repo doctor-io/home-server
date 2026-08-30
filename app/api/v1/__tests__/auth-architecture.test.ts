@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
+import { API_TOKEN_SCOPES } from "@/lib/shared/contracts/api-tokens";
 
 const publicRoutes = new Set([
   "files/google-drive/auth/route.ts",
@@ -34,5 +35,56 @@ describe("api v1 auth architecture", () => {
       });
 
     expect(missingAuth).toEqual([]);
+  });
+
+  it("accepts a scoped route as authenticated, since bearer auth runs inside the helper", () => {
+    // Token support did not add a second way in: requireApiSession handles both
+    // credentials, so a scoped route satisfies the rule above unchanged. This
+    // pins that, so nobody "fixes" the guard by special-casing scopes.
+    const apiRoot = path.join(process.cwd(), "app/api/v1");
+    const scoped = findRouteFiles(apiRoot).filter((file) =>
+      /requireApiSession\(\s*request\s*,\s*\{\s*scope:/.test(
+        readFileSync(path.join(apiRoot, file), "utf8"),
+      ),
+    );
+
+    expect(scoped.length).toBeGreaterThan(0);
+    for (const file of scoped) {
+      expect(readFileSync(path.join(apiRoot, file), "utf8")).toContain("requireApiSession");
+    }
+  });
+
+  it("never lets a route be both public and token-scoped", () => {
+    // A public route needs no credential at all, so granting it a scope would
+    // be meaningless — and would suggest a protection that is not there.
+    const apiRoot = path.join(process.cwd(), "app/api/v1");
+    const contradictions = [...publicRoutes].filter((file) => {
+      try {
+        return /requireApiSession\(\s*request\s*,\s*\{\s*scope:/.test(
+          readFileSync(path.join(apiRoot, file), "utf8"),
+        );
+      } catch {
+        return false;
+      }
+    });
+
+    expect(contradictions).toEqual([]);
+  });
+
+  it("only names scopes that exist", () => {
+    const apiRoot = path.join(process.cwd(), "app/api/v1");
+    const used = findRouteFiles(apiRoot)
+      .map((file) =>
+        readFileSync(path.join(apiRoot, file), "utf8").match(
+          /requireApiSession\(\s*request\s*,\s*\{\s*scope:\s*"([^"]+)"/,
+        )?.[1],
+      )
+      .filter((scope): scope is string => Boolean(scope));
+
+    const unknown = used.filter(
+      (scope) => !(API_TOKEN_SCOPES as readonly string[]).includes(scope),
+    );
+
+    expect(unknown).toEqual([]);
   });
 });
