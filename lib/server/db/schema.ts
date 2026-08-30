@@ -121,6 +121,26 @@ export const customStoreApps = pgTable(
   (table) => [index("custom_store_apps_updated_at_idx").on(table.updatedAt.desc())],
 );
 
+export const appHealth = pgTable(
+  "app_health",
+  {
+    appId: text("app_id").primaryKey(),
+    // Docker's own policy names, so the stored value is what compose takes.
+    // Defaults to "no": auto-heal is off until an operator turns it on.
+    restartPolicy: text("restart_policy").notNull().default("no"),
+    maxRestarts: integer("max_restarts").notNull().default(5),
+    windowMinutes: integer("window_minutes").notNull().default(10),
+    state: text("state").notNull().default("unknown"),
+    restartCount: integer("restart_count").notNull().default(0),
+    windowStartedAt: timestamp("window_started_at", { withTimezone: true }),
+    lastTransitionAt: timestamp("last_transition_at", { withTimezone: true }),
+    mutedUntil: timestamp("muted_until", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("app_health_state_idx").on(table.state)],
+);
+
 export const filesNetworkShares = pgTable(
   "files_network_shares",
   {
