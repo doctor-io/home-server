@@ -41,7 +41,11 @@ export function AppGrid({
       onClick={controller.closeContextMenu}
     >
       {controller.actionError ? (
-        <div className="mt-4 flex items-start justify-between gap-2 rounded-lg border border-status-red/30 bg-status-red/10 px-3 py-2 text-xs text-status-red">
+        // This banner sits on the desktop, over the wallpaper: a 10%-opacity
+        // tint left red text competing with a photo. An opaque backdrop plus
+        // blur — the same treatment as system-error-capsule — keeps it legible
+        // on any wallpaper, and the text is lightened for contrast against it.
+        <div className="mt-4 flex items-start justify-between gap-2 rounded-lg border border-status-red/35 bg-black/55 px-3 py-2 text-xs text-[oklch(0.82_0.13_25)] shadow-[var(--system-shadow-surface)] backdrop-blur-xl">
           <span>{controller.actionError}</span>
           <button
             onClick={controller.dismissActionError}
