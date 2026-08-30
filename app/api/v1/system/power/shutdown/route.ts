@@ -13,7 +13,7 @@ import { requireApiSession } from "@/lib/server/modules/auth/api";
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
-  const apiSession = await requireApiSession(request);
+  const apiSession = await requireApiSession(request, { scope: "system:power" });
   if (apiSession.response) return apiSession.response;
   const requestId = createRequestId();
   const sessionToken = request.cookies.get(getAuthCookieName())?.value;

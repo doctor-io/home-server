@@ -10,7 +10,7 @@ import { requireApiSession } from "@/lib/server/modules/auth/api";
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
-  const apiSession = await requireApiSession(request);
+  const apiSession = await requireApiSession(request, { scope: "read:apps" });
   if (apiSession.response) return apiSession.response;
   const requestId = createRequestId();
 

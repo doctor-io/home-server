@@ -17,7 +17,7 @@ type Context = {
 };
 
 export async function POST(request: Request, context: Context) {
-  const apiSession = await requireApiSession(request);
+  const apiSession = await requireApiSession(request, { scope: "write:apps" });
   if (apiSession.response) return apiSession.response;
   const requestId = createRequestId();
   const { appId } = await context.params;
