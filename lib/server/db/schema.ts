@@ -121,6 +121,30 @@ export const customStoreApps = pgTable(
   (table) => [index("custom_store_apps_updated_at_idx").on(table.updatedAt.desc())],
 );
 
+export const apiTokens = pgTable(
+  "api_tokens",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    // scrypt, same construction as password hashing — the raw token is never
+    // stored, so a database read cannot yield a working credential.
+    tokenHash: text("token_hash").notNull(),
+    // Indexed lookup key, so validating a token hashes one row instead of the
+    // whole table.
+    prefix: text("prefix").notNull(),
+    scopes: jsonb("scopes").notNull().default([]),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    lastUsedIp: text("last_used_ip"),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("api_tokens_prefix_idx").on(table.prefix),
+    index("api_tokens_created_at_idx").on(table.createdAt.desc()),
+  ],
+);
+
 export const appHealth = pgTable(
   "app_health",
   {
