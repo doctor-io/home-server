@@ -100,6 +100,15 @@ export class StoreOperationError extends Error {
   }
 }
 
+/**
+ * Whether an install, update or uninstall currently holds this app. The
+ * auto-heal watchdog reads it to stand down: restarting a container midway
+ * through an operation on the same app is how you corrupt a stack.
+ */
+export function hasActiveOperation(appId: string) {
+  return activeOperationsByApp.has(appId);
+}
+
 /** Exposed only for unit tests — clears the in-memory guard between test cases. */
 export function _resetActiveOperationsForTesting() {
   activeOperationsByApp.clear();
