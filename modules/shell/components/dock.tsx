@@ -58,13 +58,23 @@ export function Dock({
 
   const dockPositionClass =
     position === "bottom"
-      ? "fixed bottom-4 left-1/2 -translate-x-1/2"
+      ? "fixed left-1/2 -translate-x-1/2"
       : position === "left"
-        ? "fixed left-4 top-1/2 -translate-y-1/2"
-        : "fixed right-4 top-1/2 -translate-y-1/2";
+        ? "fixed top-1/2 -translate-y-1/2"
+        : "fixed top-1/2 -translate-y-1/2";
+
+  // Keep the dock clear of the gesture bar and of a landscape notch. Every
+  // inset resolves to 0 on a desktop browser, so this is the previous
+  // bottom-4 / left-4 / right-4 spacing there.
+  const dockPositionStyle =
+    position === "bottom"
+      ? { bottom: "calc(env(safe-area-inset-bottom, 0px) + 1rem)" }
+      : position === "left"
+        ? { left: "calc(env(safe-area-inset-left, 0px) + 1rem)" }
+        : { right: "calc(env(safe-area-inset-right, 0px) + 1rem)" };
 
   return (
-    <div className={`${dockPositionClass} z-50`}>
+    <div className={`${dockPositionClass} z-50`} style={dockPositionStyle}>
       <nav
         ref={dockRef}
         className={`flex gap-3 border border-white/[0.09] rounded-[calc(var(--radius)+0.375rem)] shadow-2xl shadow-black/40 ${

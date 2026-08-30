@@ -654,7 +654,15 @@ function DesktopShellInner() {
   }
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden">
+    <div
+      className="relative h-screen w-screen overflow-hidden"
+      // 100dvh, not 100vh: when the on-screen keyboard opens, the dynamic
+      // viewport shrinks and the shell shrinks with it, so the focused input
+      // stays visible. 100vh keeps the old height and the keyboard covers what
+      // you are typing into. The h-screen class remains as the fallback for
+      // engines that drop the dvh declaration.
+      style={{ height: "100dvh" }}
+    >
       {/* Wallpaper Background */}
       <div className="absolute inset-0">
         <div

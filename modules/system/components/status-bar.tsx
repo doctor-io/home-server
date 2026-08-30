@@ -83,7 +83,12 @@ export function StatusBar({
   }
 
   return (
-    <header className="fixed top-3 left-1/2 -translate-x-1/2 z-50 min-w-[50%] w-auto max-w-[96vw]">
+    <header
+      className="fixed left-1/2 z-50 w-auto max-w-[96vw] min-w-[50%] -translate-x-1/2"
+      // On a phone the OS status bar occupies the top of the screen; on desktop
+      // the inset is 0 and this is the original top-3.
+      style={{ top: "calc(env(safe-area-inset-top, 0px) + 0.75rem)" }}
+    >
       {/* Blur is on a separate element so it doesn't create a Firefox stacking context over the flyout popovers */}
       <div
         aria-hidden="true"

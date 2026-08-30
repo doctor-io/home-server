@@ -28,6 +28,11 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   themeColor: "#1a2332",
   userScalable: false,
+  // Draw into the notch and gesture areas rather than letterboxing the page,
+  // then keep the shell's own chrome clear of them with env(safe-area-inset-*).
+  // Without cover, those insets are always 0 and the phone's status bar sits on
+  // top of Homeio's own.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
