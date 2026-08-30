@@ -5,6 +5,7 @@ import type { AppActionTarget } from "@/modules/apps/components/app-grid";
 import { ClassicFormView } from "@/modules/apps/components/configurator/classic-form-view";
 import { ComposeEditorView } from "@/modules/apps/components/configurator/compose-editor-view";
 import { ComposeRiskNotice } from "@/modules/apps/components/configurator/compose-risk-notice";
+import { HealthPolicyCard } from "@/modules/apps/components/health-policy-card";
 import { ConfiguratorHeader } from "@/modules/apps/components/configurator/configurator-header";
 import { ImportUrlView } from "@/modules/apps/components/configurator/import-url-view";
 import {
@@ -498,11 +499,20 @@ export function AppConfiguratorPanel({
           ) : null}
 
           {activeView === "classic" ? (
-            <ClassicFormView
-              appIdLabel={queryAppId ?? appId}
-              state={classicState}
-              onChange={handleClassicChange}
-            />
+            <>
+              <ClassicFormView
+                appIdLabel={queryAppId ?? appId}
+                state={classicState}
+                onChange={handleClassicChange}
+              />
+              {/* Only for something already installed: a restart policy has
+                  nothing to act on until the app exists. */}
+              {context === "installed_edit" && queryAppId ? (
+                <div className="px-4 pb-3">
+                  <HealthPolicyCard appId={queryAppId} />
+                </div>
+              ) : null}
+            </>
           ) : null}
 
           {activeView === "compose" ? (
