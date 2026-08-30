@@ -68,17 +68,36 @@ function MetricCard({
 
 // ── History bars ──────────────────────────────────────────────────────────────
 
+/**
+ * Samples are drawn into a fixed number of slots rather than stretched to fill
+ * the card. Stretching made each bar ~10px wide and, worse, changed their width
+ * as history accumulated — so the same load looked different minute to minute.
+ * Empty slots keep the time window visible while it fills.
+ */
+/** ~4 minutes at the default 2s metrics publish interval. */
+const HISTORY_CAPACITY = 120;
+
 function HistoryBars({ values, color }: { values: number[]; color: string }) {
+  const slots = Array.from({ length: HISTORY_CAPACITY }, (_, index) => {
+    const offset = index - (HISTORY_CAPACITY - values.length);
+    return offset >= 0 ? values[offset] : null;
+  });
+
   return (
-    <div className={cn(PANEL_INSET, "flex h-10 items-end gap-px px-2 py-1.5")}>
+    <div className={cn(PANEL_INSET, "flex h-16 items-end gap-px px-2 py-1.5")}>
       {values.length === 0 ? (
         <span className="m-auto text-xs text-muted-foreground/50">Collecting…</span>
       ) : (
-        values.map((v, i) => (
+        slots.map((value, index) => (
           <span
-            key={`${i}-${v}`}
-            className={cn("flex-1 rounded-[1px] transition-all duration-300", color)}
-            style={{ height: `${Math.max(4, Math.round(v))}%` }}
+            key={index}
+            className={cn(
+              "min-w-0 flex-1 rounded-[1px] transition-[height] duration-300",
+              value === null ? "bg-white/6" : color,
+            )}
+            // A floor of 2% keeps an idle reading visible as a baseline rather
+            // than an absent bar, without inflating it the way a 4% floor did.
+            style={{ height: value === null ? "2px" : `${Math.max(2, Math.round(value))}%` }}
           />
         ))
       )}
@@ -152,11 +171,11 @@ export function Monitor() {
     const mem = systemMetrics.memory.usedPercent ?? 0;
     setCpuHistory((prev) => {
       if (prev.length > 0 && prev[prev.length - 1] === cpu) return prev;
-      return [...prev.slice(-59), cpu];
+      return [...prev.slice(-(HISTORY_CAPACITY - 1)), cpu];
     });
     setMemHistory((prev) => {
       if (prev.length > 0 && prev[prev.length - 1] === mem) return prev;
-      return [...prev.slice(-59), mem];
+      return [...prev.slice(-(HISTORY_CAPACITY - 1)), mem];
     });
     setPeakCpu((prev) => Math.max(prev, cpu));
     setPeakMem((prev) => Math.max(prev, mem));
