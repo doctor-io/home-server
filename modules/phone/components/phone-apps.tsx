@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ExternalLink, Play, RefreshCw, Square } from "@/components/icons/platform-icons";
+import { ExternalLink, Package, Play, RefreshCw, Square } from "@/components/icons/platform-icons";
 import { useInstalledApps } from "@/modules/apps/hooks/useInstalledApps";
 import { useSharedStoreActions } from "@/modules/apps/hooks/StoreActionsContext";
 import type { InstalledApp } from "@/lib/shared/contracts/apps";
@@ -14,6 +14,18 @@ const STATUS_LABELS: Record<InstalledApp["status"], string> = {
   stopped: "Stopped",
   unknown: "Unknown",
 };
+
+const FILTERS = [
+  { key: "all", label: "All" },
+  { key: "running", label: "Running" },
+  { key: "stopped", label: "Stopped" },
+] as const;
+
+type Filter = (typeof FILTERS)[number]["key"];
+
+function isRunning(app: InstalledApp) {
+  return app.status === "running" || app.status === "partial";
+}
 
 function statusTone(status: InstalledApp["status"]) {
   if (status === "running") return "bg-status-green";
@@ -33,6 +45,7 @@ export function PhoneApps() {
   const actions = useSharedStoreActions();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<Filter>("all");
 
   async function run(appId: string, action: "start" | "stop" | "restart") {
     setBusyId(appId);
@@ -49,91 +62,162 @@ export function PhoneApps() {
     }
   }
 
+  const running = apps.filter(isRunning).length;
+  const visible = apps.filter((app) => {
+    if (filter === "running") return isRunning(app);
+    if (filter === "stopped") return !isRunning(app);
+    return true;
+  });
+
   if (isLoading && apps.length === 0) {
     return <p className="mt-8 text-center text-sm text-muted-foreground">Loading apps…</p>;
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      <h1 className="text-xl font-medium">Apps</h1>
+    <div className="flex flex-col gap-3.5">
+      <header className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] text-muted-foreground">
+            {apps.length === 0
+              ? "Nothing installed"
+              : `${running} of ${apps.length} running`}
+          </p>
+          <h1 className="truncate text-lg font-medium">Apps</h1>
+        </div>
+        <Package className="mt-1 size-5 opacity-40 grayscale" />
+      </header>
 
       {error && (
-        <p className="rounded-xl border border-status-red/30 bg-status-red/10 px-3 py-2 text-[12px] text-status-red" role="alert">
+        <p
+          role="alert"
+          className="rounded-2xl bg-status-red/10 px-3.5 py-2.5 text-[12px] text-status-red"
+        >
           {error}
         </p>
       )}
 
       {apps.length === 0 ? (
-        <p className="rounded-xl border border-glass-border bg-black/20 px-3 py-4 text-[12px] text-muted-foreground">
-          No apps installed. Install one from the App Store in desktop view.
-        </p>
+        <div className="mt-10 flex flex-col items-center text-center">
+          <span className="grid size-16 place-items-center rounded-3xl bg-white/5">
+            <Package className="size-6 opacity-50 grayscale" />
+          </span>
+          <p className="mt-3 text-sm text-muted-foreground">No apps installed</p>
+          <p className="mt-1 text-[12px] text-muted-foreground/70">
+            Install one from the App Store in desktop view.
+          </p>
+        </div>
       ) : (
-        <ul className="flex flex-col gap-2">
-          {apps.map((app) => {
-            const url = webUiUrl(app);
-            const isBusy = busyId === app.id || Boolean(app.activeOperation);
-            const isRunning = app.status === "running" || app.status === "partial";
-
-            return (
-              <li
-                key={app.id}
-                className="rounded-2xl border border-glass-border bg-black/20 px-3 py-3"
+        <>
+          {/* Same filter row as the other screens, and it earns its place here:
+              on a server with a dozen apps, "what is down?" is the question. */}
+          <div className="flex gap-5">
+            {FILTERS.map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                onClick={() => setFilter(option.key)}
+                className="flex flex-col items-center gap-1.5 pt-1"
               >
-                <div className="flex items-center gap-2.5">
-                  <span
-                    aria-hidden="true"
-                    className={cn("size-2 shrink-0 rounded-full", statusTone(app.status))}
-                  />
-                  <span className="min-w-0 flex-1 truncate text-sm">{app.name}</span>
-                  <span className="shrink-0 text-[11px] text-muted-foreground">
-                    {app.activeOperation ? "Working…" : STATUS_LABELS[app.status]}
-                  </span>
-                </div>
-
-                <div className="mt-2.5 flex gap-2">
-                  {/* 44px minimum touch targets — anything smaller is a miss. */}
-                  {isRunning ? (
-                    <button
-                      type="button"
-                      onClick={() => void run(app.id, "stop")}
-                      disabled={isBusy}
-                      className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl border border-glass-border bg-black/25 text-[12px] text-muted-foreground disabled:opacity-50"
-                    >
-                      <Square className="size-3.5" /> Stop
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => void run(app.id, "start")}
-                      disabled={isBusy}
-                      className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl border border-glass-border bg-black/25 text-[12px] text-muted-foreground disabled:opacity-50"
-                    >
-                      <Play className="size-3.5" /> Start
-                    </button>
+                <span
+                  className={cn(
+                    "text-[13px] transition-colors",
+                    filter === option.key ? "font-medium" : "text-muted-foreground",
                   )}
-
-                  <button
-                    type="button"
-                    onClick={() => void run(app.id, "restart")}
-                    disabled={isBusy}
-                    className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl border border-glass-border bg-black/25 text-[12px] text-muted-foreground disabled:opacity-50"
-                  >
-                    <RefreshCw className={cn("size-3.5", isBusy && "animate-spin")} /> Restart
-                  </button>
-
-                  {url && (
-                    <a
-                      href={url}
-                      className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl bg-primary/90 text-[12px] font-medium text-primary-foreground"
-                    >
-                      <ExternalLink className="size-3.5" /> Open
-                    </a>
+                >
+                  {option.label}
+                </span>
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "size-1 rounded-full transition-colors",
+                    filter === option.key ? "bg-primary" : "bg-transparent",
                   )}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+                />
+              </button>
+            ))}
+          </div>
+
+          {visible.length === 0 ? (
+            <p className="rounded-2xl bg-white/4 px-3.5 py-3 text-[12px] text-muted-foreground">
+              Nothing {filter === "running" ? "running" : "stopped"} right now.
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-2.5">
+              {visible.map((app) => {
+                const url = webUiUrl(app);
+                const isBusy = busyId === app.id || Boolean(app.activeOperation);
+                const live = isRunning(app);
+
+                return (
+                  <li key={app.id} className="rounded-3xl bg-white/5 px-4 py-3.5">
+                    <div className="flex items-center gap-2.5">
+                      <span
+                        aria-hidden="true"
+                        className={cn("size-2 shrink-0 rounded-full", statusTone(app.status))}
+                      />
+                      <span className="min-w-0 flex-1 truncate text-[14px] font-medium">
+                        {app.name}
+                      </span>
+                      <span className="shrink-0 text-[11px] text-muted-foreground">
+                        {app.activeOperation ? "Working…" : STATUS_LABELS[app.status]}
+                      </span>
+                    </div>
+
+                    {app.webUiPort && (
+                      <p className="mt-0.5 pl-[1.125rem] text-[11px] text-muted-foreground/70 tabular-nums">
+                        port {app.webUiPort}
+                      </p>
+                    )}
+
+                    <div className="mt-3 flex gap-2">
+                      {/* 44px minimum touch targets — anything smaller is a miss. */}
+                      {live ? (
+                        <button
+                          type="button"
+                          onClick={() => void run(app.id, "stop")}
+                          disabled={isBusy}
+                          className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-2xl bg-white/6 text-[12px] text-muted-foreground transition-transform active:scale-[0.98] disabled:opacity-50"
+                        >
+                          <Square className="size-3.5 grayscale" /> Stop
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => void run(app.id, "start")}
+                          disabled={isBusy}
+                          className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-2xl bg-white/6 text-[12px] text-muted-foreground transition-transform active:scale-[0.98] disabled:opacity-50"
+                        >
+                          <Play className="size-3.5 grayscale" /> Start
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => void run(app.id, "restart")}
+                        disabled={isBusy}
+                        className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-2xl bg-white/6 text-[12px] text-muted-foreground transition-transform active:scale-[0.98] disabled:opacity-50"
+                      >
+                        <RefreshCw className={cn("size-3.5 grayscale", isBusy && "animate-spin")} />{" "}
+                        Restart
+                      </button>
+
+                      {/* Only while it can actually answer: Open on a stopped
+                          app is a connection error with extra steps. */}
+                      {url && live && (
+                        <a
+                          href={url}
+                          className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-2xl bg-primary text-[12px] font-medium text-primary-foreground transition-transform active:scale-[0.98]"
+                        >
+                          <ExternalLink className="size-3.5" /> Open
+                        </a>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </>
       )}
     </div>
   );

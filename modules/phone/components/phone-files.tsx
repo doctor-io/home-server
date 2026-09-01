@@ -77,7 +77,7 @@ function Crumbs({ segments, onNavigate }: { segments: string[]; onNavigate: (pat
               "shrink-0 rounded-full px-3 py-1.5 text-[12px] whitespace-nowrap transition-colors",
               isCurrent
                 ? "bg-primary/15 font-medium text-primary"
-                : "bg-white/6 text-muted-foreground active:bg-white/10",
+                : "bg-white/5 text-muted-foreground active:bg-white/10",
             )}
           >
             {segment}
@@ -103,7 +103,7 @@ function FileSheet({ entry, onClose }: { entry: FileListEntry; onClose: () => vo
       />
 
       <div
-        className="relative animate-in slide-in-from-bottom-4 rounded-t-[1.75rem] border-t border-glass-border bg-[#121519] px-5 pt-2.5 pb-5 duration-200"
+        className="relative animate-in slide-in-from-bottom-4 rounded-t-[1.75rem] bg-[#14171b] px-5 pt-2.5 pb-5 duration-200"
         style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 1.25rem)" }}
       >
         <span aria-hidden="true" className="mx-auto block h-1 w-10 rounded-full bg-white/15" />
@@ -125,14 +125,14 @@ function FileSheet({ entry, onClose }: { entry: FileListEntry; onClose: () => vo
             href={buildDownloadUrl(entry.path)}
             download={entry.name}
             onClick={onClose}
-            className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-primary text-[13px] font-medium text-primary-foreground active:opacity-90"
+            className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-primary text-[13px] font-medium text-primary-foreground transition-transform active:scale-[0.98]"
           >
             <Download className="size-4" /> Download
           </a>
           <button
             type="button"
             onClick={onClose}
-            className="flex min-h-12 items-center justify-center rounded-2xl border border-glass-border px-5 text-[13px] text-muted-foreground active:bg-white/5"
+            className="flex min-h-12 items-center justify-center rounded-2xl bg-white/6 px-5 text-[13px] text-muted-foreground active:bg-white/10"
           >
             Close
           </button>
@@ -160,7 +160,7 @@ function UploadSheet({
       />
 
       <div
-        className="relative animate-in slide-in-from-bottom-4 rounded-t-[1.75rem] border-t border-glass-border bg-[#121519] px-5 pt-2.5 pb-5 duration-200"
+        className="relative animate-in slide-in-from-bottom-4 rounded-t-[1.75rem] bg-[#14171b] px-5 pt-2.5 pb-5 duration-200"
         style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 1.25rem)" }}
       >
         <span aria-hidden="true" className="mx-auto block h-1 w-10 rounded-full bg-white/15" />
@@ -175,7 +175,7 @@ function UploadSheet({
                 key={picker.key}
                 type="button"
                 onClick={() => onPick(picker.accept)}
-                className="flex min-h-14 items-center gap-3.5 rounded-2xl bg-white/5 px-3.5 py-2.5 text-left ring-1 ring-white/6 transition-transform active:scale-[0.99] active:bg-white/8"
+                className="flex min-h-14 items-center gap-3.5 rounded-2xl bg-white/5 px-3.5 py-2.5 text-left transition-transform active:scale-[0.99] active:bg-white/8"
               >
                 <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white/6">
                   <Icon className="size-5" />
@@ -258,16 +258,16 @@ export function PhoneFiles() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-start gap-3">
+      <header className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-xl font-medium">
-            {segments.length > 0 ? segments[segments.length - 1] : "Files"}
-          </h1>
-          <p className="mt-0.5 text-[12px] text-muted-foreground">
+          <p className="text-[11px] text-muted-foreground">
             {isLoading
               ? "Loading…"
               : `${folders.length} folder${folders.length === 1 ? "" : "s"} · ${files.length} file${files.length === 1 ? "" : "s"}`}
           </p>
+          <h1 className="truncate text-lg font-medium">
+            {segments.length > 0 ? segments[segments.length - 1] : "Files"}
+          </h1>
         </div>
 
         {/* In the header rather than a floating button: a position:fixed child
@@ -280,12 +280,12 @@ export function PhoneFiles() {
         >
           <Plus className="size-5" />
         </button>
-      </div>
+      </header>
 
       <Crumbs segments={segments} onNavigate={navigate} />
 
       {progress !== null && (
-        <div className="rounded-2xl border border-glass-border bg-black/25 px-3.5 py-3">
+        <div className="rounded-2xl bg-white/5 px-3.5 py-3">
           <p className="text-[12px] text-muted-foreground">Uploading… {Math.round(progress)}%</p>
           <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/8">
             <div
@@ -297,7 +297,7 @@ export function PhoneFiles() {
       )}
 
       {message && (
-        <p className="rounded-xl border border-glass-border bg-black/20 px-3 py-2 text-[12px] text-muted-foreground">
+        <p className="rounded-2xl bg-white/4 px-3.5 py-2.5 text-[12px] text-muted-foreground">
           {message}
         </p>
       )}
@@ -305,14 +305,14 @@ export function PhoneFiles() {
       {error && (
         <p
           role="alert"
-          className="rounded-xl border border-status-red/30 bg-status-red/10 px-3 py-2 text-[12px] text-status-red"
+          className="rounded-2xl bg-status-red/10 px-3.5 py-2.5 text-[12px] text-status-red"
         >
           {error instanceof Error ? error.message : "Could not open that folder."}
         </p>
       )}
 
       {isLoading && entries.length === 0 && !error && (
-        <ul className="overflow-hidden rounded-3xl bg-white/4 ring-1 ring-white/6" aria-hidden="true">
+        <ul className="overflow-hidden rounded-3xl bg-white/4" aria-hidden="true">
           {[0, 1, 2].map((row) => (
             <li key={row} className="flex min-h-15 items-center gap-3.5 border-b border-white/5 px-3.5 py-2.5 last:border-b-0">
               <span className="size-10 shrink-0 animate-pulse rounded-2xl bg-white/6" />
@@ -327,7 +327,7 @@ export function PhoneFiles() {
 
       {!isLoading && entries.length === 0 && !error && (
         <div className="mt-10 flex flex-col items-center text-center">
-          <span className="grid size-16 place-items-center rounded-3xl bg-white/5 ring-1 ring-white/6">
+          <span className="grid size-16 place-items-center rounded-3xl bg-white/5">
             <File className="size-6 opacity-60" />
           </span>
           <p className="mt-3 text-sm text-muted-foreground">This folder is empty</p>
@@ -346,9 +346,9 @@ export function PhoneFiles() {
                 key={entry.path}
                 type="button"
                 onClick={() => navigate(entry.path)}
-                className="flex flex-col items-start gap-2.5 rounded-3xl bg-gradient-to-b from-white/8 to-white/3 p-3.5 text-left ring-1 ring-white/6 transition-transform active:scale-[0.98] active:from-white/12"
+                className="flex w-full flex-col items-start gap-2.5 rounded-3xl bg-white/5 p-3.5 text-left transition-transform active:scale-[0.98] active:bg-white/8"
               >
-                <span className="grid size-11 place-items-center rounded-2xl bg-white/6">
+                <span className="grid size-11 place-items-center rounded-2xl bg-white/5">
                   {getFileIcon(toUiFileEntry(entry))}
                 </span>
                 <span className="w-full">
@@ -366,7 +366,7 @@ export function PhoneFiles() {
       {files.length > 0 && (
         <section className="flex flex-col gap-2">
           <h2 className="text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Files</h2>
-          <ul className="overflow-hidden rounded-3xl bg-white/4 ring-1 ring-white/6">
+          <ul className="overflow-hidden rounded-3xl bg-white/4">
             {files.map((entry) => {
               const size = formatSize(entry.sizeBytes);
 
