@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { RealtimeBootstrap } from "@/components/providers/realtime-bootstrap";
+import { StoreActionsProvider } from "@/modules/apps/hooks/StoreActionsContext";
 import { PhoneTabBar } from "@/modules/phone/components/phone-tab-bar";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +16,7 @@ export const dynamic = "force-dynamic";
  */
 export default function PhoneLayout({ children }: { children: ReactNode }) {
   return (
+    <StoreActionsProvider>
     <div className="flex min-h-[100dvh] flex-col bg-background text-foreground">
       {/* The same SSE stream the desktop uses. useSystemMetrics holds its cache
           with staleTime: Infinity and expects this to push updates into it —
@@ -31,5 +33,6 @@ export default function PhoneLayout({ children }: { children: ReactNode }) {
       </main>
       <PhoneTabBar />
     </div>
+    </StoreActionsProvider>
   );
 }
