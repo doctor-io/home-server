@@ -10,6 +10,12 @@ import {
   prefixOf,
   verifyToken,
 } from "@/lib/server/modules/auth/api-token-service";
+import {
+  clearLoginFailures,
+  getLoginRateLimitKey,
+  isLoginRateLimited,
+  recordLoginFailure,
+} from "@/lib/server/modules/auth/rate-limit";
 import type { ApiTokenScope } from "@/lib/shared/contracts/api-tokens";
 
 export type ApiSession = NonNullable<Awaited<ReturnType<typeof authenticateSession>>>;
@@ -74,6 +80,28 @@ function unauthorized() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }
 
+function tooManyAttempts() {
+  return NextResponse.json(
+    { error: "Too many token attempts", code: "rate_limited" },
+    { status: 429 },
+  );
+}
+
+/**
+ * The login limiter, keyed by token prefix instead of username — the prefix is
+ * the credential's public half, exactly as a username is.
+ *
+ * Keyed that way on purpose. A guess at an unknown prefix is answered by an
+ * indexed lookup and nothing else, so it is cheap and there is nothing to
+ * protect; recording it would also let random prefixes grow the map without
+ * bound. The attempt worth throttling is a guess at the *secret* of a prefix
+ * that exists, because that is the one that reaches scrypt and the one that
+ * could actually succeed.
+ */
+function tokenRateLimitKey(request: Request, prefix: string) {
+  return getLoginRateLimitKey(request, `token:${prefix}`);
+}
+
 /**
  * Authenticates a request.
  *
@@ -103,9 +131,17 @@ export async function requireApiSession(
     return { session: null, response: unauthorized() };
   }
 
+  const rateLimitKey = tokenRateLimitKey(request, record.prefix);
+  if (isLoginRateLimited(rateLimitKey)) {
+    return { session: null, response: tooManyAttempts() };
+  }
+
   if (!(await verifyToken(bearer, record.tokenHash))) {
+    recordLoginFailure(rateLimitKey);
     return { session: null, response: unauthorized() };
   }
+
+  clearLoginFailures(rateLimitKey);
 
   if (!hasScope(record.scopes, options.scope)) {
     // Distinguished from "not authenticated": the credential is real, it just
