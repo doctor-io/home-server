@@ -78,9 +78,20 @@ type SourceSnapshot = {
 type CacheEntry = {
   signature: string;
   snapshot: SourceSnapshot;
+  /** Serve the cached snapshot without touching disk until this timestamp. */
+  revalidateAfter: number;
 };
 
 const catalogCache = new LruCache<CacheEntry>(16, serverEnv.STORE_CATALOG_TTL_MS);
+
+/**
+ * How long a cached snapshot is trusted before we re-stat the catalog to check
+ * for on-disk changes. Building the signature costs one stat per app (the CasaOS
+ * store ships ~1000), so doing it per request pegged the CPU and starved the
+ * libuv fs pool — every App Store search keystroke walked the whole catalog.
+ * Explicit syncs (refreshStoreCatalogSource) bypass this entirely.
+ */
+const CATALOG_REVALIDATE_INTERVAL_MS = 30_000;
 
 function normalizeCategoryId(value: string) {
   return value.trim().toLowerCase().replace(/\s+/g, "-");
@@ -297,11 +308,20 @@ async function buildSourceSnapshot(
   source: StoreCatalogSource,
   options?: { bypassCache?: boolean },
 ): Promise<SourceSnapshot> {
+  const cached = options?.bypassCache ? null : catalogCache.get(source.id);
+  if (cached && Date.now() < cached.revalidateAfter) {
+    return cached.snapshot;
+  }
+
   const appsDirectory = await resolveAppsDirectory(repoPath);
   const composePaths = await collectComposePaths(appsDirectory);
   const signature = await buildSignature(repoPath, composePaths);
-  const cached = options?.bypassCache ? null : catalogCache.get(source.id);
   if (cached && cached.signature === signature) {
+    catalogCache.set(
+      source.id,
+      { ...cached, revalidateAfter: Date.now() + CATALOG_REVALIDATE_INTERVAL_MS },
+      serverEnv.STORE_CATALOG_TTL_MS,
+    );
     return cached.snapshot;
   }
 
@@ -343,7 +363,15 @@ async function buildSourceSnapshot(
     sourcePath: repoPath,
   };
 
-  catalogCache.set(source.id, { signature, snapshot }, serverEnv.STORE_CATALOG_TTL_MS);
+  catalogCache.set(
+    source.id,
+    {
+      signature,
+      snapshot,
+      revalidateAfter: Date.now() + CATALOG_REVALIDATE_INTERVAL_MS,
+    },
+    serverEnv.STORE_CATALOG_TTL_MS,
+  );
   return snapshot;
 }
 
