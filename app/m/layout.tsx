@@ -25,7 +25,10 @@ export default function PhoneLayout({ children }: { children: ReactNode }) {
       <main
         // pb-6 rather than clearing a fixed bar: the tab bar is a flex sibling
         // now, so it takes its own space.
-        className="min-h-0 flex-1 overflow-y-auto px-4 pb-6"
+        // A flex column, so a screen that wants to own its own scrolling can
+        // stretch to the viewport (Monitor does); the rest size to content and
+        // scroll this element as before.
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-6"
         // Clear of the notch at the top; the tab bar handles the bottom.
         style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 1rem)" }}
       >

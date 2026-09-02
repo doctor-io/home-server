@@ -1,7 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Activity, CalendarClock, Cpu, HardDrive, MemoryStick } from "@/components/icons/platform-icons";
+import {
+  Activity,
+  CalendarClock,
+  Container,
+  Cpu,
+  HardDrive,
+  MemoryStick,
+  Network,
+} from "@/components/icons/platform-icons";
 import { useDockerStats } from "@/modules/system/hooks/useDockerStats";
 import { useSystemMetrics } from "@/modules/system/hooks/useSystemMetrics";
 import { cn } from "@/lib/utils";
@@ -9,7 +17,15 @@ import { cn } from "@/lib/utils";
 /** ~4 minutes at the default 2s publish interval, as on the desktop Monitor. */
 const HISTORY_CAPACITY = 120;
 
-type Series = "cpu" | "memory";
+const TABS = [
+  { key: "cpu", label: "CPU" },
+  { key: "memory", label: "Memory" },
+  { key: "disk", label: "Disk" },
+  { key: "network", label: "Network" },
+  { key: "containers", label: "Containers" },
+] as const;
+
+type Tab = (typeof TABS)[number]["key"];
 
 function formatMb(bytes: number): string {
   return `${Math.round(bytes / 1024 ** 2)} MB`;
@@ -72,14 +88,24 @@ function smoothPath(values: number[], scaleMax: number) {
  * even weight under that stretch, and the marker is an HTML dot on top rather
  * than an SVG circle, which the same stretch would turn into an ellipse.
  */
-function HistoryChart({ values, unit }: { values: number[]; unit: string }) {
+function HistoryChart({
+  values,
+  unit,
+  minScale = 20,
+  decimals = 0,
+}: {
+  values: number[];
+  unit: string;
+  minScale?: number;
+  decimals?: number;
+}) {
   // Anchored at zero, but with a ceiling that follows the data: a machine
   // idling at 4% drawn against a fixed 0-100 axis is a flat line on the floor,
-  // which says less than it could. The floor of 20 stops a quiet minute from
-  // being magnified into a mountain range.
+  // which says less than it could. The floor stops a quiet minute from being
+  // magnified into a mountain range.
   const scaleMax = useMemo(
-    () => Math.max(20, Math.ceil((Math.max(...values, 0) * 1.25) / 5) * 5),
-    [values],
+    () => Math.max(minScale, Math.max(...values, 0) * 1.25),
+    [values, minScale],
   );
   const path = useMemo(() => smoothPath(values, scaleMax), [values, scaleMax]);
   const latest = values.at(-1) ?? 0;
@@ -136,7 +162,7 @@ function HistoryChart({ values, unit }: { values: number[]; unit: string }) {
         <div className="rounded-xl bg-[#1a1d22] px-2.5 py-1.5 text-center shadow-lg shadow-black/40 ring-1 ring-white/8">
           <p className="text-[9px] whitespace-nowrap text-muted-foreground">now</p>
           <p className="text-[12px] font-medium tabular-nums">
-            {Math.round(latest)}
+            {latest.toFixed(decimals)}
             {unit}
           </p>
         </div>
@@ -161,9 +187,11 @@ function toneFor(percent: number | null) {
 
 function Chip({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex min-w-[4.75rem] flex-1 flex-col items-center gap-1.5 rounded-2xl bg-white/4 px-2 py-3">
+    <div className="flex min-w-0 flex-1 flex-col items-center gap-1.5 rounded-2xl bg-white/4 px-2 py-3">
       <span className="text-[10px] text-muted-foreground">{label}</span>
-      <span className="text-[14px] font-medium tabular-nums">{value}</span>
+      <span className="w-full truncate text-center text-[14px] font-medium tabular-nums">
+        {value}
+      </span>
     </div>
   );
 }
@@ -188,20 +216,49 @@ function Stat({
   );
 }
 
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 border-b border-white/5 px-3.5 py-2.5 last:border-b-0">
+      <span className="shrink-0 text-[12px] text-muted-foreground">{label}</span>
+      <span className="truncate font-mono text-[12px]" title={value}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function UsageBar({ percent }: { percent: number }) {
+  return (
+    <div className="h-1.5 overflow-hidden rounded-full bg-white/8">
+      <div
+        className={cn(
+          "h-full rounded-full",
+          percent >= 90 ? "bg-status-red" : percent >= 75 ? "bg-status-amber" : "bg-white/45",
+        )}
+        style={{ width: `${Math.min(100, Math.max(2, percent))}%` }}
+      />
+    </div>
+  );
+}
+
 export function PhoneMonitor() {
   const { data: metrics } = useSystemMetrics();
   const { stats, daemonAvailable } = useDockerStats();
   const [cpuHistory, setCpuHistory] = useState<number[]>([]);
   const [memHistory, setMemHistory] = useState<number[]>([]);
-  const [series, setSeries] = useState<Series>("cpu");
+  const [netHistory, setNetHistory] = useState<number[]>([]);
+  const [tab, setTab] = useState<Tab>("cpu");
 
   useEffect(() => {
     if (!metrics) return;
 
     const cpu = metrics.cpu?.normalizedPercent ?? 0;
     const memory = metrics.memory?.usedPercent ?? 0;
-    setCpuHistory((previous) => [...previous.slice(-(HISTORY_CAPACITY - 1)), cpu]);
-    setMemHistory((previous) => [...previous.slice(-(HISTORY_CAPACITY - 1)), memory]);
+    const download = metrics.wifi?.downloadMbps ?? 0;
+    const keep = <T,>(previous: T[], next: T) => [...previous.slice(-(HISTORY_CAPACITY - 1)), next];
+    setCpuHistory((previous) => keep(previous, cpu));
+    setMemHistory((previous) => keep(previous, memory));
+    setNetHistory((previous) => keep(previous, download));
   }, [metrics]);
 
   // Deliberately not gated on `metrics`: a cold metrics snapshot can take
@@ -210,44 +267,107 @@ export function PhoneMonitor() {
   // whole screen on the slowest source makes the app look broken.
   const storage = metrics?.storage;
   const temperature = metrics?.temperature?.mainCelsius;
+  const wifi = metrics?.wifi;
+  const volumes = storage?.volumes ?? [];
+  const running = stats.filter((container) => container.state === "running").length;
 
-  const isCpu = series === "cpu";
-  const HeadlineIcon = isCpu ? Cpu : MemoryStick;
-  const headline = isCpu
-    ? (metrics?.cpu?.normalizedPercent ?? null)
-    : (metrics?.memory?.usedPercent ?? null);
+  const hero: Record<Tab, { label: string; value: string; icon: typeof Activity; percent: number | null }> = {
+    cpu: {
+      label: "CPU load",
+      value: metrics ? `${Math.round(metrics.cpu?.normalizedPercent ?? 0)}%` : "—",
+      icon: Cpu,
+      percent: metrics?.cpu?.normalizedPercent ?? null,
+    },
+    memory: {
+      label: "Memory in use",
+      value: metrics ? `${Math.round(metrics.memory?.usedPercent ?? 0)}%` : "—",
+      icon: MemoryStick,
+      percent: metrics?.memory?.usedPercent ?? null,
+    },
+    disk: {
+      label: "Disk in use",
+      value: storage ? `${Math.round(storage.usedPercent)}%` : "—",
+      icon: HardDrive,
+      percent: storage?.usedPercent ?? null,
+    },
+    network: {
+      label: "Downloading",
+      value: wifi?.downloadMbps !== null && wifi?.downloadMbps !== undefined
+        ? `${wifi.downloadMbps.toFixed(1)} Mb/s`
+        : "—",
+      icon: Network,
+      percent: null,
+    },
+    containers: {
+      label: running === 1 ? "Container running" : "Containers running",
+      value: daemonAvailable === false ? "—" : `${running}`,
+      icon: Container,
+      percent: null,
+    },
+  };
 
-  const chips = isCpu
-    ? [
-        { label: "Load 1m", value: metrics ? (metrics.cpu?.oneMinute ?? 0).toFixed(2) : "—" },
-        { label: "Load 5m", value: metrics ? (metrics.cpu?.fiveMinute ?? 0).toFixed(2) : "—" },
-        { label: "Load 15m", value: metrics ? (metrics.cpu?.fifteenMinute ?? 0).toFixed(2) : "—" },
-        {
-          label: "Temp",
-          value:
-            temperature !== null && temperature !== undefined
-              ? `${Math.round(temperature)}°C`
-              : "—",
-        },
-      ]
-    : [
-        { label: "Used", value: metrics ? formatSize(metrics.memory?.usedBytes ?? 0) : "—" },
-        { label: "Free", value: metrics ? formatSize(metrics.memory?.freeBytes ?? 0) : "—" },
-        { label: "Total", value: metrics ? formatSize(metrics.memory?.totalBytes ?? 0) : "—" },
-        {
-          label: "Containers",
-          value: daemonAvailable === false ? "—" : String(stats.length),
-        },
-      ];
+  const chips: Record<Tab, { label: string; value: string }[]> = {
+    cpu: [
+      { label: "Load 1m", value: metrics ? (metrics.cpu?.oneMinute ?? 0).toFixed(2) : "—" },
+      { label: "Load 5m", value: metrics ? (metrics.cpu?.fiveMinute ?? 0).toFixed(2) : "—" },
+      { label: "Load 15m", value: metrics ? (metrics.cpu?.fifteenMinute ?? 0).toFixed(2) : "—" },
+      {
+        label: "Temp",
+        value:
+          temperature !== null && temperature !== undefined
+            ? `${Math.round(temperature)}°C`
+            : "—",
+      },
+    ],
+    memory: [
+      { label: "Used", value: metrics ? formatSize(metrics.memory?.usedBytes ?? 0) : "—" },
+      { label: "Free", value: metrics ? formatSize(metrics.memory?.freeBytes ?? 0) : "—" },
+      { label: "Total", value: metrics ? formatSize(metrics.memory?.totalBytes ?? 0) : "—" },
+    ],
+    disk: [
+      { label: "Used", value: storage ? formatSize(storage.usedBytes) : "—" },
+      { label: "Free", value: storage ? formatSize(storage.availableBytes) : "—" },
+      { label: "Total", value: storage ? formatSize(storage.totalBytes) : "—" },
+      { label: "Volumes", value: volumes.length > 0 ? String(volumes.length) : "1" },
+    ],
+    network: [
+      {
+        label: "Down",
+        value: wifi?.downloadMbps != null ? `${wifi.downloadMbps.toFixed(1)}` : "—",
+      },
+      { label: "Up", value: wifi?.uploadMbps != null ? `${wifi.uploadMbps.toFixed(1)}` : "—" },
+      {
+        label: "Signal",
+        value: wifi?.signalPercent != null ? `${Math.round(wifi.signalPercent)}%` : "—",
+      },
+      { label: "Link", value: wifi?.ssid ?? wifi?.iface ?? "—" },
+    ],
+    containers: [
+      { label: "Running", value: String(running) },
+      { label: "Total", value: String(stats.length) },
+      {
+        label: "CPU",
+        value: `${stats.reduce((sum, container) => sum + container.cpuPercent, 0).toFixed(1)}%`,
+      },
+      {
+        label: "Memory",
+        value: formatSize(stats.reduce((sum, container) => sum + container.memoryUsed, 0)),
+      },
+    ],
+  };
+
+  const HeroIcon = hero[tab].icon;
 
   return (
-    <div className="flex flex-col gap-3.5">
+    // A fixed head with a scrolling body: the page itself no longer moves, so
+    // the reading you came for stays on screen while a long list scrolls.
+    <div className="flex min-h-0 flex-1 flex-col gap-3.5">
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[11px] text-muted-foreground">Monitoring</p>
           <h1 className="truncate text-lg font-medium">{metrics?.hostname ?? "This server"}</h1>
         </div>
-        <Activity className="mt-1 size-5 opacity-40" />
+        <Activity className="mt-1 size-5 opacity-40 grayscale" />
       </header>
 
       {/* The headline reading, sized to be read from across the room — the
@@ -257,14 +377,18 @@ export function PhoneMonitor() {
           {metrics ? `Up ${formatUptime(metrics.uptimeSeconds)}` : "Reading…"}
         </p>
         <div className="mt-1 flex items-end justify-between gap-4">
-          <div>
-            <p className="text-[13px] font-medium">{isCpu ? "CPU load" : "Memory in use"}</p>
-            <p className="mt-1 text-[2.75rem] leading-none font-medium tabular-nums">
-              {headline === null ? "—" : Math.round(headline)}
-              {headline !== null && <span className="text-2xl">%</span>}
+          <div className="min-w-0">
+            <p className="text-[13px] font-medium">{hero[tab].label}</p>
+            <p
+              className={cn(
+                "mt-1 truncate text-[2.75rem] leading-none font-medium tabular-nums",
+                toneFor(hero[tab].percent),
+              )}
+            >
+              {hero[tab].value}
             </p>
           </div>
-          <HeadlineIcon className="size-14 opacity-40" />
+          <HeroIcon className="size-14 shrink-0 opacity-40" />
         </div>
       </section>
 
@@ -288,80 +412,132 @@ export function PhoneMonitor() {
         />
       </section>
 
-      {/* Tabs pick the series for everything below them — the chips are that
-          series' supporting numbers, the chart is its history. */}
-      <div className="flex flex-col gap-2.5">
-        <div className="flex gap-5">
-          {(["cpu", "memory"] as const).map((option) => (
-            <button
-              key={option}
-              type="button"
-              onClick={() => setSeries(option)}
-              className="flex flex-col items-center gap-1.5 pt-1"
+      {/* Tabs pick what everything below them is about — the chips are that
+          subject's supporting numbers, the panel is its detail. */}
+      <div className="-mx-4 flex gap-4 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {TABS.map((option) => (
+          <button
+            key={option.key}
+            type="button"
+            onClick={() => setTab(option.key)}
+            className="flex shrink-0 flex-col items-center gap-1.5 pt-1"
+          >
+            <span
+              className={cn(
+                "text-[13px] whitespace-nowrap transition-colors",
+                tab === option.key ? "font-medium" : "text-muted-foreground",
+              )}
             >
-              <span
-                className={cn(
-                  "text-[13px] transition-colors",
-                  series === option ? "font-medium" : "text-muted-foreground",
-                )}
-              >
-                {option === "cpu" ? "CPU" : "Memory"}
-              </span>
-              <span
-                aria-hidden="true"
-                className={cn(
-                  "size-1 rounded-full transition-colors",
-                  series === option ? "bg-primary" : "bg-transparent",
-                )}
-              />
-            </button>
-          ))}
-        </div>
+              {option.label}
+            </span>
+            <span
+              aria-hidden="true"
+              className={cn(
+                "size-1 rounded-full transition-colors",
+                tab === option.key ? "bg-primary" : "bg-transparent",
+              )}
+            />
+          </button>
+        ))}
+      </div>
 
-        <div className="flex gap-2">
-          {chips.map((chip) => (
+      <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto pb-2">
+        <div className="flex shrink-0 gap-2">
+          {chips[tab].map((chip) => (
             <Chip key={chip.label} label={chip.label} value={chip.value} />
           ))}
         </div>
 
-        <HistoryChart values={isCpu ? cpuHistory : memHistory} unit="%" />
-      </div>
-
-      <section className="mb-2 flex flex-col gap-2">
-        <h2 className="text-[10px] tracking-[0.18em] text-muted-foreground uppercase">
-          Containers
-        </h2>
-        {daemonAvailable === false ? (
-          <p className="rounded-2xl bg-white/4 px-3.5 py-3 text-[12px] text-status-amber">
-            The Docker daemon is not reachable.
-          </p>
-        ) : stats.length === 0 ? (
-          <p className="rounded-2xl bg-white/4 px-3.5 py-3 text-[12px] text-muted-foreground">
-            No containers running.
-          </p>
-        ) : (
-          <ul className="overflow-hidden rounded-3xl bg-white/4">
-            {stats.map((container) => (
-              <li
-                key={container.id}
-                className="flex items-center gap-3 border-b border-white/5 px-3.5 py-3 last:border-b-0"
-              >
-                <span
-                  aria-hidden="true"
-                  className={cn(
-                    "size-2 shrink-0 rounded-full",
-                    container.state === "running" ? "bg-status-green" : "bg-white/25",
-                  )}
-                />
-                <span className="min-w-0 flex-1 truncate text-[13px]">{container.name}</span>
-                <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
-                  {container.cpuPercent.toFixed(1)}% · {formatMb(container.memoryUsed)}
-                </span>
-              </li>
-            ))}
-          </ul>
+        {(tab === "cpu" || tab === "memory") && (
+          <HistoryChart values={tab === "cpu" ? cpuHistory : memHistory} unit="%" />
         )}
-      </section>
+
+        {tab === "network" && (
+          <>
+            <HistoryChart values={netHistory} unit=" Mb/s" minScale={1} decimals={1} />
+            <div className="overflow-hidden rounded-3xl bg-white/4">
+              <Row label="Interface" value={wifi?.iface ?? "—"} />
+              <Row label="Network" value={wifi?.ssid ?? (wifi?.connected ? "Wired" : "—")} />
+              <Row label="IPv4" value={wifi?.ipv4 ?? "—"} />
+              <Row label="IPv6" value={wifi?.ipv6 ?? "—"} />
+            </div>
+          </>
+        )}
+
+        {tab === "disk" && (
+          <>
+            <div className="rounded-3xl bg-white/4 px-4 py-3.5">
+              <div className="flex items-baseline justify-between">
+                <span className="truncate font-mono text-[12px] text-muted-foreground">
+                  {storage?.mountPath ?? "—"}
+                </span>
+                <span className={cn("text-[13px] font-medium tabular-nums", toneFor(storage?.usedPercent ?? null))}>
+                  {storage ? `${Math.round(storage.usedPercent)}%` : "—"}
+                </span>
+              </div>
+              <div className="mt-2.5">
+                <UsageBar percent={storage?.usedPercent ?? 0} />
+              </div>
+            </div>
+
+            {volumes.length > 0 && (
+              <ul className="overflow-hidden rounded-3xl bg-white/4">
+                {volumes.map((volume) => (
+                  <li key={volume.id} className="border-b border-white/5 px-3.5 py-3 last:border-b-0">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="min-w-0 flex-1 truncate text-[13px]">{volume.label}</span>
+                      <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
+                        {formatSize(volume.usedBytes)} / {formatSize(volume.totalBytes)}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground/60">
+                      {volume.mountPath}
+                    </p>
+                    <div className="mt-2">
+                      <UsageBar percent={volume.usedPercent} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
+
+        {tab === "containers" && (
+          <>
+            {daemonAvailable === false ? (
+              <p className="rounded-2xl bg-white/4 px-3.5 py-3 text-[12px] text-status-amber">
+                The Docker daemon is not reachable.
+              </p>
+            ) : stats.length === 0 ? (
+              <p className="rounded-2xl bg-white/4 px-3.5 py-3 text-[12px] text-muted-foreground">
+                No containers running.
+              </p>
+            ) : (
+              <ul className="overflow-hidden rounded-3xl bg-white/4">
+                {stats.map((container) => (
+                  <li
+                    key={container.id}
+                    className="flex items-center gap-3 border-b border-white/5 px-3.5 py-3 last:border-b-0"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        "size-2 shrink-0 rounded-full",
+                        container.state === "running" ? "bg-status-green" : "bg-white/25",
+                      )}
+                    />
+                    <span className="min-w-0 flex-1 truncate text-[13px]">{container.name}</span>
+                    <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
+                      {container.cpuPercent.toFixed(1)}% · {formatMb(container.memoryUsed)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
