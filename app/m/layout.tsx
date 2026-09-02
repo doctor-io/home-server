@@ -17,7 +17,11 @@ export const dynamic = "force-dynamic";
 export default function PhoneLayout({ children }: { children: ReactNode }) {
   return (
     <StoreActionsProvider>
-    <div className="flex min-h-[100dvh] flex-col bg-background text-foreground">
+    {/* A height, not a minimum. With min-h the column grows to fit its content,
+        so a screen that wants to scroll one region internally cannot: everything
+        above it grows too and the document scrolls instead. 100dvh shrinks with
+        the keyboard, which is what the terminal depends on. */}
+    <div className="flex h-[100dvh] flex-col bg-background text-foreground">
       {/* The same SSE stream the desktop uses. useSystemMetrics holds its cache
           with staleTime: Infinity and expects this to push updates into it —
           without it the phone would show one snapshot and then never move. */}

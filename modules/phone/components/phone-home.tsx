@@ -118,7 +118,9 @@ export function PhoneHome() {
   const attention = summary.apps.filter(needsAttention).length;
 
   return (
-    <div className="flex flex-col gap-3.5">
+    // Fixed head, scrolling apps: the readings you opened the screen for stay
+    // put, and only the list moves. Same shape as Monitor.
+    <div className="flex min-h-0 flex-1 flex-col gap-3.5">
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[11px] text-muted-foreground">Welcome home,</p>
@@ -216,16 +218,20 @@ export function PhoneHome() {
         </section>
       )}
 
-      <section className="flex flex-col gap-2">
-        <h2 className="text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Apps</h2>
+      <section className="flex min-h-0 flex-1 flex-col gap-2">
+        <h2 className="shrink-0 text-[10px] tracking-[0.18em] text-muted-foreground uppercase">
+          Apps
+        </h2>
 
         {summary.apps.length === 0 ? (
           <p className="rounded-2xl bg-white/4 px-3.5 py-3 text-[12px] text-muted-foreground">
             Nothing installed yet.
           </p>
         ) : (
-          <ul className="overflow-hidden rounded-3xl bg-white/4">
-            {summary.apps.slice(0, 6).map((app) => (
+          // Every app, not the first six: the list scrolls on its own now, so a
+          // cap would just be an arbitrary place for it to stop.
+          <ul className="min-h-0 flex-1 overflow-y-auto rounded-3xl bg-white/4 pb-0">
+            {summary.apps.map((app) => (
               <li key={app.appId} className="border-b border-white/5 last:border-b-0">
                 <Link
                   href="/m/apps"
@@ -250,27 +256,9 @@ export function PhoneHome() {
                 </Link>
               </li>
             ))}
-
-            {summary.apps.length > 6 && (
-              <li>
-                <Link
-                  href="/m/apps"
-                  className="flex min-h-12 items-center justify-center gap-1 px-3.5 text-[12px] text-primary"
-                >
-                  All {summary.apps.length} apps
-                </Link>
-              </li>
-            )}
           </ul>
         )}
       </section>
-
-      <Link
-        href="/"
-        className="mb-2 block rounded-2xl bg-white/4 py-3 text-center text-[12px] text-muted-foreground active:bg-white/8"
-      >
-        Desktop view
-      </Link>
     </div>
   );
 }
