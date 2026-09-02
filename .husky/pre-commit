@@ -1,11 +1,20 @@
 #!/usr/bin/env sh
-# Run tests
-npm run test:watch
-# Bump package version without creating a git tag or commit (force to allow dirty tree during commit)
-npm version patch --no-git-tag-version --force
+set -e
 
-# Ensure bumped files are staged for the current commit
+# A merge is not a change worth a version, and bumping mid-merge fights the
+# merge itself.
+if [ -e .git/MERGE_HEAD ]; then
+	exit 0
+fi
+
+# Single run, not `test:watch`: the watcher never exits, so a commit that
+# called it would hang until someone noticed and killed it.
+npm test
+
+# Every commit carries a version, so an install can always be traced back to
+# what it is running. No tag and no commit of its own — the bump rides along
+# with the change that caused it.
+npm version patch --no-git-tag-version --force
 git add package.json package-lock.json
 
-# Run lint fixes and build validation
 npx lint-staged && npm run build
