@@ -3,6 +3,13 @@
 A self-hosted server manager with a desktop-style UI. Alternative to CasaOS, Umbrel, and Portainer — focused on a modern interface, real-time system visibility, and Docker app management.
 
 <p align="center">
+  <a href="https://github.com/doctor-io/homeio/stargazers"><img src="https://img.shields.io/github/stars/doctor-io/homeio?style=for-the-badge&logo=github&color=2563eb" alt="GitHub Stars" /></a>
+  <a href="https://demo.homeio.app"><img src="https://img.shields.io/badge/Live%20Demo-demo.homeio.app-10b981?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Live Demo" /></a>
+  <a href="https://github.com/doctor-io/homeio/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-f59e0b?style=for-the-badge" alt="MIT License" /></a>
+  <a href="https://github.com/sponsors/doctor-io"><img src="https://img.shields.io/github/sponsors/doctor-io?style=for-the-badge&color=ec4899" alt="GitHub Sponsors" /></a>
+</p>
+
+<p align="center">
   <img src="public/screenshots/demo.gif" alt="Homeio demo — desktop shell, command palette, file manager, and terminal" width="100%" />
 </p>
 
@@ -10,9 +17,9 @@ A self-hosted server manager with a desktop-style UI. Alternative to CasaOS, Umb
   <a href="https://demo.homeio.app"><strong>🖥️ Live demo</strong></a> &nbsp;·&nbsp;
   <code>homeio</code> / <code>homeio26</code>
   &nbsp;·&nbsp;
-  <a href="https://github.com/sponsors/doctor-io">
-    <img src="https://img.shields.io/github/sponsors/doctor-io?style=for-the-badge" alt="GitHub Sponsors" />
-  </a>
+  <a href="https://github.com/doctor-io/homeio"><strong>⭐ Star on GitHub</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/sponsors/doctor-io"><strong>💖 Sponsor</strong></a>
 </p>
 
 ## Screenshots
@@ -39,7 +46,12 @@ A self-hosted server manager with a desktop-style UI. Alternative to CasaOS, Umb
 - Terminal with command allowlist (ls, cat, docker, df, ping, and more)
 - Docker container stats in real time
 - Network manager: WiFi and Ethernet via NetworkManager
-- Weather widget with location-based conditions
+- Tailscale integration: install, activate, and monitor your tailnet from Settings — reach your server from anywhere without port forwarding
+- Google Drive: connect accounts over OAuth 2.0 and browse Drive alongside local and network locations in the file manager
+- Two-factor authentication (TOTP) with backup codes — works with any authenticator app
+- Disk manager and server info: drives, partitions, mount points, thermal sensors, and usage warnings
+- Mobile app (preview): a Capacitor shell for Android and iOS that reaches your server over Tailscale
+- Runs on amd64 and arm64 — Raspberry Pi 4/5 pull a native image
 - PostgreSQL-backed persistence
 
 ---
@@ -99,7 +111,8 @@ curl -fsSL https://raw.githubusercontent.com/doctor-io/homeio/main/scripts/unins
 ## Security Notes
 
 - Change `AUTH_SESSION_SECRET` to a random 32+ character string before exposing outside your LAN
-- Put Homeio behind a TLS reverse proxy for HTTPS — the `Secure` cookie flag is set automatically when requests arrive over HTTPS. v1.7 will include a built-in reverse proxy manager with automatic Let's Encrypt certificates.
+- Put Homeio behind a TLS reverse proxy for HTTPS — the `Secure` cookie flag is set automatically when requests arrive over HTTPS. One-click HTTPS over Tailscale arrives in v2.0; a built-in reverse proxy manager with automatic Let's Encrypt certificates follows in v2.1.
+- Enable two-factor authentication (Settings → Users & Access) before exposing Homeio beyond your LAN
 - The built-in terminal enforces a strict command allowlist — it is not a full shell
 
 ---
@@ -160,23 +173,35 @@ To opt out, set `HOMEIO_TELEMETRY=false` in your environment.
 
 ## Roadmap
 
-See [ROADMAP.md](./ROADMAP.md) — currently shipping v1.7.
+See [ROADMAP.md](./ROADMAP.md) — current stable release is **v1.7.24**.
 
-**Coming in v1.7:**
-- Reverse proxy manager — expose any container over HTTPS with a custom domain, managed from within Homeio; auto-provisions Let's Encrypt certificates, no nginx config editing required
+**Shipped in v1.7:**
+- Two-factor authentication (TOTP) — secure the account with any authenticator app; ten single-use backup codes included
+- Stability & Pi hardening — multi-arch Docker image (amd64 + arm64), Node.js heap cap, Docker compose timeouts, bounded file search, and clean graceful shutdown
+- Authenticated SSE streams — system metrics, container stats, and store operations now require a session, with an architecture test that fails any new unauthenticated `/api/v1` route
+- Mobile app preview — Capacitor shell for Android and iOS over Tailscale
+
+**Coming in v2.0** (there is no v1.8 — six tracks ship together):
+- First-run setup wizard — timezone, storage, Tailscale, 2FA, and your first app in five skippable steps
+- Bring your own compose — paste a compose file, a `docker run` command, or a GitHub raw URL and Homeio installs it as an app
+- Container auto-heal — per-app restart policy, crash-loop detection, and an alert after N restarts in a window
+- Home Assistant integration — scoped API tokens plus a custom component exposing CPU, memory, disk, temperature, and per-app state as entities
+- Expose apps over Tailscale — one click gives any container a valid HTTPS tailnet URL, no port forwarding and no certificate management
+- Mobile app v2 — multiple servers, QR pairing, real error states, biometric launcher lock, and native download handling
+
+**Planned for v2.1:**
+- Reverse proxy manager — expose any container over HTTPS with a custom domain; auto-provisions Let's Encrypt certificates, no nginx config editing required
 - Dynamic DNS (DDNS) — automatically update Cloudflare, DuckDNS, or No-IP when your WAN IP changes
 - SMART disk health monitoring — drive health status, temperature, and pre-failure alerts via `smartctl`
 - Hardware sensor monitoring — CPU die temperature, NVMe temp, and fan RPM in the System module
-- Two-factor authentication (TOTP) — secure the single-user account with any authenticator app; backup codes included
-- Stability & Pi hardening — multi-arch Docker image (amd64 + arm64), Node.js heap cap, SSE authentication fixes, Docker compose timeout, and graceful shutdown improvements
-
-**Planned for v1.8:**
 - Metrics history — persist and graph system and container metrics with time-range selectors (1 h / 24 h / 7 d / 30 d)
-- SMART disk health — real-time drive health status, temperature, and pre-failure alerts via `smartctl`
-- Hardware sensor monitoring — CPU die temperature, NVMe temp, and fan RPM
 - Docker image manager — browse, pull, inspect, and remove images directly without compose files
 - Webhooks — outbound HTTP notifications to Home Assistant, n8n, and other services
 - File manager enhancements — zip/unzip, bulk rename, batch delete
+
+**Planned for v2.2:**
+- Multi-user with role-based access (admin / user / viewer), per-app access control, and optional isolated file roots
+- Audit log — every install, file operation, power action, settings change, and auth event recorded
 
 ## Support Homeio
 

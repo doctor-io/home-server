@@ -127,9 +127,10 @@ A second factor matters as soon as Homeio is reachable beyond the LAN — over T
 
 > *Make Homeio easy to start, easy to fill with apps, hard to knock over, and reachable from anywhere.*
 
-**Status: active development.** Tracks 1, 2 and 3 are complete on the `v2.0` branch. Track 5
-(expose over Tailscale) was dropped from this release; the remaining work is Track 4 (Home
-Assistant) and Track 6 (mobile v2). Status is marked per track below.
+**Status: active development.** Tracks 1, 2 and 3 are complete on the `v2.0` branch, as is
+the API-token half of Track 4. Track 5 (expose over Tailscale) was dropped from this release,
+and the Home Assistant component is paused pending a packaging decision. Active work is
+Track 6 (mobile v2) and Track 7 (the phone UI). Status is marked per track below.
 
 **There is no v1.8 or v1.9.** The six tracks below land together as one release, so the version jumps from v1.7.24 straight to v2.0. Everything previously scoped for v1.8 — reverse proxy, SSL, DDNS, SMART, sensors, metrics history — moves to [v2.1](#v21--exposure-observability--docker-power-tools). Multi-user and RBAC move to [v2.2](#v22--multi-user--access-control).
 
@@ -269,7 +270,9 @@ Homeio can already tell you a container crashed. It cannot do anything about it.
 
 ---
 
-### Track 4 — Home Assistant Integration
+### Track 4 — Home Assistant Integration ⏸ Tokens shipped, component paused
+
+*The Homeio side is complete and on `v2.0`: scoped API tokens, and a `/api/v1/system/summary` aggregate cached for five seconds. The Home Assistant component itself is paused as of 2026-08-30, pending a decision on whether it lives in its own HACS-installable repository (recommended, since HACS installs from a repository root) or under `apps/` here.*
 
 Home Assistant is where the homelab audience already lives. This track ships the API-token layer first (previously scoped for v2.0's multi-user work, pulled forward because it stands alone) and then a custom component that consumes it — so the tokens land with a real client instead of shipping into a vacuum.
 
@@ -345,6 +348,29 @@ The full nginx-plus-ACME reverse proxy is a large project with a lot of 3 a.m. f
 - Status is read on the existing Tailscale status poll; this track adds no new poller and no new background loop.
 
 **Done when** — an app is reachable at a valid HTTPS tailnet URL in under 30 seconds from one click; exposures survive a container restart; uninstalling the app removes the exposure; with no exposures configured, v1.6 Tailscale behaviour is unchanged.
+
+---
+
+### Track 7 — Phone UI (`/m`) 🚧 In progress
+
+> *A phone screen, not a shrunken desktop.*
+
+The desktop shell is a desktop metaphor — windows, a dock, drag-to-move, a command palette —
+and it does not shrink into a phone. Rather than thread breakpoints through the window
+manager and every panel, which is the riskiest possible change for existing desktop users,
+the phone gets its own route in the same app.
+
+`/m` shares the session cookie, the API and the hooks, and leaves the desktop shell
+untouched. The mobile launcher navigates there and falls back to `/` when a server does not
+serve it, so an older server keeps working.
+
+**What belongs on a phone:** system status at a glance, the monitor (CPU and memory history,
+disk, load, containers), the app list with start/stop/restart and a tap to open an app, file
+browsing with download and upload, and the terminal.
+
+**What does not:** the app store, disk manager, compose editor, scheduled tasks, and settings
+beyond the essentials. A "Desktop view" link covers the rare case where someone needs one of
+them from a phone.
 
 ---
 

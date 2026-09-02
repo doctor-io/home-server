@@ -1184,6 +1184,9 @@ print_summary() {
 	echo -e "  App runtime: 127.0.0.1:${APP_PORT}"
 	echo -e "  Auth entry:  ${auth_entry}"
 	echo ""
+	echo -e "${YELLOW}⭐ Enjoying Homeio? Consider starring us on GitHub:${NC}"
+	echo -e "  https://github.com/doctor-io/homeio"
+	echo ""
 }
 
 
