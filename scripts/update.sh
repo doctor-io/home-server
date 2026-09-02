@@ -129,6 +129,17 @@ create_backup() {
 }
 
 deploy_from_git() {
+	# Never sit waiting for a username. This script is piped into `sudo bash`
+	# with the services already stopped, so a prompt on stdin is an outage that
+	# waits for someone to notice it. Fail fast and let the error path roll back.
+	#
+	# Git prompts for credentials whenever it cannot make sense of the server's
+	# answer, which is not always an auth problem: a host whose network mangles
+	# git's protocol v2 exchange produces "expected flush after ref listing" and
+	# then a username prompt for a public repository. `git config --global
+	# http.version HTTP/1.1`, or `protocol.version 0`, fixes that end.
+	export GIT_TERMINAL_PROMPT=0
+
 	if [[ -d "${INSTALL_DIR}/.git" ]]; then
 		print_status "Updating from git (${REPO_BRANCH})..."
 		git -C "${INSTALL_DIR}" fetch --depth=1 origin "${REPO_BRANCH}" --quiet

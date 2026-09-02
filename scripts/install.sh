@@ -657,7 +657,12 @@ clone_or_update_repo() {
 	fi
 
 	print_status "Cloning repository (branch: ${REPO_BRANCH})..."
-	git clone --depth=1 --branch "${REPO_BRANCH}" "${REPO_URL}" "${INSTALL_DIR}" --quiet
+	# Fail rather than prompt: this runs unattended from a curl pipe, and by
+	# here the previous installation directory has already been removed, so a
+	# wait on stdin is a wait with nothing left on disk. See update.sh for the
+	# non-obvious case — a network that mangles git's protocol v2 makes git ask
+	# for credentials to a public repository.
+	GIT_TERMINAL_PROMPT=0 git clone --depth=1 --branch "${REPO_BRANCH}" "${REPO_URL}" "${INSTALL_DIR}" --quiet
 }
 
 unset_env_key() {
