@@ -19,6 +19,7 @@ vi.mock("@/lib/server/modules/apps/health-repository", () => ({
 import {
   getSystemSummary,
   resetSystemSummaryCache,
+  toNetworkSummary,
 } from "@/lib/server/modules/system/summary-service";
 
 const METRICS = {
@@ -31,6 +32,19 @@ const METRICS = {
   memory: { usedBytes: 2_000_000_000, totalBytes: 8_000_000_000, freeBytes: 6_000_000_000, usedPercent: 25 },
   storage: { mountPath: "/", usedBytes: 100_000_000_000, totalBytes: 1_000_000_000_000, availableBytes: 900_000_000_000, usedPercent: 10 },
   temperature: { mainCelsius: 44, maxCelsius: 51, coresCelsius: [] },
+  wifi: {
+    connected: true,
+    iface: "wlan0",
+    ssid: "Home",
+    bssid: null,
+    signalPercent: 72,
+    txRateMbps: 300,
+    downloadMbps: 12.5,
+    uploadMbps: 1.5,
+    ipv4: "192.168.1.20",
+    ipv6: null,
+    availableNetworks: [],
+  },
 };
 
 beforeEach(() => {
@@ -126,5 +140,63 @@ describe("getSystemSummary", () => {
     const summary = await getSystemSummary();
 
     expect(summary.apps[0].name).toBe("custom-thing");
+  });
+});
+
+describe("toNetworkSummary", () => {
+  const wired = {
+    connected: true,
+    iface: "eth0",
+    ssid: null,
+    bssid: null,
+    signalPercent: null,
+    txRateMbps: null,
+    downloadMbps: 40,
+    uploadMbps: 8,
+    ipv4: "192.168.1.10",
+    ipv6: null,
+    availableNetworks: [],
+  };
+
+  it("names the Wi-Fi network and keeps its signal", async () => {
+    const summary = await getSystemSummary();
+
+    expect(summary.network).toMatchObject({
+      type: "wifi",
+      name: "Home",
+      iface: "wlan0",
+      ipv4: "192.168.1.20",
+      signalPercent: 72,
+    });
+  });
+
+  it("reads a connected interface with no SSID as a wired link", () => {
+    expect(toNetworkSummary(wired)).toMatchObject({
+      type: "wired",
+      name: "eth0",
+      ipv4: "192.168.1.10",
+      // Signal is a Wi-Fi idea; reporting one for a cable would be an invention.
+      signalPercent: null,
+    });
+  });
+
+  it("reports no type at all when nothing is connected", () => {
+    expect(toNetworkSummary({ ...wired, connected: false, ipv4: null })).toMatchObject({
+      type: null,
+      name: null,
+      ipv4: null,
+    });
+  });
+
+  it("survives a snapshot with no wifi block", () => {
+    expect(toNetworkSummary(undefined)).toEqual({
+      type: null,
+      name: null,
+      iface: null,
+      ipv4: null,
+      signalPercent: null,
+      downloadMbps: null,
+      uploadMbps: null,
+    });
   });
 });

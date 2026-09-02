@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronRight, Cpu, HardDrive, MemoryStick, Server } from "@/components/icons/platform-icons";
+import { ChevronRight, Cpu, Globe, HardDrive, MemoryStick, Server, Wifi } from "@/components/icons/platform-icons";
 import { cn } from "@/lib/utils";
 import type { SystemSummary, SystemSummaryApp } from "@/lib/shared/contracts/system-summary";
 
@@ -112,6 +112,8 @@ export function PhoneHome() {
     );
   }
 
+  // Optional on the contract: a server older than this field answers without it.
+  const network = summary.network;
   const installed = summary.apps.filter((app) => app.status === "installed").length;
   const attention = summary.apps.filter(needsAttention).length;
 
@@ -177,6 +179,34 @@ export function PhoneHome() {
           detail={formatBytes(summary.storage.usedBytes)}
         />
       </section>
+
+      {/* Where the server is, in the two facts you actually need when you are
+          away from it: what it is on, and the address to reach it at. */}
+      {network?.type && (
+        <section className="flex items-center gap-3.5 rounded-3xl bg-white/5 px-4 py-3.5">
+          <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-white/5">
+            {network.type === "wifi" ? (
+              <Wifi className="size-5 grayscale" />
+            ) : (
+              <Globe className="size-5 grayscale" />
+            )}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[13.5px] font-medium">{network.name ?? "Connected"}</p>
+            <p className="text-[11px] text-muted-foreground">
+              {network.type === "wifi" ? "Wi-Fi" : "Ethernet"}
+              {network.type === "wifi" && network.signalPercent !== null
+                ? ` · ${Math.round(network.signalPercent)}% signal`
+                : network.iface
+                  ? ` · ${network.iface}`
+                  : ""}
+            </p>
+          </div>
+          {network.ipv4 && (
+            <span className="shrink-0 font-mono text-[12px] tabular-nums">{network.ipv4}</span>
+          )}
+        </section>
+      )}
 
       <section className="flex flex-col gap-2">
         <h2 className="text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Apps</h2>

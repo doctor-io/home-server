@@ -3,12 +3,34 @@ import "server-only";
 import { listInstalledStacksFromDb } from "@/lib/server/modules/apps/stacks-repository";
 import { listAppHealth } from "@/lib/server/modules/apps/health-repository";
 import { getSystemMetricsSnapshot } from "@/lib/server/modules/system/service";
-import type { SystemSummary } from "@/lib/shared/contracts/system-summary";
+import type { SystemSummary, SystemSummaryNetwork } from "@/lib/shared/contracts/system-summary";
+import type { WifiMetrics } from "@/lib/shared/contracts/system";
 
 export const SUMMARY_CACHE_TTL_MS = 5_000;
 
 type Cached = { at: number; value: SystemSummary };
 let cache: Cached | null = null;
+
+/**
+ * The `wifi` block already covers a wired link: with no SSID it falls back to
+ * the default interface, so an Ethernet server reports connected with an iface
+ * and an address and no network name. That is what tells the two apart here.
+ */
+export function toNetworkSummary(wifi: WifiMetrics | undefined): SystemSummaryNetwork {
+  const ssid = wifi?.ssid?.trim() ?? "";
+  const iface = wifi?.iface ?? null;
+  const connected = Boolean(wifi?.connected);
+
+  return {
+    type: !connected ? null : ssid.length > 0 ? "wifi" : "wired",
+    name: ssid.length > 0 ? ssid : connected ? iface : null,
+    iface,
+    ipv4: wifi?.ipv4 ?? null,
+    signalPercent: ssid.length > 0 ? (wifi?.signalPercent ?? null) : null,
+    downloadMbps: wifi?.downloadMbps ?? null,
+    uploadMbps: wifi?.uploadMbps ?? null,
+  };
+}
 
 function percentOf(used: number | null | undefined, total: number | null | undefined) {
   if (!used || !total || total <= 0) return null;
@@ -53,6 +75,7 @@ async function build(): Promise<SystemSummary> {
       totalBytes: metrics.storage?.totalBytes ?? null,
       usagePercent: metrics.storage?.usedPercent ?? percentOf(metrics.storage?.usedBytes, metrics.storage?.totalBytes),
     },
+    network: toNetworkSummary(metrics.wifi),
     apps: stacks.map((stack) => ({
       appId: stack.appId,
       name: stack.displayName ?? stack.appId,
