@@ -175,11 +175,18 @@ deploy_from_tarball() {
 	[[ -n "${source_dir:-}" && -f "${source_dir}/package.json" ]] || { print_error "Could not locate app root in tarball."; exit 1; }
 
 	print_status "Deploying tarball contents..."
+	# .env and .env.local are the operator's, not the release's: they hold
+	# DATABASE_URL and AUTH_SESSION_SECRET, and --delete would take them with
+	# everything else the tarball does not contain. Losing AUTH_SESSION_SECRET
+	# ends every session and orphans TOTP secrets, whose key is derived from it.
+	# The git path has always excluded them; this one did not.
 	rsync -a \
 		--delete \
 		--exclude ".git" \
 		--exclude "node_modules" \
 		--exclude ".next" \
+		--exclude ".env" \
+		--exclude ".env.local" \
 		"${source_dir}/" "${INSTALL_DIR}/"
 
 	rm -rf "${tmp_dir}"
