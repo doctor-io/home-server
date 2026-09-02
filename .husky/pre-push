@@ -1,0 +1,9 @@
+#!/usr/bin/env sh
+set -e
+
+# The build is the only honest check this project has: vitest and eslint have
+# both passed changes that `next build` then rejected (TODO.md records two, in
+# W5 and W7). It costs about a minute, which is worth paying once per push and
+# not once per commit — commits are cheap and frequent, a push is what other
+# people end up running.
+npm run build

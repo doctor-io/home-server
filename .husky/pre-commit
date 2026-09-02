@@ -17,4 +17,4 @@ npm test
 npm version patch --no-git-tag-version --force
 git add package.json package-lock.json
 
-npx lint-staged && npm run build
+npx lint-staged
