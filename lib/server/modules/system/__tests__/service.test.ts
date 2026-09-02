@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("node:os", () => ({
   default: {
@@ -96,11 +96,24 @@ vi.mock("systeminformation", () => ({
   },
 }));
 
-import { getSystemMetricsSnapshot } from "@/lib/server/modules/system/service";
+import {
+  _resetWifiCachesForTesting,
+  getSystemMetricsSnapshot,
+} from "@/lib/server/modules/system/service";
+
+/** Let a background probe's `.then` run before the next assertion. */
+function flushMicrotasks() {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
 
 describe("system service", () => {
+  beforeEach(() => {
+    _resetWifiCachesForTesting();
+  });
+
   it("returns a snapshot with expected shape", async () => {
     const snapshot = await getSystemMetricsSnapshot({ bypassCache: true });
+    await flushMicrotasks();
 
     expect(snapshot.hostname).toBe("pi");
     expect(snapshot.timestamp).toBeTypeOf("string");
@@ -114,9 +127,24 @@ describe("system service", () => {
     expect(snapshot.battery.cycleCount).toBe(248);
     expect(snapshot.battery.designToMaxCapacityPercent).toBe(90);
     expect(snapshot.wifi.connected).toBe(true);
-    expect(snapshot.wifi.ssid).toBe("HomeNet");
     expect(snapshot.wifi.downloadMbps).toBe(24.8);
     expect(snapshot.wifi.uploadMbps).toBe(8.8);
+    // No SSID yet: the connection probe runs in the background — see below.
+    expect(snapshot.wifi.ssid).toBeNull();
+  });
+
+  it("never blocks a snapshot on the Wi-Fi probe, and fills it in next time", async () => {
+    // The probe takes 8-13s on macOS, and the snapshot gathers with Promise.all,
+    // so awaiting it inline made every cache miss cost that. The first read
+    // starts it and answers without it; the next read has the answer.
+    const first = await getSystemMetricsSnapshot({ bypassCache: true });
+    expect(first.wifi.ssid).toBeNull();
+
+    await flushMicrotasks();
+
+    const second = await getSystemMetricsSnapshot({ bypassCache: true });
+    expect(second.wifi.ssid).toBe("HomeNet");
+    expect(second.wifi.signalPercent).toBe(66);
   });
 
   it("serves cached snapshot unless bypassCache is set", async () => {

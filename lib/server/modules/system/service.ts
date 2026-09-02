@@ -22,6 +22,7 @@ const HELPER_STATUS_UNAVAILABLE_BACKOFF_MS = 15_000;
 const HELPER_STATUS_ERROR_LOG_COOLDOWN_MS = 30_000;
 const STORAGE_DETAILS_CACHE_TTL_MS = 60_000;
 const WIFI_NETWORKS_CACHE_TTL_MS = 30_000;
+const WIFI_CONNECTIONS_CACHE_TTL_MS = 15_000;
 
 /** Filesystem types that are virtual/pseudo and should not appear as real disk volumes. */
 const VIRTUAL_FS_TYPES = new Set([
@@ -60,6 +61,11 @@ let wifiNetworksCache: {
   expiresAt: number;
 } | null = null;
 let wifiNetworksRefreshing = false;
+let wifiConnectionsCache: {
+  value: Awaited<ReturnType<typeof si.wifiConnections>>;
+  expiresAt: number;
+} | null = null;
+let wifiConnectionsRefreshing = false;
 let storageDetailsCache:
   | {
       value: CachedStorageDetails;
@@ -518,6 +524,50 @@ function getWifiNetworksStale(): Awaited<ReturnType<typeof si.wifiNetworks>> {
   return wifiNetworksCache?.value ?? [];
 }
 
+/**
+ * The same treatment as the scan above, and for the same reason measured on a
+ * bigger scale: `wifiConnections` shells out to `system_profiler` on macOS and
+ * took 8.8-12.7s per call on the development machine. Awaiting it inline made
+ * every metrics cache miss cost that, because the snapshot gathers with
+ * Promise.all and pays for the slowest probe.
+ *
+ * A shorter TTL than the network scan: this is the link the server is on, and
+ * it appears on the phone's Home screen, so it should not lag reality by half a
+ * minute. Fifteen seconds still turns ~30 blocking calls a minute into two in
+ * the background.
+ */
+function getWifiConnectionsStale(): Awaited<ReturnType<typeof si.wifiConnections>> {
+  const now = Date.now();
+
+  if (wifiConnectionsCache && wifiConnectionsCache.expiresAt > now) {
+    return wifiConnectionsCache.value;
+  }
+
+  if (!wifiConnectionsRefreshing) {
+    wifiConnectionsRefreshing = true;
+    void withFallback("system.metrics.wifiConnections", () => si.wifiConnections(), [])
+      .then((connections) => {
+        wifiConnectionsCache = {
+          value: connections,
+          expiresAt: Date.now() + WIFI_CONNECTIONS_CACHE_TTL_MS,
+        };
+      })
+      .finally(() => {
+        wifiConnectionsRefreshing = false;
+      });
+  }
+
+  return wifiConnectionsCache?.value ?? [];
+}
+
+/** Test seam only: the Wi-Fi caches are module state that outlives a test. */
+export function _resetWifiCachesForTesting() {
+  wifiConnectionsCache = null;
+  wifiConnectionsRefreshing = false;
+  wifiNetworksCache = null;
+  wifiNetworksRefreshing = false;
+}
+
 async function withFallback<T>(
   action: string,
   run: () => Promise<T>,
@@ -563,11 +613,7 @@ async function collectSnapshot(): Promise<SystemMetricsSnapshot> {
       null,
     ),
     withFallback("system.metrics.battery", () => si.battery(), null),
-    withFallback(
-      "system.metrics.wifiConnections",
-      () => si.wifiConnections(),
-      [],
-    ),
+    Promise.resolve(getWifiConnectionsStale()),
     Promise.resolve(getWifiNetworksStale()),
     withFallback(
       "system.metrics.networkInterfaces",
