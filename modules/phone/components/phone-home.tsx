@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronRight, Cpu, Globe, HardDrive, MemoryStick, Server, Wifi } from "@/components/icons/platform-icons";
+import { ChevronRight, Cpu, Globe, HardDrive, MemoryStick, Server, Settings, Wifi } from "@/components/icons/platform-icons";
 import { cn } from "@/lib/utils";
 import type { SystemSummary, SystemSummaryApp } from "@/lib/shared/contracts/system-summary";
 
@@ -124,7 +124,15 @@ export function PhoneHome() {
           <p className="text-[11px] text-muted-foreground">Welcome home,</p>
           <h1 className="truncate text-lg font-medium">{summary.host.hostname}</h1>
         </div>
-        <Server className="mt-1 size-5 opacity-40 grayscale" />
+        {/* The only way into app-level settings from here — the tab bar is
+            full, and five tabs is already the most a thumb wants. */}
+        <Link
+          href="/m/settings"
+          aria-label="Settings"
+          className="mt-1 grid size-9 shrink-0 place-items-center rounded-2xl active:bg-white/6"
+        >
+          <Settings className="size-5 opacity-40 grayscale" />
+        </Link>
       </header>
 
       {/* One glance answers "is anything wrong?", and only then "with what?" */}
