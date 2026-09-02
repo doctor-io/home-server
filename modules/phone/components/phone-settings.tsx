@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronRight, LayoutGrid, LogOut, Server } from "@/components/icons/platform-icons";
+import { ChevronRight, LayoutGrid, LockKeyhole, LogOut, Server } from "@/components/icons/platform-icons";
 
 /**
  * The launcher stamps this on the WebView's user agent (capacitor.config.ts).
@@ -14,6 +14,9 @@ const APP_USER_AGENT_MARKER = "HomeioApp";
 
 /** Where the launcher lives inside the app, and the flag that stops it bouncing back. */
 const LAUNCHER_URL = "http://localhost/?disconnect=1";
+
+/** Same origin hop, but keeping the connection: it opens the app's own settings. */
+const LAUNCHER_SETTINGS_URL = "http://localhost/?settings=1";
 
 function Row({
   icon: Icon,
@@ -92,6 +95,22 @@ export function PhoneSettings() {
           />
         </div>
 
+        {/* The unlock and reconnect switches cannot live on this page: it is
+            served from the server's origin, where the app's storage is not
+            reachable. So this goes and opens them where they do live. */}
+        {inApp && (
+          <div className="border-b border-white/5">
+            <Row
+              icon={LockKeyhole}
+              label="App settings"
+              hint="Require unlock, reconnect on open"
+              onClick={() => {
+                window.location.href = LAUNCHER_SETTINGS_URL;
+              }}
+            />
+          </div>
+        )}
+
         {/* Only inside the app: a browser tab has no launcher to return to, and
             the link would take it to a localhost that is not Homeio. */}
         {inApp && (
@@ -111,7 +130,7 @@ export function PhoneSettings() {
 
       <p className="px-1 text-[11px] text-muted-foreground/70">
         {inApp
-          ? "Unlock and reconnect settings live in the app, on the server list."
+          ? "App settings belong to this phone, not to the server, so they open in the app itself."
           : "Open Homeio in the mobile app for app-level settings."}
       </p>
     </div>
