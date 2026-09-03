@@ -149,14 +149,25 @@ describe("module boundaries", () => {
 
   /**
    * api/v1 routes that are intentionally exempt from requireApiSession.
-   * Currently limited to the Google Drive OAuth handshake: the browser is
-   * redirected through Google, and Google's redirect back to /callback may
-   * arrive without the homeio session cookie depending on SameSite behaviour.
-   * The allowlist must only ever shrink — never grow.
+   *
+   * The Google Drive OAuth handshake: the browser is redirected through Google,
+   * and Google's redirect back to /callback may arrive without the homeio
+   * session cookie depending on SameSite behaviour.
+   *
+   * And, from v2.0, the pairing claim (M4): a phone spending a code has no
+   * session yet, because a session is what it is asking for. This entry is the
+   * first growth of this list, made deliberately when QR pairing was chosen to
+   * sign the phone in rather than only carry the address. The code is 256 bits,
+   * single use through a conditional UPDATE, expires in 60 seconds, can only be
+   * minted by an already-authenticated operator, and failed claims are rate
+   * limited on the login limiter.
+   *
+   * Otherwise: this list shrinks, it does not grow.
    */
   const V1_AUTH_ALLOWLIST = new Set<string>([
     "app/api/v1/files/google-drive/auth/route.ts",
     "app/api/v1/files/google-drive/callback/route.ts",
+    "app/api/v1/auth/pairing/claim/route.ts",
   ]);
 
   const HTTP_HANDLER_PATTERN =

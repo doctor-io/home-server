@@ -310,3 +310,32 @@ export const filesTrashEntries = pgTable(
     index("files_trash_entries_deleted_at_idx").on(table.deletedAt.desc()),
   ],
 );
+
+/**
+ * Short-lived codes behind the pairing QR, so a phone can be signed in by
+ * scanning rather than by typing a tailnet address and a password on a
+ * touchscreen.
+ *
+ * The code is the credential, so: hashed at rest, single use (claimed_at is
+ * set in the same statement that reads it), and dead in a minute. Minting a
+ * new one drops the owner's earlier unclaimed codes, so at most one QR on one
+ * screen is ever live.
+ */
+export const pairingCodes = pgTable(
+  "pairing_codes",
+  {
+    id: text("id").primaryKey(),
+    codeHash: text("code_hash").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }),
+    claimedIp: text("claimed_ip"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("pairing_codes_code_hash_idx").on(table.codeHash),
+    index("pairing_codes_user_id_idx").on(table.userId),
+  ],
+);

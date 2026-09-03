@@ -10,6 +10,14 @@ const publicRoutes = new Set([
   // token (issued by /api/auth/login) but no session yet — that's the whole
   // reason this endpoint exists.
   "auth/login/totp/route.ts",
+  // M4: a phone spending a pairing code has no session yet — that is what it
+  // is asking for. This is the first addition to this list since v1.7, and it
+  // was a deliberate decision rather than an oversight: the alternative QR
+  // designs (address only, or address plus username) need no new route at all.
+  // What keeps it narrow — a 256-bit code, single use enforced by a conditional
+  // UPDATE, dead after 60 seconds, mintable only by an operator who is already
+  // signed in, and rate limited on the login limiter.
+  "auth/pairing/claim/route.ts",
 ]);
 
 function findRouteFiles(dir: string, root = dir): string[] {

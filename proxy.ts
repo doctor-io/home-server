@@ -32,6 +32,10 @@ function isPublicApiRoute(pathname: string) {
     // only a short-lived partial-auth token. Route handler validates that
     // token itself; do not gate it on a session.
     pathname === "/api/v1/auth/login/totp" ||
+    // M4: a phone spending a pairing code has no session cookie — that is what
+    // the code buys it. The route handler decides whether the code is real,
+    // unspent and unexpired; the proxy has no database and cannot.
+    pathname === "/api/v1/auth/pairing/claim" ||
     pathname === "/api/v1/logs"
   );
 }
