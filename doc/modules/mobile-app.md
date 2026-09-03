@@ -14,11 +14,16 @@ the shell does not embed a tunnel and never stores a password.
 
 ## The two halves, and the seam between them
 
-| Half | Lives in | Owns |
+The app lives in its own repository — **[doctor-io/homeio-mobile](https://github.com/doctor-io/homeio-mobile)**
+(private) — because it ships on a different clock: signed APKs, store metadata, a
+keystore that does not belong in a public repo, and push work that touches no
+server code.
+
+| Half | Repository | Owns |
 |---|---|---|
-| Launcher | `apps/mobile/src/` | Server list, reachability probes, app settings storage |
-| Native shell | `apps/mobile/native/android/` | Back button, downloads, app lock, the settings bridge, the phone-UI fallback |
-| Phone UI | `app/m/`, `modules/phone/` | Everything after connecting — served by the server |
+| Launcher | `homeio-mobile` → `src/` | Server list, reachability probes, app settings storage |
+| Native shell | `homeio-mobile` → `native/android/` | Back button, downloads, app lock, the settings bridge, the phone-UI fallback |
+| Phone UI | this repo → `app/m/`, `modules/phone/` | Everything after connecting — served by the server |
 
 The third row is the important one: **`/m` is served by the server, not by the
 app.** The two are separate origins (`http://localhost` for the launcher,
@@ -29,9 +34,10 @@ app's storage directly, and why the couplings below exist at all.
 
 ## Contract between the app and the server
 
-Five points where one side depends on the other. Neither compiler can see them,
-and no test fails when one moves — a break shows up as a dead button on someone's
-phone. Change either side and change both.
+Five points where one side depends on the other, and they now live in **separate
+repositories**. Neither compiler can see them, and no test fails when one moves —
+a break shows up as a dead button on someone's phone. Change either side and
+change both, in both repos, in the same sitting.
 
 | # | App side | Server side | If it breaks |
 |---|---|---|---|

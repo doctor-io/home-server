@@ -12,10 +12,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 #### Mobile App (preview)
 
-- `apps/mobile` — a [Capacitor](https://capacitorjs.com/) shell for Android and iOS that connects to a Homeio server over Tailscale
+- `apps/mobile` — a [Capacitor](https://capacitorjs.com/) shell for Android and iOS that connects to a Homeio server over Tailscale (moved to [doctor-io/homeio-mobile](https://github.com/doctor-io/homeio-mobile) after this release)
 - The bundled Connect screen probes `GET <address>/api/health`, then navigates the WebView onto the server's own origin — login, terminal WebSocket, SSE, and uploads all run first-party, so nothing is re-implemented and no CORS or auth bridging is involved
 - Requires the official Tailscale app on the phone; Homeio does not embed the tunnel and never stores your password
-- Native platform folders are generated locally and git-ignored — see [`apps/mobile/README.md`](./apps/mobile/README.md)
+- Native platform folders are generated locally and git-ignored — see the app's own repository
 
 #### Documentation
 

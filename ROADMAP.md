@@ -553,7 +553,7 @@ Every action recorded with user, timestamp, and result:
 
 These are not scheduled yet. Community interest will determine if and when they move to a release.
 
-- **Mobile-optimised layout** — the current UI is desktop-first. A native shell for Android and iOS shipped in preview in v1.7.24 (`apps/mobile`, reaches the server over Tailscale), but it renders the same desktop-first web app; a responsive layout for the most common actions is still open.
+- **Mobile-optimised layout** — the current UI is desktop-first. A native shell for Android and iOS shipped in preview in v1.7.24 ([doctor-io/homeio-mobile](https://github.com/doctor-io/homeio-mobile), reaches the server over Tailscale), but it renders the same desktop-first web app; a responsive layout for the most common actions is still open.
 - **ARMv7 (32-bit Pi 2/3)** — blocked on `@lydell/node-pty` publishing an `armv7` prebuilt; building from source on 1 GB hardware that already strains under Postgres + Node + Docker is a poor trade. Parked unless there is real demand.
 - **WebSocket / SSE multiplexing** — consolidate multiple SSE streams into a single connection to reduce per-client overhead on low-memory devices
 - **Portainer-style container control** — create containers from images directly, not just from Compose templates; inspect and exec into running containers
