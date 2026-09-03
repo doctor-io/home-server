@@ -3,6 +3,7 @@
 import { InfoBanner, SectionDivider } from "@/modules/settings/components/panel/controls";
 import { SETTINGS_PANEL_INSET } from "@/modules/settings/components/panel/surface";
 import { ApiTokensCard } from "@/modules/settings/components/panel/sections/api-tokens-card";
+import { PairPhoneCard } from "@/modules/settings/components/panel/sections/pair-phone-card";
 import { TwoFactorCard } from "@/modules/settings/components/panel/sections/two-factor-card";
 import { Plus } from "@/components/icons/platform-icons";
 import type { TwoFactorStatus } from "@/lib/shared/contracts/auth";
@@ -52,6 +53,8 @@ export function UsersSection({
       <TwoFactorCard status={twoFactor} isDemoMode={isDemoMode} />
 
       <ApiTokensCard isDemoMode={isDemoMode} />
+
+      <PairPhoneCard isDemoMode={isDemoMode} />
 
       <SectionDivider title="Access" />
       <div className={cn(SETTINGS_PANEL_INSET, "flex items-center justify-between gap-4 px-4 py-3")}>
