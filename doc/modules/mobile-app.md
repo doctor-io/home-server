@@ -22,7 +22,7 @@ server code.
 | Half | Repository | Owns |
 |---|---|---|
 | Launcher | `homeio-mobile` → `src/` | Server list, reachability probes, app settings storage |
-| Native shell | `homeio-mobile` → `native/android/` | Back button, downloads, app lock, the settings bridge, the phone-UI fallback |
+| Native shell | `homeio-mobile` → `native/android/` | Back button, downloads, app lock, the settings bridge, the phone-UI fallback, the push connection |
 | Phone UI | this repo → `app/m/`, `modules/phone/` | Everything after connecting — served by the server |
 
 The third row is the important one: **`/m` is served by the server, not by the
@@ -34,7 +34,7 @@ app's storage directly, and why the couplings below exist at all.
 
 ## Contract between the app and the server
 
-Five points where one side depends on the other, and they now live in **separate
+Seven points where one side depends on the other, and they now live in **separate
 repositories**. Neither compiler can see them, and no test fails when one moves —
 a break shows up as a dead button on someone's phone. Change either side and
 change both, in both repos, in the same sitting.
@@ -46,6 +46,14 @@ change both, in both repos, in the same sitting.
 | 3 | `main.ts` reads `?disconnect=1` on the launcher | `phone-settings.tsx` navigates to `http://localhost/?disconnect=1` | Disconnect returns to the list but auto-reconnect drags the user back in |
 | 4 | `MainActivity` catches a main-frame **404 on `/m`** and loads `<origin>/` | The `/m` route existing at all | A server older than the phone UI shows a raw 404 instead of the desktop shell |
 | 5 | Launcher navigates to `<origin>/m` after a successful probe | `/m` being the phone UI's entry point | The app lands somewhere that is not the phone UI |
+| 6 | `MainActivity` exposes `HomeioApp.{setPush,clearPush}` and reports `pushTopic` from `read()` | `phone-settings.tsx` calls them from the "Notifications on this phone" row | The row disappears, or the switch moves and nothing subscribes |
+| 7 | `PushService` subscribes to `<url>/<topic>/json` | `GET /api/v1/settings/push` returning the same `ntfyUrl` and `ntfyTopic` the dispatcher publishes to | The phone listens to an address nothing publishes to, silently |
+
+Points 6 and 7 fail the same quiet way point 4 does: nothing errors, the alert
+simply never arrives. The row is built to expose which half is missing — it
+reads as off whenever this phone is not subscribed to *the topic the server
+currently uses*, so a rotated topic shows as off and the switch moves the phone
+onto the new one.
 
 Point 2 is the one to be careful with: that interface is exposed to **every page
 the WebView loads**, including a server that has been compromised. It is
@@ -75,6 +83,16 @@ launcher's listeners die the moment the WebView navigates onto a server.
   missing `/m` itself, because its probe is cross-origin and a `no-cors`
   response is opaque.
 - **Settings bridge** — see contract point 2.
+- **Push** — a foreground service holding ntfy's JSON stream, because the whole
+  point is alerts arriving with the app closed and nothing tied to the activity
+  survives that. It costs a permanent low-priority notification, which is the
+  honest price of holding a socket open. No wake lock: under Doze the connection
+  can stall and messages arrive when the phone next wakes, which is the trade
+  every non-FCM push app makes. The topic and address are validated in
+  `MainActivity` before they are stored — the bridge is reachable from any page
+  the WebView loads — and nothing is stored at all until the notification
+  permission is actually granted, or a denied prompt would leave `BootReceiver`
+  starting a service that can never post.
 
 ---
 
@@ -83,5 +101,7 @@ launcher's listeners die the moment the WebView navigates onto a server.
 - No credentials are stored by the app; sign-in happens on the server's own page.
 - The WebView origin allowlist stays limited to configured servers.
 - TLS errors are never silently accepted.
+- Notification text is published by whoever knows the topic, so it is displayed
+  and nothing more: tapping opens the app, and there are no actions or deep links.
 - The app must keep working against a **v1.7 server** — it may not assume any
   v2.0 endpoint exists.

@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronRight, LayoutGrid, LockKeyhole, LogOut, Server } from "@/components/icons/platform-icons";
+import { Bell, ChevronRight, LayoutGrid, LockKeyhole, LogOut, Server } from "@/components/icons/platform-icons";
+import type { PushConfigPublic } from "@/lib/shared/contracts/push";
 import { cn } from "@/lib/utils";
+import { pushRowState } from "@/modules/phone/push-subscription";
 
 /**
  * The launcher stamps this on the WebView's user agent (capacitor.config.ts).
@@ -27,9 +29,17 @@ type AppSettingsBridge = {
   read: () => string;
   setLock: (enabled: boolean) => void;
   setAutoReconnect: (enabled: boolean) => void;
+  /** Both added in 2.0; an older launcher has neither. */
+  setPush?: (url: string, topic: string) => void;
+  clearPush?: () => void;
 };
 
-type AppSettings = { lock: boolean; autoReconnect: boolean };
+type AppSettings = {
+  lock: boolean;
+  autoReconnect: boolean;
+  /** What this phone is listening to, null when it is listening to nothing. */
+  pushTopic?: string | null;
+};
 
 function bridge(): AppSettingsBridge | null {
   return (window as unknown as { HomeioApp?: AppSettingsBridge }).HomeioApp ?? null;
@@ -50,11 +60,15 @@ function Switch({
   label,
   hint,
   checked,
+  disabled,
+  icon: Icon = LockKeyhole,
   onChange,
 }: {
   label: string;
   hint: string;
   checked: boolean;
+  disabled?: boolean;
+  icon?: typeof Server;
   onChange: (next: boolean) => void;
 }) {
   return (
@@ -62,11 +76,15 @@ function Switch({
       type="button"
       role="switch"
       aria-checked={checked}
+      disabled={disabled}
       onClick={() => onChange(!checked)}
-      className="flex min-h-14 w-full items-center gap-3.5 px-3.5 py-3 text-left active:bg-white/6"
+      className={cn(
+        "flex min-h-14 w-full items-center gap-3.5 px-3.5 py-3 text-left active:bg-white/6",
+        disabled && "opacity-55",
+      )}
     >
       <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-white/5">
-        <LockKeyhole className="size-5 grayscale" />
+        <Icon className="size-5 grayscale" />
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-[13.5px]">{label}</span>
@@ -142,6 +160,7 @@ export function PhoneSettings() {
   const [inApp, setInApp] = useState(false);
   const [origin, setOrigin] = useState("");
   const [app, setApp] = useState<AppSettings | null>(null);
+  const [push, setPush] = useState<PushConfigPublic | null>(null);
 
   useEffect(() => {
     setInApp(navigator.userAgent.includes(APP_USER_AGENT_MARKER));
@@ -154,6 +173,32 @@ export function PhoneSettings() {
     window.addEventListener("homeio:app-settings", sync);
     return () => window.removeEventListener("homeio:app-settings", sync);
   }, []);
+
+  useEffect(() => {
+    // Only worth asking inside a launcher that can act on the answer. In a
+    // browser tab there is nothing to subscribe, and on a server old enough not
+    // to have the route the request simply fails and the row stays away.
+    if (!bridge()?.setPush) return;
+
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const response = await fetch("/api/v1/settings/push");
+        if (!response.ok) return;
+        const json = (await response.json()) as { data: PushConfigPublic };
+        if (!cancelled) setPush(json.data);
+      } catch {
+        // Same as a 404: no row rather than a wrong one.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const pushState = pushRowState(push, app?.pushTopic ?? null);
 
   return (
     <div className="flex flex-col gap-3.5">
@@ -191,6 +236,30 @@ export function PhoneSettings() {
                 onChange={(next) => bridge()?.setLock(next)}
               />
             </div>
+            {/* Only once the server has said where it publishes: a switch that
+                cannot lead anywhere is worse than no switch. */}
+            {push && (
+              <div className="border-b border-white/5">
+                <Switch
+                  icon={Bell}
+                  label="Notifications on this phone"
+                  hint={
+                    pushState.kind === "on"
+                      ? "Alerts arrive with the app closed"
+                      : pushState.kind === "off"
+                        ? "Subscribe this phone to your server's alerts"
+                        : "Turn push on in Settings → Notifications first"
+                  }
+                  checked={pushState.kind === "on"}
+                  disabled={pushState.kind === "server-off"}
+                  onChange={(next) => {
+                    if (pushState.kind === "server-off") return;
+                    if (next) bridge()?.setPush?.(pushState.url, pushState.topic);
+                    else bridge()?.clearPush?.();
+                  }}
+                />
+              </div>
+            )}
             <div className="border-b border-white/5">
               <Switch
                 label="Reconnect on open"
