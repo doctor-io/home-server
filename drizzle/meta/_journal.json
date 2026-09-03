@@ -92,6 +92,13 @@
       "when": 1787300100000,
       "tag": "0013_pairing_codes",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1787300200000,
+      "tag": "0014_push_notifications",
+      "breakpoints": true
     }
   ]
 }

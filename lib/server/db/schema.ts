@@ -273,6 +273,14 @@ export const settings = pgTable("settings", {
   onboardingCompletedAt: timestamp("onboarding_completed_at", { withTimezone: true }),
   timezone: text("timezone"),
   defaultStorageRoot: text("default_storage_root"),
+  // Push delivery (v2.0 Track 7). Off until an operator turns it on, so an
+  // upgraded install keeps exactly the notifications it had.
+  pushEnabled: boolean("push_enabled").notNull().default(false),
+  pushNtfyUrl: text("push_ntfy_url"),
+  pushNtfyTopic: text("push_ntfy_topic"),
+  pushNtfyTokenCiphertext: text("push_ntfy_token_ciphertext"),
+  pushNtfyTokenIv: text("push_ntfy_token_iv"),
+  pushNtfyTokenTag: text("push_ntfy_token_tag"),
 });
 
 export const filesGoogleDriveTokens = pgTable(

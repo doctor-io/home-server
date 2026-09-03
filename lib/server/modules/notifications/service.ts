@@ -6,6 +6,7 @@ import { notifications } from "@/lib/server/db/schema";
 import type { NotificationKind, NotificationRecord } from "@/lib/shared/contracts/notifications";
 import { desc, eq } from "drizzle-orm";
 import { emitNotification, emitNotificationCleared, emitNotificationReadAll } from "./emitter";
+import { dispatchPush } from "./push-service";
 
 const MAX_NOTIFICATIONS = 50;
 
@@ -48,6 +49,11 @@ export async function createNotification(input: {
 
   const record = toRecord(row);
   emitNotification(record);
+
+  // Third sink, after the row and the stream, and last on purpose: the phone is
+  // the only one that involves the network, and a notification that exists must
+  // not wait on it — nor be undone by it. dispatchPush swallows its own errors.
+  void dispatchPush(record);
 
   // Prune old rows non-blocking
   void pruneOldNotifications().catch(() => undefined);
