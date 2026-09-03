@@ -72,14 +72,19 @@ describe("createPairingCode", () => {
   });
 
   it("never stores the code itself", async () => {
-    const values = vi.fn(async () => undefined);
-    mockDb.insert.mockReturnValue({ values });
+    let stored: { codeHash: string } | null = null;
+    mockDb.insert.mockReturnValue({
+      values: vi.fn(async (row: { codeHash: string }) => {
+        stored = row;
+      }),
+    });
 
     const { code } = await createPairingCode("user-1");
-    const stored = values.mock.calls[0][0] as { codeHash: string };
+    if (!stored) throw new Error("insert was never called");
 
-    expect(stored.codeHash).not.toBe(code);
-    expect(stored.codeHash).toMatch(/^[0-9a-f]{64}$/);
+    const row = stored as { codeHash: string };
+    expect(row.codeHash).not.toBe(code);
+    expect(row.codeHash).toMatch(/^[0-9a-f]{64}$/);
   });
 });
 

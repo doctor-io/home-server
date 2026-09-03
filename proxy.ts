@@ -167,6 +167,14 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Straight through, and deliberately not in PUBLIC_ROUTES: that branch sends
+  // an unauthenticated visitor to /login, which is every phone arriving with a
+  // pairing code, and sends an authenticated one to /, which would silently
+  // skip claiming. The page spends the code and redirects itself.
+  if (pathname === "/pair") {
+    return NextResponse.next();
+  }
+
   if (
     DEMO_MODE &&
     DEMO_BLOCKED_METHODS.has(request.method) &&
