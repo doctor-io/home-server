@@ -7,7 +7,11 @@ vi.mock("@/lib/server/modules/notifications/push-config", () => ({
   DEFAULT_NTFY_URL: "https://ntfy.sh",
 }));
 
-import { dispatchPush, ntfyTransport } from "@/lib/server/modules/notifications/push-service";
+import {
+  describePushFailure,
+  dispatchPush,
+  ntfyTransport,
+} from "@/lib/server/modules/notifications/push-service";
 import type { NotificationRecord } from "@/lib/shared/contracts/notifications";
 
 const notification: NotificationRecord = {
@@ -160,5 +164,45 @@ describe("ntfyTransport", () => {
     await ntfyTransport.send(notification, { ...configured, ntfyTopic: null });
 
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("describePushFailure", () => {
+  it("names the host and the reason a connection did not happen", () => {
+    // Node reports both a refused port and an unresolvable name as the same
+    // bare "fetch failed", with the only useful detail hidden on `cause`.
+    const refused = new TypeError("fetch failed", {
+      cause: Object.assign(new Error("connect ECONNREFUSED"), { code: "ECONNREFUSED" }),
+    });
+
+    expect(describePushFailure(refused, "http://nas.local:8080")).toBe(
+      "Could not reach http://nas.local:8080 (ECONNREFUSED)",
+    );
+  });
+
+  it("says a timeout is a timeout, with the limit", () => {
+    const aborted = Object.assign(new Error("This operation was aborted"), {
+      name: "AbortError",
+    });
+
+    expect(describePushFailure(aborted, "https://ntfy.sh")).toBe(
+      "https://ntfy.sh did not answer within 5 seconds",
+    );
+  });
+
+  it("passes through what ntfy itself said", () => {
+    // A 403 is the operator's answer about their token, not a network problem.
+    expect(describePushFailure(new Error("ntfy answered 403"), "https://ntfy.sh")).toBe(
+      "ntfy answered 403",
+    );
+  });
+
+  it("still says something useful for a failure with no cause at all", () => {
+    expect(describePushFailure(new TypeError("fetch failed"), "https://ntfy.sh")).toBe(
+      "Could not reach https://ntfy.sh",
+    );
+    expect(describePushFailure("not an error", "https://ntfy.sh")).toBe(
+      "Could not reach https://ntfy.sh",
+    );
   });
 });

@@ -254,6 +254,7 @@ export function buildSettingsSectionDefinitions(
         <NotificationsSection
           draft={context.notificationController.draft}
           onChange={context.notificationController.patchDraft}
+          isDemoMode={context.settingsBackend.general.isDemoMode}
         />
       ),
       save: context.notificationController.saveState

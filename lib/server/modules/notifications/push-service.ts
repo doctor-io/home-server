@@ -78,6 +78,33 @@ export const ntfyTransport: PushTransport = {
 };
 
 /**
+ * Turn a fetch failure into something an operator can act on.
+ *
+ * Node answers a refused connection or an unresolvable host with a bare
+ * "fetch failed" and hides the real reason on `cause`, which tells whoever
+ * pressed "Send test" nothing at all — and the whole point of that button is
+ * to say which of the two happened.
+ */
+export function describePushFailure(error: unknown, url: string): string {
+  if (!(error instanceof Error)) return `Could not reach ${url}`;
+
+  if (error.name === "AbortError" || error.name === "TimeoutError") {
+    return `${url} did not answer within ${PUSH_TIMEOUT_MS / 1000} seconds`;
+  }
+
+  const cause: unknown = (error as { cause?: unknown }).cause;
+  const code =
+    cause && typeof cause === "object" && "code" in cause
+      ? String((cause as { code: unknown }).code)
+      : null;
+
+  if (code) return `Could not reach ${url} (${code})`;
+  if (error.message === "fetch failed") return `Could not reach ${url}`;
+
+  return error.message;
+}
+
+/**
  * Deliver a notification to the phone, if push is on and configured.
  *
  * **This never throws.** It is called from createNotification, where the row is

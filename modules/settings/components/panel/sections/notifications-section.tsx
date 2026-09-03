@@ -1,6 +1,7 @@
 "use client";
 
 import { SectionDivider, Toggle } from "@/modules/settings/components/panel/controls";
+import { PushCard } from "@/modules/settings/components/panel/sections/push-card";
 import { SETTINGS_PANEL_INSET } from "@/modules/settings/components/panel/surface";
 import type { NotificationSettingsDraft } from "@/modules/settings/components/panel/types";
 import { cn } from "@/lib/utils";
@@ -8,6 +9,7 @@ import { cn } from "@/lib/utils";
 type NotificationsSectionProps = {
   draft: NotificationSettingsDraft;
   onChange: (patch: Partial<NotificationSettingsDraft>) => void;
+  isDemoMode?: boolean;
 };
 
 function ThresholdRow({
@@ -45,7 +47,11 @@ function ThresholdRow({
   );
 }
 
-export function NotificationsSection({ draft, onChange }: NotificationsSectionProps) {
+export function NotificationsSection({
+  draft,
+  onChange,
+  isDemoMode = false,
+}: NotificationsSectionProps) {
   return (
     <div className="flex flex-col gap-1">
       <SectionDivider title="Alert Types" />
@@ -120,6 +126,8 @@ export function NotificationsSection({ draft, onChange }: NotificationsSectionPr
           onChange={(v) => onChange({ temperatureAlertThresholdCelsius: v })}
         />
       </div>
+
+      <PushCard isDemoMode={isDemoMode} />
     </div>
   );
 }

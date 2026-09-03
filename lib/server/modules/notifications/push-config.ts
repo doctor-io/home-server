@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/server/db/drizzle";
 import { settings } from "@/lib/server/db/schema";
 import { decryptSecret, encryptSecret } from "@/lib/server/modules/files/secrets";
+import type { PushConfigPublic } from "@/lib/shared/contracts/push";
 
 /** ntfy's own public instance, used when an operator names a topic and nothing else. */
 export const DEFAULT_NTFY_URL = "https://ntfy.sh";
@@ -16,14 +17,7 @@ export type PushConfig = {
   ntfyToken: string | null;
 };
 
-/** What the UI is allowed to see: whether a token exists, never the token. */
-export type PushConfigPublic = {
-  enabled: boolean;
-  ntfyUrl: string;
-  ntfyTopic: string | null;
-  hasToken: boolean;
-};
-
+/** Strips the token down to whether one exists — the UI never sees the value. */
 export function toPublicPushConfig(config: PushConfig): PushConfigPublic {
   return {
     enabled: config.enabled,
