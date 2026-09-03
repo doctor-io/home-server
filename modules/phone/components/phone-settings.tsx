@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ChevronRight, LayoutGrid, LockKeyhole, LogOut, Server } from "@/components/icons/platform-icons";
+import { cn } from "@/lib/utils";
 
 /**
  * The launcher stamps this on the WebView's user agent (capacitor.config.ts).
@@ -15,8 +16,79 @@ const APP_USER_AGENT_MARKER = "HomeioApp";
 /** Where the launcher lives inside the app, and the flag that stops it bouncing back. */
 const LAUNCHER_URL = "http://localhost/?disconnect=1";
 
-/** Same origin hop, but keeping the connection: it opens the app's own settings. */
-const LAUNCHER_SETTINGS_URL = "http://localhost/?settings=1";
+/**
+ * The narrow native interface MainActivity injects into every page the WebView
+ * loads. It is the only way this page can reach settings that belong to the
+ * app rather than to the server — and turning the lock off asks for a
+ * fingerprint on the native side, so a page that is not the owner cannot
+ * quietly weaken it.
+ */
+type AppSettingsBridge = {
+  read: () => string;
+  setLock: (enabled: boolean) => void;
+  setAutoReconnect: (enabled: boolean) => void;
+};
+
+type AppSettings = { lock: boolean; autoReconnect: boolean };
+
+function bridge(): AppSettingsBridge | null {
+  return (window as unknown as { HomeioApp?: AppSettingsBridge }).HomeioApp ?? null;
+}
+
+function readSettings(): AppSettings | null {
+  const api = bridge();
+  if (!api) return null;
+
+  try {
+    return JSON.parse(api.read()) as AppSettings;
+  } catch {
+    return null;
+  }
+}
+
+function Switch({
+  label,
+  hint,
+  checked,
+  onChange,
+}: {
+  label: string;
+  hint: string;
+  checked: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className="flex min-h-14 w-full items-center gap-3.5 px-3.5 py-3 text-left active:bg-white/6"
+    >
+      <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-white/5">
+        <LockKeyhole className="size-5 grayscale" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[13.5px]">{label}</span>
+        <span className="block text-[11px] text-muted-foreground">{hint}</span>
+      </span>
+      <span
+        aria-hidden="true"
+        className={cn(
+          "flex h-6 w-10 shrink-0 items-center rounded-full p-[3px] transition-colors",
+          checked ? "bg-primary" : "bg-white/15",
+        )}
+      >
+        <span
+          className={cn(
+            "size-[1.125rem] rounded-full bg-white transition-transform",
+            checked && "translate-x-4",
+          )}
+        />
+      </span>
+    </button>
+  );
+}
 
 function Row({
   icon: Icon,
@@ -69,10 +141,18 @@ function Row({
 export function PhoneSettings() {
   const [inApp, setInApp] = useState(false);
   const [origin, setOrigin] = useState("");
+  const [app, setApp] = useState<AppSettings | null>(null);
 
   useEffect(() => {
     setInApp(navigator.userAgent.includes(APP_USER_AGENT_MARKER));
     setOrigin(window.location.host);
+    setApp(readSettings());
+
+    // The native side fires this after every change it applies — including the
+    // one it refused, so a switch the owner declined to move goes back.
+    const sync = () => setApp(readSettings());
+    window.addEventListener("homeio:app-settings", sync);
+    return () => window.removeEventListener("homeio:app-settings", sync);
   }, []);
 
   return (
@@ -95,20 +175,38 @@ export function PhoneSettings() {
           />
         </div>
 
-        {/* The unlock and reconnect switches cannot live on this page: it is
-            served from the server's origin, where the app's storage is not
-            reachable. So this goes and opens them where they do live. */}
-        {inApp && (
-          <div className="border-b border-white/5">
-            <Row
-              icon={LockKeyhole}
-              label="App settings"
-              hint="Require unlock, reconnect on open"
-              onClick={() => {
-                window.location.href = LAUNCHER_SETTINGS_URL;
-              }}
-            />
-          </div>
+        {/* Settings that belong to the phone, not the server, reached through
+            the native bridge because this page cannot touch app storage. */}
+        {app && (
+          <>
+            <div className="border-b border-white/5">
+              <Switch
+                label="Require unlock"
+                hint={
+                  app.lock
+                    ? "Face or fingerprint when you open Homeio"
+                    : "Anyone with this phone can open your server"
+                }
+                checked={app.lock}
+                onChange={(next) => bridge()?.setLock(next)}
+              />
+            </div>
+            <div className="border-b border-white/5">
+              <Switch
+                label="Reconnect on open"
+                hint={
+                  app.autoReconnect
+                    ? "Go straight to the server you used last"
+                    : "Always start on the server list"
+                }
+                checked={app.autoReconnect}
+                onChange={(next) => {
+                  bridge()?.setAutoReconnect(next);
+                  setApp(readSettings());
+                }}
+              />
+            </div>
+          </>
         )}
 
         {/* Only inside the app: a browser tab has no launcher to return to, and
@@ -130,7 +228,7 @@ export function PhoneSettings() {
 
       <p className="px-1 text-[11px] text-muted-foreground/70">
         {inApp
-          ? "App settings belong to this phone, not to the server, so they open in the app itself."
+          ? "Unlock and reconnect are settings of this phone, not of the server. Turning the lock off asks for your fingerprint."
           : "Open Homeio in the mobile app for app-level settings."}
       </p>
     </div>
