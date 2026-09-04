@@ -159,7 +159,7 @@ curl -fsSL https://raw.githubusercontent.com/doctor-io/homeio/main/scripts/unins
 ## Security Notes
 
 - Change `AUTH_SESSION_SECRET` to a random 32+ character string before exposing outside your LAN
-- Put Homeio behind a TLS reverse proxy for HTTPS — the `Secure` cookie flag is set automatically when requests arrive over HTTPS. One-click HTTPS over Tailscale arrives in v2.0; a built-in reverse proxy manager with automatic Let's Encrypt certificates follows in v2.1.
+- Put Homeio behind a TLS reverse proxy for HTTPS — the `Secure` cookie flag is set automatically when requests arrive over HTTPS. Tailscale ships integrated and can serve Homeio over HTTPS on your tailnet with no port forwarding and no certificates to renew.
 - Enable two-factor authentication (Settings → Users & Access) before exposing Homeio beyond your LAN
 - The built-in terminal enforces a strict command allowlist — it is not a full shell
 
@@ -219,38 +219,6 @@ To opt out, set `HOMEIO_TELEMETRY=false` in your environment.
 
 ---
 
-## Roadmap
-
-See [ROADMAP.md](./ROADMAP.md) — current stable release is **v1.7.24**.
-
-**Shipped in v1.7:**
-- Two-factor authentication (TOTP) — secure the account with any authenticator app; ten single-use backup codes included
-- Stability & Pi hardening — multi-arch Docker image (amd64 + arm64), Node.js heap cap, Docker compose timeouts, bounded file search, and clean graceful shutdown
-- Authenticated SSE streams — system metrics, container stats, and store operations now require a session, with an architecture test that fails any new unauthenticated `/api/v1` route
-- Mobile app preview — Capacitor shell for Android and iOS over Tailscale
-
-**Coming in v2.0** (there is no v1.8 — six tracks ship together):
-- First-run setup wizard — timezone, storage, Tailscale, 2FA, and your first app in five skippable steps
-- Bring your own compose — paste a compose file, a `docker run` command, or a GitHub raw URL and Homeio installs it as an app
-- Container auto-heal — per-app restart policy, crash-loop detection, and an alert after N restarts in a window
-- Home Assistant integration — scoped API tokens plus a custom component exposing CPU, memory, disk, temperature, and per-app state as entities
-- Expose apps over Tailscale — one click gives any container a valid HTTPS tailnet URL, no port forwarding and no certificate management
-- Mobile app v2 — multiple servers, QR pairing, real error states, biometric launcher lock, and native download handling
-
-**Planned for v2.1:**
-- Reverse proxy manager — expose any container over HTTPS with a custom domain; auto-provisions Let's Encrypt certificates, no nginx config editing required
-- Dynamic DNS (DDNS) — automatically update Cloudflare, DuckDNS, or No-IP when your WAN IP changes
-- SMART disk health monitoring — drive health status, temperature, and pre-failure alerts via `smartctl`
-- Hardware sensor monitoring — CPU die temperature, NVMe temp, and fan RPM in the System module
-- Metrics history — persist and graph system and container metrics with time-range selectors (1 h / 24 h / 7 d / 30 d)
-- Docker image manager — browse, pull, inspect, and remove images directly without compose files
-- Webhooks — outbound HTTP notifications to Home Assistant, n8n, and other services
-- File manager enhancements — zip/unzip, bulk rename, batch delete
-
-**Planned for v2.2:**
-- Multi-user with role-based access (admin / user / viewer), per-app access control, and optional isolated file roots
-- Audit log — every install, file operation, power action, settings change, and auth event recorded
-
 ## Support Homeio
 
 Homeio is open-source and built for the homelab and self-hosting community. If you find it useful:
@@ -265,7 +233,7 @@ Your support helps fund ongoing development: real-time infrastructure tooling, D
 
 ## Contributing
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md).
+See [CONTRIBUTING.md](./CONTRIBUTING.md). Where Homeio is heading: [ROADMAP.md](./ROADMAP.md).
 
 ## License
 
