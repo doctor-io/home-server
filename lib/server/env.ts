@@ -105,6 +105,9 @@ const envSchema = z.object({
   DOCKER_SOCKET_PATH: z.string().default("/var/run/docker.sock"),
   // Auto-heal watches container events and can restart apps. Off by default,
   // and this flag is the kill switch when a policy misbehaves in the field.
+  // Module specifier for an optional extensions bundle, loaded at boot. Unset
+  // on a stock install, which is why the core never looks for one.
+  HOMEIO_EXTENSIONS_ENTRY: z.string().min(1).optional(),
   HOMEIO_AUTOHEAL: z
     .string()
     .optional()
