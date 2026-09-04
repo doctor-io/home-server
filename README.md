@@ -22,6 +22,32 @@ A self-hosted server manager with a desktop-style UI. Alternative to CasaOS, Umb
   <a href="https://github.com/sponsors/doctor-io"><strong>💖 Sponsor</strong></a>
 </p>
 
+## Why Homeio
+
+Most self-hosted managers give you a dashboard of tiles. Homeio gives you a
+desktop: windows you can move and stack, a dock, and `⌘K` to jump anywhere.
+
+- **It manages the machine, not just the containers.** Files, disks, network,
+  USB drives, scheduled tasks and a terminal are built in — not add-on apps.
+- **Everything is live.** CPU, memory, disk, container stats and logs stream
+  over SSE. No refresh button.
+- **It runs on a Raspberry Pi.** Native amd64 and arm64 images.
+- **MIT.** The whole server manager is in this repository — nothing here is a
+  trial, a demo tier, or a feature waiting for a licence key.
+
+## Quick start
+
+```bash
+git clone https://github.com/doctor-io/homeio.git
+cd homeio
+docker compose up -d
+```
+
+Open **http://localhost:12026**, create your account, done. The database ships
+with it — nothing else to install.
+
+> Try it first at **[demo.homeio.app](https://demo.homeio.app)** — `homeio` / `homeio26`
+
 ## Screenshots
 
 | Desktop | App Store |
@@ -32,27 +58,47 @@ A self-hosted server manager with a desktop-style UI. Alternative to CasaOS, Umb
 |----------|----------|
 | ![Settings](public/screenshots/settings.png) | ![Terminal](public/screenshots/terminal.png) |
 
+## How it compares
+
+|  | **Homeio** | CasaOS | Umbrel | Portainer |
+|---|---|---|---|---|
+| Interface | Desktop shell — windows, dock, `⌘K` | App dashboard | App dashboard | Admin console |
+| Built for | Running the whole server | Home apps | Home apps | Container operations |
+| Docker apps | Compose app store — reads CasaOS store archives | Compose app store | Curated app store | Stacks and containers |
+| Files · disks · network · terminal | Built in | Partly | Mostly via apps | Containers only |
+| Remote access | Tailscale built in — no port forwarding | — | Tailscale / Tor | Bring your own |
+| Licence | **MIT** | Apache-2.0 | Source-available | zlib (CE) + paid Business |
+
+Homeio is the youngest of the four and the smallest. What it trades in maturity
+it spends on the interface and on treating the host as a first-class citizen.
+
 ## Features
 
 - Desktop shell UI with dock, windows, command palette (`⌘K`), widgets, and lock screen
 - Real-time system metrics (CPU, memory, disk, network) via SSE
 - App Store: install, update, uninstall Docker Compose apps — compatible with CasaOS store archives
-- Container log viewer: real-time streaming, log-level badges, keyword filter, download
 - File manager: browse, upload (with progress), download, multi-select copy/move, conflict resolution, audio/video/image/PDF preview, Monaco code editor
+- Terminal with command allowlist (ls, cat, docker, df, ping, and more)
+- Tailscale integration: install, activate, and monitor your tailnet from Settings — reach your server from anywhere without port forwarding
+- Runs on amd64 and arm64 — Raspberry Pi 4/5 pull a native image
+
+<details>
+<summary><strong>And 12 more — logs, backups, cron, USB, Samba, 2FA, Google Drive…</strong></summary>
+
+- Container log viewer: real-time streaming, log-level badges, keyword filter, download
 - Scheduled tasks: built-in cron runner for shell commands, app restarts, backups, and image pulls — no SSH required
 - Notification system: real-time alerts for app events, container crashes, disk warnings, and task failures
 - USB drive support: auto-detect, mount, browse, and eject removable drives from the file manager
 - Local folder sharing over Samba and SMB network mount/unmount
-- Terminal with command allowlist (ls, cat, docker, df, ping, and more)
 - Docker container stats in real time
 - Network manager: WiFi and Ethernet via NetworkManager
-- Tailscale integration: install, activate, and monitor your tailnet from Settings — reach your server from anywhere without port forwarding
 - Google Drive: connect accounts over OAuth 2.0 and browse Drive alongside local and network locations in the file manager
 - Two-factor authentication (TOTP) with backup codes — works with any authenticator app
 - Disk manager and server info: drives, partitions, mount points, thermal sensors, and usage warnings
 - Mobile app (preview): a Capacitor shell for Android and iOS that reaches your server over Tailscale
-- Runs on amd64 and arm64 — Raspberry Pi 4/5 pull a native image
 - PostgreSQL-backed persistence
+
+</details>
 
 ---
 
@@ -63,6 +109,8 @@ A self-hosted server manager with a desktop-style UI. Alternative to CasaOS, Umb
 Requires Docker and Docker Compose.
 
 ```bash
+git clone https://github.com/doctor-io/homeio.git
+cd homeio
 docker compose up -d
 ```
 
