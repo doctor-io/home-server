@@ -16,6 +16,7 @@ import {
     InfoBanner,
     SectionDivider,
 } from "@/modules/settings/components/panel/controls";
+import { LicensePlanCard } from "@/modules/settings/components/panel/sections/license-plan-card";
 import { SETTINGS_PANEL_INSET } from "@/modules/settings/components/panel/surface";
 import type { SettingsBackend } from "@/modules/settings/components/panel/types";
 
@@ -272,6 +273,7 @@ export function GeneralSection({
                 <ExternalLink className="size-3 opacity-60" />
               </a>
             </div>
+            <LicensePlanCard />
             <div className="flex flex-wrap items-center gap-3 border-t border-glass-border/40 pt-2 text-xs">
               <a
                 href="https://github.com/doctor-io/homeio"

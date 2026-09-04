@@ -1,6 +1,12 @@
 /* @vitest-environment jsdom */
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import {
+  fireEvent,
+  render as renderComponent,
+  screen,
+  type RenderOptions,
+} from "@testing-library/react";
+import type { ReactElement } from "react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { AppearanceSettings } from "@/lib/desktop/appearance";
 
@@ -38,6 +44,19 @@ vi.mock("@/modules/settings/hooks/useTwoFactor", () => ({
 }));
 
 import { SettingsPanel } from "@/modules/settings/components/settings";
+import {
+  createTestQueryClient,
+  createWrapper,
+} from "@/test/query-client-wrapper";
+
+// The panel reads the licence plan through react-query, so every render needs
+// a client — the real app supplies one from app-providers.
+function render(ui: ReactElement, options?: RenderOptions) {
+  return renderComponent(ui, {
+    wrapper: createWrapper(createTestQueryClient()),
+    ...options,
+  });
+}
 
 const appearance: AppearanceSettings = {
   theme: "dark",
