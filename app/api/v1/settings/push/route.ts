@@ -11,13 +11,24 @@ import type { PushConfigSaveRequest } from "@/lib/shared/contracts/push";
 
 export const runtime = "nodejs";
 
+/**
+ * Never cacheable, and this is not a detail: a proxy that applies a default
+ * max-age to a JSON GET will happily serve yesterday's push config for a day —
+ * which is exactly what happened on a live server, leaving the phone's switch
+ * insisting push was off minutes after it had been turned on.
+ */
+const NO_STORE = { "Cache-Control": "no-store" } as const;
+
 export async function GET(request: Request) {
   const apiSession = await requireApiSession(request);
   if (apiSession.response) return apiSession.response;
 
   const requestId = createRequestId();
   try {
-    return NextResponse.json({ data: toPublicPushConfig(await readPushConfig()) });
+    return NextResponse.json(
+      { data: toPublicPushConfig(await readPushConfig()) },
+      { headers: NO_STORE },
+    );
   } catch (err) {
     logServerAction({
       level: "error",
@@ -72,7 +83,10 @@ export async function PUT(request: Request) {
             : body.ntfyToken.trim(),
     });
 
-    return NextResponse.json({ data: toPublicPushConfig(await readPushConfig()) });
+    return NextResponse.json(
+      { data: toPublicPushConfig(await readPushConfig()) },
+      { headers: NO_STORE },
+    );
   } catch (err) {
     logServerAction({
       level: "error",

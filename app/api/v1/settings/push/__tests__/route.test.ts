@@ -73,6 +73,23 @@ describe("GET /api/v1/settings/push", () => {
   });
 });
 
+describe("caching", () => {
+  it("forbids storing the push config, on every answer that carries it", async () => {
+    // A proxy applying a default max-age to a JSON GET served a stale config
+    // for a day on a live server: the phone's switch kept insisting push was
+    // off minutes after it had been turned on.
+    const read = await GET(new Request("http://localhost/api/v1/settings/push"));
+    const written = await put({
+      enabled: true,
+      ntfyUrl: "https://ntfy.sh",
+      ntfyTopic: "homeio-alerts",
+    });
+
+    expect(read.headers.get("Cache-Control")).toBe("no-store");
+    expect(written.headers.get("Cache-Control")).toBe("no-store");
+  });
+});
+
 describe("PUT /api/v1/settings/push", () => {
   it("saves a valid config", async () => {
     const response = await put({

@@ -54,7 +54,10 @@ export async function POST(request: Request) {
       requestId,
     });
 
-    return NextResponse.json({ data: { delivered: true } });
+    return NextResponse.json(
+      { data: { delivered: true } },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   } catch (err) {
     logServerAction({
       level: "warn",
