@@ -1,19 +1,4 @@
-import {
-  Bell         as AlertRegular,
-  RefreshCw    as ArrowSyncRegular,
-  Container    as BoxRegular,
-  CalendarClock as CalendarClockRegular,
-  Database     as DatabaseRegular,
-  HardDrive    as HardDriveRegular,
-  Paintbrush   as PaintBrushRegular,
-  Plug         as PlugRegular,
-  Users        as PeopleRegular,
-  Power        as PowerRegular,
-  Router       as RouterRegular,
-  Server       as ServerRegular,
-  Shield       as ShieldRegular,
-  Wrench       as WrenchRegular,
-} from "@/components/icons/platform-icons";
+import { SETTINGS_SECTIONS } from "@/modules/settings/components/panel/catalog";
 import {
   AdvancedSection,
   AppearanceSection,
@@ -35,30 +20,8 @@ import type {
   SettingsBackend,
   SettingsSection,
   SettingsSectionDefinition,
+  SettingsSectionId,
 } from "@/modules/settings/components/panel/types";
-
-export const SETTINGS_SECTIONS: SettingsSection[] = [
-  // System
-  { id: "general",          label: "General",          icon: ServerRegular       },
-  { id: "appearance",       label: "Appearance",       icon: PaintBrushRegular   },
-  { id: "updates",          label: "Updates",          icon: ArrowSyncRegular    },
-  // Infrastructure
-  { id: "network",          label: "Network",          icon: RouterRegular       },
-  { id: "storage",          label: "Storage",          icon: HardDriveRegular    },
-  { id: "docker",           label: "Docker",           icon: BoxRegular          },
-  // Integrations
-  { id: "integrations",     label: "Integrations",     icon: PlugRegular         },
-  // Automation
-  { id: "scheduled-tasks",  label: "Scheduled Tasks",  icon: CalendarClockRegular },
-  { id: "backup",           label: "Backup & Restore", icon: DatabaseRegular     },
-  // Access & Safety
-  { id: "users",            label: "Users & Access",   icon: PeopleRegular       },
-  { id: "security",         label: "Security",         icon: ShieldRegular       },
-  { id: "notifications",    label: "Notifications",    icon: AlertRegular        },
-  // Danger zone
-  { id: "power",            label: "Power",            icon: PowerRegular        },
-  { id: "advanced",         label: "Advanced",         icon: WrenchRegular       },
-];
 
 type SettingsRegistryContext = {
   appearance: Parameters<typeof AppearanceSection>[0]["appearance"];
@@ -96,6 +59,9 @@ type SettingsRegistryContext = {
   };
 };
 
+/** What a section contributes on top of its catalog metadata. */
+type SettingsSectionBody = Omit<SettingsSectionDefinition, keyof SettingsSection>;
+
 function getDefaultSaveConfig(
   settingsBackend: SettingsBackend,
   sectionId: keyof SettingsBackend["capabilities"]["saveBySection"],
@@ -112,13 +78,16 @@ function getDefaultSaveConfig(
   };
 }
 
-export function buildSettingsSectionDefinitions(
+/**
+ * Renderers keyed by section id. Typing this as a full `Record` means a section
+ * added to the catalog will not compile until it is given a body here — the two
+ * lists cannot drift apart.
+ */
+function buildSectionBodies(
   context: SettingsRegistryContext,
-): SettingsSectionDefinition[] {
-  return [
-    // ── System ──────────────────────────────────────────────────────────
-    {
-      ...SETTINGS_SECTIONS[0], // General
+): Record<SettingsSectionId, SettingsSectionBody> {
+  return {
+    general: {
       render: () => (
         <GeneralSection
           data={context.settingsBackend.general}
@@ -143,8 +112,8 @@ export function buildSettingsSectionDefinitions(
         ? { ...context.generalController.saveState, onSave: context.generalController.save }
         : getDefaultSaveConfig(context.settingsBackend, "general"),
     },
-    {
-      ...SETTINGS_SECTIONS[1], // Appearance
+
+    appearance: {
       liveApply: true,
       render: () => (
         <AppearanceSection
@@ -156,8 +125,8 @@ export function buildSettingsSectionDefinitions(
         />
       ),
     },
-    {
-      ...SETTINGS_SECTIONS[2], // Updates
+
+    updates: {
       render: () => (
         <UpdatesSection
           data={context.settingsBackend.updates}
@@ -171,19 +140,22 @@ export function buildSettingsSectionDefinitions(
       save: getDefaultSaveConfig(context.settingsBackend, "updates"),
     },
 
-    // ── Infrastructure ───────────────────────────────────────────────────
-    {
-      ...SETTINGS_SECTIONS[3], // Network
+    network: {
       render: () => <NetworkSection data={context.settingsBackend.network} />,
       save: getDefaultSaveConfig(context.settingsBackend, "network"),
     },
-    {
-      ...SETTINGS_SECTIONS[4], // Storage
-      render: () => <StorageSection data={context.settingsBackend.storage} onOpenDiskManager={context.onOpenDiskManager} />,
+
+    storage: {
+      render: () => (
+        <StorageSection
+          data={context.settingsBackend.storage}
+          onOpenDiskManager={context.onOpenDiskManager}
+        />
+      ),
       save: getDefaultSaveConfig(context.settingsBackend, "storage"),
     },
-    {
-      ...SETTINGS_SECTIONS[5], // Docker
+
+    docker: {
       render: () => (
         <DockerSection
           data={context.settingsBackend.docker}
@@ -195,19 +167,15 @@ export function buildSettingsSectionDefinitions(
       save: getDefaultSaveConfig(context.settingsBackend, "docker"),
     },
 
-    // ── Integrations ─────────────────────────────────────────────────────
-    {
-      ...SETTINGS_SECTIONS[6], // Integrations
+    integrations: {
       render: () => <IntegrationsSection />,
     },
 
-    // ── Automation ───────────────────────────────────────────────────────
-    {
-      ...SETTINGS_SECTIONS[7], // Scheduled Tasks
+    "scheduled-tasks": {
       render: () => <ScheduledTasksSection />,
     },
-    {
-      ...SETTINGS_SECTIONS[8], // Backup & Restore
+
+    backup: {
       render: () => (
         <BackupSection
           data={context.settingsBackend.backup}
@@ -223,9 +191,7 @@ export function buildSettingsSectionDefinitions(
         : getDefaultSaveConfig(context.settingsBackend, "backup"),
     },
 
-    // ── Access & Safety ──────────────────────────────────────────────────
-    {
-      ...SETTINGS_SECTIONS[9], // Users & Access
+    users: {
       render: () => (
         <UsersSection
           username={context.settingsBackend.general.username}
@@ -235,8 +201,8 @@ export function buildSettingsSectionDefinitions(
       ),
       save: getDefaultSaveConfig(context.settingsBackend, "users"),
     },
-    {
-      ...SETTINGS_SECTIONS[10], // Security
+
+    security: {
       render: () => (
         <SecuritySection
           data={context.settingsBackend.security}
@@ -248,8 +214,8 @@ export function buildSettingsSectionDefinitions(
         ? { ...context.securityController.saveState, onSave: context.securityController.save }
         : getDefaultSaveConfig(context.settingsBackend, "security"),
     },
-    {
-      ...SETTINGS_SECTIONS[11], // Notifications
+
+    notifications: {
       render: () => (
         <NotificationsSection
           draft={context.notificationController.draft}
@@ -262,9 +228,7 @@ export function buildSettingsSectionDefinitions(
         : getDefaultSaveConfig(context.settingsBackend, "notifications"),
     },
 
-    // ── Danger zone ──────────────────────────────────────────────────────
-    {
-      ...SETTINGS_SECTIONS[12], // Power
+    power: {
       render: () => (
         <PowerSection
           power={context.settingsBackend.power}
@@ -276,9 +240,19 @@ export function buildSettingsSectionDefinitions(
       ),
       save: getDefaultSaveConfig(context.settingsBackend, "power"),
     },
-    {
-      ...SETTINGS_SECTIONS[13], // Advanced
+
+    advanced: {
       render: () => <AdvancedSection />,
     },
-  ];
+  };
+}
+
+export function buildSettingsSectionDefinitions(
+  context: SettingsRegistryContext,
+): SettingsSectionDefinition[] {
+  const bodies = buildSectionBodies(context);
+  return SETTINGS_SECTIONS.map((section) => ({
+    ...section,
+    ...bodies[section.id],
+  }));
 }

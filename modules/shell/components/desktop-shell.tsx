@@ -34,6 +34,7 @@ import {
   useSharedStoreActions,
 } from "@/modules/apps/hooks/StoreActionsContext";
 import { FileManager } from "@/modules/files/components/file-manager";
+import { SETTINGS_SECTIONS } from "@/modules/settings/components/panel/catalog";
 import { SettingsPanel } from "@/modules/settings/components/settings";
 import { CommandPalette } from "@/modules/shell/components/command-palette";
 import { useDesktopAppearance } from "@/modules/shell/hooks/useDesktopAppearance";
@@ -56,19 +57,6 @@ import { Window } from "./window";
 
 const WINDOW_CLOSE_ANIMATION_MS = 180;
 const WALLPAPER_FADE_MS = 420;
-const SETTINGS_SEARCH_SECTIONS = [
-  { id: "general", label: "General" },
-  { id: "network", label: "Network" },
-  { id: "storage", label: "Storage" },
-  { id: "docker", label: "Docker" },
-  { id: "users", label: "Users & Access" },
-  { id: "security", label: "Security" },
-  { id: "notifications", label: "Notifications" },
-  { id: "backup", label: "Backup & Restore" },
-  { id: "updates", label: "Updates" },
-  { id: "appearance", label: "Appearance" },
-  { id: "power", label: "Power" },
-] as const;
 
 export function DesktopShell() {
   return (
@@ -194,8 +182,8 @@ function DesktopShellInner() {
 
   const filteredSettingsSections = useMemo(() => {
     const query = settingsSearchQuery.trim().toLowerCase();
-    if (!query) return SETTINGS_SEARCH_SECTIONS;
-    return SETTINGS_SEARCH_SECTIONS.filter((section) =>
+    if (!query) return SETTINGS_SECTIONS;
+    return SETTINGS_SECTIONS.filter((section) =>
       section.label.toLowerCase().includes(query),
     );
   }, [settingsSearchQuery]);
@@ -365,7 +353,7 @@ function DesktopShellInner() {
       setSettingsSectionRequest(sectionId);
       setIsSettingsSearchOpen(false);
       setSettingsSearchQuery("");
-      const section = SETTINGS_SEARCH_SECTIONS.find(
+      const section = SETTINGS_SECTIONS.find(
         (entry) => entry.id === sectionId,
       );
       if (typeof window !== "undefined" && section) {

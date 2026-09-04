@@ -12,27 +12,16 @@ import {
     useUpdatesAutoCheckEffect,
 } from "@/modules/settings/components/panel/controllers";
 import {
-    buildSettingsSectionDefinitions,
-    SETTINGS_SECTIONS,
-} from "@/modules/settings/components/panel/registry";
+    SETTINGS_SECTION_GROUPS,
+    SETTINGS_SECTION_IDS,
+} from "@/modules/settings/components/panel/catalog";
+import { buildSettingsSectionDefinitions } from "@/modules/settings/components/panel/registry";
 import {
     SETTINGS_BADGE_SURFACE,
     SETTINGS_PANEL_SHELL,
 } from "@/modules/settings/components/panel/surface";
-import type {
-    SettingsPanelProps,
-    SettingsSectionId,
-} from "@/modules/settings/components/panel/types";
+import type { SettingsPanelProps } from "@/modules/settings/components/panel/types";
 import { useSettingsBackend } from "@/modules/settings/hooks/useSettingsBackend";
-
-const SIDEBAR_GROUPS: { label: string; ids: SettingsSectionId[] }[] = [
-  { label: "System", ids: ["general", "appearance", "updates"] },
-  { label: "Infrastructure", ids: ["network", "storage", "docker"] },
-  { label: "Integrations", ids: ["integrations"] },
-  { label: "Automation", ids: ["scheduled-tasks", "backup"] },
-  { label: "Access", ids: ["users", "security", "notifications"] },
-  { label: "Danger Zone", ids: ["power", "advanced"] },
-];
 
 export function SettingsPanel({
   appearance,
@@ -47,7 +36,7 @@ export function SettingsPanel({
   const desktopPreferences = useDesktopPreferences();
   const { activeSection, setActiveSection } = useActiveSettingsSection(
     selectedSection,
-    SETTINGS_SECTIONS.map((section) => section.id),
+    SETTINGS_SECTION_IDS,
   );
 
   const generalController = useGeneralSettingsController(
@@ -96,17 +85,17 @@ export function SettingsPanel({
         className={cn("m-2 flex w-52 shrink-0 flex-col", SETTINGS_PANEL_SHELL)}
       >
         <div className="flex-1 overflow-y-auto px-2 py-3">
-          {SIDEBAR_GROUPS.map((group) => {
-            const sections = sectionDefinitions.filter((s) =>
-              group.ids.includes(s.id as SettingsSectionId),
+          {SETTINGS_SECTION_GROUPS.map((group) => {
+            const sections = sectionDefinitions.filter(
+              (section) => section.group === group.id,
             );
             if (sections.length === 0) return null;
             return (
-              <div key={group.label} className="mb-3">
+              <div key={group.id} className="mb-3">
                 <div
                   className={cn(
                     "mb-1 px-3 text-[10px] font-semibold uppercase tracking-[0.16em]",
-                    group.label === "Danger Zone"
+                    group.id === "danger"
                       ? "text-status-red/60"
                       : "text-muted-foreground/50",
                   )}

@@ -27,10 +27,24 @@ export type SettingsSectionId =
   | "scheduled-tasks"
   | "advanced";
 
+export type SettingsSectionGroupId =
+  | "system"
+  | "infrastructure"
+  | "integrations"
+  | "automation"
+  | "access"
+  | "danger";
+
+export type SettingsSectionGroup = {
+  id: SettingsSectionGroupId;
+  label: string;
+};
+
 export type SettingsSection = {
   id: SettingsSectionId;
   label: string;
   icon: ComponentType<SVGProps<SVGSVGElement>>;
+  group: SettingsSectionGroupId;
   badge?: string;
 };
 
