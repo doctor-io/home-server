@@ -281,6 +281,8 @@ export const settings = pgTable("settings", {
   pushNtfyTokenCiphertext: text("push_ntfy_token_ciphertext"),
   pushNtfyTokenIv: text("push_ntfy_token_iv"),
   pushNtfyTokenTag: text("push_ntfy_token_tag"),
+  /** False — the default — sends a signal with no alert text in it. */
+  pushIncludeContent: boolean("push_include_content").notNull().default(false),
 });
 
 export const filesGoogleDriveTokens = pgTable(

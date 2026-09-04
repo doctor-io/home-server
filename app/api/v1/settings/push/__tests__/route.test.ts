@@ -16,11 +16,13 @@ vi.mock("@/lib/server/modules/notifications/push-config", () => ({
     ntfyUrl: string;
     ntfyTopic: string | null;
     ntfyToken: string | null;
+    includeContent: boolean;
   }) => ({
     enabled: config.enabled,
     ntfyUrl: config.ntfyUrl,
     ntfyTopic: config.ntfyTopic,
     hasToken: config.ntfyToken !== null,
+    includeContent: config.includeContent,
   }),
 }));
 
@@ -40,6 +42,7 @@ const saved = {
   ntfyUrl: "https://ntfy.sh",
   ntfyTopic: "homeio-abcdefghijklmnop",
   ntfyToken: "tk_secret",
+  includeContent: false,
 };
 
 function put(body: unknown) {
@@ -68,6 +71,7 @@ describe("GET /api/v1/settings/push", () => {
       ntfyUrl: "https://ntfy.sh",
       ntfyTopic: "homeio-abcdefghijklmnop",
       hasToken: true,
+      includeContent: false,
     });
     expect(JSON.stringify(json)).not.toContain("tk_secret");
   });
@@ -138,6 +142,23 @@ describe("PUT /api/v1/settings/push", () => {
       (await put({ enabled: true, ntfyUrl: "file:///etc/passwd", ntfyTopic: "homeio" })).status,
     ).toBe(400);
     expect(mockWrite).not.toHaveBeenCalled();
+  });
+
+  it("only hands the relay the alert text when asked in so many words", async () => {
+    // Anything but an explicit true keeps the text off the wire, so a client
+    // that has never heard of this setting cannot turn it on by omission.
+    await put({ enabled: true, ntfyUrl: "https://ntfy.sh", ntfyTopic: "homeio-alerts" });
+    expect(mockWrite).toHaveBeenCalledWith(expect.objectContaining({ includeContent: false }));
+
+    await put({
+      enabled: true,
+      ntfyUrl: "https://ntfy.sh",
+      ntfyTopic: "homeio-alerts",
+      includeContent: true,
+    });
+    expect(mockWrite).toHaveBeenLastCalledWith(
+      expect.objectContaining({ includeContent: true }),
+    );
   });
 
   it("leaves the stored token alone when the field was not touched", async () => {

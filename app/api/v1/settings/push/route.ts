@@ -73,6 +73,9 @@ export async function PUT(request: Request) {
       enabled,
       ntfyUrl: url,
       ntfyTopic: topic || null,
+      // Opt-in, never inferred: handing the relay the alert text is a decision
+      // the operator makes, so anything but an explicit true stays off.
+      includeContent: body.includeContent === true,
       // Undefined keeps whatever is stored; the UI only sends this key when the
       // operator typed a new token or asked to remove the one there.
       ntfyToken:

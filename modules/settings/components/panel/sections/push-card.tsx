@@ -16,6 +16,7 @@ const DEFAULT_NTFY_URL = "https://ntfy.sh";
 
 type Draft = {
   enabled: boolean;
+  includeContent: boolean;
   ntfyUrl: string;
   ntfyTopic: string;
   /** Null while untouched: an empty box must not clear a stored token. */
@@ -27,6 +28,7 @@ type Status = { tone: "ok" | "error"; text: string };
 function draftFrom(config: PushConfigPublic): Draft {
   return {
     enabled: config.enabled,
+    includeContent: config.includeContent,
     ntfyUrl: config.ntfyUrl || DEFAULT_NTFY_URL,
     ntfyTopic: config.ntfyTopic ?? "",
     ntfyToken: null,
@@ -36,6 +38,7 @@ function draftFrom(config: PushConfigPublic): Draft {
 function isDirty(draft: Draft, saved: PushConfigPublic) {
   return (
     draft.enabled !== saved.enabled ||
+    draft.includeContent !== saved.includeContent ||
     draft.ntfyUrl !== (saved.ntfyUrl || DEFAULT_NTFY_URL) ||
     draft.ntfyTopic !== (saved.ntfyTopic ?? "") ||
     draft.ntfyToken !== null
@@ -95,6 +98,7 @@ export function PushCard({ isDemoMode = false }: { isDemoMode?: boolean }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           enabled: draft.enabled,
+          includeContent: draft.includeContent,
           ntfyUrl: draft.ntfyUrl,
           ntfyTopic: draft.ntfyTopic || null,
           // Only travels when the operator touched it, so saving the toggle
@@ -159,13 +163,38 @@ export function PushCard({ isDemoMode = false }: { isDemoMode?: boolean }) {
           disabledReason={isDemoMode ? "Not available in demo mode" : undefined}
         />
 
+        <Toggle
+          label="Put the alert text in the push"
+          description={
+            draft.includeContent
+              ? "The push server sees your alert titles and messages"
+              : "The push carries a signal only — the phone reads the alert from here"
+          }
+          enabled={draft.includeContent}
+          onToggle={() => patch({ includeContent: !draft.includeContent })}
+          disabled={isDemoMode}
+          disabledReason={isDemoMode ? "Not available in demo mode" : undefined}
+        />
+
+        {draft.includeContent && (
+          <p className="flex items-start gap-1.5 pb-2 text-[11px] text-status-amber">
+            <AlertTriangle className="mt-px size-3.5 shrink-0" />
+            &ldquo;Jellyfin stopped&rdquo; tells whoever runs that server rather a lot about
+            your household. Leave this off unless the phone often cannot reach Homeio.
+          </p>
+        )}
+
         <div className="flex items-end gap-2">
           <div className="flex-1">
             <SettingsInput
               label="Topic"
               value={draft.ntfyTopic}
               placeholder="homeio-…"
-              description="The phone subscribes to this. Anyone who knows it can read your alerts."
+              description={
+                draft.includeContent
+                  ? "The phone subscribes to this. Anyone who knows it can read your alerts."
+                  : "The phone subscribes to this. Anyone who knows it learns when an alert fires, not what it says."
+              }
               onChange={isDemoMode ? undefined : (value) => patch({ ntfyTopic: value.trim() })}
             />
           </div>

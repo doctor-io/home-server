@@ -34,7 +34,7 @@ app's storage directly, and why the couplings below exist at all.
 
 ## Contract between the app and the server
 
-Seven points where one side depends on the other, and they now live in **separate
+Eight points where one side depends on the other, and they now live in **separate
 repositories**. Neither compiler can see them, and no test fails when one moves —
 a break shows up as a dead button on someone's phone. Change either side and
 change both, in both repos, in the same sitting.
@@ -48,6 +48,7 @@ change both, in both repos, in the same sitting.
 | 5 | Launcher navigates to `<origin>/m` after a successful probe | `/m` being the phone UI's entry point | The app lands somewhere that is not the phone UI |
 | 6 | `MainActivity` exposes `HomeioApp.{setPush,clearPush}` and reports `pushTopic` from `read()` | `phone-settings.tsx` calls them from the "Notifications on this phone" row | The row disappears, or the switch moves and nothing subscribes |
 | 7 | `PushService` subscribes to `<url>/<topic>/json` | `GET /api/v1/settings/push` returning the same `ntfyUrl` and `ntfyTopic` the dispatcher publishes to | The phone listens to an address nothing publishes to, silently |
+| 8 | `PushService` treats the tag `homeio-ping` as "go and read `GET /api/v1/notifications`" | `push-service.ts` tagging a content-free push with `PING_TAG` | Every alert reads "New notification" and never says what happened |
 
 Points 6 and 7 fail the same quiet way point 4 does: nothing errors, the alert
 simply never arrives. The row is built to expose which half is missing — it
@@ -83,6 +84,15 @@ launcher's listeners die the moment the WebView navigates onto a server.
   missing `/m` itself, because its probe is cross-origin and a `no-cors`
   response is opaque.
 - **Settings bridge** — see contract point 2.
+- **Push, ping mode** — by default the push carries no alert text at all: the
+  relay is told that something happened, at what severity, and nothing else.
+  `PushService` then fetches the real notification from the user's own Homeio,
+  with the session cookie taken from the WebView's store, and shows that. When
+  the server cannot be reached — phone off the tailnet, session expired — it
+  falls back to the generic text, so an alert is degraded but never lost. The
+  origin it resolves against is captured from the WebView at subscribe time,
+  not from the page: the bridge is reachable from every page loaded, and a page
+  that could name the server could name someone else's.
 - **Push** — a foreground service holding ntfy's JSON stream, because the whole
   point is alerts arriving with the app closed and nothing tied to the activity
   survives that. It costs a permanent low-priority notification, which is the
@@ -103,5 +113,10 @@ launcher's listeners die the moment the WebView navigates onto a server.
 - TLS errors are never silently accepted.
 - Notification text is published by whoever knows the topic, so it is displayed
   and nothing more: tapping opens the app, and there are no actions or deep links.
+- `GET /api/v1/notifications` must stay `no-store`. The phone resolves a
+  content-free push against it, so a cached copy is not a stale screen — it is an
+  alert that never appears. A CDN in front of a self-hosted server is a normal
+  deployment, and one was observed serving that API with `Age: 2916`; the app
+  cache-busts the URL for the same reason.
 - The app must keep working against a **v1.7 server** — it may not assume any
   v2.0 endpoint exists.

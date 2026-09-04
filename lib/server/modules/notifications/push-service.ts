@@ -36,6 +36,39 @@ function ntfyHeadersFor(kind: NotificationKind) {
 }
 
 /**
+ * The tag that tells the app this push carries nothing worth reading.
+ *
+ * An app too old to know it simply shows the generic text below — degraded,
+ * never broken, which is the only acceptable failure mode for a phone that
+ * updates on its own schedule.
+ */
+export const PING_TAG = "homeio-ping";
+
+/**
+ * What a push says when the operator has chosen not to hand the relay their
+ * alert text. It is deliberately identical for every notification: a relay that
+ * can see "Jellyfin stopped" can see rather a lot about a household.
+ */
+const PING_TITLE = "Homeio";
+const PING_MESSAGE = "New notification — open Homeio to read it";
+
+/**
+ * Priority survives ping mode, and that is a considered leak: it is what
+ * decides whether the phone buzzes at 3am, and a push that cannot distinguish
+ * a crashed container from a finished backup is not an alerting system. What
+ * escapes is one of three severity levels, with no subject attached.
+ */
+function payloadFor(notification: NotificationRecord, config: PushConfig) {
+  const { priority, tags } = ntfyHeadersFor(notification.kind);
+
+  if (config.includeContent) {
+    return { title: notification.title, message: notification.body, priority, tags: [tags] };
+  }
+
+  return { title: PING_TITLE, message: PING_MESSAGE, priority, tags: [tags, PING_TAG] };
+}
+
+/**
  * Header values must be Latin-1 and single-line, and a notification body is
  * neither: container names carry unicode, and log excerpts carry newlines. ntfy
  * accepts a JSON body instead, which has no such rule — so that is what this
@@ -47,7 +80,7 @@ export const ntfyTransport: PushTransport = {
   async send(notification, config) {
     if (!config.ntfyTopic) return;
 
-    const { priority, tags } = ntfyHeadersFor(notification.kind);
+    const payload = payloadFor(notification, config);
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), PUSH_TIMEOUT_MS);
 
@@ -59,13 +92,7 @@ export const ntfyTransport: PushTransport = {
           "Content-Type": "application/json",
           ...(config.ntfyToken ? { Authorization: `Bearer ${config.ntfyToken}` } : {}),
         },
-        body: JSON.stringify({
-          topic: config.ntfyTopic,
-          title: notification.title,
-          message: notification.body,
-          priority,
-          tags: [tags],
-        }),
+        body: JSON.stringify({ topic: config.ntfyTopic, ...payload }),
       });
 
       if (!response.ok) {

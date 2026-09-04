@@ -8,6 +8,7 @@ vi.mock("@/lib/server/modules/notifications/push-config", () => ({
 }));
 
 import {
+  PING_TAG,
   describePushFailure,
   dispatchPush,
   ntfyTransport,
@@ -28,7 +29,11 @@ const configured = {
   ntfyUrl: "https://ntfy.sh",
   ntfyTopic: "homeio-abc",
   ntfyToken: null,
+  includeContent: true,
 };
+
+/** The default: the relay is told that something happened and nothing else. */
+const pinging = { ...configured, includeContent: false };
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -87,9 +92,18 @@ describe("dispatchPush", () => {
 
 describe("ntfyTransport", () => {
   function captureFetch(response = { ok: true, status: 200 }) {
-    const fetchMock = vi.fn(async () => response as Response);
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => response as Response);
     vi.stubGlobal("fetch", fetchMock);
     return fetchMock;
+  }
+
+  function bodyOf(init: RequestInit | undefined) {
+    return JSON.parse(String(init?.body)) as {
+      title: string;
+      message: string;
+      priority: number;
+      tags: string[];
+    };
   }
 
   it("posts the notification as JSON, not as headers", async () => {
@@ -97,8 +111,8 @@ describe("ntfyTransport", () => {
 
     await ntfyTransport.send(notification, configured);
 
-    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    const body = JSON.parse(String(init.body));
+    const [url, init] = fetchMock.mock.calls[0];
+    const body = bodyOf(init);
 
     // Header values must be Latin-1 and single-line; titles carry unicode and
     // bodies carry newlines, so the payload goes in the body where neither rule
@@ -117,9 +131,7 @@ describe("ntfyTransport", () => {
     await ntfyTransport.send(notification, configured);
     await ntfyTransport.send({ ...notification, kind: "info" }, configured);
 
-    const priorities = fetchMock.mock.calls.map(
-      (call) => JSON.parse(String((call[1] as RequestInit).body)).priority,
-    );
+    const priorities = fetchMock.mock.calls.map((call) => bodyOf(call[1]).priority);
 
     // A stopped container should wake someone; a routine message should not.
     expect(priorities[0]).toBe(5);
@@ -129,15 +141,12 @@ describe("ntfyTransport", () => {
   it("carries a token only when one is configured", async () => {
     const withToken = captureFetch();
     await ntfyTransport.send(notification, { ...configured, ntfyToken: "tk_secret" });
-    const authed = (withToken.mock.calls[0][1] as RequestInit).headers as Record<string, string>;
+    const authed = withToken.mock.calls[0][1]?.headers as Record<string, string>;
     expect(authed.Authorization).toBe("Bearer tk_secret");
 
     const withoutToken = captureFetch();
     await ntfyTransport.send(notification, configured);
-    const anonymous = (withoutToken.mock.calls[0][1] as RequestInit).headers as Record<
-      string,
-      string
-    >;
+    const anonymous = withoutToken.mock.calls[0][1]?.headers as Record<string, string>;
     expect(anonymous.Authorization).toBeUndefined();
   });
 
@@ -204,5 +213,82 @@ describe("describePushFailure", () => {
     expect(describePushFailure("not an error", "https://ntfy.sh")).toBe(
       "Could not reach https://ntfy.sh",
     );
+  });
+});
+
+describe("ping mode", () => {
+  function captureFetch() {
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) =>
+      ({ ok: true, status: 200 }) as Response,
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  function bodyOf(init: RequestInit | undefined) {
+    return JSON.parse(String(init?.body)) as {
+      title: string;
+      message: string;
+      priority: number;
+      tags: string[];
+    };
+  }
+
+  it("hands the relay no part of the notification", async () => {
+    const fetchMock = captureFetch();
+
+    await ntfyTransport.send(notification, pinging);
+
+    const sent = JSON.stringify(fetchMock.mock.calls[0][1]?.body);
+    // "jellyfin stopped" tells whoever runs the relay rather a lot about a
+    // household, and this is the whole point of the mode.
+    expect(sent).not.toContain("jellyfin");
+    expect(sent).not.toContain("exited");
+    expect(bodyOf(fetchMock.mock.calls[0][1]).title).toBe("Homeio");
+  });
+
+  it("says the same thing for every notification", async () => {
+    const fetchMock = captureFetch();
+
+    await ntfyTransport.send(notification, pinging);
+    await ntfyTransport.send(
+      { ...notification, title: "Backup finished", body: "42 GB", kind: "success" },
+      pinging,
+    );
+
+    const [first, second] = fetchMock.mock.calls.map((call) => bodyOf(call[1]));
+    expect(first.message).toBe(second.message);
+    expect(first.title).toBe(second.title);
+  });
+
+  it("keeps priority, because a silent crash alert is not an alert", async () => {
+    const fetchMock = captureFetch();
+
+    await ntfyTransport.send(notification, pinging);
+    await ntfyTransport.send({ ...notification, kind: "info" }, pinging);
+
+    const [crash, routine] = fetchMock.mock.calls.map((call) => bodyOf(call[1]));
+    // One of three severity levels escapes, with no subject attached. That is
+    // the considered trade: without it the phone cannot know to wake anyone.
+    expect(crash.priority).toBe(5);
+    expect(routine.priority).toBe(2);
+  });
+
+  it("marks the push so the app knows to go and read the real one", async () => {
+    const fetchMock = captureFetch();
+
+    await ntfyTransport.send(notification, pinging);
+
+    expect(bodyOf(fetchMock.mock.calls[0][1]).tags).toContain(PING_TAG);
+  });
+
+  it("does not mark a push that already carries the text", async () => {
+    const fetchMock = captureFetch();
+
+    await ntfyTransport.send(notification, configured);
+
+    const body = bodyOf(fetchMock.mock.calls[0][1]);
+    expect(body.tags).not.toContain(PING_TAG);
+    expect(body.title).toBe("jellyfin stopped");
   });
 });

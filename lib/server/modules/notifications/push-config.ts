@@ -15,6 +15,8 @@ export type PushConfig = {
   ntfyTopic: string | null;
   /** Only set for protected topics; ntfy.sh public topics need none. */
   ntfyToken: string | null;
+  /** False — the default — sends a signal the app resolves against this server. */
+  includeContent: boolean;
 };
 
 /** Strips the token down to whether one exists — the UI never sees the value. */
@@ -24,6 +26,7 @@ export function toPublicPushConfig(config: PushConfig): PushConfigPublic {
     ntfyUrl: config.ntfyUrl,
     ntfyTopic: config.ntfyTopic,
     hasToken: config.ntfyToken !== null,
+    includeContent: config.includeContent,
   };
 }
 
@@ -31,7 +34,13 @@ export async function readPushConfig(): Promise<PushConfig> {
   const [row] = await db.select().from(settings).where(eq(settings.id, "singleton")).limit(1);
 
   if (!row) {
-    return { enabled: false, ntfyUrl: DEFAULT_NTFY_URL, ntfyTopic: null, ntfyToken: null };
+    return {
+      enabled: false,
+      ntfyUrl: DEFAULT_NTFY_URL,
+      ntfyTopic: null,
+      ntfyToken: null,
+      includeContent: false,
+    };
   }
 
   let ntfyToken: string | null = null;
@@ -55,6 +64,7 @@ export async function readPushConfig(): Promise<PushConfig> {
     ntfyUrl: row.pushNtfyUrl ?? DEFAULT_NTFY_URL,
     ntfyTopic: row.pushNtfyTopic,
     ntfyToken,
+    includeContent: row.pushIncludeContent,
   };
 }
 
@@ -62,6 +72,7 @@ export async function writePushConfig(update: {
   enabled: boolean;
   ntfyUrl: string;
   ntfyTopic: string | null;
+  includeContent: boolean;
   /** undefined leaves the stored token alone; null clears it. */
   ntfyToken?: string | null;
 }): Promise<void> {
@@ -89,6 +100,7 @@ export async function writePushConfig(update: {
       pushEnabled: update.enabled,
       pushNtfyUrl: update.ntfyUrl,
       pushNtfyTopic: update.ntfyTopic,
+      pushIncludeContent: update.includeContent,
       ...secret,
       updatedAt: new Date(),
     })

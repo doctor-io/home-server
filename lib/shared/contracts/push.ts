@@ -4,12 +4,15 @@ export type PushConfigPublic = {
   ntfyUrl: string;
   ntfyTopic: string | null;
   hasToken: boolean;
+  /** False — the default — pushes a signal with no alert text in it. */
+  includeContent: boolean;
 };
 
 export type PushConfigSaveRequest = {
   enabled: boolean;
   ntfyUrl: string;
   ntfyTopic: string | null;
+  includeContent?: boolean;
   /** Omitted leaves the stored token alone; null clears it. */
   ntfyToken?: string | null;
 };
