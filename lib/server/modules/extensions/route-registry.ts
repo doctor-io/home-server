@@ -2,6 +2,7 @@ import "server-only";
 
 import type { ApiSession } from "@/lib/server/modules/auth/api";
 import type { ApiTokenScope } from "@/lib/shared/contracts/api-tokens";
+import type { Entitlement } from "@/lib/shared/contracts/licensing";
 
 /**
  * Where API routes that do not ship in this repo plug in.
@@ -46,6 +47,12 @@ export type ExtensionRoute = {
    * requireApiSession refuses bearer tokens for a route that names no scope.
    */
   scope?: ApiTokenScope;
+  /**
+   * Entitlement this route needs. Enforced by the core dispatcher, not by the
+   * module: a paid endpoint must not be the one deciding whether it was paid
+   * for.
+   */
+  entitlement?: Entitlement;
   handler: ExtensionRouteHandler;
 };
 

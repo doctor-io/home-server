@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const hasEntitlement = vi.hoisted(() => vi.fn(() => false));
+
+vi.mock("@/lib/server/modules/licensing/entitlements-service", () => ({
+  hasEntitlement,
+}));
+
 import { DELETE, GET, POST } from "@/app/api/v1/ext/[...path]/route";
 import { requireApiSession } from "@/lib/server/modules/auth/api";
 import {
@@ -19,6 +25,8 @@ function requestFor(path: string, method = "GET") {
 describe("/api/v1/ext/**", () => {
   beforeEach(() => {
     resetExtensionRoutes();
+    hasEntitlement.mockReset();
+    hasEntitlement.mockReturnValue(false);
   });
 
   it("returns 404 when nothing is registered", async () => {
@@ -114,5 +122,57 @@ describe("/api/v1/ext/**", () => {
     expect(response.status).toBe(500);
     expect(body.error).toBe("Extension route failed");
     expect(JSON.stringify(body)).not.toContain("secret internal detail");
+  });
+  it("refuses a route whose entitlement the licence does not grant", async () => {
+    registerExtensionRoutes([
+      {
+        method: "GET",
+        path: "fleet/servers",
+        entitlement: "multi-server",
+        handler: () => NextResponse.json({ reached: true }),
+      },
+    ]);
+
+    const response = await GET(
+      requestFor("fleet/servers"),
+      contextFor("fleet", "servers"),
+    );
+    const body = (await response.json()) as { code: string; reached?: boolean };
+
+    expect(response.status).toBe(403);
+    expect(body.code).toBe("entitlement_required");
+    // The handler must not have run at all.
+    expect(body.reached).toBeUndefined();
+  });
+
+  it("serves the route once the licence grants its entitlement", async () => {
+    hasEntitlement.mockReturnValue(true);
+    registerExtensionRoutes([
+      {
+        method: "GET",
+        path: "fleet/servers",
+        entitlement: "multi-server",
+        handler: () => NextResponse.json({ reached: true }),
+      },
+    ]);
+
+    const response = await GET(
+      requestFor("fleet/servers"),
+      contextFor("fleet", "servers"),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ reached: true });
+    expect(hasEntitlement).toHaveBeenCalledWith("multi-server");
+  });
+
+  it("does not consult the licence for a route that needs no entitlement", async () => {
+    registerExtensionRoutes([
+      { method: "GET", path: "free/thing", handler: () => NextResponse.json({}) },
+    ]);
+
+    await GET(requestFor("free/thing"), contextFor("free", "thing"));
+
+    expect(hasEntitlement).not.toHaveBeenCalled();
   });
 });

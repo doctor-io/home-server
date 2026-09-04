@@ -108,6 +108,9 @@ const envSchema = z.object({
   // Module specifier for an optional extensions bundle, loaded at boot. Unset
   // on a stock install, which is why the core never looks for one.
   HOMEIO_EXTENSIONS_ENTRY: z.string().min(1).optional(),
+  // Signed licence token. Unset means the free plan: the server grants no
+  // entitlements and says so, rather than failing to start.
+  HOMEIO_LICENSE: z.string().min(1).optional(),
   HOMEIO_AUTOHEAL: z
     .string()
     .optional()

@@ -10,6 +10,7 @@ import {
   normalizeExtensionPath,
   type ExtensionRouteMethod,
 } from "@/lib/server/modules/extensions/route-registry";
+import { hasEntitlement } from "@/lib/server/modules/licensing/entitlements-service";
 
 export const runtime = "nodejs";
 
@@ -52,6 +53,19 @@ async function handleExtensionRequest(
         code: "extension_route_not_found",
       },
       { status: 404 },
+    );
+  }
+
+  // Enforced here rather than inside the handler: the module that benefits from
+  // an entitlement is not the right place to check for it.
+  if (route.entitlement && !hasEntitlement(route.entitlement)) {
+    return NextResponse.json(
+      {
+        error: `This endpoint requires the ${route.entitlement} entitlement`,
+        code: "entitlement_required",
+        entitlement: route.entitlement,
+      },
+      { status: 403 },
     );
   }
 
