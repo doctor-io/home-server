@@ -1,37 +1,14 @@
 "use client";
 
 import {
-  ShoppingBag   as AppStore24Regular,
-  LayoutGrid    as GridDotsRegular,
-  FolderOpen    as OpenFolderRegular,
-  Cpu           as PulseRegular,
-  Settings      as SettingsRegular,
-  TerminalSquare as WindowConsoleRegular,
-} from "@/components/icons/platform-icons";
-import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { OsIcon } from "@/components/icons/OsIcon";
 import { APP_ICONS } from "@/components/icons/icon-assets";
+import { DOCK_APPS } from "@/modules/shell/app-catalog";
 import { useRef, useState } from "react";
-
-export type DockItemDef = {
-  id: string;
-  name: string;
-  icon: React.ComponentType<{ className?: string }>;
-  iconBg: string;
-};
-
-export const dockItemDefs: DockItemDef[] = [
-  { id: "apps",      name: "Home",      icon: GridDotsRegular,      iconBg: "bg-blue-500/80" },
-  { id: "terminal",  name: "Terminal",  icon: WindowConsoleRegular, iconBg: "bg-slate-700/90" },
-  { id: "files",     name: "Files",     icon: OpenFolderRegular,    iconBg: "bg-amber-500/80" },
-  { id: "monitor",   name: "Monitor",   icon: PulseRegular,         iconBg: "bg-emerald-600/80" },
-  { id: "app-store", name: "App Store", icon: AppStore24Regular,    iconBg: "bg-purple-600/80" },
-  { id: "settings",  name: "Settings",  icon: SettingsRegular,      iconBg: "bg-zinc-600/80" },
-];
 
 type DockProps = {
   activeWindows?: string[];
@@ -90,7 +67,7 @@ export function Dock({
         onMouseLeave={() => setHoveredIndex(null)}
         aria-label="Quick launch dock"
       >
-        {dockItemDefs.map((item, index) => {
+        {DOCK_APPS.map((item, index) => {
           const scale = animationsEnabled ? getScale(index) : 1;
           const isRunning = activeWindows.includes(item.id);
           const isFocused = focusedWindow === item.id;

@@ -1,16 +1,6 @@
 "use client";
 
-import {
-  Activity,
-  Bell,
-  FolderOpen,
-  HardDrive,
-  Package,
-  Search,
-  Settings,
-  ShoppingBag,
-  TerminalSquare,
-} from "@/components/icons/platform-icons";
+import { Search } from "@/components/icons/platform-icons";
 import { CurrentUserError, useCurrentUser } from "@/hooks/useCurrentUser";
 import { readLockState, writeLockState } from "@/lib/desktop/lock-state";
 import {
@@ -35,6 +25,11 @@ import {
 } from "@/modules/apps/hooks/StoreActionsContext";
 import { FileManager } from "@/modules/files/components/file-manager";
 import { SETTINGS_SECTIONS } from "@/modules/settings/components/panel/catalog";
+import {
+  DESKTOP_WINDOWS,
+  DESKTOP_WINDOWS_BY_ID,
+  type DesktopWindowId,
+} from "@/modules/shell/app-catalog";
 import { SettingsPanel } from "@/modules/settings/components/settings";
 import { CommandPalette } from "@/modules/shell/components/command-palette";
 import { useDesktopAppearance } from "@/modules/shell/hooks/useDesktopAppearance";
@@ -54,6 +49,16 @@ import { SessionLoadingScreen } from "./session-loading-screen";
 import { Terminal } from "./terminal";
 import { UpdateRecoveryScreen } from "./update-recovery-screen";
 import { Window } from "./window";
+
+type DesktopWindowBody = {
+  /** Extra condition beyond "is open" — app-settings needs a target first. */
+  enabled?: boolean;
+  /** Overrides the catalog title when it depends on runtime state. */
+  title?: string;
+  /** Overrides the default close handler when extra state must be cleared. */
+  onClose?: () => void;
+  render: () => React.ReactNode;
+};
 
 const WINDOW_CLOSE_ANIMATION_MS = 180;
 const WALLPAPER_FADE_MS = 420;
@@ -473,26 +478,15 @@ function DesktopShellInner() {
   const openCommandPaletteWindow = useCallback(
     (windowId: "files" | "settings" | "app-store" | "terminal" | "monitor" | "notifications" | "app-settings" | "disk-manager") => {
       if (typeof window !== "undefined") {
-        const metadata = {
-          files: { title: "Open Files", subtitle: "Folder and file browser" },
-          settings: { title: "Open Settings", subtitle: "System preferences" },
-          "app-store": {
-            title: "Open App Store",
-            subtitle: "Browse and install apps",
-          },
-          terminal: { title: "Open Terminal", subtitle: "Shell and logs" },
-          monitor: { title: "Open Monitor", subtitle: "System performance" },
-          notifications: { title: "Open Notifications", subtitle: "Activity feed" },
-          "app-settings": { title: "Open App Settings", subtitle: "App configuration" },
-          "disk-manager": { title: "Open Disk Manager", subtitle: "Storage management" },
-        }[windowId];
+        const spec = DESKTOP_WINDOWS_BY_ID.get(windowId);
+        if (!spec) return;
 
         setRecentActions(
           pushRecentCommandAction(window.localStorage, {
             key: `window:${windowId}`,
             kind: "window",
-            title: metadata.title,
-            subtitle: metadata.subtitle,
+            title: `Open ${spec.title}`,
+            subtitle: spec.commandSubtitle,
             windowId,
           }),
         );
@@ -641,6 +635,85 @@ function DesktopShellInner() {
     return <SessionLoadingScreen />;
   }
 
+  // What each window puts inside its frame. Everything else about a window —
+  // title, icon, size — comes from DESKTOP_WINDOWS. Typing this as a full
+  // Record means a window added to the catalog will not compile until it has
+  // contents here.
+  const windowBodies: Record<DesktopWindowId, DesktopWindowBody> = {
+    files: {
+      render: () => <FileManager />,
+    },
+    settings: {
+      render: () => (
+        <SettingsPanel
+          appearance={appearance}
+          wallpaperOptions={wallpapers}
+          accentOptions={accentColors}
+          onAppearanceChange={updateAppearance}
+          wallpaperAccentColor={wallpaperAccentColor}
+          selectedSection={settingsSectionRequest}
+          onOpenDiskManager={() => openWindow("disk-manager")}
+        />
+      ),
+    },
+    monitor: {
+      render: () => <Monitor />,
+    },
+    notifications: {
+      render: () => <NotificationsPanel />,
+    },
+    "app-store": {
+      render: () => (
+        <AppStore
+          onOpenCustomInstall={() => openWindow("custom-install")}
+          launchRequest={appStoreLaunchRequest}
+        />
+      ),
+    },
+    "custom-install": {
+      render: () => (
+        <AppConfiguratorPanel
+          context="custom_install"
+          onClose={() => closeWindow("custom-install")}
+        />
+      ),
+    },
+    "app-settings": {
+      enabled: appSettingsTarget !== null,
+      title: appSettingsTarget
+        ? `${appSettingsTarget.appName} Settings`
+        : undefined,
+      onClose: () => {
+        closeWindow("app-settings");
+        setAppSettingsTarget(null);
+      },
+      render: () =>
+        appSettingsTarget ? (
+          <AppConfiguratorPanel
+            context="installed_edit"
+            target={appSettingsTarget}
+            actions={{ saveAppSettings: shellStoreActions.saveAppSettings }}
+            onClose={() => {
+              closeWindow("app-settings");
+              setAppSettingsTarget(null);
+            }}
+          />
+        ) : null,
+    },
+    terminal: {
+      title: terminalMode === "logs" ? "Container Logs" : "Terminal",
+      render: () => (
+        <Terminal
+          commandRequest={terminalCommandRequest}
+          readOnly={terminalMode === "logs"}
+        />
+      ),
+    },
+    "disk-manager": {
+      render: () => <DiskManager />,
+    },
+  };
+
   return (
     <div
       className="relative h-screen w-screen overflow-hidden"
@@ -744,205 +817,33 @@ function DesktopShellInner() {
           <SystemWidgets />
         </div>
 
-        {/* Windows */}
-        {openWindows.includes("files") && (
-          <Window
-            title="Files"
-            icon={<FolderOpen className="size-4 text-sky-400" />}
-            onClose={() => closeWindow("files")}
-            onMinimize={() => minimizeWindow("files")}
-            defaultWidth={1100}
-            defaultHeight={679}
-            zIndex={getWindowZ("files")}
-            dockPosition={appearance.dockPosition}
-            onFocus={() => setFocusedWindow("files")}
-            isClosing={closingWindows.includes("files")}
-            isMinimized={minimizedWindows.includes("files")}
-            animationsEnabled={appearance.animationsEnabled}
-          >
-            <FileManager />
-          </Window>
-        )}
+        {/* Windows — one element per catalog entry, contents from windowBodies */}
+        {DESKTOP_WINDOWS.map((spec) => {
+          const body = windowBodies[spec.id];
+          if (!openWindows.includes(spec.id)) return null;
+          if (body.enabled === false) return null;
+          const SpecIcon = spec.icon;
 
-        {openWindows.includes("settings") && (
-          <Window
-            title="Settings"
-            icon={<Settings className="size-4 text-muted-foreground" />}
-            onClose={() => closeWindow("settings")}
-            onMinimize={() => minimizeWindow("settings")}
-            defaultWidth={860}
-            defaultHeight={620}
-            zIndex={getWindowZ("settings")}
-            dockPosition={appearance.dockPosition}
-            onFocus={() => setFocusedWindow("settings")}
-            isClosing={closingWindows.includes("settings")}
-            isMinimized={minimizedWindows.includes("settings")}
-            animationsEnabled={appearance.animationsEnabled}
-          >
-            <SettingsPanel
-              appearance={appearance}
-              wallpaperOptions={wallpapers}
-              accentOptions={accentColors}
-              onAppearanceChange={updateAppearance}
-              wallpaperAccentColor={wallpaperAccentColor}
-              selectedSection={settingsSectionRequest}
-              onOpenDiskManager={() => openWindow("disk-manager")}
-            />
-          </Window>
-        )}
-
-        {openWindows.includes("monitor") && (
-          <Window
-            title="Monitor"
-            icon={<Activity className="size-4 text-primary" />}
-            onClose={() => closeWindow("monitor")}
-            onMinimize={() => minimizeWindow("monitor")}
-            defaultWidth={1120}
-            defaultHeight={700}
-            zIndex={getWindowZ("monitor")}
-            dockPosition={appearance.dockPosition}
-            onFocus={() => setFocusedWindow("monitor")}
-            isClosing={closingWindows.includes("monitor")}
-            isMinimized={minimizedWindows.includes("monitor")}
-            animationsEnabled={appearance.animationsEnabled}
-          >
-            <Monitor />
-          </Window>
-        )}
-
-        {openWindows.includes("notifications") && (
-          <Window
-            title="Notifications"
-            icon={<Bell className="size-4 text-primary" />}
-            onClose={() => closeWindow("notifications")}
-            onMinimize={() => minimizeWindow("notifications")}
-            defaultWidth={640}
-            defaultHeight={520}
-            zIndex={getWindowZ("notifications")}
-            dockPosition={appearance.dockPosition}
-            onFocus={() => setFocusedWindow("notifications")}
-            isClosing={closingWindows.includes("notifications")}
-            isMinimized={minimizedWindows.includes("notifications")}
-            animationsEnabled={appearance.animationsEnabled}
-          >
-            <NotificationsPanel />
-          </Window>
-        )}
-
-        {openWindows.includes("app-store") && (
-          <Window
-            title="App Store"
-            icon={<ShoppingBag className="size-4 text-sky-400" />}
-            onClose={() => closeWindow("app-store")}
-            onMinimize={() => minimizeWindow("app-store")}
-            defaultWidth={1080}
-            defaultHeight={680}
-            zIndex={getWindowZ("app-store")}
-            dockPosition={appearance.dockPosition}
-            onFocus={() => setFocusedWindow("app-store")}
-            isClosing={closingWindows.includes("app-store")}
-            isMinimized={minimizedWindows.includes("app-store")}
-            animationsEnabled={appearance.animationsEnabled}
-          >
-            <AppStore
-              onOpenCustomInstall={() => openWindow("custom-install")}
-              launchRequest={appStoreLaunchRequest}
-            />
-          </Window>
-        )}
-
-        {openWindows.includes("custom-install") && (
-          <Window
-            title="Install Custom App"
-            icon={<Package className="size-4 text-primary" />}
-            onClose={() => closeWindow("custom-install")}
-            onMinimize={() => minimizeWindow("custom-install")}
-            defaultWidth={720}
-            defaultHeight={600}
-            zIndex={getWindowZ("custom-install")}
-            dockPosition={appearance.dockPosition}
-            onFocus={() => setFocusedWindow("custom-install")}
-            isClosing={closingWindows.includes("custom-install")}
-            isMinimized={minimizedWindows.includes("custom-install")}
-            animationsEnabled={appearance.animationsEnabled}
-          >
-            <AppConfiguratorPanel
-              context="custom_install"
-              onClose={() => closeWindow("custom-install")}
-            />
-          </Window>
-        )}
-
-        {openWindows.includes("app-settings") && appSettingsTarget && (
-          <Window
-            title={`${appSettingsTarget.appName} Settings`}
-            icon={<Settings className="size-4 text-primary" />}
-            onClose={() => {
-              closeWindow("app-settings");
-              setAppSettingsTarget(null);
-            }}
-            onMinimize={() => minimizeWindow("app-settings")}
-            defaultWidth={920}
-            defaultHeight={700}
-            zIndex={getWindowZ("app-settings")}
-            dockPosition={appearance.dockPosition}
-            onFocus={() => setFocusedWindow("app-settings")}
-            isClosing={closingWindows.includes("app-settings")}
-            isMinimized={minimizedWindows.includes("app-settings")}
-            animationsEnabled={appearance.animationsEnabled}
-          >
-            <AppConfiguratorPanel
-              context="installed_edit"
-              target={appSettingsTarget}
-              actions={{ saveAppSettings: shellStoreActions.saveAppSettings }}
-              onClose={() => {
-                closeWindow("app-settings");
-                setAppSettingsTarget(null);
-              }}
-            />
-          </Window>
-        )}
-
-        {openWindows.includes("terminal") && (
-          <Window
-            title={terminalMode === "logs" ? "Container Logs" : "Terminal"}
-            icon={<TerminalSquare className="size-4 text-emerald-400" />}
-            onClose={() => closeWindow("terminal")}
-            onMinimize={() => minimizeWindow("terminal")}
-            defaultWidth={980}
-            defaultHeight={620}
-            zIndex={getWindowZ("terminal")}
-            dockPosition={appearance.dockPosition}
-            onFocus={() => setFocusedWindow("terminal")}
-            isClosing={closingWindows.includes("terminal")}
-            isMinimized={minimizedWindows.includes("terminal")}
-            animationsEnabled={appearance.animationsEnabled}
-          >
-            <Terminal
-              commandRequest={terminalCommandRequest}
-              readOnly={terminalMode === "logs"}
-            />
-          </Window>
-        )}
-
-        {openWindows.includes("disk-manager") && (
-          <Window
-            title="Disk Manager"
-            icon={<HardDrive className="size-4 text-amber-400" />}
-            onClose={() => closeWindow("disk-manager")}
-            onMinimize={() => minimizeWindow("disk-manager")}
-            defaultWidth={980}
-            defaultHeight={640}
-            zIndex={getWindowZ("disk-manager")}
-            dockPosition={appearance.dockPosition}
-            onFocus={() => setFocusedWindow("disk-manager")}
-            isClosing={closingWindows.includes("disk-manager")}
-            isMinimized={minimizedWindows.includes("disk-manager")}
-            animationsEnabled={appearance.animationsEnabled}
-          >
-            <DiskManager />
-          </Window>
-        )}
+          return (
+            <Window
+              key={spec.id}
+              title={body.title ?? spec.title}
+              icon={<SpecIcon className={spec.iconClassName} />}
+              onClose={body.onClose ?? (() => closeWindow(spec.id))}
+              onMinimize={() => minimizeWindow(spec.id)}
+              defaultWidth={spec.defaultWidth}
+              defaultHeight={spec.defaultHeight}
+              zIndex={getWindowZ(spec.id)}
+              dockPosition={appearance.dockPosition}
+              onFocus={() => setFocusedWindow(spec.id)}
+              isClosing={closingWindows.includes(spec.id)}
+              isMinimized={minimizedWindows.includes(spec.id)}
+              animationsEnabled={appearance.animationsEnabled}
+            >
+              {body.render()}
+            </Window>
+          );
+        })}
 
         {/* Command Palette Badge — floats above the dock */}
         <div className="fixed bottom-[5.75rem] left-1/2 z-40 -translate-x-1/2">
