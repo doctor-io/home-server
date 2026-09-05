@@ -1,4 +1,5 @@
 export const queryKeys = {
+  appearanceSettings: ["settings", "appearance"] as const,
   systemMetrics: ["system", "metrics"] as const,
   systemPreferences: ["system", "preferences"] as const,
   systemUpdates: ["system", "updates"] as const,

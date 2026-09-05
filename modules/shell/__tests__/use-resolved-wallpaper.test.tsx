@@ -4,6 +4,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_APPEARANCE_SETTINGS } from "@/lib/desktop/appearance";
 import { useResolvedWallpaper } from "@/modules/shell/hooks/useResolvedWallpaper";
+import { createTestQueryClient, createWrapper } from "@/test/query-client-wrapper";
 
 describe("useResolvedWallpaper", () => {
   beforeEach(() => {
@@ -15,7 +16,9 @@ describe("useResolvedWallpaper", () => {
       new Response(JSON.stringify({ data: { wallpaper: "/images/7.jpg" } }), { status: 200 }),
     );
 
-    const { result } = renderHook(() => useResolvedWallpaper());
+    const { result } = renderHook(() => useResolvedWallpaper(), {
+      wrapper: createWrapper(createTestQueryClient()),
+    });
 
     await waitFor(() => {
       expect(result.current.isHydrated).toBe(true);
@@ -27,7 +30,9 @@ describe("useResolvedWallpaper", () => {
   it("falls back to default wallpaper when API fails", async () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValueOnce(new Error("Network error"));
 
-    const { result } = renderHook(() => useResolvedWallpaper());
+    const { result } = renderHook(() => useResolvedWallpaper(), {
+      wrapper: createWrapper(createTestQueryClient()),
+    });
 
     await waitFor(() => {
       expect(result.current.isHydrated).toBe(true);
@@ -41,7 +46,9 @@ describe("useResolvedWallpaper", () => {
       new Response(JSON.stringify({ data: { wallpaper: "/invalid/path.jpg" } }), { status: 200 }),
     );
 
-    const { result } = renderHook(() => useResolvedWallpaper());
+    const { result } = renderHook(() => useResolvedWallpaper(), {
+      wrapper: createWrapper(createTestQueryClient()),
+    });
 
     await waitFor(() => {
       expect(result.current.isHydrated).toBe(true);

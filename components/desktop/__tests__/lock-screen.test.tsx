@@ -3,6 +3,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { LockScreen } from "@/modules/shell/components/lock-screen";
+import { createTestQueryClient, createWrapper } from "@/test/query-client-wrapper";
 
 describe("LockScreen", () => {
   it("shows only unlock UI and submits password", async () => {
@@ -11,6 +12,7 @@ describe("LockScreen", () => {
 
     render(
       <LockScreen username="admin" onUnlock={onUnlock} onLogout={onLogout} />,
+      { wrapper: createWrapper(createTestQueryClient()) },
     );
 
     expect(screen.getByTestId("full-screen-shell")).toBeTruthy();
@@ -40,6 +42,7 @@ describe("LockScreen", () => {
         onUnlock={onUnlock}
         onLogout={vi.fn(async () => undefined)}
       />,
+      { wrapper: createWrapper(createTestQueryClient()) },
     );
 
     expect(screen.getByTestId("full-screen-shell")).toBeTruthy();

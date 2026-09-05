@@ -1,27 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import {
-  DEFAULT_APPEARANCE_SETTINGS,
-  sanitizeAppearanceSettings,
-  type AppearanceSettings,
-} from "@/lib/desktop/appearance";
+import { DEFAULT_APPEARANCE_SETTINGS } from "@/lib/desktop/appearance";
+import { useAppearanceSettings } from "@/modules/shell/hooks/useAppearanceSettings";
 
 export function useResolvedWallpaper() {
-  const [wallpaper, setWallpaper] = useState(DEFAULT_APPEARANCE_SETTINGS.wallpaper);
-  const [isHydrated, setIsHydrated] = useState(false);
+  const { data, isSuccess, isError } = useAppearanceSettings();
 
-  useEffect(() => {
-    fetch("/api/v1/settings/appearance", { cache: "no-store" })
-      .then((res) => res.ok ? res.json() : null)
-      .then((json: { data: AppearanceSettings } | null) => {
-        if (json?.data) {
-          setWallpaper(sanitizeAppearanceSettings(json.data).wallpaper);
-        }
-        setIsHydrated(true);
-      })
-      .catch(() => setIsHydrated(true));
-  }, []);
-
-  return { wallpaper, isHydrated };
+  return {
+    wallpaper: data?.wallpaper ?? DEFAULT_APPEARANCE_SETTINGS.wallpaper,
+    // Hydrated once the read settles either way — a failed read still means the
+    // default is the final answer, not a value still on its way.
+    isHydrated: isSuccess || isError,
+  };
 }

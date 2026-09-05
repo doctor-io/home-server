@@ -13,6 +13,7 @@ import {
   WALLPAPER_OPTIONS,
 } from "@/lib/desktop/appearance"
 import { extractWallpaperColor } from "@/lib/desktop/wallpaper-color"
+import { useAppearanceSettings } from "@/modules/shell/hooks/useAppearanceSettings"
 
 const fontSizeScaleMap: Record<DesktopFontSize, number> = {
   compact: 14,
@@ -67,13 +68,6 @@ function applyAppearanceToDom(settings: AppearanceSettings) {
   }
 }
 
-async function fetchAppearance(): Promise<AppearanceSettings> {
-  const res = await fetch("/api/v1/settings/appearance", { cache: "no-store" });
-  if (!res.ok) return DEFAULT_APPEARANCE_SETTINGS;
-  const json = await res.json() as { data: AppearanceSettings };
-  return sanitizeAppearanceSettings(json.data);
-}
-
 async function saveAppearance(appearance: AppearanceSettings): Promise<void> {
   await fetch("/api/v1/settings/appearance", {
     method: "PUT",
@@ -87,13 +81,15 @@ export function useDesktopAppearance() {
   const [loaded, setLoaded] = useState(false)
   const [wallpaperAccentColor, setWallpaperAccentColor] = useState<string | null>(null)
   const extractingRef = useRef<string | null>(null)
+  const lastSavedRef = useRef<string | null>(null)
+  const { data: savedAppearance } = useAppearanceSettings()
 
   useEffect(() => {
-    fetchAppearance().then((saved) => {
-      setAppearance(saved)
-      setLoaded(true)
-    });
-  }, [])
+    if (!savedAppearance) return
+    setAppearance(savedAppearance)
+    lastSavedRef.current = JSON.stringify(savedAppearance)
+    setLoaded(true)
+  }, [savedAppearance])
 
   // Extract wallpaper color whenever wallpaper changes (or on first load if auto is active)
   useEffect(() => {
@@ -112,6 +108,11 @@ export function useDesktopAppearance() {
 
   useEffect(() => {
     if (!loaded) return
+    const serialized = JSON.stringify(appearance)
+    // Hydrating used to trip this effect and PUT back exactly what had just
+    // been read, so every desktop load wrote unchanged settings to the server.
+    if (serialized === lastSavedRef.current) return
+    lastSavedRef.current = serialized
     saveAppearance(appearance);
   }, [appearance, loaded])
 

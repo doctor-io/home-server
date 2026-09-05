@@ -3,6 +3,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { UpdateRecoveryScreen } from "@/modules/shell/components/update-recovery-screen";
+import { createTestQueryClient, createWrapper } from "@/test/query-client-wrapper";
 
 const routerReplaceMock = vi.fn();
 
@@ -46,7 +47,7 @@ describe("UpdateRecoveryScreen", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<UpdateRecoveryScreen />);
+    render(<UpdateRecoveryScreen />, { wrapper: createWrapper(createTestQueryClient()) });
 
     await waitFor(() => {
       expect(screen.getByTestId("full-screen-shell")).toBeTruthy();
@@ -67,7 +68,7 @@ describe("UpdateRecoveryScreen", () => {
   });
 
   it("redirects home when there is no active update state", async () => {
-    render(<UpdateRecoveryScreen />);
+    render(<UpdateRecoveryScreen />, { wrapper: createWrapper(createTestQueryClient()) });
 
     await waitFor(() => {
       expect(routerReplaceMock).toHaveBeenCalledWith("/");
