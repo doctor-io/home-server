@@ -68,6 +68,7 @@ function toSummary(
     platform: template.platform,
     categories: template.categories,
     logoUrl: installed?.iconUrl ?? template.logoUrl,
+    heroImageUrl: template.screenshots[0] ?? null,
     repositoryUrl: template.repositoryUrl,
     stackFile: template.stackFile,
     status: installed?.status ?? "not_installed",

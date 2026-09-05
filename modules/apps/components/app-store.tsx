@@ -208,6 +208,93 @@ function CategoryPills({
 
 // ── Featured strip ────────────────────────────────────────────────────────────
 
+/**
+ * The storefront's largest scale. Everything else — the recommended strip, the
+ * catalog rows — is small and uniform, so nothing drew the eye; Umbrel opens on
+ * banners that take a third of the screen and homeio opened on nothing.
+ *
+ * Apps without a screenshot fall back to a tinted panel rather than a broken
+ * image: the CasaOS catalog does not guarantee artwork.
+ */
+function FeaturedHero({
+  title,
+  icon,
+  apps,
+  operationsByApp,
+  onSelect,
+  onInstall,
+  onUpdate,
+}: {
+  title: string;
+  icon: ReactNode;
+  apps: StoreAppSummary[];
+  operationsByApp: Record<string, AppOperationState>;
+  onSelect: (id: string) => void;
+  onInstall: (app: StoreAppSummary) => void;
+  onUpdate: (app: StoreAppSummary) => void;
+}) {
+  if (apps.length === 0) return null;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 px-0.5">
+        {icon}
+        <span className="text-sm font-semibold text-foreground">{title}</span>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        {apps.slice(0, 2).map((app) => (
+          <div
+            key={app.id}
+            className="group relative h-44 overflow-hidden rounded-xl border border-glass-border"
+          >
+            {app.heroImageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={app.heroImageUrl}
+                alt=""
+                aria-hidden="true"
+                className="absolute inset-0 size-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+              />
+            ) : (
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/25 via-background/50 to-background/85" />
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-black/10" />
+
+            <button
+              type="button"
+              onClick={() => onSelect(app.id)}
+              aria-label={`View details for ${app.name}`}
+              className="absolute inset-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+            />
+
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end gap-3 p-4">
+              <div className={cn(STORE_PANEL_INSET, "flex size-11 shrink-0 items-center justify-center overflow-hidden bg-black/40")}>
+                <StoreLogo logoUrl={app.logoUrl} alt={app.name} className="size-6 object-contain" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="truncate text-sm font-semibold text-white">{app.name}</span>
+                  <AppStatusDot app={app} operation={operationsByApp[app.id]} />
+                </div>
+                <p className="mt-0.5 line-clamp-2 text-xs leading-4 text-white/70">{app.description}</p>
+              </div>
+              <div className="pointer-events-auto shrink-0">
+                <CatalogRowAction
+                  app={app}
+                  operation={operationsByApp[app.id]}
+                  onInstall={() => onInstall(app)}
+                  onUpdate={() => onUpdate(app)}
+                />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function FeaturedStrip({
   title,
   icon,
@@ -913,11 +1000,14 @@ export function AppStore({
               {/* Featured + Recommended strips */}
               {shouldShowStrips && (
                 <>
-                  <FeaturedStrip
+                  <FeaturedHero
                     title="Featured"
                     icon={<Star className="size-4 text-primary" />}
                     apps={featuredApps}
+                    operationsByApp={operationsByApp}
                     onSelect={setSelectedAppId}
+                    onInstall={(app) => void startInstall(app)}
+                    onUpdate={(app) => void startUpdate(app)}
                   />
                   <FeaturedStrip
                     title="Recommended"
@@ -939,7 +1029,13 @@ export function AppStore({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-1.5 lg:grid-cols-2">
+                {/* Named so the catalog is distinguishable from the featured
+                    cards above, where the same app can also appear. */}
+                <div
+                  role="group"
+                  aria-label="Catalog"
+                  className="grid grid-cols-1 gap-1.5 lg:grid-cols-2"
+                >
                   {visibleApps.map((app) => (
                     <CatalogRow
                       key={app.id}

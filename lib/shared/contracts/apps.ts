@@ -91,6 +91,13 @@ export type StoreAppSummary = {
   platform: string;
   categories: string[];
   logoUrl: string | null;
+  /**
+   * First screenshot, carried on the summary so the storefront can render a
+   * hero card without fetching every app's detail. The full list stays on
+   * StoreAppDetail — a catalog of a few hundred apps should not ship every
+   * screenshot URL it has.
+   */
+  heroImageUrl: string | null;
   repositoryUrl: string;
   stackFile: string;
   status: InstalledStackStatus;

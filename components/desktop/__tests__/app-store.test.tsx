@@ -54,6 +54,7 @@ const summaryApp: StoreAppSummary = {
   platform: "Docker",
   categories: ["Media"],
   logoUrl: "https://cdn.example.com/plex.png",
+  heroImageUrl: "https://cdn.example.com/plex-hero.png",
   repositoryUrl: "https://github.com/plex",
   stackFile: "Apps/Plex/docker-compose.yml",
   status: "not_installed",
@@ -355,7 +356,8 @@ describe("AppStore", () => {
       detail: installableAppDetail,
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /^install$/i }));
+    const catalog = screen.getByRole("group", { name: "Catalog" });
+    fireEvent.click(within(catalog).getByRole("button", { name: /^install$/i }));
 
     expect(installApp).toHaveBeenCalledWith({ appId: "plex" });
     // The row action must not be a shortcut into the detail view.
@@ -365,7 +367,8 @@ describe("AppStore", () => {
   it("keeps the catalog row to name, description and action", () => {
     setup({ apps: [installedSummaryApp] });
 
-    const row = screen.getByRole("button", { name: /view details for plex/i });
+    const catalog = screen.getByRole("group", { name: "Catalog" });
+    const row = within(catalog).getByRole("button", { name: /view details for plex/i });
 
     expect(within(row).getByText("Plex")).toBeTruthy();
     expect(within(row).getByText("Media server")).toBeTruthy();
@@ -387,7 +390,8 @@ describe("AppStore", () => {
       ],
     });
 
-    const row = screen.getByRole("button", { name: /view details for plex/i });
+    const catalog = screen.getByRole("group", { name: "Catalog" });
+    const row = within(catalog).getByRole("button", { name: /view details for plex/i });
 
     expect(within(row).getByText("My Compose")).toBeTruthy();
   });
@@ -395,7 +399,8 @@ describe("AppStore", () => {
   it("keeps the row itself a way into the detail panel", () => {
     setup({ detail: installableAppDetail });
 
-    fireEvent.click(screen.getByRole("button", { name: /view details for plex/i }));
+    const catalog = screen.getByRole("group", { name: "Catalog" });
+    fireEvent.click(within(catalog).getByRole("button", { name: /view details for plex/i }));
 
     expect(screen.getByRole("button", { name: /back to store/i })).toBeTruthy();
   });
