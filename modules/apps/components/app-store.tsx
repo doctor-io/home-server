@@ -21,6 +21,7 @@ import { useStoreSourceActions, useStoreSources } from "@/modules/apps/hooks/use
 import {
   ArrowUpCircle,
   ChevronLeftIcon as ChevronLeft,
+  ChevronRight,
   Download,
   ExternalLink,
   Loader2,
@@ -213,6 +214,10 @@ function CategoryPills({
  * catalog rows — is small and uniform, so nothing drew the eye; Umbrel opens on
  * banners that take a third of the screen and homeio opened on nothing.
  *
+ * Paged with CSS scroll snapping rather than a carousel library: embla is a
+ * dependency here but unused, and paging a scroll container is something the
+ * platform already does well. Reach for embla if drag physics are ever wanted.
+ *
  * Apps without a screenshot fall back to a tinted panel rather than a broken
  * image: the CasaOS catalog does not guarantee artwork.
  */
@@ -233,20 +238,78 @@ function FeaturedHero({
   onInstall: (app: StoreAppSummary) => void;
   onUpdate: (app: StoreAppSummary) => void;
 }) {
+  const trackRef = useRef<HTMLDivElement>(null);
+  const [canPrev, setCanPrev] = useState(false);
+  const [canNext, setCanNext] = useState(false);
+
+  useEffect(() => {
+    const el = trackRef.current;
+    if (!el) return;
+
+    const update = () => {
+      setCanPrev(el.scrollLeft > 4);
+      setCanNext(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+    };
+
+    update();
+    el.addEventListener("scroll", update, { passive: true });
+
+    const observer =
+      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
+    observer?.observe(el);
+
+    return () => {
+      el.removeEventListener("scroll", update);
+      observer?.disconnect();
+    };
+  }, [apps.length]);
+
+  function page(direction: 1 | -1) {
+    const el = trackRef.current;
+    // jsdom has no scrollBy; nothing to page in a test either.
+    el?.scrollBy?.({ left: direction * el.clientWidth, behavior: "smooth" });
+  }
+
   if (apps.length === 0) return null;
 
+  const arrow =
+    "inline-flex size-6 items-center justify-center rounded-full border border-glass-border bg-background/60 text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30";
+
   return (
-    <div className="space-y-2">
+    <section className="space-y-2" aria-label={`${title} apps`}>
       <div className="flex items-center gap-2 px-0.5">
         {icon}
         <span className="text-sm font-semibold text-foreground">{title}</span>
+        <div className="ml-auto flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => page(-1)}
+            disabled={!canPrev}
+            aria-label={`Previous ${title.toLowerCase()} apps`}
+            className={arrow}
+          >
+            <ChevronLeft className="size-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => page(1)}
+            disabled={!canNext}
+            aria-label={`More ${title.toLowerCase()} apps`}
+            className={arrow}
+          >
+            <ChevronRight className="size-3.5" />
+          </button>
+        </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2">
-        {apps.slice(0, 2).map((app) => (
+      <div
+        ref={trackRef}
+        className="flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth"
+      >
+        {apps.map((app) => (
           <div
             key={app.id}
-            className="group relative h-44 overflow-hidden rounded-xl border border-glass-border"
+            className="group relative h-44 min-w-full shrink-0 snap-start overflow-hidden rounded-xl border border-glass-border md:min-w-[calc(50%-0.375rem)]"
           >
             {app.heroImageUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -254,6 +317,7 @@ function FeaturedHero({
                 src={app.heroImageUrl}
                 alt=""
                 aria-hidden="true"
+                loading="lazy"
                 className="absolute inset-0 size-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
               />
             ) : (
@@ -291,7 +355,7 @@ function FeaturedHero({
           </div>
         ))}
       </div>
-    </div>
+    </section>
   );
 }
 

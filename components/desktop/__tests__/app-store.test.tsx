@@ -351,6 +351,24 @@ describe("AppStore", () => {
     expect(installApp).toHaveBeenCalledWith({ appId: "plex" });
   });
 
+  it("pages through every featured app rather than showing the first two", () => {
+    const featured = ["plex", "jellyfin", "immich"].map((id, index) => ({
+      ...summaryApp,
+      id,
+      name: `Featured ${index}`,
+    }));
+
+    setup({ apps: featured, featuredAppIds: featured.map((app) => app.id) });
+
+    const hero = screen.getByRole("region", { name: "Featured apps" });
+    for (const app of featured) {
+      expect(
+        within(hero).getByRole("button", { name: `View details for ${app.name}` }),
+      ).toBeTruthy();
+    }
+    expect(within(hero).getByRole("button", { name: /more featured apps/i })).toBeTruthy();
+  });
+
   it("installs straight from the catalog row without opening the detail panel", () => {
     const { installApp } = setup({
       detail: installableAppDetail,
