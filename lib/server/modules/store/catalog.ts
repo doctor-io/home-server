@@ -158,6 +158,24 @@ async function ensureCatalogRoot(directoryPath: string) {
   throw new Error("Catalog archive must contain an Apps or Store directory");
 }
 
+/**
+ * A `.git` entry is not proof of a usable checkout: an interrupted clone or a
+ * partially cleaned directory leaves the subdirectories behind without HEAD or
+ * config, and every git command there fails with "not a git repository".
+ */
+async function isGitRepository(directory: string) {
+  try {
+    await execFileAsync("git", ["-C", directory, "rev-parse", "--git-dir"]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function cloneOfficialCatalogRepo(absoluteTarget: string) {
+  await execFileAsync("git", ["clone", "--depth=1", CASAOS_APPSTORE_REPO_URL, absoluteTarget]);
+}
+
 async function ensureOfficialCatalogRepo(targetPath: string, options?: { forceSync?: boolean }) {
   const absoluteTarget = path.resolve(targetPath);
 
@@ -165,10 +183,18 @@ async function ensureOfficialCatalogRepo(targetPath: string, options?: { forceSy
   await mkdir(path.dirname(absoluteTarget), { recursive: true });
 
   if (!existsSync(absoluteTarget)) {
-    await execFileAsync("git", ["clone", "--depth=1", CASAOS_APPSTORE_REPO_URL, absoluteTarget]);
-  } else if (existsSync(path.join(absoluteTarget, ".git")) && options?.forceSync) {
-    await execFileAsync("git", ["-C", absoluteTarget, "fetch", "--depth=1", "origin"]);
-    await execFileAsync("git", ["-C", absoluteTarget, "reset", "--hard", "origin/HEAD"]);
+    await cloneOfficialCatalogRepo(absoluteTarget);
+  } else if (options?.forceSync) {
+    if (await isGitRepository(absoluteTarget)) {
+      await execFileAsync("git", ["-C", absoluteTarget, "fetch", "--depth=1", "origin"]);
+      await execFileAsync("git", ["-C", absoluteTarget, "reset", "--hard", "origin/HEAD"]);
+    } else {
+      // The catalog is a disposable mirror of a public repository, so replacing
+      // an unusable checkout costs nothing and is what the user asked for by
+      // pressing refresh. Without this the store stays broken for good.
+      await rm(absoluteTarget, { recursive: true, force: true });
+      await cloneOfficialCatalogRepo(absoluteTarget);
+    }
   }
 
   await writeStoreCatalogConfig({
