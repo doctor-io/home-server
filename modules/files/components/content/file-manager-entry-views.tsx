@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Star } from "@/components/icons/platform-icons";
+import { Loader2, MoreHorizontal, Star } from "@/components/icons/platform-icons";
 import { cn } from "@/lib/utils";
 import { buildAssetUrl } from "@/modules/files/hooks/files-api";
 import {
@@ -10,6 +10,47 @@ import {
 } from "@/modules/files/components/file-manager-presenters";
 import React, { useEffect, useRef, useState } from "react";
 import type { MouseEvent } from "react";
+
+/**
+ * The visible handle on every entry. Actions used to live behind right-click
+ * alone, which is the least discoverable gesture there is — especially on a
+ * trackpad. This opens the same menu at the same place.
+ *
+ * It stays hidden until the row is hovered, focused or selected, so a dense
+ * grid does not turn into a field of dots. Selection is what makes it reachable
+ * without a hover: tap an entry, the handle appears.
+ */
+function EntryActionsButton({
+  entry,
+  isSelected,
+  onEntryContextMenu,
+  className,
+}: {
+  entry: FileEntry;
+  isSelected: boolean;
+  onEntryContextMenu: (event: MouseEvent, entry: FileEntry) => void;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={`Actions for ${entry.name}`}
+      title="Actions"
+      onClick={(event) => onEntryContextMenu(event, entry)}
+      className={cn(
+        "inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-all",
+        "hover:bg-background/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+        "opacity-0 focus-visible:opacity-100 group-hover:opacity-100",
+        isSelected && "opacity-100",
+        className,
+      )}
+    >
+      {/* The icon set only ships a horizontal variant; rotating it gives the
+          vertical ellipsis without adding another asset. */}
+      <MoreHorizontal className="size-3.5 rotate-90" />
+    </button>
+  );
+}
 
 const IMAGE_EXTS = new Set(["jpg", "jpeg", "png", "gif", "webp", "bmp"]);
 const VIRTUAL_BATCH = 100;
@@ -124,19 +165,22 @@ export function FileGrid({
           const isImage = entry.type === "file" && IMAGE_EXTS.has((entry.ext ?? "").toLowerCase());
           const isSelected = selectedFiles.has(entry.name);
           return (
-            <button
+            <div
               key={entry.name}
-              title={titleFromPath ? entry.path : entry.name}
-              onClick={(event) => onEntryClick(event, entry)}
-              onDoubleClick={() => onOpenEntry(entry)}
-              onContextMenu={(event) => onEntryContextMenu(event, entry)}
               className={cn(
-                "flex cursor-pointer flex-col items-center gap-3 rounded-xl border p-4 transition-all",
+                "group relative rounded-xl border transition-all",
                 isSelected
                   ? "border-primary/30 bg-primary/15"
                   : "border-transparent hover:bg-background/50",
               )}
             >
+              <button
+                title={titleFromPath ? entry.path : entry.name}
+                onClick={(event) => onEntryClick(event, entry)}
+                onDoubleClick={() => onOpenEntry(entry)}
+                onContextMenu={(event) => onEntryContextMenu(event, entry)}
+                className="flex w-full cursor-pointer flex-col items-center gap-3 p-4"
+              >
               <div className="relative">
                 {pendingEntryPath === entry.path ? (
                   <div className="flex size-14 items-center justify-center">
@@ -159,7 +203,14 @@ export function FileGrid({
                   <span className="text-2xs text-muted-foreground/60">{entry.size}</span>
                 )}
               </div>
-            </button>
+              </button>
+              <EntryActionsButton
+                entry={entry}
+                isSelected={isSelected}
+                onEntryContextMenu={onEntryContextMenu}
+                className="absolute right-1 top-1"
+              />
+            </div>
           );
         })}
       </div>
@@ -204,18 +255,22 @@ export function FileList({
         <span className="hidden w-32 text-right md:block">
           {isTrashView ? "Deleted" : "Modified"}
         </span>
+        <span className="w-7 shrink-0" aria-hidden="true" />
       </div>
 
       {visible.map((entry) => (
-        <button
+        <div
           key={entry.name}
+          className={cn(
+            "group flex items-center pr-2 transition-colors",
+            selectedFiles.has(entry.name) ? "bg-primary/15" : "hover:bg-background/50",
+          )}
+        >
+        <button
           onClick={(event) => onEntryClick(event, entry)}
           onDoubleClick={() => onOpenEntry(entry)}
           onContextMenu={(event) => onEntryContextMenu(event, entry)}
-          className={cn(
-            "flex cursor-pointer items-center gap-3 px-3 py-2.5 text-left transition-colors",
-            selectedFiles.has(entry.name) ? "bg-primary/15" : "hover:bg-background/50",
-          )}
+          className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 px-3 py-2.5 text-left"
         >
           <div className="flex min-w-0 flex-1 items-center gap-2.5">
             {pendingEntryPath === entry.path ? (
@@ -264,6 +319,13 @@ export function FileList({
               : entry.modified}
           </span>
         </button>
+          <EntryActionsButton
+            entry={entry}
+            isSelected={selectedFiles.has(entry.name)}
+            onEntryContextMenu={onEntryContextMenu}
+            className="ml-1 shrink-0"
+          />
+        </div>
       ))}
 
       {limit < entries.length && (

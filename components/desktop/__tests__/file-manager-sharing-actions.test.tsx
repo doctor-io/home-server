@@ -21,7 +21,21 @@ describe("FileManager sharing and actions", () => {
     mockUseFilesDirectory.mockReturnValue(mockDirectory([{ name: "FolderToShare", path: "FolderToShare", type: "folder" }]));
     await renderFileManager();
 
-    fireEvent.contextMenu(screen.getByRole("button", { name: /FolderToShare/i }), { clientX: 120, clientY: 120 });
+    fireEvent.contextMenu(screen.getByRole("button", { name: /^FolderToShare/i }), { clientX: 120, clientY: 120 });
+    expect(screen.getByRole("button", { name: "Share Folder" })).toBeTruthy();
+  });
+
+  it("opens the same entry menu from the visible actions handle", async () => {
+    mockUseFilesDirectory.mockReturnValue(mockDirectory([{ name: "FolderToShare", path: "FolderToShare", type: "folder" }]));
+    await renderFileManager();
+
+    // Right-click is the least discoverable gesture there is; the handle has to
+    // reach the same menu.
+    fireEvent.click(screen.getByRole("button", { name: "Actions for FolderToShare" }), {
+      clientX: 120,
+      clientY: 120,
+    });
+
     expect(screen.getByRole("button", { name: "Share Folder" })).toBeTruthy();
   });
 
@@ -35,7 +49,7 @@ describe("FileManager sharing and actions", () => {
     });
 
     await renderFileManager();
-    fireEvent.contextMenu(screen.getByRole("button", { name: /FolderToShare/i }), { clientX: 120, clientY: 120 });
+    fireEvent.contextMenu(screen.getByRole("button", { name: /^FolderToShare/i }), { clientX: 120, clientY: 120 });
     expect(screen.getByRole("button", { name: "Unshare Folder" })).toBeTruthy();
   });
 
@@ -62,7 +76,7 @@ describe("FileManager sharing and actions", () => {
 
     await renderFileManager();
     fireEvent.click(screen.getByRole("button", { name: "Shared" }));
-    fireEvent.contextMenu(screen.getByRole("button", { name: /portainer/i }), { clientX: 120, clientY: 120 });
+    fireEvent.contextMenu(screen.getByRole("button", { name: /^portainer/i }), { clientX: 120, clientY: 120 });
     fireEvent.click(screen.getByRole("button", { name: "Copy Path" }));
 
     await waitFor(() => {
@@ -93,9 +107,9 @@ describe("FileManager sharing and actions", () => {
     mockUseFilesDirectory.mockReturnValue(mockDirectory([{ name: "FolderToShare", path: "FolderToShare", type: "folder" }]));
     await renderFileManager();
 
-    fireEvent.contextMenu(screen.getByRole("button", { name: /FolderToShare/i }), { clientX: 100, clientY: 100 });
+    fireEvent.contextMenu(screen.getByRole("button", { name: /^FolderToShare/i }), { clientX: 100, clientY: 100 });
     fireEvent.click(screen.getByRole("button", { name: "Copy" }));
-    fireEvent.contextMenu(screen.getByRole("button", { name: /FolderToShare/i }), { clientX: 110, clientY: 110 });
+    fireEvent.contextMenu(screen.getByRole("button", { name: /^FolderToShare/i }), { clientX: 110, clientY: 110 });
     fireEvent.click(screen.getByRole("button", { name: "Paste" }));
 
     await waitFor(() => {

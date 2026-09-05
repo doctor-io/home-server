@@ -39,10 +39,10 @@ describe("FileManager open-file dialog", () => {
     });
 
     await renderFileManager();
-    fireEvent.doubleClick(screen.getByRole("button", { name: /notes\.txt/i }));
+    fireEvent.doubleClick(screen.getByRole("button", { name: /^notes\.txt/i }));
 
     await waitFor(() => {
-      expect(screen.getByRole("dialog", { name: /notes\.txt/i })).toBeTruthy();
+      expect(screen.getByRole("dialog", { name: /^notes\.txt/i })).toBeTruthy();
     });
     expect(screen.queryByRole("button", { name: "Back to files" })).toBeNull();
   });
@@ -73,7 +73,7 @@ describe("FileManager open-file dialog", () => {
     });
 
     await renderFileManager();
-    fireEvent.doubleClick(screen.getByRole("button", { name: /song\.mp3/i }));
+    fireEvent.doubleClick(screen.getByRole("button", { name: /^song\.mp3/i }));
 
     await waitFor(() => {
       expect(screen.getByText("Loading file...")).toBeTruthy();
