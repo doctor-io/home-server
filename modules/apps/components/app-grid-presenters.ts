@@ -253,17 +253,40 @@ export function getAppVisualState(app: AppItem) {
     };
   }
 
-  if (app.status === "stopped" || app.status === "unknown") {
+  // A stopped app is not a failure — usually someone stopped it on purpose —
+  // so it gets no alarm colour, no pulsing frame and no blinking dot. Dimming
+  // and desaturating says "off" the way every dock and launcher already does,
+  // and it stays legible next to a running app without shouting.
+  //
+  // Red is deliberately unused here: the status union has no error state, so
+  // nothing on this grid warrants an alarm. Keep it free for one.
+  if (app.status === "stopped") {
     return {
-      containerClass: "animate-pulse shadow-status-red/10",
-      imageClass: "opacity-65 grayscale",
-      dotClass: "bg-status-red",
-      dotInnerClass: "animate-ping bg-status-red/80",
-      ringClass: "border-status-red/35",
-      badgeIcon: AlertTriangle,
-      badgeClass: "bg-status-red/15 text-status-red",
+      containerClass: "",
+      imageClass: "opacity-50 grayscale",
+      dotClass: "bg-muted-foreground/50",
+      dotInnerClass: "",
+      ringClass: "border-transparent",
+      badgeIcon: null,
+      badgeClass: "",
       badgeIconClass: "",
-      title: app.status === "unknown" ? "Status unknown" : "Down",
+      title: "Stopped",
+    };
+  }
+
+  // Unknown is genuinely uncertain rather than off, so it keeps a mark — muted,
+  // not red, and not animated.
+  if (app.status === "unknown") {
+    return {
+      containerClass: "",
+      imageClass: "opacity-50 grayscale",
+      dotClass: "bg-muted-foreground/50",
+      dotInnerClass: "",
+      ringClass: "border-transparent",
+      badgeIcon: AlertTriangle,
+      badgeClass: "bg-muted/80 text-muted-foreground",
+      badgeIconClass: "",
+      title: "Status unknown",
     };
   }
 
