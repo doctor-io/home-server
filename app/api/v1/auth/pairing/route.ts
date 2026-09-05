@@ -23,6 +23,31 @@ function pairingUrl(origin: string, code: string) {
   return `homeio://pair?server=${encodeURIComponent(origin)}&code=${encodeURIComponent(code)}`;
 }
 
+/**
+ * The address the browser actually used, taken from the request headers.
+ *
+ * `new URL(request.url).origin` cannot be used here: with a custom server, Next
+ * builds that from its own bind address, so it answers "http://localhost:3000"
+ * whatever Host the client sent. The QR then told the phone to connect to
+ * localhost — which, on a phone, is the phone.
+ *
+ * Host is client-controlled, but the only client here is the authenticated
+ * operator asking for their own pairing code, so a forged value can misdirect
+ * nobody but themselves.
+ */
+function requestOrigin(request: Request) {
+  const first = (value: string | null) => value?.split(",")[0]?.trim() || null;
+
+  const host = first(request.headers.get("x-forwarded-host")) ?? first(request.headers.get("host"));
+  if (!host) return new URL(request.url).origin;
+
+  const proto =
+    first(request.headers.get("x-forwarded-proto")) ??
+    new URL(request.url).protocol.replace(":", "");
+
+  return `${proto}://${host}`;
+}
+
 export async function POST(request: Request) {
   const apiSession = await requireApiSession(request);
   if (apiSession.response) return apiSession.response;
@@ -36,10 +61,10 @@ export async function POST(request: Request) {
 
         const { code, expiresAt } = await createPairingCode(apiSession.session.userId);
 
-        // The origin the operator is already looking at: whatever reaches this
-        // browser reaches the phone on the same network, and guessing a public
-        // hostname from the server side gets it wrong behind a tunnel.
-        const origin = new URL(request.url).origin;
+        // Whatever reaches this browser reaches the phone on the same network,
+        // and guessing a public hostname from the server side gets it wrong
+        // behind a tunnel.
+        const origin = requestOrigin(request);
         const url = pairingUrl(origin, code);
 
         return NextResponse.json(

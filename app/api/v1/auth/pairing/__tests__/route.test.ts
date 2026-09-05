@@ -81,6 +81,43 @@ describe("POST /api/v1/auth/pairing", () => {
     expect(body.data.url.startsWith("homeio://pair?")).toBe(true);
   });
 
+  it("uses the address the browser reached, not the one the server binds", async () => {
+    // Reproduces the real failure: with a custom server, request.url reports
+    // Next's own bind address whatever Host the client sent, so the QR told the
+    // phone to connect to localhost — which on a phone is the phone.
+    const body = await (
+      await mint(
+        new NextRequest("http://localhost:3000/api/v1/auth/pairing", {
+          method: "POST",
+          headers: { cookie: "homeio_session=t", host: "192.168.1.37:3000" },
+        }),
+      )
+    ).json();
+
+    expect(body.data.url).toContain(encodeURIComponent("http://192.168.1.37:3000"));
+    expect(body.data.url).not.toContain(encodeURIComponent("localhost"));
+  });
+
+  it("prefers the forwarded address and scheme behind a proxy", async () => {
+    const body = await (
+      await mint(
+        new NextRequest("http://localhost:3000/api/v1/auth/pairing", {
+          method: "POST",
+          headers: {
+            cookie: "homeio_session=t",
+            host: "127.0.0.1:3000",
+            "x-forwarded-host": "homeio.tail1234.ts.net",
+            "x-forwarded-proto": "https",
+          },
+        }),
+      )
+    ).json();
+
+    expect(body.data.url).toContain(
+      encodeURIComponent("https://homeio.tail1234.ts.net"),
+    );
+  });
+
   it("returns an SVG the settings page can render inline", async () => {
     const body = await (await mint(mintRequest())).json();
 
