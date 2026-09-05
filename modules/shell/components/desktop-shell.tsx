@@ -758,8 +758,14 @@ function DesktopShellInner() {
             wash laid over the wallpaper, and it pooled hardest at the lower
             right, which is exactly where the widget column sits. Easing the
             falloff and holding the clear centre wider keeps the depth without
-            the smear behind the cards. */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_130%_100%_at_50%_0%,transparent_45%,rgba(0,0,0,0.10)_72%,rgba(0,0,0,0.26)_100%)]" />
+            the smear behind the cards.
+
+            The vertical radius exceeds the viewport on purpose: anchored at the
+            top, a 100% radius reaches full darkness exactly at the bottom edge,
+            so the taller the screen the deeper the widget column sank into it.
+            Overshooting means the gradient is still climbing when it runs out
+            of screen, which keeps tall displays as light as short ones. */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_140%_135%_at_50%_0%,transparent_50%,rgba(0,0,0,0.08)_76%,rgba(0,0,0,0.18)_100%)]" />
         {/* Bottom ambient shadow (dock area) */}
         <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-black/30 to-transparent" />
       </div>

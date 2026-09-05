@@ -36,12 +36,17 @@ export function NetworkCard({ network }: NetworkCardProps) {
 
         <div className="h-px bg-white/[0.07]" />
 
-        <DetailRow label="SSID" value={network.ssid} />
-        <DetailRow label="Interface" value={network.interfaceName} />
-        {!network.isDemoMode && (
-          <DetailRow label="Local IP" value={network.ipAddress} />
-        )}
-        <DetailRow label="Hostname" value={network.hostname} />
+        {/* Reference values, not live metrics — they get their own tighter
+            rhythm so four of them do not cost as much height as the two
+            throughput rows above. */}
+        <div className="flex flex-col gap-1.5">
+          <DetailRow label="SSID" value={network.ssid} />
+          <DetailRow label="Interface" value={network.interfaceName} />
+          {!network.isDemoMode && (
+            <DetailRow label="Local IP" value={network.ipAddress} />
+          )}
+          <DetailRow label="Hostname" value={network.hostname} />
+        </div>
       </div>
     </WidgetCard>
   );
@@ -49,9 +54,16 @@ export function NetworkCard({ network }: NetworkCardProps) {
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between">
-      <span className="text-xs text-muted-foreground/70">{label}</span>
-      <span className="text-xs font-mono text-foreground/80">{value}</span>
+    <div className="flex min-w-0 items-baseline justify-between gap-3">
+      <span className="shrink-0 text-xs text-muted-foreground/70">{label}</span>
+      {/* A long hostname used to wrap onto a second line and collide with its
+          own label. The full value stays available on hover. */}
+      <span
+        className="truncate text-right text-xs font-mono text-foreground/80"
+        title={value}
+      >
+        {value}
+      </span>
     </div>
   );
 }
