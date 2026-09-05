@@ -51,6 +51,8 @@ A self-hosted server manager with a desktop-style UI. Alternative to CasaOS, Umb
 Requires Docker and Docker Compose.
 
 ```bash
+git clone https://github.com/doctor-io/homeio.git
+cd homeio
 docker compose up -d
 ```
 
