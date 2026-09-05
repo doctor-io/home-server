@@ -74,7 +74,7 @@ export function Dock({
     <div className={`${dockPositionClass} z-50`} style={dockPositionStyle}>
       <nav
         ref={dockRef}
-        className={`flex ${sizing.gap} border border-white/[0.09] rounded-[calc(var(--radius)+0.375rem)] shadow-2xl shadow-black/40 ${
+        className={`flex ${sizing.gap} border border-white/[0.09] rounded-[var(--system-radius-floating)] shadow-2xl shadow-black/40 ${
           isVertical
             ? "flex-col items-center px-2.5 py-3"
             : "items-end px-3 py-2.5"

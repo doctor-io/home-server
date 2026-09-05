@@ -864,7 +864,7 @@ function DesktopShellInner() {
             aria-label="Open command palette"
           >
             <Search className="size-2.5 shrink-0" />
-            <span className="font-mono text-[9px] tracking-widest">⌘K</span>
+            <span className="font-mono text-3xs tracking-widest">⌘K</span>
           </button>
         </div>
 

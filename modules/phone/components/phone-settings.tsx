@@ -88,7 +88,7 @@ function Switch({
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-[13.5px]">{label}</span>
-        <span className="block text-[11px] text-muted-foreground">{hint}</span>
+        <span className="block text-2xs text-muted-foreground">{hint}</span>
       </span>
       <span
         aria-hidden="true"
@@ -132,7 +132,7 @@ function Row({
         <span className={tone === "danger" ? "block text-[13.5px] text-status-red" : "block text-[13.5px]"}>
           {label}
         </span>
-        {hint && <span className="block text-[11px] text-muted-foreground">{hint}</span>}
+        {hint && <span className="block text-2xs text-muted-foreground">{hint}</span>}
       </span>
       <ChevronRight className="size-4 shrink-0 opacity-35" />
     </>
@@ -204,7 +204,7 @@ export function PhoneSettings() {
     <div className="flex flex-col gap-3.5">
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[11px] text-muted-foreground">Connected to</p>
+          <p className="text-2xs text-muted-foreground">Connected to</p>
           <h1 className="truncate text-lg font-medium">{origin || "this server"}</h1>
         </div>
         <Server className="mt-1 size-5 opacity-40 grayscale" />
@@ -295,7 +295,7 @@ export function PhoneSettings() {
         )}
       </section>
 
-      <p className="px-1 text-[11px] text-muted-foreground/70">
+      <p className="px-1 text-2xs text-muted-foreground/70">
         {inApp
           ? "Unlock and reconnect are settings of this phone, not of the server. Turning the lock off asks for your fingerprint."
           : "Open Homeio in the mobile app for app-level settings."}

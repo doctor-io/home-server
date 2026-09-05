@@ -38,7 +38,7 @@ function PreferenceRow({
       <div className="min-w-0">
         <div className="text-sm text-foreground">{label}</div>
         {description && (
-          <div className="mt-0.5 text-[11px] text-muted-foreground/70">{description}</div>
+          <div className="mt-0.5 text-2xs text-muted-foreground/70">{description}</div>
         )}
       </div>
       {children}

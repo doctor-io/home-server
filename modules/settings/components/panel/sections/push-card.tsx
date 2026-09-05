@@ -177,7 +177,7 @@ export function PushCard({ isDemoMode = false }: { isDemoMode?: boolean }) {
         />
 
         {draft.includeContent && (
-          <p className="flex items-start gap-1.5 pb-2 text-[11px] text-status-amber">
+          <p className="flex items-start gap-1.5 pb-2 text-2xs text-status-amber">
             <AlertTriangle className="mt-px size-3.5 shrink-0" />
             &ldquo;Jellyfin stopped&rdquo; tells whoever runs that server rather a lot about
             your household. Leave this off unless the phone often cannot reach Homeio.
@@ -202,7 +202,7 @@ export function PushCard({ isDemoMode = false }: { isDemoMode?: boolean }) {
             type="button"
             onClick={() => patch({ ntfyTopic: generateNtfyTopic() })}
             disabled={isDemoMode}
-            className="mb-2 inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-glass-border px-2.5 py-1.5 text-[11px] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+            className="mb-2 inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-glass-border px-2.5 py-1.5 text-2xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
           >
             <RefreshCw className="size-3" />
             Generate
@@ -210,7 +210,7 @@ export function PushCard({ isDemoMode = false }: { isDemoMode?: boolean }) {
         </div>
 
         {guessable && (
-          <p className="flex items-start gap-1.5 pb-2 text-[11px] text-status-amber">
+          <p className="flex items-start gap-1.5 pb-2 text-2xs text-status-amber">
             <AlertTriangle className="mt-px size-3.5 shrink-0" />
             Short topics are guessable, and on a public server that is the whole lock —
             generate one instead.
@@ -237,7 +237,7 @@ export function PushCard({ isDemoMode = false }: { isDemoMode?: boolean }) {
           <button
             type="button"
             onClick={() => patch({ ntfyToken: "" })}
-            className="-mt-1 w-fit pb-2 text-[11px] text-muted-foreground/80 hover:text-foreground"
+            className="-mt-1 w-fit pb-2 text-2xs text-muted-foreground/80 hover:text-foreground"
           >
             Remove the saved token
           </button>
@@ -248,7 +248,7 @@ export function PushCard({ isDemoMode = false }: { isDemoMode?: boolean }) {
             type="button"
             onClick={() => void save()}
             disabled={!dirty || busy !== null || isDemoMode}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary/90 px-3 py-1.5 text-[12px] font-medium text-primary-foreground disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary/90 px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
           >
             {busy === "save" ? "Saving…" : "Save"}
           </button>
@@ -259,7 +259,7 @@ export function PushCard({ isDemoMode = false }: { isDemoMode?: boolean }) {
             // Testing a draft would prove nothing about what the server will
             // actually send, so the test runs on saved values only.
             disabled={dirty || busy !== null || !saved.ntfyTopic || isDemoMode}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-glass-border px-3 py-1.5 text-[12px] text-foreground disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-glass-border px-3 py-1.5 text-xs text-foreground disabled:opacity-50"
           >
             <Bell className="size-3.5" />
             {busy === "test" ? "Sending…" : "Send test"}
@@ -268,7 +268,7 @@ export function PushCard({ isDemoMode = false }: { isDemoMode?: boolean }) {
           {status && (
             <span
               className={cn(
-                "flex items-center gap-1.5 text-[11px]",
+                "flex items-center gap-1.5 text-2xs",
                 status.tone === "ok" ? "text-status-green" : "text-status-red",
               )}
               role={status.tone === "error" ? "alert" : undefined}
@@ -283,7 +283,7 @@ export function PushCard({ isDemoMode = false }: { isDemoMode?: boolean }) {
           )}
 
           {dirty && !status && (
-            <span className="text-[11px] text-muted-foreground/70">Unsaved changes</span>
+            <span className="text-2xs text-muted-foreground/70">Unsaved changes</span>
           )}
         </div>
       </div>

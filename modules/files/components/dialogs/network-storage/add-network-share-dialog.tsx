@@ -34,7 +34,7 @@ type AddNetworkShareDialogProps = {
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+    <div className="mb-2 text-3xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
       {children}
     </div>
   );
@@ -91,7 +91,7 @@ export function AddNetworkShareDialog({
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex h-6 items-center gap-1 rounded-md border border-glass-border bg-background/80 px-2 text-[11px] text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground"
+              className="inline-flex h-6 items-center gap-1 rounded-md border border-glass-border bg-background/80 px-2 text-2xs text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground"
               aria-label="Back"
             >
               <ArrowLeft className="size-3" />

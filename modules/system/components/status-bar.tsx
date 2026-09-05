@@ -212,7 +212,7 @@ export function StatusBar({
             >
               <Bell className="size-4 text-muted-foreground" />
               {unreadCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 size-4 rounded-full bg-primary text-[9px] text-primary-foreground flex items-center justify-center font-bold shadow-sm shadow-black/30">
+                <span className="absolute -top-0.5 -right-0.5 size-4 rounded-full bg-primary text-3xs text-primary-foreground flex items-center justify-center font-bold shadow-sm shadow-black/30">
                   {unreadCount}
                 </span>
               )}

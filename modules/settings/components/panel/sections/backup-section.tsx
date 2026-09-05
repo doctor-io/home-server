@@ -53,7 +53,7 @@ function PreferenceRow({
       <div className="min-w-0">
         <div className="text-sm text-foreground">{label}</div>
         {description && (
-          <div className="mt-0.5 text-[11px] text-muted-foreground/70">{description}</div>
+          <div className="mt-0.5 text-2xs text-muted-foreground/70">{description}</div>
         )}
       </div>
       {children}
@@ -158,7 +158,7 @@ export function BackupSection({
         <div className={cn(SETTINGS_PANEL_INSET, "flex items-center justify-between gap-4 px-4 py-3")}>
           <div className="min-w-0">
             <div className="text-sm text-foreground">Run backup now</div>
-            <div className="mt-0.5 text-[11px] text-muted-foreground/70">Creates a full archive immediately</div>
+            <div className="mt-0.5 text-2xs text-muted-foreground/70">Creates a full archive immediately</div>
           </div>
           <button
             onClick={() => void onRunBackupNow()}
@@ -174,7 +174,7 @@ export function BackupSection({
         <div className={cn(SETTINGS_PANEL_INSET, "flex items-center justify-between gap-4 px-4 py-3")}>
           <div className="min-w-0">
             <div className="text-sm text-foreground">Restore from backup</div>
-            <div className="mt-0.5 text-[11px] text-muted-foreground/70">
+            <div className="mt-0.5 text-2xs text-muted-foreground/70">
               {selectedBackup
                 ? `Selected: ${new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(selectedBackup.createdAt))}`
                 : "No backup selected"}
@@ -246,12 +246,12 @@ export function BackupSection({
                   <div className="text-xs font-medium text-foreground">
                     {new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(backup.createdAt))}
                   </div>
-                  <div className="text-[11px] text-muted-foreground/70">
+                  <div className="text-2xs text-muted-foreground/70">
                     {backup.hostname} · {formatStorageSize(backup.sizeBytes)}
                   </div>
                 </div>
                 {isSelected && (
-                  <span className="text-[11px] font-medium text-primary">Selected</span>
+                  <span className="text-2xs font-medium text-primary">Selected</span>
                 )}
               </button>
             );

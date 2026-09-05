@@ -36,12 +36,12 @@ export function StatusScreen({
                 className={`relative z-10 size-[3.65rem] blur-[0.15px] ${failed ? "" : "animate-homeio-breathe"}`}
               />
             </div>
-            <div className="system-pill-surface mt-2.5 px-3 py-1 text-[10px] tracking-[0.24em] text-foreground/58 uppercase">
+            <div className="system-pill-surface mt-2.5 px-3 py-1 text-3xs tracking-[0.24em] text-foreground/58 uppercase">
               {failed ? "Error" : "Home server"}
             </div>
           </div>
 
-          <p className="text-[1.48rem] font-medium tracking-[-0.03em] text-foreground">
+          <p className="text-2xl font-medium tracking-[-0.03em] text-foreground">
             {title}
           </p>
           <p className="mb-5 mt-1 text-sm leading-6 text-muted-foreground/78">

@@ -100,13 +100,13 @@ export function ApiTokensCard({ isDemoMode = false }: { isDemoMode?: boolean }) 
             Copy this token now — it is not shown again
           </span>
           <div className="flex items-center gap-2">
-            <code className="min-w-0 flex-1 truncate rounded-md bg-black/40 px-2 py-1.5 font-mono text-[11px] text-foreground">
+            <code className="min-w-0 flex-1 truncate rounded-md bg-black/40 px-2 py-1.5 font-mono text-2xs text-foreground">
               {issued.token}
             </code>
             <button
               type="button"
               onClick={() => void navigator.clipboard?.writeText(issued.token)}
-              className="flex items-center gap-1 rounded-md border border-glass-border px-2 py-1.5 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+              className="flex items-center gap-1 rounded-md border border-glass-border px-2 py-1.5 text-2xs text-muted-foreground transition-colors hover:text-foreground"
             >
               <Copy className="size-3" /> Copy
             </button>
@@ -114,7 +114,7 @@ export function ApiTokensCard({ isDemoMode = false }: { isDemoMode?: boolean }) 
           <button
             type="button"
             onClick={() => setIssued(null)}
-            className="self-start text-[11px] text-muted-foreground hover:text-foreground"
+            className="self-start text-2xs text-muted-foreground hover:text-foreground"
           >
             I have saved it
           </button>
@@ -123,7 +123,7 @@ export function ApiTokensCard({ isDemoMode = false }: { isDemoMode?: boolean }) 
 
       <div className={cn(SETTINGS_PANEL_INSET, "overflow-hidden")}>
         {tokens.length === 0 ? (
-          <p className="px-4 py-3 text-[11px] text-muted-foreground/70">
+          <p className="px-4 py-3 text-2xs text-muted-foreground/70">
             No tokens yet. Create one to let Home Assistant, n8n or a script talk to Homeio.
           </p>
         ) : (
@@ -136,20 +136,20 @@ export function ApiTokensCard({ isDemoMode = false }: { isDemoMode?: boolean }) 
                 <div className="flex items-center gap-2">
                   <span className="truncate text-sm text-foreground">{token.name}</span>
                   {token.revokedAt ? (
-                    <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                    <span className="rounded bg-white/10 px-1.5 py-0.5 text-3xs text-muted-foreground">
                       Revoked
                     </span>
                   ) : isStale(token) ? (
                     // Not an error, but worth asking whether it is still needed.
-                    <span className="rounded bg-status-amber/15 px-1.5 py-0.5 text-[10px] text-status-amber">
+                    <span className="rounded bg-status-amber/15 px-1.5 py-0.5 text-3xs text-status-amber">
                       Unused 90 days
                     </span>
                   ) : null}
                 </div>
-                <div className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground/70">
+                <div className="mt-0.5 truncate font-mono text-3xs text-muted-foreground/70">
                   {token.prefix}… · {token.scopes.join(", ") || "no scopes"}
                 </div>
-                <div className="text-[10px] text-muted-foreground/60">
+                <div className="text-3xs text-muted-foreground/60">
                   Last used {formatWhen(token.lastUsedAt)}
                   {token.lastUsedIp ? ` from ${token.lastUsedIp}` : ""}
                 </div>
@@ -160,7 +160,7 @@ export function ApiTokensCard({ isDemoMode = false }: { isDemoMode?: boolean }) 
                   type="button"
                   onClick={() => void revoke(token.id)}
                   disabled={isBusy || isDemoMode}
-                  className="flex shrink-0 items-center gap-1 rounded-md border border-status-red/30 px-2 py-1 text-[11px] text-status-red transition-colors hover:bg-status-red/10 disabled:opacity-50"
+                  className="flex shrink-0 items-center gap-1 rounded-md border border-status-red/30 px-2 py-1 text-2xs text-status-red transition-colors hover:bg-status-red/10 disabled:opacity-50"
                 >
                   <Trash2 className="size-3" /> Revoke
                 </button>
@@ -181,9 +181,9 @@ export function ApiTokensCard({ isDemoMode = false }: { isDemoMode?: boolean }) 
           />
 
           <fieldset className="flex flex-col gap-1.5">
-            <legend className="mb-1 text-[11px] text-muted-foreground">Scopes</legend>
+            <legend className="mb-1 text-2xs text-muted-foreground">Scopes</legend>
             {API_TOKEN_SCOPES.map((scope) => (
-              <label key={scope} className="flex items-center gap-2 text-[11px] text-foreground">
+              <label key={scope} className="flex items-center gap-2 text-2xs text-foreground">
                 <input
                   type="checkbox"
                   checked={scopes.includes(scope)}
@@ -197,7 +197,7 @@ export function ApiTokensCard({ isDemoMode = false }: { isDemoMode?: boolean }) 
 
           {wantsPower && (
             // Power is the one scope that can take the server away from you.
-            <p className="rounded-md border border-status-amber/30 bg-status-amber/10 px-2.5 py-2 text-[11px] leading-relaxed text-status-amber">
+            <p className="rounded-md border border-status-amber/30 bg-status-amber/10 px-2.5 py-2 text-2xs leading-relaxed text-status-amber">
               This token will be able to shut down and restart your server. Anyone who
               obtains it can take it offline.
             </p>
@@ -208,14 +208,14 @@ export function ApiTokensCard({ isDemoMode = false }: { isDemoMode?: boolean }) 
               type="button"
               onClick={() => void create()}
               disabled={!canSubmit}
-              className="rounded-md bg-primary px-3 py-1.5 text-[11px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+              className="rounded-md bg-primary px-3 py-1.5 text-2xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
             >
               {isBusy ? "Creating…" : "Create token"}
             </button>
             <button
               type="button"
               onClick={() => setIsCreating(false)}
-              className="rounded-md border border-glass-border px-3 py-1.5 text-[11px] text-muted-foreground hover:text-foreground"
+              className="rounded-md border border-glass-border px-3 py-1.5 text-2xs text-muted-foreground hover:text-foreground"
             >
               Cancel
             </button>
@@ -236,7 +236,7 @@ export function ApiTokensCard({ isDemoMode = false }: { isDemoMode?: boolean }) 
       )}
 
       {error && (
-        <p className="px-4 py-2 text-[11px] text-status-red" role="alert">
+        <p className="px-4 py-2 text-2xs text-status-red" role="alert">
           {error}
         </p>
       )}

@@ -100,7 +100,7 @@ export function GoogleDrivePanel({ connectionId, accountEmail }: Props) {
       {/* Header */}
       <div className={cn("flex shrink-0 items-center justify-between border-b border-glass-border/50 px-4 py-2.5", FILES_PANEL_INSET)}>
         {/* Breadcrumb */}
-        <nav className="flex min-w-0 items-center gap-1 text-[12px]">
+        <nav className="flex min-w-0 items-center gap-1 text-xs">
           <Cloud className="size-3.5 shrink-0 text-sky-400" />
           {navStack.map((seg, i) => (
             <span key={seg.id} className="flex items-center gap-1">
@@ -164,12 +164,12 @@ export function GoogleDrivePanel({ connectionId, accountEmail }: Props) {
               if (e.key === "Escape") { setShowNewFolder(false); setNewFolderName(""); }
             }}
             placeholder="Folder name"
-            className="h-7 flex-1 rounded-md border border-glass-border/60 bg-background/40 px-2 text-[12px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/40"
+            className="h-7 flex-1 rounded-md border border-glass-border/60 bg-background/40 px-2 text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/40"
           />
           <button
             onClick={handleCreateFolder}
             disabled={!newFolderName.trim() || createFolder.isPending}
-            className="rounded-md bg-primary/15 px-2.5 py-1 text-[11px] font-medium text-primary transition-colors hover:bg-primary/25 disabled:opacity-40"
+            className="rounded-md bg-primary/15 px-2.5 py-1 text-2xs font-medium text-primary transition-colors hover:bg-primary/25 disabled:opacity-40"
           >
             {createFolder.isPending ? <Loader2 className="size-3 animate-spin" /> : "Create"}
           </button>
@@ -190,7 +190,7 @@ export function GoogleDrivePanel({ connectionId, accountEmail }: Props) {
             </p>
             <button
               onClick={() => void browseQuery.refetch()}
-              className="rounded-md bg-background/50 px-3 py-1 text-[11px] text-muted-foreground hover:text-foreground"
+              className="rounded-md bg-background/50 px-3 py-1 text-2xs text-muted-foreground hover:text-foreground"
             >
               Retry
             </button>
@@ -224,13 +224,13 @@ export function GoogleDrivePanel({ connectionId, accountEmail }: Props) {
                     entry.isFolder ? "cursor-pointer" : "cursor-default",
                   )}
                 >
-                  <span className="truncate text-[13px] font-medium text-foreground">
+                  <span className="truncate text-sm font-medium text-foreground">
                     {entry.name}
                   </span>
-                  <span className="text-[10px] text-muted-foreground/50">
+                  <span className="text-3xs text-muted-foreground/50">
                     {[formatSize(entry.size), formatDate(entry.modifiedAt)].filter(Boolean).join(" · ")}
                     {isGoogleNative(entry.mimeType) && (
-                      <span className="ml-1 rounded-sm bg-sky-500/10 px-1 py-0.5 text-[9px] text-sky-400">
+                      <span className="ml-1 rounded-sm bg-sky-500/10 px-1 py-0.5 text-3xs text-sky-400">
                         Google
                       </span>
                     )}
@@ -276,7 +276,7 @@ export function GoogleDrivePanel({ connectionId, accountEmail }: Props) {
 
       {/* Footer */}
       <div className={cn("shrink-0 border-t border-glass-border/50 px-4 py-2", FILES_PANEL_INSET)}>
-        <p className="text-[11px] text-muted-foreground/50 truncate">
+        <p className="text-2xs text-muted-foreground/50 truncate">
           <Cloud className="mr-1 inline-block size-3 text-sky-400/70" />
           {accountEmail}
         </p>
@@ -286,23 +286,23 @@ export function GoogleDrivePanel({ connectionId, accountEmail }: Props) {
       {deleteConfirm && (
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/60 backdrop-blur-sm">
           <div className="w-72 rounded-xl border border-glass-border bg-popover/96 p-5 shadow-xl shadow-black/30">
-            <p className="text-[13px] font-medium text-foreground">
+            <p className="text-sm font-medium text-foreground">
               Delete &ldquo;{deleteConfirm.name}&rdquo;?
             </p>
-            <p className="mt-1 text-[11px] text-muted-foreground">
+            <p className="mt-1 text-2xs text-muted-foreground">
               This will move the file to Google Drive Trash.
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <button
                 onClick={() => setDeleteConfirm(null)}
-                className="rounded-md px-3 py-1.5 text-[11px] text-muted-foreground hover:text-foreground"
+                className="rounded-md px-3 py-1.5 text-2xs text-muted-foreground hover:text-foreground"
               >
                 Cancel
               </button>
               <button
                 onClick={() => handleDelete(deleteConfirm)}
                 disabled={deleteFile.isPending}
-                className="flex items-center gap-1.5 rounded-md bg-status-red/15 px-3 py-1.5 text-[11px] font-medium text-status-red transition-colors hover:bg-status-red/25 disabled:opacity-40"
+                className="flex items-center gap-1.5 rounded-md bg-status-red/15 px-3 py-1.5 text-2xs font-medium text-status-red transition-colors hover:bg-status-red/25 disabled:opacity-40"
               >
                 {deleteFile.isPending && <Loader2 className="size-3 animate-spin" />}
                 Delete

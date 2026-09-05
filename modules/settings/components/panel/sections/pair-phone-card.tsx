@@ -68,7 +68,7 @@ export function PairPhoneCard({ isDemoMode }: { isDemoMode?: boolean }) {
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <div className="text-sm text-foreground">Pair a phone</div>
-            <div className="mt-0.5 text-[11px] text-muted-foreground/70">
+            <div className="mt-0.5 text-2xs text-muted-foreground/70">
               Scan from the Homeio app to add this server and sign in, without typing an
               address or a password on a touchscreen.
             </div>
@@ -79,7 +79,7 @@ export function PairPhoneCard({ isDemoMode }: { isDemoMode?: boolean }) {
               type="button"
               onClick={() => void mint()}
               disabled={busy || isDemoMode}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary/90 px-3 py-1.5 text-[12px] font-medium text-primary-foreground disabled:opacity-50"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary/90 px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
             >
               <Maximize2 className="size-3.5" />
               {busy ? "Preparing…" : "Show QR"}
@@ -88,7 +88,7 @@ export function PairPhoneCard({ isDemoMode }: { isDemoMode?: boolean }) {
         </div>
 
         {error && (
-          <p className="flex items-center gap-1.5 text-[11px] text-status-red" role="alert">
+          <p className="flex items-center gap-1.5 text-2xs text-status-red" role="alert">
             <AlertTriangle className="size-3.5" /> {error}
           </p>
         )}
@@ -106,14 +106,14 @@ export function PairPhoneCard({ isDemoMode }: { isDemoMode?: boolean }) {
               <p className="text-sm font-medium text-foreground">
                 Open the Homeio app and scan this
               </p>
-              <p className="text-[11px] text-muted-foreground/80">
+              <p className="text-2xs text-muted-foreground/80">
                 It carries this server&apos;s address and a one-time code. The phone is
                 signed in as you — treat the screen like a password while it is up.
               </p>
 
               <p
                 className={cn(
-                  "text-[11px] tabular-nums",
+                  "text-2xs tabular-nums",
                   remaining <= 10 ? "text-status-amber" : "text-muted-foreground/70",
                 )}
               >
@@ -124,7 +124,7 @@ export function PairPhoneCard({ isDemoMode }: { isDemoMode?: boolean }) {
                 type="button"
                 onClick={() => void mint()}
                 disabled={busy}
-                className="inline-flex w-fit items-center gap-1.5 text-[11px] text-muted-foreground/80 hover:text-foreground disabled:opacity-50"
+                className="inline-flex w-fit items-center gap-1.5 text-2xs text-muted-foreground/80 hover:text-foreground disabled:opacity-50"
               >
                 <RefreshCw className={cn("size-3", busy && "animate-spin")} />
                 New code

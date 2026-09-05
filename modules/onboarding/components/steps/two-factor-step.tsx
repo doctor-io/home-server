@@ -71,7 +71,7 @@ export function TwoFactorStep({ isRemotelyReachable, onEnabled }: TwoFactorStepP
       {phase === "idle" && (
         <>
           {isRemotelyReachable && (
-            <p className="mb-2 rounded-[var(--system-radius-control)] border border-status-amber/20 bg-status-amber/10 px-2.5 py-2 text-[11px] leading-relaxed text-status-amber">
+            <p className="mb-2 rounded-[var(--system-radius-control)] border border-status-amber/20 bg-status-amber/10 px-2.5 py-2 text-2xs leading-relaxed text-status-amber">
               You just made this server reachable beyond your LAN. A second factor is worth
               the two minutes.
             </p>
@@ -80,7 +80,7 @@ export function TwoFactorStep({ isRemotelyReachable, onEnabled }: TwoFactorStepP
             type="button"
             onClick={begin}
             disabled={startSetup.isPending}
-            className="w-full cursor-pointer rounded-[var(--system-radius-control)] border border-white/8 bg-white/[0.06] px-3 py-2 text-[13px] font-medium text-foreground transition-colors hover:bg-white/[0.09] disabled:opacity-60"
+            className="w-full cursor-pointer rounded-[var(--system-radius-control)] border border-white/8 bg-white/[0.06] px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-white/[0.09] disabled:opacity-60"
           >
             {startSetup.isPending ? "Preparing…" : "Set up two-factor"}
           </button>
@@ -97,16 +97,16 @@ export function TwoFactorStep({ isRemotelyReachable, onEnabled }: TwoFactorStepP
               dangerouslySetInnerHTML={{ __html: enrollment.qrCodeSvg }}
             />
             <div className="min-w-0">
-              <p className="text-[13px] font-medium text-foreground">
+              <p className="text-sm font-medium text-foreground">
                 Scan with your authenticator
               </p>
-              <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground/75">
+              <p className="mt-0.5 text-2xs leading-relaxed text-muted-foreground/75">
                 1Password, Bitwarden, Authy, or Google Authenticator.
               </p>
-              <p className="mt-1.5 text-[10px] tracking-[0.16em] text-muted-foreground/60 uppercase">
+              <p className="mt-1.5 text-3xs tracking-[0.16em] text-muted-foreground/60 uppercase">
                 Or enter this key
               </p>
-              <p className="font-mono text-[11px] break-all text-foreground/85">
+              <p className="font-mono text-2xs break-all text-foreground/85">
                 {enrollment.secret}
               </p>
             </div>
@@ -114,7 +114,7 @@ export function TwoFactorStep({ isRemotelyReachable, onEnabled }: TwoFactorStepP
 
           <label
             htmlFor="setup-totp-code"
-            className="mt-3 mb-1.5 block px-1 text-[11px] tracking-[0.18em] text-muted-foreground/70 uppercase"
+            className="mt-3 mb-1.5 block px-1 text-2xs tracking-[0.18em] text-muted-foreground/70 uppercase"
           >
             Six-digit code
           </label>
@@ -131,7 +131,7 @@ export function TwoFactorStep({ isRemotelyReachable, onEnabled }: TwoFactorStepP
             type="button"
             onClick={confirm}
             disabled={code.length !== 6 || verify.isPending}
-            className="mt-2 w-full cursor-pointer rounded-[var(--system-radius-control)] border border-white/8 bg-white/[0.06] px-3 py-2 text-[13px] font-medium text-foreground transition-colors hover:bg-white/[0.09] disabled:opacity-50"
+            className="mt-2 w-full cursor-pointer rounded-[var(--system-radius-control)] border border-white/8 bg-white/[0.06] px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-white/[0.09] disabled:opacity-50"
           >
             {verify.isPending ? "Checking…" : "Turn on two-factor"}
           </button>
@@ -140,10 +140,10 @@ export function TwoFactorStep({ isRemotelyReachable, onEnabled }: TwoFactorStepP
 
       {phase === "saved" && (
         <>
-          <p className="px-1 text-[13px] font-medium text-status-green">
+          <p className="px-1 text-sm font-medium text-status-green">
             Two-factor is on
           </p>
-          <p className="mt-1 px-1 text-[11px] leading-relaxed text-muted-foreground/75">
+          <p className="mt-1 px-1 text-2xs leading-relaxed text-muted-foreground/75">
             Save these backup codes somewhere safe. Each one works once, and this is the
             only time they are shown.
           </p>
@@ -151,7 +151,7 @@ export function TwoFactorStep({ isRemotelyReachable, onEnabled }: TwoFactorStepP
             {backupCodes.map((backupCode) => (
               <li
                 key={backupCode}
-                className="rounded-[10px] border border-white/6 bg-black/25 px-2 py-1.5 text-center font-mono text-[12px] text-foreground/85"
+                className="rounded-[10px] border border-white/6 bg-black/25 px-2 py-1.5 text-center font-mono text-xs text-foreground/85"
               >
                 {backupCode}
               </li>
@@ -161,7 +161,7 @@ export function TwoFactorStep({ isRemotelyReachable, onEnabled }: TwoFactorStepP
       )}
 
       {error && (
-        <p className="mt-2 px-1 text-[11px] text-status-red" role="alert">
+        <p className="mt-2 px-1 text-2xs text-status-red" role="alert">
           {error}
         </p>
       )}

@@ -38,7 +38,7 @@ export function NotificationsPanel() {
             >
               {f}
               {f === "unread" && unreadCount > 0 && (
-                <span className="ml-1.5 rounded-full bg-primary/20 px-1.5 py-0.5 text-[10px] text-primary">
+                <span className="ml-1.5 rounded-full bg-primary/20 px-1.5 py-0.5 text-3xs text-primary">
                   {unreadCount}
                 </span>
               )}

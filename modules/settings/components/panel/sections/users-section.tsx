@@ -41,11 +41,11 @@ export function UsersSection({
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium text-foreground">{username}</span>
-              <span className="rounded-md bg-primary/15 px-1.5 py-0.5 text-[11px] font-medium text-primary">
+              <span className="rounded-md bg-primary/15 px-1.5 py-0.5 text-2xs font-medium text-primary">
                 Admin
               </span>
             </div>
-            <div className="text-[11px] text-muted-foreground/70">Local account · Current session</div>
+            <div className="text-2xs text-muted-foreground/70">Local account · Current session</div>
           </div>
         </div>
       </div>
@@ -60,7 +60,7 @@ export function UsersSection({
       <div className={cn(SETTINGS_PANEL_INSET, "flex items-center justify-between gap-4 px-4 py-3")}>
         <div className="min-w-0">
           <div className="text-sm text-foreground">Add user</div>
-          <div className="mt-0.5 text-[11px] text-muted-foreground/70">Multi-user support is coming soon</div>
+          <div className="mt-0.5 text-2xs text-muted-foreground/70">Multi-user support is coming soon</div>
         </div>
         <button
           disabled
@@ -68,7 +68,7 @@ export function UsersSection({
         >
           <Plus className="size-3" />
           Add User
-          <span className="rounded bg-primary/20 px-1 py-px text-[10px] font-semibold uppercase tracking-wide">
+          <span className="rounded bg-primary/20 px-1 py-px text-3xs font-semibold uppercase tracking-wide">
             Soon
           </span>
         </button>

@@ -77,7 +77,7 @@ export function PhoneApps() {
     <div className="flex flex-col gap-3.5">
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-2xs text-muted-foreground">
             {apps.length === 0
               ? "Nothing installed"
               : `${running} of ${apps.length} running`}
@@ -90,7 +90,7 @@ export function PhoneApps() {
       {error && (
         <p
           role="alert"
-          className="rounded-2xl bg-status-red/10 px-3.5 py-2.5 text-[12px] text-status-red"
+          className="rounded-2xl bg-status-red/10 px-3.5 py-2.5 text-xs text-status-red"
         >
           {error}
         </p>
@@ -102,7 +102,7 @@ export function PhoneApps() {
             <Package className="size-6 opacity-50 grayscale" />
           </span>
           <p className="mt-3 text-sm text-muted-foreground">No apps installed</p>
-          <p className="mt-1 text-[12px] text-muted-foreground/70">
+          <p className="mt-1 text-xs text-muted-foreground/70">
             Install one from the App Store in desktop view.
           </p>
         </div>
@@ -120,7 +120,7 @@ export function PhoneApps() {
               >
                 <span
                   className={cn(
-                    "text-[13px] transition-colors",
+                    "text-sm transition-colors",
                     filter === option.key ? "font-medium" : "text-muted-foreground",
                   )}
                 >
@@ -138,7 +138,7 @@ export function PhoneApps() {
           </div>
 
           {visible.length === 0 ? (
-            <p className="rounded-2xl bg-white/4 px-3.5 py-3 text-[12px] text-muted-foreground">
+            <p className="rounded-2xl bg-white/4 px-3.5 py-3 text-xs text-muted-foreground">
               Nothing {filter === "running" ? "running" : "stopped"} right now.
             </p>
           ) : (
@@ -155,16 +155,16 @@ export function PhoneApps() {
                         aria-hidden="true"
                         className={cn("size-2 shrink-0 rounded-full", statusTone(app.status))}
                       />
-                      <span className="min-w-0 flex-1 truncate text-[14px] font-medium">
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium">
                         {app.name}
                       </span>
-                      <span className="shrink-0 text-[11px] text-muted-foreground">
+                      <span className="shrink-0 text-2xs text-muted-foreground">
                         {app.activeOperation ? "Working…" : STATUS_LABELS[app.status]}
                       </span>
                     </div>
 
                     {app.webUiPort && (
-                      <p className="mt-0.5 pl-[1.125rem] text-[11px] text-muted-foreground/70 tabular-nums">
+                      <p className="mt-0.5 pl-[1.125rem] text-2xs text-muted-foreground/70 tabular-nums">
                         port {app.webUiPort}
                       </p>
                     )}
@@ -176,7 +176,7 @@ export function PhoneApps() {
                           type="button"
                           onClick={() => void run(app.id, "stop")}
                           disabled={isBusy}
-                          className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-2xl bg-white/6 text-[12px] text-muted-foreground transition-transform active:scale-[0.98] disabled:opacity-50"
+                          className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-2xl bg-white/6 text-xs text-muted-foreground transition-transform active:scale-[0.98] disabled:opacity-50"
                         >
                           <Square className="size-3.5 grayscale" /> Stop
                         </button>
@@ -185,7 +185,7 @@ export function PhoneApps() {
                           type="button"
                           onClick={() => void run(app.id, "start")}
                           disabled={isBusy}
-                          className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-2xl bg-white/6 text-[12px] text-muted-foreground transition-transform active:scale-[0.98] disabled:opacity-50"
+                          className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-2xl bg-white/6 text-xs text-muted-foreground transition-transform active:scale-[0.98] disabled:opacity-50"
                         >
                           <Play className="size-3.5 grayscale" /> Start
                         </button>
@@ -195,7 +195,7 @@ export function PhoneApps() {
                         type="button"
                         onClick={() => void run(app.id, "restart")}
                         disabled={isBusy}
-                        className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-2xl bg-white/6 text-[12px] text-muted-foreground transition-transform active:scale-[0.98] disabled:opacity-50"
+                        className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-2xl bg-white/6 text-xs text-muted-foreground transition-transform active:scale-[0.98] disabled:opacity-50"
                       >
                         <RefreshCw className={cn("size-3.5 grayscale", isBusy && "animate-spin")} />{" "}
                         Restart
@@ -206,7 +206,7 @@ export function PhoneApps() {
                       {url && live && (
                         <a
                           href={url}
-                          className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-2xl bg-primary text-[12px] font-medium text-primary-foreground transition-transform active:scale-[0.98]"
+                          className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-2xl bg-primary text-xs font-medium text-primary-foreground transition-transform active:scale-[0.98]"
                         >
                           <ExternalLink className="size-3.5" /> Open
                         </a>

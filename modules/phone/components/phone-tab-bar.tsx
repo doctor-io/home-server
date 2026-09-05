@@ -64,7 +64,7 @@ export function PhoneTabBar() {
                 />
                 <span
                   className={cn(
-                    "relative text-[10px] transition-colors",
+                    "relative text-3xs transition-colors",
                     isActive ? "font-medium text-primary" : "text-muted-foreground/70",
                   )}
                 >

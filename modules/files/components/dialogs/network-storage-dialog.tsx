@@ -190,7 +190,7 @@ export function NetworkStorageDialog({
                 type="button"
                 onClick={() => void handleDiscoverServers()}
                 disabled={isBusy}
-                className="inline-flex h-6 items-center gap-1 rounded-md border border-glass-border bg-background/80 px-2 text-[11px] text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-6 items-center gap-1 rounded-md border border-glass-border bg-background/80 px-2 text-2xs text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {discoverServers.isPending ? (
                   <Loader2 className="size-3 animate-spin" />

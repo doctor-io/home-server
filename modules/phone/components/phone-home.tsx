@@ -52,12 +52,12 @@ function Stat({
   return (
     <div className="flex flex-1 flex-col items-center gap-1.5 px-1">
       <Icon className="size-4 opacity-60 grayscale" />
-      <span className={cn("text-[15px] font-medium tabular-nums", toneFor(percent))}>
+      <span className={cn("text-base font-medium tabular-nums", toneFor(percent))}>
         {percent === null ? "—" : `${Math.round(percent)}%`}
       </span>
-      <span className="text-[10px] text-muted-foreground">{label}</span>
+      <span className="text-3xs text-muted-foreground">{label}</span>
       {/* Kept even when empty so the three columns stay on one baseline. */}
-      <span className="min-h-[0.9rem] truncate text-[10px] text-muted-foreground/60">{detail}</span>
+      <span className="min-h-[0.9rem] truncate text-3xs text-muted-foreground/60">{detail}</span>
     </div>
   );
 }
@@ -105,7 +105,7 @@ export function PhoneHome() {
     return (
       <div className="mt-8 text-center">
         <p className="text-sm text-muted-foreground">Reading system status…</p>
-        <p className="mt-1 text-[11px] text-muted-foreground/60">
+        <p className="mt-1 text-2xs text-muted-foreground/60">
           The first read after a restart can take a few seconds.
         </p>
       </div>
@@ -123,7 +123,7 @@ export function PhoneHome() {
     <div className="flex min-h-0 flex-1 flex-col gap-3.5">
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[11px] text-muted-foreground">Welcome home,</p>
+          <p className="text-2xs text-muted-foreground">Welcome home,</p>
           <h1 className="truncate text-lg font-medium">{summary.host.hostname}</h1>
         </div>
         {/* The only way into app-level settings from here — the tab bar is
@@ -139,14 +139,14 @@ export function PhoneHome() {
 
       {/* One glance answers "is anything wrong?", and only then "with what?" */}
       <section className="rounded-3xl bg-white/5 px-5 py-4">
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-2xs text-muted-foreground">
           Homeio {summary.host.version} · up {formatUptime(summary.host.uptimeSeconds)}
         </p>
         <div className="mt-1 flex items-end justify-between gap-4">
           <div className="min-w-0">
             <p
               className={cn(
-                "text-[13px] font-medium",
+                "text-sm font-medium",
                 attention > 0 ? "text-status-amber" : "text-status-green",
               )}
             >
@@ -203,7 +203,7 @@ export function PhoneHome() {
           </span>
           <div className="min-w-0 flex-1">
             <p className="truncate text-[13.5px] font-medium">{network.name ?? "Connected"}</p>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-2xs text-muted-foreground">
               {network.type === "wifi" ? "Wi-Fi" : "Ethernet"}
               {network.type === "wifi" && network.signalPercent !== null
                 ? ` · ${Math.round(network.signalPercent)}% signal`
@@ -213,18 +213,18 @@ export function PhoneHome() {
             </p>
           </div>
           {network.ipv4 && (
-            <span className="shrink-0 font-mono text-[12px] tabular-nums">{network.ipv4}</span>
+            <span className="shrink-0 font-mono text-xs tabular-nums">{network.ipv4}</span>
           )}
         </section>
       )}
 
       <section className="flex min-h-0 flex-1 flex-col gap-2">
-        <h2 className="shrink-0 text-[10px] tracking-[0.18em] text-muted-foreground uppercase">
+        <h2 className="shrink-0 text-3xs tracking-[0.18em] text-muted-foreground uppercase">
           Apps
         </h2>
 
         {summary.apps.length === 0 ? (
-          <p className="rounded-2xl bg-white/4 px-3.5 py-3 text-[12px] text-muted-foreground">
+          <p className="rounded-2xl bg-white/4 px-3.5 py-3 text-xs text-muted-foreground">
             Nothing installed yet.
           </p>
         ) : (
@@ -249,7 +249,7 @@ export function PhoneHome() {
                     )}
                   />
                   <span className="min-w-0 flex-1 truncate text-[13.5px]">{app.name}</span>
-                  <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
+                  <span className="shrink-0 text-2xs text-muted-foreground tabular-nums">
                     {app.webUiPort ? `:${app.webUiPort}` : app.status}
                   </span>
                   <ChevronRight className="size-4 shrink-0 opacity-35" />

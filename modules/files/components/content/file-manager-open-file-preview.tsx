@@ -191,7 +191,7 @@ function AudioPlayer({ src, fileName }: { src: string; fileName: string }) {
 
           <div className="min-w-0 space-y-5 sm:space-y-6">
             <div className="space-y-2 text-center sm:text-left">
-              <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-muted-foreground/80">
+              <p className="text-2xs font-medium uppercase tracking-[0.24em] text-muted-foreground/80">
                 Audio Preview
               </p>
               <h3 className="truncate text-xl font-semibold text-foreground sm:text-2xl" title={fileName}>
@@ -258,7 +258,7 @@ function AudioPlayer({ src, fileName }: { src: string; fileName: string }) {
                     className="w-16 rounded-2xl border-glass-border/80 bg-popover/95 p-3 shadow-xl backdrop-blur-xl"
                   >
                     <div className="flex flex-col items-center gap-3">
-                      <span className="text-[11px] font-medium tabular-nums text-muted-foreground">
+                      <span className="text-2xs font-medium tabular-nums text-muted-foreground">
                         {Math.round(volume * 100)}%
                       </span>
                       <Slider

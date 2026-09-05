@@ -64,7 +64,7 @@ export function NetworkSection({ data }: NetworkSectionProps) {
                     {data.topSsids.map((ssid) => (
                       <span
                         key={ssid}
-                        className="rounded-md border border-glass-border bg-background/50 px-2 py-0.5 font-mono text-[11px] text-foreground/80"
+                        className="rounded-md border border-glass-border bg-background/50 px-2 py-0.5 font-mono text-2xs text-foreground/80"
                       >
                         {ssid}
                       </span>

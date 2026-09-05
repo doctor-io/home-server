@@ -18,7 +18,9 @@ export function WidgetCard({
   return (
     <section
       className={cn(
-        "relative shrink-0 overflow-hidden rounded-2xl border border-white/[0.09] p-4",
+        // A floating panel, like the dock — same token, so peers agree instead of
+        // landing 2px apart by accident.
+        "relative shrink-0 overflow-hidden rounded-[var(--system-radius-floating)] border border-white/[0.09] p-4",
         className,
       )}
       style={{
@@ -37,7 +39,7 @@ export function WidgetCard({
               <Icon className="size-3 text-primary" />
             </div>
           ) : null}
-          <h3 className="text-[10px] font-semibold uppercase tracking-[0.15em] text-foreground/55">
+          <h3 className="text-3xs font-semibold uppercase tracking-[0.15em] text-foreground/55">
             {title}
           </h3>
         </header>

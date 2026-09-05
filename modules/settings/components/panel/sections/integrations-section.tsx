@@ -83,7 +83,7 @@ function InputRow({ label, description, children }: { label: string; description
     <div className={cn(SETTINGS_PANEL_INSET, "flex items-start justify-between gap-4 px-4 py-3")}>
       <div className="min-w-0 flex-1">
         <div className="text-sm text-foreground">{label}</div>
-        {description && <div className="mt-0.5 text-[11px] text-muted-foreground/70">{description}</div>}
+        {description && <div className="mt-0.5 text-2xs text-muted-foreground/70">{description}</div>}
       </div>
       <div className="shrink-0">{children}</div>
     </div>
@@ -96,7 +96,7 @@ function StatusPill({ tone, label }: { tone: "ok" | "warn" | "muted"; label: str
   return (
     <span
       className={cn(
-        "rounded-full border px-2 py-0.5 text-[10px] font-medium",
+        "rounded-full border px-2 py-0.5 text-3xs font-medium",
         tone === "ok" && "border-status-green/25 bg-status-green/10 text-status-green",
         tone === "warn" && "border-status-amber/25 bg-status-amber/10 text-status-amber",
         tone === "muted" && "border-glass-border bg-background/55 text-muted-foreground",
@@ -179,14 +179,14 @@ function GoogleDriveConfig() {
 
       {/* Setup guide link */}
       <div className={cn(SETTINGS_PANEL_INSET, "flex items-center justify-between px-4 py-2.5")}>
-        <div className="text-[11px] text-muted-foreground/70">
+        <div className="text-2xs text-muted-foreground/70">
           You need a Google Cloud project with the Drive API enabled and an OAuth 2.0 Client ID.
         </div>
         <a
           href="https://console.cloud.google.com/apis/credentials"
           target="_blank"
           rel="noopener noreferrer"
-          className="ml-4 flex shrink-0 items-center gap-1 text-[11px] text-primary hover:underline"
+          className="ml-4 flex shrink-0 items-center gap-1 text-2xs text-primary hover:underline"
         >
           Google Cloud Console
           <ExternalLink className="size-3" />
@@ -197,9 +197,9 @@ function GoogleDriveConfig() {
       <div className={cn(SETTINGS_PANEL_INSET, "flex items-center justify-between gap-4 px-4 py-2.5")}>
         <div className="min-w-0 flex-1">
           <div className="text-sm text-foreground">Redirect URI</div>
-          <div className="mt-0.5 text-[11px] text-muted-foreground/70">Add this exact URI to your OAuth client&apos;s Authorized redirect URIs</div>
+          <div className="mt-0.5 text-2xs text-muted-foreground/70">Add this exact URI to your OAuth client&apos;s Authorized redirect URIs</div>
         </div>
-        <code className="rounded bg-background/55 px-2 py-1 font-mono text-[10px] text-foreground">
+        <code className="rounded bg-background/55 px-2 py-1 font-mono text-3xs text-foreground">
           {effectiveRedirectUri}
         </code>
       </div>
@@ -259,7 +259,7 @@ function GoogleDriveConfig() {
               type="button"
               onClick={() => clearMutation.mutate()}
               disabled={isBusy}
-              className="text-[11px] text-status-red hover:underline disabled:opacity-50"
+              className="text-2xs text-status-red hover:underline disabled:opacity-50"
             >
               {clearMutation.isPending ? "Removing…" : "Remove credentials"}
             </button>
@@ -396,7 +396,7 @@ function TailscaleConfig() {
             />
             <div className="min-w-0">
               <div className="text-sm font-medium text-foreground">Tailscale</div>
-              <div className="mt-0.5 text-[11px] text-muted-foreground/70">
+              <div className="mt-0.5 text-2xs text-muted-foreground/70">
                 Install the official Linux client and register this server with an auth key.
               </div>
             </div>
@@ -407,7 +407,7 @@ function TailscaleConfig() {
           />
         </div>
 
-        <div className="grid gap-2 text-[11px] text-muted-foreground sm:grid-cols-2">
+        <div className="grid gap-2 text-2xs text-muted-foreground sm:grid-cols-2">
           <div className="rounded-lg border border-glass-border bg-background/35 px-3 py-2">
             <div className="text-muted-foreground/60">Service</div>
             <div className="mt-1 text-xs text-foreground">{serviceLabel}</div>
@@ -432,14 +432,14 @@ function TailscaleConfig() {
       </div>
 
       <div className={cn(SETTINGS_PANEL_INSET, "flex items-center justify-between px-4 py-2.5")}>
-        <div className="text-[11px] text-muted-foreground/70">
+        <div className="text-2xs text-muted-foreground/70">
           Activate uses the official Linux install script, then runs tailscale up with your auth key.
         </div>
         <a
           href="https://login.tailscale.com/admin/settings/keys"
           target="_blank"
           rel="noopener noreferrer"
-          className="ml-4 flex shrink-0 items-center gap-1 text-[11px] text-primary hover:underline"
+          className="ml-4 flex shrink-0 items-center gap-1 text-2xs text-primary hover:underline"
         >
           Tailscale keys
           <ExternalLink className="size-3" />
@@ -487,7 +487,7 @@ function TailscaleConfig() {
               type="button"
               onClick={() => clearMutation.mutate()}
               disabled={isBusy}
-              className="text-[11px] text-status-red hover:underline disabled:opacity-50"
+              className="text-2xs text-status-red hover:underline disabled:opacity-50"
             >
               {clearMutation.isPending ? "Removing…" : "Remove credentials"}
             </button>

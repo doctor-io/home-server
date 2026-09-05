@@ -16,7 +16,7 @@ function StatCard({ label, value, valueClass }: { label: string; value: number |
   return (
     <div className={cn(SETTINGS_PANEL_INSET, "flex flex-col items-center justify-center gap-1 py-3")}>
       <span className={cn("text-2xl font-bold tabular-nums", valueClass ?? "text-foreground")}>{value}</span>
-      <span className="text-[11px] text-muted-foreground">{label}</span>
+      <span className="text-2xs text-muted-foreground">{label}</span>
     </div>
   );
 }
@@ -49,7 +49,7 @@ function MaintenanceRow({
     <div className={cn(SETTINGS_PANEL_INSET, "flex items-center justify-between gap-4 px-4 py-3")}>
       <div className="min-w-0">
         <div className="text-sm text-foreground">{label}</div>
-        <div className="mt-0.5 text-[11px] text-muted-foreground/70">{description}</div>
+        <div className="mt-0.5 text-2xs text-muted-foreground/70">{description}</div>
       </div>
       <button
         onClick={onClick}

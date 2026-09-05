@@ -134,12 +134,12 @@ export function NetworkStoragePanel({
             >
               {t}
               {t === "configured" && shares.length > 0 && (
-                <span className="ml-1.5 rounded-full bg-primary/20 px-1.5 py-0.5 text-[10px] text-primary">
+                <span className="ml-1.5 rounded-full bg-primary/20 px-1.5 py-0.5 text-3xs text-primary">
                   {shares.length}
                 </span>
               )}
               {t === "discovered" && discoveredServers.length > 0 && (
-                <span className="ml-1.5 rounded-full bg-sky-500/20 px-1.5 py-0.5 text-[10px] text-sky-400">
+                <span className="ml-1.5 rounded-full bg-sky-500/20 px-1.5 py-0.5 text-3xs text-sky-400">
                   {discoveredServers.length}
                 </span>
               )}
@@ -206,7 +206,7 @@ export function NetworkStoragePanel({
                         {share.host}/{share.share}
                       </span>
                       {share.isMounted && (
-                        <span className="shrink-0 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
+                        <span className="shrink-0 rounded-full bg-emerald-500/15 px-2 py-0.5 text-3xs font-medium text-emerald-400">
                           Mounted
                         </span>
                       )}

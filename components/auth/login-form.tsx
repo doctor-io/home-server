@@ -219,15 +219,15 @@ export function LoginForm({ isDemoMode = false }: { isDemoMode?: boolean }) {
             className="relative z-10 size-[3.4rem] blur-[0.12px]"
           />
         </div>
-        <div className="system-pill-surface mt-2 px-3 py-1 text-[10px] tracking-[0.22em] text-foreground/54 uppercase">
+        <div className="system-pill-surface mt-2 px-3 py-1 text-3xs tracking-[0.22em] text-foreground/54 uppercase">
           Home server
         </div>
       </div>
 
-      <p className="text-[1.48rem] font-medium tracking-[-0.03em] text-foreground">
+      <p className="text-2xl font-medium tracking-[-0.03em] text-foreground">
         {stage.kind === "credentials" ? "Welcome back" : "Two-step verification"}
       </p>
-      <p className="mb-5 mt-1 text-[11px] tracking-[0.18em] text-muted-foreground/78 uppercase">
+      <p className="mb-5 mt-1 text-2xs tracking-[0.18em] text-muted-foreground/78 uppercase">
         {stage.kind === "credentials"
           ? "Sign in to continue"
           : stage.useBackupCode
@@ -273,7 +273,7 @@ export function LoginForm({ isDemoMode = false }: { isDemoMode?: boolean }) {
                   value={username}
                   onChange={(event) => setUsername(event.target.value)}
                   placeholder="Username"
-                  className="h-10 w-full border-0 bg-transparent px-1 text-[15px] text-foreground outline-none placeholder:text-muted-foreground/52"
+                  className="h-10 w-full border-0 bg-transparent px-1 text-base text-foreground outline-none placeholder:text-muted-foreground/52"
                   required
                   autoFocus
                 />
@@ -291,7 +291,7 @@ export function LoginForm({ isDemoMode = false }: { isDemoMode?: boolean }) {
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   placeholder="Password"
-                  className="h-10 w-full border-0 bg-transparent px-1 text-[15px] text-foreground outline-none placeholder:text-muted-foreground/52"
+                  className="h-10 w-full border-0 bg-transparent px-1 text-base text-foreground outline-none placeholder:text-muted-foreground/52"
                   required
                 />
                 <button
@@ -362,7 +362,7 @@ export function LoginForm({ isDemoMode = false }: { isDemoMode?: boolean }) {
                 value={totpCode}
                 onChange={(event) => setTotpCode(event.target.value)}
                 placeholder={stage.useBackupCode ? "Backup code" : "123 456"}
-                className="h-10 w-full border-0 bg-transparent px-1 text-[15px] tracking-[0.2em] text-foreground outline-none placeholder:text-muted-foreground/52"
+                className="h-10 w-full border-0 bg-transparent px-1 text-base tracking-[0.2em] text-foreground outline-none placeholder:text-muted-foreground/52"
                 autoFocus
                 required
               />
@@ -389,7 +389,7 @@ export function LoginForm({ isDemoMode = false }: { isDemoMode?: boolean }) {
             <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
           </button>
 
-          <div className="flex items-center justify-between text-[11px] text-muted-foreground/80">
+          <div className="flex items-center justify-between text-2xs text-muted-foreground/80">
             <button
               type="button"
               onClick={backToCredentials}

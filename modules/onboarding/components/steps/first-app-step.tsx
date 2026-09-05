@@ -74,13 +74,13 @@ export function FirstAppStep({ selectedAppId, onChange }: FirstAppStepProps) {
   return (
     <div className="system-soft-surface p-2.5 text-left">
       {phase === "loading" && (
-        <p className="px-1 py-3 text-center text-[12px] text-muted-foreground/70">
+        <p className="px-1 py-3 text-center text-xs text-muted-foreground/70">
           Loading the app store…
         </p>
       )}
 
       {phase === "unavailable" && (
-        <p className="px-1 py-2 text-[11px] leading-relaxed text-muted-foreground/70">
+        <p className="px-1 py-2 text-2xs leading-relaxed text-muted-foreground/70">
           The app store catalog is not available yet. Skip this — the store is on your dock
           once setup finishes.
         </p>
@@ -111,7 +111,7 @@ export function FirstAppStep({ selectedAppId, onChange }: FirstAppStepProps) {
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={app.logoUrl} alt="" className="size-full object-contain" />
                   ) : (
-                    <span className="text-[11px] text-foreground/70">
+                    <span className="text-2xs text-foreground/70">
                       {app.name.slice(0, 1).toUpperCase()}
                     </span>
                   )}

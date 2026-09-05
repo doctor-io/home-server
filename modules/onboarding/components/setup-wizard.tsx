@@ -217,10 +217,10 @@ export function SetupWizard({ initialState, onFinished }: SetupWizardProps) {
 
     return (
       <div className="w-full text-center" data-testid="setup-summary">
-        <p className="text-[1.48rem] font-medium tracking-[-0.03em] text-foreground">
+        <p className="text-2xl font-medium tracking-[-0.03em] text-foreground">
           Your server is ready
         </p>
-        <p className="mb-5 mt-1 text-[11px] tracking-[0.18em] text-muted-foreground/78 uppercase">
+        <p className="mb-5 mt-1 text-2xs tracking-[0.18em] text-muted-foreground/78 uppercase">
           Setup complete
         </p>
 
@@ -230,9 +230,9 @@ export function SetupWizard({ initialState, onFinished }: SetupWizardProps) {
               key={row.label}
               className="flex items-center gap-2 rounded-[var(--system-radius-control)] px-2.5 py-1.5"
             >
-              <span className="flex-grow text-[13px] text-foreground/85">{row.label}</span>
+              <span className="flex-grow text-sm text-foreground/85">{row.label}</span>
               <span
-                className={`truncate text-[12px] ${
+                className={`truncate text-xs ${
                   row.value ? "text-foreground/70" : "text-muted-foreground/50"
                 }`}
               >
@@ -251,7 +251,7 @@ export function SetupWizard({ initialState, onFinished }: SetupWizardProps) {
           Open Homeio
         </button>
 
-        <p className="mt-3 text-[11px] text-muted-foreground/60">
+        <p className="mt-3 text-2xs text-muted-foreground/60">
           Everything here can be changed later in Settings.
         </p>
       </div>
@@ -279,13 +279,13 @@ export function SetupWizard({ initialState, onFinished }: SetupWizardProps) {
         ))}
       </div>
 
-      <p className="text-[1.48rem] font-medium tracking-[-0.03em] text-foreground">
+      <p className="text-2xl font-medium tracking-[-0.03em] text-foreground">
         {current.title}
       </p>
-      <p className="mb-5 mt-1 text-[11px] tracking-[0.18em] text-muted-foreground/78 uppercase">
+      <p className="mb-5 mt-1 text-2xs tracking-[0.18em] text-muted-foreground/78 uppercase">
         Step {step} of {ONBOARDING_LAST_STEP}
       </p>
-      <p className="mx-auto mb-5 max-w-[22rem] text-[12px] leading-relaxed text-muted-foreground/72">
+      <p className="mx-auto mb-5 max-w-[22rem] text-xs leading-relaxed text-muted-foreground/72">
         {current.blurb}
       </p>
 
@@ -305,7 +305,7 @@ export function SetupWizard({ initialState, onFinished }: SetupWizardProps) {
       </div>
 
       {error && (
-        <p className="system-error-capsule mx-auto mb-4 text-[12px]" role="alert">
+        <p className="system-error-capsule mx-auto mb-4 text-xs" role="alert">
           {error}
         </p>
       )}

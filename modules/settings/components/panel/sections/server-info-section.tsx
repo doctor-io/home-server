@@ -84,7 +84,7 @@ function MemoryTab({ info }: { info: ServerHardwareInfo }) {
       {filledSlots.length > 0 && (
         <>
           <div className="border-t border-glass-border/40 px-4 pb-1 pt-3">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/50">Slots</span>
+            <span className="text-3xs font-semibold uppercase tracking-[0.14em] text-muted-foreground/50">Slots</span>
           </div>
           <div className="divide-y divide-glass-border/30 px-4">
             {filledSlots.map((slot, i) => (
@@ -92,8 +92,8 @@ function MemoryTab({ info }: { info: ServerHardwareInfo }) {
                 <span className="shrink-0 font-mono text-xs text-muted-foreground">{slot.bank ?? `Slot ${i + 1}`}</span>
                 <div className="text-right">
                   <div className="text-xs font-medium text-foreground">{formatBytes(slot.sizeBytes)}</div>
-                  {slot.manufacturer && <div className="text-[11px] text-muted-foreground/60">{slot.manufacturer}</div>}
-                  <div className="text-[11px] text-muted-foreground/50">
+                  {slot.manufacturer && <div className="text-2xs text-muted-foreground/60">{slot.manufacturer}</div>}
+                  <div className="text-2xs text-muted-foreground/50">
                     {[slot.type, slot.formFactor, slot.clockSpeedMhz ? `${slot.clockSpeedMhz} MHz` : null].filter(Boolean).join(" · ")}
                   </div>
                 </div>
@@ -119,9 +119,9 @@ function GpuTab({ info }: { info: ServerHardwareInfo }) {
           <div key={i} className="py-3">
             <div className="mb-1 text-xs font-medium text-foreground">{name}</div>
             <div className="flex flex-wrap gap-x-4 gap-y-0.5">
-              {ctrl.bus && <span className="text-[11px] text-muted-foreground/70">{ctrl.bus}</span>}
-              {ctrl.vramBytes && <span className="text-[11px] text-muted-foreground/70">VRAM {formatBytes(ctrl.vramBytes)}</span>}
-              {ctrl.subVendor && <span className="text-[11px] text-muted-foreground/70">{ctrl.subVendor}</span>}
+              {ctrl.bus && <span className="text-2xs text-muted-foreground/70">{ctrl.bus}</span>}
+              {ctrl.vramBytes && <span className="text-2xs text-muted-foreground/70">VRAM {formatBytes(ctrl.vramBytes)}</span>}
+              {ctrl.subVendor && <span className="text-2xs text-muted-foreground/70">{ctrl.subVendor}</span>}
             </div>
           </div>
         );
@@ -163,13 +163,13 @@ function ThermalTab({ metrics }: { metrics: SystemMetricsSnapshot | undefined })
       <div className="flex gap-6 border-b border-glass-border/40 px-4 py-3">
         {main != null && (
           <div>
-            <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground/60">CPU</div>
+            <div className="text-3xs uppercase tracking-[0.14em] text-muted-foreground/60">CPU</div>
             <div className={cn("mt-0.5 text-lg font-semibold tabular-nums", tempColor(main))}>{main}°C</div>
           </div>
         )}
         {max != null && (
           <div>
-            <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground/60">Max</div>
+            <div className="text-3xs uppercase tracking-[0.14em] text-muted-foreground/60">Max</div>
             <div className={cn("mt-0.5 text-lg font-semibold tabular-nums", tempColor(max))}>{max}°C</div>
           </div>
         )}
@@ -178,15 +178,15 @@ function ThermalTab({ metrics }: { metrics: SystemMetricsSnapshot | undefined })
       {/* Per-core grid */}
       {cores.length > 0 && (
         <div className="px-4 pb-3 pt-3">
-          <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/50">
+          <div className="mb-2 text-3xs font-semibold uppercase tracking-[0.14em] text-muted-foreground/50">
             Cores
           </div>
           <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 sm:grid-cols-3">
             {cores.map((c, i) => (
               <div key={i}>
                 <div className="mb-1 flex items-center justify-between">
-                  <span className="text-[11px] text-muted-foreground/70">Core {i}</span>
-                  <span className={cn("text-[11px] font-medium tabular-nums", tempColor(c))}>{c}°C</span>
+                  <span className="text-2xs text-muted-foreground/70">Core {i}</span>
+                  <span className={cn("text-2xs font-medium tabular-nums", tempColor(c))}>{c}°C</span>
                 </div>
                 <div className="h-1 overflow-hidden rounded-full bg-background/50">
                   <div
@@ -218,12 +218,12 @@ function NetworkTab({ info }: { info: ServerHardwareInfo }) {
           <div className="mb-2 flex items-center gap-2">
             <span className="font-mono text-xs font-semibold text-foreground">{iface.iface}</span>
             {iface.type && (
-              <span className="rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide bg-background/60 text-muted-foreground/70">
+              <span className="rounded px-1.5 py-0.5 text-3xs font-medium uppercase tracking-wide bg-background/60 text-muted-foreground/70">
                 {iface.type}
               </span>
             )}
             {iface.isDefault && (
-              <span className="rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide bg-primary/15 text-primary">
+              <span className="rounded px-1.5 py-0.5 text-3xs font-medium uppercase tracking-wide bg-primary/15 text-primary">
                 default
               </span>
             )}
@@ -232,7 +232,7 @@ function NetworkTab({ info }: { info: ServerHardwareInfo }) {
                 "size-1.5 rounded-full",
                 iface.operstate === "up" ? "bg-status-green" : iface.operstate === "down" ? "bg-status-red" : "bg-muted-foreground/30",
               )} />
-              <span className="text-[11px] text-muted-foreground/60">{iface.operstate ?? "unknown"}</span>
+              <span className="text-2xs text-muted-foreground/60">{iface.operstate ?? "unknown"}</span>
             </div>
           </div>
 
@@ -240,33 +240,33 @@ function NetworkTab({ info }: { info: ServerHardwareInfo }) {
           <div className="space-y-0.5">
             {iface.ip4 && (
               <div className="flex justify-between gap-4">
-                <span className="text-[11px] text-muted-foreground/60">IPv4</span>
-                <span className="font-mono text-[11px] text-foreground/80">
+                <span className="text-2xs text-muted-foreground/60">IPv4</span>
+                <span className="font-mono text-2xs text-foreground/80">
                   {iface.ip4}{iface.ip4subnet ? `/${iface.ip4subnet}` : ""}
                 </span>
               </div>
             )}
             {iface.ip6 && (
               <div className="flex justify-between gap-4">
-                <span className="shrink-0 text-[11px] text-muted-foreground/60">IPv6</span>
-                <span className="max-w-[70%] break-all font-mono text-[11px] text-foreground/80">{iface.ip6}</span>
+                <span className="shrink-0 text-2xs text-muted-foreground/60">IPv6</span>
+                <span className="max-w-[70%] break-all font-mono text-2xs text-foreground/80">{iface.ip6}</span>
               </div>
             )}
             {iface.mac && (
               <div className="flex justify-between gap-4">
-                <span className="text-[11px] text-muted-foreground/60">MAC</span>
-                <span className="font-mono text-[11px] text-foreground/80">{iface.mac}</span>
+                <span className="text-2xs text-muted-foreground/60">MAC</span>
+                <span className="font-mono text-2xs text-foreground/80">{iface.mac}</span>
               </div>
             )}
             <div className="flex gap-4">
               {iface.speedMbps && (
-                <span className="text-[11px] text-muted-foreground/60">{iface.speedMbps} Mbps</span>
+                <span className="text-2xs text-muted-foreground/60">{iface.speedMbps} Mbps</span>
               )}
               {iface.duplex && (
-                <span className="text-[11px] text-muted-foreground/60">{iface.duplex} duplex</span>
+                <span className="text-2xs text-muted-foreground/60">{iface.duplex} duplex</span>
               )}
               {iface.dhcp && (
-                <span className="text-[11px] text-muted-foreground/60">DHCP</span>
+                <span className="text-2xs text-muted-foreground/60">DHCP</span>
               )}
             </div>
           </div>
@@ -355,7 +355,7 @@ export function ServerInfoSection() {
           </button>
         ))}
         {info && (
-          <span className="ml-auto text-[10px] text-muted-foreground/40">
+          <span className="ml-auto text-3xs text-muted-foreground/40">
             {new Date(info.fetchedAt).toLocaleTimeString()}
           </span>
         )}

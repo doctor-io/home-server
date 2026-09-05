@@ -328,14 +328,14 @@ export function AppLogsDialog({ target, onClose }: AppLogsDialogProps) {
                   {line.level ? (
                     <span
                       className={cn(
-                        "shrink-0 px-1 py-px text-[10px] font-semibold rounded border leading-none",
+                        "shrink-0 px-1 py-px text-3xs font-semibold rounded border leading-none",
                         LEVEL_CLASSES[line.level],
                       )}
                     >
                       {line.level}
                     </span>
                   ) : line.stream === "stderr" ? (
-                    <span className="shrink-0 px-1 py-px text-[10px] font-semibold rounded border leading-none bg-status-red/15 text-status-red border-status-red/25">
+                    <span className="shrink-0 px-1 py-px text-3xs font-semibold rounded border leading-none bg-status-red/15 text-status-red border-status-red/25">
                       ERR
                     </span>
                   ) : (

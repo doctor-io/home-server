@@ -69,11 +69,11 @@ export function StorageSection({ data, onOpenDiskManager }: StorageSectionProps)
           <div className="flex-1">
             <p className="flex items-center gap-2 text-sm font-medium text-foreground">
               Disk & Partition Manager
-              <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-400">
+              <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-3xs font-medium text-amber-400">
                 Experimental
               </span>
             </p>
-            <p className="text-[11px] text-muted-foreground/70">
+            <p className="text-2xs text-muted-foreground/70">
               Format, mount, and manage partitions
             </p>
           </div>
@@ -98,7 +98,7 @@ export function StorageSection({ data, onOpenDiskManager }: StorageSectionProps)
             { label: "Total", value: formatStorageSize(data.totalBytes) },
           ].map(({ label, value }) => (
             <div key={label}>
-              <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground/60">{label}</div>
+              <div className="text-3xs uppercase tracking-[0.14em] text-muted-foreground/60">{label}</div>
               <div className="mt-0.5 text-xs font-medium text-foreground">{value}</div>
             </div>
           ))}
@@ -178,10 +178,10 @@ export function StorageSection({ data, onOpenDiskManager }: StorageSectionProps)
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="text-xs font-medium text-foreground">{share.name}</div>
-                  <div className="font-mono text-[11px] text-muted-foreground/70">{share.path}</div>
+                  <div className="font-mono text-2xs text-muted-foreground/70">{share.path}</div>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  <span className="text-[11px] text-muted-foreground">{share.protocol}</span>
+                  <span className="text-2xs text-muted-foreground">{share.protocol}</span>
                   <div className={cn(
                     "size-1.5 rounded-full",
                     share.status === "Mounted" ? "bg-status-green" : share.status === "Partially configured" ? "bg-status-amber" : "bg-muted-foreground/40",
@@ -192,7 +192,7 @@ export function StorageSection({ data, onOpenDiskManager }: StorageSectionProps)
           </div>
         )}
         <div className="flex items-center justify-between border-t border-glass-border/50 px-4 py-2">
-          <span className="text-[11px] text-muted-foreground/60">{data.localShareCount} local · {data.networkShareCount} network</span>
+          <span className="text-2xs text-muted-foreground/60">{data.localShareCount} local · {data.networkShareCount} network</span>
         </div>
       </div>
 
@@ -210,7 +210,7 @@ export function StorageSection({ data, onOpenDiskManager }: StorageSectionProps)
               <span className="text-sm font-medium text-foreground">{smartData.message}</span>
             </div>
             {smartCheckedLabel && (
-              <span className="text-[11px] text-muted-foreground/60">{smartCheckedLabel}</span>
+              <span className="text-2xs text-muted-foreground/60">{smartCheckedLabel}</span>
             )}
           </div>
           {smartData.disks.length > 0 && (
@@ -222,9 +222,9 @@ export function StorageSection({ data, onOpenDiskManager }: StorageSectionProps)
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="font-mono text-xs font-medium text-foreground">{disk.device}</div>
-                    {disk.name && <div className="text-[11px] text-muted-foreground/70">{disk.name}</div>}
+                    {disk.name && <div className="text-2xs text-muted-foreground/70">{disk.name}</div>}
                   </div>
-                  <div className="flex shrink-0 items-center gap-2 text-[11px] text-muted-foreground">
+                  <div className="flex shrink-0 items-center gap-2 text-2xs text-muted-foreground">
                     {disk.type && <span>{disk.type}</span>}
                     {disk.sizeBytes != null && <span>{formatStorageSize(disk.sizeBytes)}</span>}
                     {disk.temperatureCelsius != null && (

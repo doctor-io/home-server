@@ -66,19 +66,19 @@ export function RemoteAccessStep({ onConnectedChange }: RemoteAccessStepProps) {
   return (
     <div className="system-soft-surface p-2.5 text-left">
       {phase === "loading" && (
-        <p className="px-1 py-3 text-center text-[12px] text-muted-foreground/70">
+        <p className="px-1 py-3 text-center text-xs text-muted-foreground/70">
           Checking Tailscale…
         </p>
       )}
 
       {phase === "installing" && (
-        <p className="px-1 py-3 text-center text-[12px] text-muted-foreground/70">
+        <p className="px-1 py-3 text-center text-xs text-muted-foreground/70">
           Installing and activating — this can take a minute…
         </p>
       )}
 
       {phase === "unavailable" && (
-        <p className="px-1 py-2 text-[11px] leading-relaxed text-muted-foreground/70">
+        <p className="px-1 py-2 text-2xs leading-relaxed text-muted-foreground/70">
           Tailscale status is unavailable on this host. Skip for now and set up remote
           access later from Settings → Integrations.
         </p>
@@ -98,8 +98,8 @@ export function RemoteAccessStep({ onConnectedChange }: RemoteAccessStepProps) {
               }`}
             />
             <span className="min-w-0 flex-grow">
-              <span className="block text-[14px] font-medium text-foreground">Tailscale</span>
-              <span className="block truncate text-[11px] text-muted-foreground/80">
+              <span className="block text-sm font-medium text-foreground">Tailscale</span>
+              <span className="block truncate text-2xs text-muted-foreground/80">
                 {status.connected
                   ? "Connected"
                   : status.installed
@@ -110,7 +110,7 @@ export function RemoteAccessStep({ onConnectedChange }: RemoteAccessStepProps) {
           </div>
 
           {status.connected && status.dnsName && (
-            <p className="mt-2 px-1 text-[11px] text-muted-foreground/70">
+            <p className="mt-2 px-1 text-2xs text-muted-foreground/70">
               Reachable at{" "}
               <span className="font-mono text-foreground/85">{status.dnsName}</span>
               {status.tailscaleIps[0] ? ` · ${status.tailscaleIps[0]}` : ""}
@@ -118,7 +118,7 @@ export function RemoteAccessStep({ onConnectedChange }: RemoteAccessStepProps) {
           )}
 
           {status.issue && (
-            <p className="mt-2 rounded-[var(--system-radius-control)] border border-status-amber/20 bg-status-amber/10 px-2.5 py-2 text-[11px] leading-relaxed text-status-amber">
+            <p className="mt-2 rounded-[var(--system-radius-control)] border border-status-amber/20 bg-status-amber/10 px-2.5 py-2 text-2xs leading-relaxed text-status-amber">
               {ISSUE_HELP[status.issue]}
             </p>
           )}
@@ -127,14 +127,14 @@ export function RemoteAccessStep({ onConnectedChange }: RemoteAccessStepProps) {
             <button
               type="button"
               onClick={install}
-              className="mt-2 w-full cursor-pointer rounded-[var(--system-radius-control)] border border-white/8 bg-white/[0.06] px-3 py-2 text-[13px] font-medium text-foreground transition-colors hover:bg-white/[0.09]"
+              className="mt-2 w-full cursor-pointer rounded-[var(--system-radius-control)] border border-white/8 bg-white/[0.06] px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-white/[0.09]"
             >
               {status.installed ? "Activate Tailscale" : "Install and activate"}
             </button>
           )}
 
           {error && (
-            <p className="mt-2 px-1 text-[11px] text-status-red" role="alert">
+            <p className="mt-2 px-1 text-2xs text-status-red" role="alert">
               {error}
             </p>
           )}

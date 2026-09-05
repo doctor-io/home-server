@@ -76,15 +76,15 @@ function DiskCard({ disk, selected, onClick }: { disk: DiskDevice; selected: boo
     >
       <div className="flex items-center gap-2">
         <HardDriveRegular className={cn("size-3.5 shrink-0", selected ? "text-primary" : badge.color)} />
-        <span className="truncate text-[13px] font-medium">{disk.device}</span>
+        <span className="truncate text-sm font-medium">{disk.device}</span>
       </div>
       {disk.model && (
-        <p className="truncate pl-5 text-[11px] text-muted-foreground/70">{disk.model}</p>
+        <p className="truncate pl-5 text-2xs text-muted-foreground/70">{disk.model}</p>
       )}
       <div className="flex items-center gap-2 pl-5">
-        <span className={cn("text-[11px] font-medium", badge.color)}>{badge.label}</span>
-        <span className="text-[11px] text-muted-foreground/60">{formatBytes(disk.sizeBytes)}</span>
-        <span className="text-[11px] text-muted-foreground/40">{disk.partitions.length}p</span>
+        <span className={cn("text-2xs font-medium", badge.color)}>{badge.label}</span>
+        <span className="text-2xs text-muted-foreground/60">{formatBytes(disk.sizeBytes)}</span>
+        <span className="text-2xs text-muted-foreground/40">{disk.partitions.length}p</span>
       </div>
     </button>
   );
@@ -148,12 +148,12 @@ function ConfirmBanner({
   return (
     <div className="flex items-center gap-3 rounded-xl border border-status-red/30 bg-status-red/10 px-4 py-2.5">
       <WarningRegular className="size-4 shrink-0 text-status-red" />
-      <p className="flex-1 text-[12px] text-foreground">{messages[state.type]}</p>
+      <p className="flex-1 text-xs text-foreground">{messages[state.type]}</p>
       <div className="flex items-center gap-1.5">
         <button
           onClick={onCancel}
           disabled={isPending}
-          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-background/60 hover:text-foreground"
+          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-background/60 hover:text-foreground"
         >
           <DismissRegular className="size-3.5" />
           Cancel
@@ -161,7 +161,7 @@ function ConfirmBanner({
         <button
           onClick={onConfirm}
           disabled={isPending}
-          className="flex items-center gap-1.5 rounded-lg bg-status-red/20 px-3 py-1.5 text-[12px] font-medium text-status-red transition-colors hover:bg-status-red/30 disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded-lg bg-status-red/20 px-3 py-1.5 text-xs font-medium text-status-red transition-colors hover:bg-status-red/30 disabled:opacity-50"
         >
           <CheckmarkRegular className="size-3.5" />
           {isPending ? "Working…" : "Confirm"}
@@ -190,17 +190,17 @@ function MountForm({
 
   return (
     <div className={cn(PANEL_INSET, "flex flex-col gap-3 p-3")}>
-      <p className="text-[12px] font-medium text-foreground">Mount {device}</p>
+      <p className="text-xs font-medium text-foreground">Mount {device}</p>
       <div className="flex flex-col gap-1.5">
-        <label className="text-[11px] text-muted-foreground">Mount point</label>
+        <label className="text-2xs text-muted-foreground">Mount point</label>
         <input
           value={mountPoint}
           onChange={(e) => setMountPoint(e.target.value)}
-          className="rounded-lg border border-glass-border bg-background/55 px-3 py-1.5 text-[12px] text-foreground outline-none focus:border-primary/40"
+          className="rounded-lg border border-glass-border bg-background/55 px-3 py-1.5 text-xs text-foreground outline-none focus:border-primary/40"
           placeholder="/mnt/data"
         />
       </div>
-      <label className="flex items-center gap-2 text-[12px] text-muted-foreground">
+      <label className="flex items-center gap-2 text-xs text-muted-foreground">
         <input
           type="checkbox"
           checked={addToFstab}
@@ -212,14 +212,14 @@ function MountForm({
       <div className="flex items-center justify-end gap-1.5">
         <button
           onClick={onCancel}
-          className="rounded-lg px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-background/60 hover:text-foreground"
+          className="rounded-lg px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-background/60 hover:text-foreground"
         >
           Cancel
         </button>
         <button
           onClick={() => onMount(mountPoint, addToFstab)}
           disabled={isPending || !mountPoint.startsWith("/")}
-          className="rounded-lg bg-primary/20 px-3 py-1.5 text-[12px] font-medium text-primary transition-colors hover:bg-primary/30 disabled:opacity-50"
+          className="rounded-lg bg-primary/20 px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/30 disabled:opacity-50"
         >
           {isPending ? "Mounting…" : "Mount"}
         </button>
@@ -244,14 +244,14 @@ function FormatForm({
 
   return (
     <div className={cn(PANEL_INSET, "flex flex-col gap-3 p-3")}>
-      <p className="text-[12px] font-medium text-foreground">Format {device}</p>
+      <p className="text-xs font-medium text-foreground">Format {device}</p>
       <div className="flex gap-3">
         <div className="flex flex-1 flex-col gap-1.5">
-          <label className="text-[11px] text-muted-foreground">Filesystem</label>
+          <label className="text-2xs text-muted-foreground">Filesystem</label>
           <select
             value={filesystem}
             onChange={(e) => setFilesystem(e.target.value as DiskFilesystem)}
-            className="rounded-lg border border-glass-border bg-background/55 px-3 py-1.5 text-[12px] text-foreground outline-none focus:border-primary/40"
+            className="rounded-lg border border-glass-border bg-background/55 px-3 py-1.5 text-xs text-foreground outline-none focus:border-primary/40"
           >
             {DISK_FILESYSTEMS.map((fs) => (
               <option key={fs} value={fs}>{fs}</option>
@@ -259,25 +259,25 @@ function FormatForm({
           </select>
         </div>
         <div className="flex flex-1 flex-col gap-1.5">
-          <label className="text-[11px] text-muted-foreground">Label (optional)</label>
+          <label className="text-2xs text-muted-foreground">Label (optional)</label>
           <input
             value={label}
             onChange={(e) => setLabel(e.target.value)}
             placeholder="data"
-            className="rounded-lg border border-glass-border bg-background/55 px-3 py-1.5 text-[12px] text-foreground outline-none focus:border-primary/40"
+            className="rounded-lg border border-glass-border bg-background/55 px-3 py-1.5 text-xs text-foreground outline-none focus:border-primary/40"
           />
         </div>
       </div>
       <div className="flex items-center justify-end gap-1.5">
         <button
           onClick={onCancel}
-          className="rounded-lg px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-background/60 hover:text-foreground"
+          className="rounded-lg px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-background/60 hover:text-foreground"
         >
           Cancel
         </button>
         <button
           onClick={() => onFormat(filesystem, label)}
-          className="rounded-lg bg-status-amber/20 px-3 py-1.5 text-[12px] font-medium text-status-amber transition-colors hover:bg-status-amber/30"
+          className="rounded-lg bg-status-amber/20 px-3 py-1.5 text-xs font-medium text-status-amber transition-colors hover:bg-status-amber/30"
         >
           Continue →
         </button>
@@ -304,37 +304,37 @@ function CreatePartitionForm({
 
   return (
     <div className={cn(PANEL_INSET, "flex flex-col gap-3 p-3")}>
-      <p className="text-[12px] font-medium text-foreground">New partition on {disk}</p>
+      <p className="text-xs font-medium text-foreground">New partition on {disk}</p>
       <div className="flex gap-3">
         {[
           { label: "Start", value: start, setter: setStart, placeholder: "1MiB or 0%" },
           { label: "End", value: end, setter: setEnd, placeholder: "100% or 50GiB" },
         ].map(({ label, value, setter, placeholder }) => (
           <div key={label} className="flex flex-1 flex-col gap-1.5">
-            <label className="text-[11px] text-muted-foreground">{label}</label>
+            <label className="text-2xs text-muted-foreground">{label}</label>
             <input
               value={value}
               onChange={(e) => setter(e.target.value)}
               placeholder={placeholder}
-              className="rounded-lg border border-glass-border bg-background/55 px-3 py-1.5 text-[12px] font-mono text-foreground outline-none focus:border-primary/40"
+              className="rounded-lg border border-glass-border bg-background/55 px-3 py-1.5 text-xs font-mono text-foreground outline-none focus:border-primary/40"
             />
           </div>
         ))}
       </div>
-      <p className="text-[11px] text-muted-foreground/60">
+      <p className="text-2xs text-muted-foreground/60">
         Use % for proportional (e.g. 0%, 100%) or size units (1MiB, 50GiB).
       </p>
       <div className="flex items-center justify-end gap-1.5">
         <button
           onClick={onCancel}
-          className="rounded-lg px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-background/60 hover:text-foreground"
+          className="rounded-lg px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-background/60 hover:text-foreground"
         >
           Cancel
         </button>
         <button
           onClick={() => onCreate(start, end)}
           disabled={isPending}
-          className="rounded-lg bg-primary/20 px-3 py-1.5 text-[12px] font-medium text-primary transition-colors hover:bg-primary/30 disabled:opacity-50"
+          className="rounded-lg bg-primary/20 px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/30 disabled:opacity-50"
         >
           {isPending ? "Creating…" : "Create"}
         </button>
@@ -510,12 +510,12 @@ function DiskDetail({ disk }: { disk: DiskDevice }) {
           <p className="truncate text-sm font-semibold text-foreground">
             {disk.model ?? disk.device}
           </p>
-          <p className="font-mono text-[11px] text-muted-foreground/70">
+          <p className="font-mono text-2xs text-muted-foreground/70">
             {disk.device} · {formatBytes(disk.sizeBytes)} · {MEDIA_BADGE[disk.mediaType]?.label ?? "Disk"}
           </p>
         </div>
         {disk.serial && (
-          <span className="font-mono text-[11px] text-muted-foreground/50">{disk.serial}</span>
+          <span className="font-mono text-2xs text-muted-foreground/50">{disk.serial}</span>
         )}
       </div>
 
@@ -526,7 +526,7 @@ function DiskDetail({ disk }: { disk: DiskDevice }) {
 
       {/* Partition table */}
       <div className={cn(PANEL_INSET, "overflow-hidden")}>
-        <div className="grid grid-cols-[1.4fr_0.9fr_0.8fr_1.2fr_auto] gap-3 border-b border-glass-border/50 px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/50">
+        <div className="grid grid-cols-[1.4fr_0.9fr_0.8fr_1.2fr_auto] gap-3 border-b border-glass-border/50 px-4 py-2 text-3xs font-semibold uppercase tracking-[0.14em] text-muted-foreground/50">
           <span>Partition</span>
           <span>Filesystem</span>
           <span>Size</span>
@@ -596,7 +596,7 @@ function DiskDetail({ disk }: { disk: DiskDevice }) {
         <button
           onClick={() => setActiveForm({ type: "create-partition" })}
           disabled={anyPending}
-          className="flex items-center gap-1.5 rounded-xl border border-glass-border bg-background/40 px-3 py-2 text-[12px] text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground disabled:opacity-40"
+          className="flex items-center gap-1.5 rounded-xl border border-glass-border bg-background/40 px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground disabled:opacity-40"
         >
           <AddRegular className="size-3.5" />
           Create Partition
@@ -604,7 +604,7 @@ function DiskDetail({ disk }: { disk: DiskDevice }) {
         <button
           onClick={() => setConfirmState({ type: "wipe", disk: disk.device })}
           disabled={anyPending}
-          className="flex items-center gap-1.5 rounded-xl border border-status-red/25 bg-status-red/8 px-3 py-2 text-[12px] text-status-red transition-colors hover:bg-status-red/15 disabled:opacity-40"
+          className="flex items-center gap-1.5 rounded-xl border border-status-red/25 bg-status-red/8 px-3 py-2 text-xs text-status-red transition-colors hover:bg-status-red/15 disabled:opacity-40"
         >
           <WarningRegular className="size-3.5" />
           Wipe Disk
@@ -627,13 +627,13 @@ export function DiskManager() {
     <div className="flex h-full flex-col">
       {/* Header */}
       <div className="flex shrink-0 items-center justify-between border-b border-glass-border/60 px-4 py-2.5">
-        <span className="text-[13px] font-medium text-foreground">
+        <span className="text-sm font-medium text-foreground">
           {isLoading ? "Loading…" : `${disks.length} disk${disks.length !== 1 ? "s" : ""} detected`}
         </span>
         <button
           onClick={() => refetch()}
           disabled={isRefetching}
-          className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-background/60 hover:text-foreground disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-background/60 hover:text-foreground disabled:opacity-50"
         >
           <ArrowSyncRegular className={cn("size-3.5", isRefetching && "animate-spin")} />
           Refresh

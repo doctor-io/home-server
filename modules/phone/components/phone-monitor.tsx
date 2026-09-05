@@ -117,7 +117,7 @@ function HistoryChart({
   if (values.length < 2) {
     return (
       <div className="flex h-40 items-center justify-center rounded-3xl bg-white/4">
-        <span className="text-[12px] text-muted-foreground">Collecting…</span>
+        <span className="text-xs text-muted-foreground">Collecting…</span>
       </div>
     );
   }
@@ -160,8 +160,8 @@ function HistoryChart({
         style={{ left: markerLeft, top: `${markerY}%` }}
       >
         <div className="rounded-xl bg-[#1a1d22] px-2.5 py-1.5 text-center shadow-lg shadow-black/40 ring-1 ring-white/8">
-          <p className="text-[9px] whitespace-nowrap text-muted-foreground">now</p>
-          <p className="text-[12px] font-medium tabular-nums">
+          <p className="text-3xs whitespace-nowrap text-muted-foreground">now</p>
+          <p className="text-xs font-medium tabular-nums">
             {latest.toFixed(decimals)}
             {unit}
           </p>
@@ -188,8 +188,8 @@ function toneFor(percent: number | null) {
 function Chip({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex min-w-0 flex-1 flex-col items-center gap-1.5 rounded-2xl bg-white/4 px-2 py-3">
-      <span className="text-[10px] text-muted-foreground">{label}</span>
-      <span className="w-full truncate text-center text-[14px] font-medium tabular-nums">
+      <span className="text-3xs text-muted-foreground">{label}</span>
+      <span className="w-full truncate text-center text-sm font-medium tabular-nums">
         {value}
       </span>
     </div>
@@ -210,8 +210,8 @@ function Stat({
   return (
     <div className="flex flex-1 flex-col items-center gap-1.5">
       <Icon className="size-4 opacity-60 grayscale" />
-      <span className={cn("text-[14px] font-medium tabular-nums", toneFor(percent))}>{value}</span>
-      <span className="text-[10px] text-muted-foreground">{label}</span>
+      <span className={cn("text-sm font-medium tabular-nums", toneFor(percent))}>{value}</span>
+      <span className="text-3xs text-muted-foreground">{label}</span>
     </div>
   );
 }
@@ -219,8 +219,8 @@ function Stat({
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3 border-b border-white/5 px-3.5 py-2.5 last:border-b-0">
-      <span className="shrink-0 text-[12px] text-muted-foreground">{label}</span>
-      <span className="truncate font-mono text-[12px]" title={value}>
+      <span className="shrink-0 text-xs text-muted-foreground">{label}</span>
+      <span className="truncate font-mono text-xs" title={value}>
         {value}
       </span>
     </div>
@@ -364,7 +364,7 @@ export function PhoneMonitor() {
     <div className="flex min-h-0 flex-1 flex-col gap-3.5">
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[11px] text-muted-foreground">Monitoring</p>
+          <p className="text-2xs text-muted-foreground">Monitoring</p>
           <h1 className="truncate text-lg font-medium">{metrics?.hostname ?? "This server"}</h1>
         </div>
         <Activity className="mt-1 size-5 opacity-40 grayscale" />
@@ -373,12 +373,12 @@ export function PhoneMonitor() {
       {/* The headline reading, sized to be read from across the room — the
           number you open this screen for. */}
       <section className="rounded-3xl bg-white/5 px-5 py-4">
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-2xs text-muted-foreground">
           {metrics ? `Up ${formatUptime(metrics.uptimeSeconds)}` : "Reading…"}
         </p>
         <div className="mt-1 flex items-end justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-[13px] font-medium">{hero[tab].label}</p>
+            <p className="text-sm font-medium">{hero[tab].label}</p>
             <p
               className={cn(
                 "mt-1 truncate text-[2.75rem] leading-none font-medium tabular-nums",
@@ -424,7 +424,7 @@ export function PhoneMonitor() {
           >
             <span
               className={cn(
-                "text-[13px] whitespace-nowrap transition-colors",
+                "text-sm whitespace-nowrap transition-colors",
                 tab === option.key ? "font-medium" : "text-muted-foreground",
               )}
             >
@@ -468,10 +468,10 @@ export function PhoneMonitor() {
           <>
             <div className="rounded-3xl bg-white/4 px-4 py-3.5">
               <div className="flex items-baseline justify-between">
-                <span className="truncate font-mono text-[12px] text-muted-foreground">
+                <span className="truncate font-mono text-xs text-muted-foreground">
                   {storage?.mountPath ?? "—"}
                 </span>
-                <span className={cn("text-[13px] font-medium tabular-nums", toneFor(storage?.usedPercent ?? null))}>
+                <span className={cn("text-sm font-medium tabular-nums", toneFor(storage?.usedPercent ?? null))}>
                   {storage ? `${Math.round(storage.usedPercent)}%` : "—"}
                 </span>
               </div>
@@ -485,12 +485,12 @@ export function PhoneMonitor() {
                 {volumes.map((volume) => (
                   <li key={volume.id} className="border-b border-white/5 px-3.5 py-3 last:border-b-0">
                     <div className="flex items-center justify-between gap-3">
-                      <span className="min-w-0 flex-1 truncate text-[13px]">{volume.label}</span>
-                      <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
+                      <span className="min-w-0 flex-1 truncate text-sm">{volume.label}</span>
+                      <span className="shrink-0 text-2xs text-muted-foreground tabular-nums">
                         {formatSize(volume.usedBytes)} / {formatSize(volume.totalBytes)}
                       </span>
                     </div>
-                    <p className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground/60">
+                    <p className="mt-0.5 truncate font-mono text-2xs text-muted-foreground/60">
                       {volume.mountPath}
                     </p>
                     <div className="mt-2">
@@ -506,11 +506,11 @@ export function PhoneMonitor() {
         {tab === "containers" && (
           <>
             {daemonAvailable === false ? (
-              <p className="rounded-2xl bg-white/4 px-3.5 py-3 text-[12px] text-status-amber">
+              <p className="rounded-2xl bg-white/4 px-3.5 py-3 text-xs text-status-amber">
                 The Docker daemon is not reachable.
               </p>
             ) : stats.length === 0 ? (
-              <p className="rounded-2xl bg-white/4 px-3.5 py-3 text-[12px] text-muted-foreground">
+              <p className="rounded-2xl bg-white/4 px-3.5 py-3 text-xs text-muted-foreground">
                 No containers running.
               </p>
             ) : (
@@ -527,8 +527,8 @@ export function PhoneMonitor() {
                         container.state === "running" ? "bg-status-green" : "bg-white/25",
                       )}
                     />
-                    <span className="min-w-0 flex-1 truncate text-[13px]">{container.name}</span>
-                    <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
+                    <span className="min-w-0 flex-1 truncate text-sm">{container.name}</span>
+                    <span className="shrink-0 text-2xs text-muted-foreground tabular-nums">
                       {container.cpuPercent.toFixed(1)}% · {formatMb(container.memoryUsed)}
                     </span>
                   </li>

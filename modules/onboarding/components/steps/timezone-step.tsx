@@ -65,7 +65,7 @@ export function TimezoneStep({ value, onChange }: TimezoneStepProps) {
     <div className="system-soft-surface p-2.5 text-left">
       <label
         htmlFor="setup-timezone"
-        className="mb-1.5 block px-1 text-[11px] tracking-[0.18em] text-muted-foreground/70 uppercase"
+        className="mb-1.5 block px-1 text-2xs tracking-[0.18em] text-muted-foreground/70 uppercase"
       >
         Time zone
       </label>
@@ -74,7 +74,7 @@ export function TimezoneStep({ value, onChange }: TimezoneStepProps) {
         id="setup-timezone"
         value={selected}
         onChange={(event) => onChange(event.target.value)}
-        className="h-11 w-full cursor-pointer rounded-[var(--system-radius-control)] border border-white/6 bg-white/[0.035] px-3 text-[15px] text-foreground outline-none transition-colors hover:bg-white/[0.05] focus:bg-white/[0.05]"
+        className="h-11 w-full cursor-pointer rounded-[var(--system-radius-control)] border border-white/6 bg-white/[0.035] px-3 text-base text-foreground outline-none transition-colors hover:bg-white/[0.05] focus:bg-white/[0.05]"
       >
         {zones.map((zone) => (
           <option key={zone} value={zone} className="bg-neutral-900">
@@ -85,7 +85,7 @@ export function TimezoneStep({ value, onChange }: TimezoneStepProps) {
       </select>
 
       {preview && (
-        <p className="mt-2 px-1 text-[11px] text-muted-foreground/70">
+        <p className="mt-2 px-1 text-2xs text-muted-foreground/70">
           Server clock would read <span className="text-foreground/80">{preview}</span>
         </p>
       )}

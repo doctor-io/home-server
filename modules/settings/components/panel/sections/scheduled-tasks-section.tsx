@@ -84,7 +84,7 @@ function buildCron(form: TaskFormState): string {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground/70">
+      <label className="text-2xs font-medium uppercase tracking-[0.14em] text-muted-foreground/70">
         {label}
       </label>
       {children}
@@ -128,7 +128,7 @@ function TaskRow({
         </div>
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-medium text-foreground">{task.label}</div>
-          <div className="truncate text-[11px] text-muted-foreground/70">
+          <div className="truncate text-2xs text-muted-foreground/70">
             {TASK_TYPE_LABELS[task.taskType]} · <span className="font-mono">{task.cronExpression}</span>
           </div>
         </div>
@@ -145,22 +145,22 @@ function TaskRow({
           {/* Info rows */}
           <div className="mb-3 divide-y divide-glass-border/40">
             <div className="flex items-center justify-between py-1.5">
-              <span className="text-[11px] text-muted-foreground">Last run</span>
-              <span className={cn("text-[11px] font-medium", task.lastRunStatus === "error" ? "text-status-red" : "text-foreground")}>
+              <span className="text-2xs text-muted-foreground">Last run</span>
+              <span className={cn("text-2xs font-medium", task.lastRunStatus === "error" ? "text-status-red" : "text-foreground")}>
                 {formatRelative(task.lastRunAt)}
               </span>
             </div>
             <div className="flex items-center justify-between py-1.5">
-              <span className="text-[11px] text-muted-foreground">Next run</span>
-              <span className="text-[11px] font-medium text-foreground">
+              <span className="text-2xs text-muted-foreground">Next run</span>
+              <span className="text-2xs font-medium text-foreground">
                 {task.nextRunAt ? formatRelative(task.nextRunAt, true) : "—"}
               </span>
             </div>
             {task.lastRunOutput && (
               <div className="py-1.5">
-                <span className="text-[11px] text-muted-foreground">Output</span>
+                <span className="text-2xs text-muted-foreground">Output</span>
                 <div className={cn(
-                  "mt-1 rounded-md border border-glass-border/50 bg-background/40 px-2.5 py-2 font-mono text-[11px] break-all",
+                  "mt-1 rounded-md border border-glass-border/50 bg-background/40 px-2.5 py-2 font-mono text-2xs break-all",
                   task.lastRunStatus === "error" ? "text-status-red" : "text-foreground/80",
                 )}>
                   {task.lastRunOutput}
@@ -175,7 +175,7 @@ function TaskRow({
               type="button"
               onClick={onToggle}
               className={cn(
-                "rounded-lg border border-glass-border px-2.5 py-1 text-[11px] font-medium transition-colors",
+                "rounded-lg border border-glass-border px-2.5 py-1 text-2xs font-medium transition-colors",
                 task.enabled ? "bg-status-green/10 text-status-green" : "bg-background/55 text-muted-foreground hover:text-foreground",
               )}
             >
@@ -185,7 +185,7 @@ function TaskRow({
               type="button"
               onClick={onRunNow}
               disabled={isRunning}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-glass-border bg-background/55 px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-glass-border bg-background/55 px-2.5 py-1 text-2xs text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Play className="size-3" />
               {isRunning ? "Running…" : "Run now"}
@@ -193,7 +193,7 @@ function TaskRow({
             <button
               type="button"
               onClick={onDelete}
-              className="ml-auto inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] text-muted-foreground/50 transition-colors hover:bg-status-red/10 hover:text-status-red"
+              className="ml-auto inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-2xs text-muted-foreground/50 transition-colors hover:bg-status-red/10 hover:text-status-red"
             >
               <Trash2 className="size-3" />
               Delete
@@ -290,7 +290,7 @@ function CreateTaskForm({
             spellCheck={false}
             className="w-full resize-y rounded-lg border border-glass-border bg-background/55 px-3 py-2 font-mono text-xs text-foreground placeholder:text-muted-foreground/40 focus:border-primary/40 focus:outline-none"
           />
-          <p className="text-[11px] text-muted-foreground/60">
+          <p className="text-2xs text-muted-foreground/60">
             Runs via <code className="font-mono">bash -c</code> · 2-minute timeout
           </p>
         </Field>
@@ -332,7 +332,7 @@ function CreateTaskForm({
             className={cn(inputCls, "font-mono mt-1.5")}
           />
         )}
-        <span className="font-mono text-[11px] text-muted-foreground/60">{cronExpression}</span>
+        <span className="font-mono text-2xs text-muted-foreground/60">{cronExpression}</span>
       </Field>
 
       <div className="flex items-center justify-end gap-2 border-t border-glass-border/50 pt-3">

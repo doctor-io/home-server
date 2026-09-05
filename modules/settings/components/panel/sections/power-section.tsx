@@ -48,7 +48,7 @@ function PreferenceRow({
       <div className="min-w-0">
         <div className="text-sm text-foreground">{label}</div>
         {description && (
-          <div className="mt-0.5 text-[11px] text-muted-foreground/70">{description}</div>
+          <div className="mt-0.5 text-2xs text-muted-foreground/70">{description}</div>
         )}
       </div>
       {children}
@@ -111,7 +111,7 @@ export function PowerSection({
             >
               <RefreshCw className="size-5 text-status-amber group-hover:animate-spin" />
               <span className="text-xs font-medium text-foreground">Reboot</span>
-              <span className="text-[11px] text-muted-foreground/60">Restart all services</span>
+              <span className="text-2xs text-muted-foreground/60">Restart all services</span>
             </button>
           </AlertDialogTrigger>
           <AlertDialogContent>
@@ -145,7 +145,7 @@ export function PowerSection({
             >
               <Power className="size-5 text-status-red" />
               <span className="text-xs font-medium text-foreground">Shutdown</span>
-              <span className="text-[11px] text-muted-foreground/60">Power off the machine</span>
+              <span className="text-2xs text-muted-foreground/60">Power off the machine</span>
             </button>
           </AlertDialogTrigger>
           <AlertDialogContent>
@@ -224,7 +224,7 @@ export function PowerSection({
         </PreferenceRow>
 
         <div className={cn(SETTINGS_PANEL_INSET, "flex items-center justify-between gap-4 px-4 py-3")}>
-          <span className="text-[11px] text-muted-foreground/70">
+          <span className="text-2xs text-muted-foreground/70">
             {scheduleEnabled
               ? `Reboot will run ${scheduleFrequency === "daily" ? "daily" : `every ${scheduleDayOfWeek}`} at ${scheduleTime}.`
               : "Scheduled reboot is disabled."}
@@ -249,7 +249,7 @@ export function PowerSection({
       <div className={cn(SETTINGS_PANEL_INSET, "flex items-center justify-between gap-4 px-4 py-3")}>
         <div className="min-w-0">
           <div className="text-sm text-foreground">Factory reset server</div>
-          <div className="mt-0.5 text-[11px] text-muted-foreground/70">Wipes all data and returns Homeio to a clean state</div>
+          <div className="mt-0.5 text-2xs text-muted-foreground/70">Wipes all data and returns Homeio to a clean state</div>
         </div>
         <AlertDialog>
           <AlertDialogTrigger asChild>

@@ -43,7 +43,7 @@ export default function IconsDevPage() {
           {ICONS.map(({ label, icon: Icon }) => (
             <div key={label} className="flex flex-col items-center gap-2">
               <Icon className="size-14" />
-              <span className="text-[11px] text-white/50">{label}</span>
+              <span className="text-2xs text-white/50">{label}</span>
             </div>
           ))}
         </div>
@@ -58,7 +58,7 @@ export default function IconsDevPage() {
           {ICONS.map(({ label, icon: Icon }) => (
             <div key={label} className="flex flex-col items-center gap-2">
               <Icon className="size-8" />
-              <span className="text-[11px] text-white/50">{label}</span>
+              <span className="text-2xs text-white/50">{label}</span>
             </div>
           ))}
         </div>
@@ -73,7 +73,7 @@ export default function IconsDevPage() {
           {ICONS.map(({ label, icon: Icon }) => (
             <div key={label} className="flex flex-col items-center gap-2">
               <Icon className="size-5" />
-              <span className="text-[11px] text-white/50">{label}</span>
+              <span className="text-2xs text-white/50">{label}</span>
             </div>
           ))}
         </div>
@@ -101,7 +101,7 @@ export default function IconsDevPage() {
               className="flex w-24 cursor-pointer flex-col items-center gap-3 rounded-xl border border-transparent p-4 hover:bg-white/5"
             >
               <Icon className="size-14" />
-              <span className="line-clamp-2 break-all text-center text-[12px] font-medium text-white/70">
+              <span className="line-clamp-2 break-all text-center text-xs font-medium text-white/70">
                 {label}
               </span>
             </div>

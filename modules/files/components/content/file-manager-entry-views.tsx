@@ -210,7 +210,7 @@ export function FileGrid({
                 )}
               </div>
               <div className="flex w-full flex-col items-center gap-0.5">
-                <span className="line-clamp-2 break-all text-center text-[13px] font-medium leading-tight text-foreground">
+                <span className="line-clamp-2 break-all text-center text-sm font-medium leading-tight text-foreground">
                   {entry.name}
                 </span>
                 {entry.size && (
@@ -261,7 +261,7 @@ export function FileList({
 
   return (
     <div className="flex flex-col">
-      <div className="flex items-center gap-3 border-b border-glass-border/60 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/50">
+      <div className="flex items-center gap-3 border-b border-glass-border/60 px-3 py-2 text-3xs font-semibold uppercase tracking-[0.16em] text-muted-foreground/50">
         <span className="min-w-0 flex-1">Name</span>
         {isTrashView && <span className="hidden w-48 text-right lg:block">Original Location</span>}
         {isGlobalSearchActive && <span className="hidden w-48 text-right lg:block">Location</span>}

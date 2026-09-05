@@ -200,7 +200,7 @@ export function TwoFactorCard({ status, isDemoMode = false }: TwoFactorCardProps
                   </span>
                   <StatusBadge enabled={status.enabled} />
                 </div>
-                <p className="mt-0.5 text-[11px] text-muted-foreground/70">
+                <p className="mt-0.5 text-2xs text-muted-foreground/70">
                   {status.enabled
                     ? `Enabled on ${formatEnrolledAt(status.enrolledAt)}. A 6-digit code is required at sign-in.`
                     : "Add a second step to sign-in using an authenticator app (Google Authenticator, 1Password, Aegis, …)."}
@@ -239,7 +239,7 @@ export function TwoFactorCard({ status, isDemoMode = false }: TwoFactorCardProps
             <div className="flex flex-col gap-2 rounded-lg border border-glass-border bg-background/40 p-3">
               <label
                 htmlFor="two-factor-disable-code"
-                className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground/80"
+                className="text-2xs uppercase tracking-[0.18em] text-muted-foreground/80"
               >
                 Confirm with current code or backup code
               </label>
@@ -264,7 +264,7 @@ export function TwoFactorCard({ status, isDemoMode = false }: TwoFactorCardProps
               >
                 {disable.isPending ? "Disabling…" : "Disable 2FA"}
               </button>
-              <p className="text-[11px] text-muted-foreground/70">
+              <p className="text-2xs text-muted-foreground/70">
                 You&apos;ll be signed out and need to sign in again.
               </p>
             </div>
@@ -277,7 +277,7 @@ export function TwoFactorCard({ status, isDemoMode = false }: TwoFactorCardProps
           <button
             type="button"
             onClick={cancelWizard}
-            className="self-start inline-flex items-center gap-1 text-[11px] text-muted-foreground/80 hover:text-foreground"
+            className="self-start inline-flex items-center gap-1 text-2xs text-muted-foreground/80 hover:text-foreground"
           >
             <ArrowLeft className="size-3" />
             Cancel
@@ -295,7 +295,7 @@ export function TwoFactorCard({ status, isDemoMode = false }: TwoFactorCardProps
                 <p className="text-sm font-medium text-foreground">
                   Scan with your authenticator app
                 </p>
-                <p className="mt-1 text-[11px] text-muted-foreground/80">
+                <p className="mt-1 text-2xs text-muted-foreground/80">
                   Add a new account and scan this QR. Don&apos;t have a camera?
                   Enter the key below manually.
                 </p>
@@ -330,7 +330,7 @@ export function TwoFactorCard({ status, isDemoMode = false }: TwoFactorCardProps
           <button
             type="button"
             onClick={() => setStep("scan")}
-            className="self-start inline-flex items-center gap-1 text-[11px] text-muted-foreground/80 hover:text-foreground"
+            className="self-start inline-flex items-center gap-1 text-2xs text-muted-foreground/80 hover:text-foreground"
           >
             <ArrowLeft className="size-3" />
             Back
@@ -339,7 +339,7 @@ export function TwoFactorCard({ status, isDemoMode = false }: TwoFactorCardProps
             <p className="text-sm font-medium text-foreground">
               Enter the 6-digit code
             </p>
-            <p className="mt-1 text-[11px] text-muted-foreground/80">
+            <p className="mt-1 text-2xs text-muted-foreground/80">
               Type the current code from your authenticator app to confirm.
             </p>
           </div>
@@ -383,7 +383,7 @@ export function TwoFactorCard({ status, isDemoMode = false }: TwoFactorCardProps
               <p className="text-sm font-medium text-foreground">
                 Save your backup codes
               </p>
-              <p className="mt-1 text-[11px] text-muted-foreground/80">
+              <p className="mt-1 text-2xs text-muted-foreground/80">
                 These ten codes are the only way to sign in if you lose your
                 authenticator. Each works once. We can&apos;t show them again.
               </p>
@@ -417,7 +417,7 @@ export function TwoFactorCard({ status, isDemoMode = false }: TwoFactorCardProps
             </button>
           </div>
 
-          <label className="mt-1 flex items-start gap-2 text-[11px] text-muted-foreground/90">
+          <label className="mt-1 flex items-start gap-2 text-2xs text-muted-foreground/90">
             <input
               type="checkbox"
               checked={acknowledgedBackup}
@@ -444,13 +444,13 @@ export function TwoFactorCard({ status, isDemoMode = false }: TwoFactorCardProps
 function StatusBadge({ enabled }: { enabled: boolean }) {
   if (enabled) {
     return (
-      <span className="rounded-md bg-status-green/15 px-1.5 py-0.5 text-[11px] font-medium text-status-green">
+      <span className="rounded-md bg-status-green/15 px-1.5 py-0.5 text-2xs font-medium text-status-green">
         Enabled
       </span>
     );
   }
   return (
-    <span className="rounded-md bg-muted/40 px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+    <span className="rounded-md bg-muted/40 px-1.5 py-0.5 text-2xs font-medium text-muted-foreground">
       Disabled
     </span>
   );

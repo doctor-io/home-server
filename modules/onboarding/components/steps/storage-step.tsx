@@ -80,7 +80,7 @@ export function StorageStep({ value, onChange }: StorageStepProps) {
   return (
     <div className="system-soft-surface p-2.5 text-left">
       {state === "loading" && (
-        <p className="px-1 py-3 text-center text-[12px] text-muted-foreground/70">
+        <p className="px-1 py-3 text-center text-xs text-muted-foreground/70">
           Looking for drives…
         </p>
       )}
@@ -107,10 +107,10 @@ export function StorageStep({ value, onChange }: StorageStepProps) {
                 }`}
               />
               <span className="min-w-0 flex-grow">
-                <span className="block truncate text-[14px] font-medium text-foreground">
+                <span className="block truncate text-sm font-medium text-foreground">
                   {option.label}
                 </span>
-                <span className="block truncate text-[11px] text-muted-foreground/80">
+                <span className="block truncate text-2xs text-muted-foreground/80">
                   {option.detail}
                 </span>
               </span>
@@ -122,7 +122,7 @@ export function StorageStep({ value, onChange }: StorageStepProps) {
         <>
           <label
             htmlFor="setup-storage-path"
-            className="mb-1.5 block px-1 text-[11px] tracking-[0.18em] text-muted-foreground/70 uppercase"
+            className="mb-1.5 block px-1 text-2xs tracking-[0.18em] text-muted-foreground/70 uppercase"
           >
             Storage path
           </label>
@@ -131,9 +131,9 @@ export function StorageStep({ value, onChange }: StorageStepProps) {
             value={value ?? ""}
             onChange={(event) => onChange(event.target.value)}
             placeholder="/DATA"
-            className="h-11 w-full rounded-[var(--system-radius-control)] border border-white/6 bg-white/[0.035] px-3 text-[15px] text-foreground outline-none transition-colors placeholder:text-muted-foreground/52 focus:bg-white/[0.05]"
+            className="h-11 w-full rounded-[var(--system-radius-control)] border border-white/6 bg-white/[0.035] px-3 text-base text-foreground outline-none transition-colors placeholder:text-muted-foreground/52 focus:bg-white/[0.05]"
           />
-          <p className="mt-2 px-1 text-[11px] leading-relaxed text-muted-foreground/70">
+          <p className="mt-2 px-1 text-2xs leading-relaxed text-muted-foreground/70">
             No drives were detected — that is normal in Docker without host block devices.
             Type a path, or skip and set it later in Settings.
           </p>
@@ -141,7 +141,7 @@ export function StorageStep({ value, onChange }: StorageStepProps) {
       )}
 
       {selectedIsSystemDisk && (
-        <p className="mt-2 rounded-[var(--system-radius-control)] border border-status-amber/20 bg-status-amber/10 px-2.5 py-2 text-[11px] leading-relaxed text-status-amber">
+        <p className="mt-2 rounded-[var(--system-radius-control)] border border-status-amber/20 bg-status-amber/10 px-2.5 py-2 text-2xs leading-relaxed text-status-amber">
           App data on the system disk fills the root partition. A separate drive is safer.
         </p>
       )}

@@ -60,7 +60,7 @@ export function PairClaim() {
       <p className={state === "failed" ? "text-sm text-status-red" : "text-sm"}>{message}</p>
 
       {state === "failed" && (
-        <a href="/login" className="text-[12px] text-primary">
+        <a href="/login" className="text-xs text-primary">
           Sign in instead
         </a>
       )}

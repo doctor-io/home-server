@@ -63,8 +63,8 @@ export function LicensePlanCard() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-between gap-4 border-t border-glass-border/40 pt-2">
-        <span className="text-[11px] text-muted-foreground/60">Plan</span>
-        <span className="text-[11px] text-muted-foreground/40">Checking…</span>
+        <span className="text-2xs text-muted-foreground/60">Plan</span>
+        <span className="text-2xs text-muted-foreground/40">Checking…</span>
       </div>
     );
   }
@@ -75,10 +75,10 @@ export function LicensePlanCard() {
   return (
     <div className="flex flex-col gap-1.5 border-t border-glass-border/40 pt-2">
       <div className="flex items-center justify-between gap-4">
-        <span className="text-[11px] text-muted-foreground">Plan</span>
+        <span className="text-2xs text-muted-foreground">Plan</span>
         <span
           className={cn(
-            "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-semibold",
+            "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-2xs font-semibold",
             isPaid
               ? "bg-primary/15 text-primary"
               : "text-muted-foreground/80",
@@ -91,7 +91,7 @@ export function LicensePlanCard() {
 
       <div
         className={cn(
-          "flex items-center gap-1 text-[11px]",
+          "flex items-center gap-1 text-2xs",
           tone === "warning"
             ? "text-status-amber"
             : "text-muted-foreground/70",
@@ -108,7 +108,7 @@ export function LicensePlanCard() {
           {snapshot.entitlements.map((entitlement) => (
             <li
               key={entitlement}
-              className="text-[11px] text-muted-foreground/70"
+              className="text-2xs text-muted-foreground/70"
             >
               · {ENTITLEMENT_LABELS[entitlement]}
             </li>

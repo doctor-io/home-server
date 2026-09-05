@@ -110,7 +110,7 @@ export function OpenFileDialog({
                     title="Unsaved changes"
                   />
                 ) : null}
-                <span className={`${FILES_BADGE_SURFACE} px-1.5 py-px text-[10px] uppercase tracking-wider text-primary/70`}>
+                <span className={`${FILES_BADGE_SURFACE} px-1.5 py-px text-3xs uppercase tracking-wider text-primary/70`}>
                   {openFileBadgeLabel}
                 </span>
               </div>
@@ -119,7 +119,7 @@ export function OpenFileDialog({
             {/* Right gutter — balances traffic lights */}
             <div className="flex w-[76px] items-center justify-end px-4">
               {hasUnsavedChanges ? (
-                <span className="text-[11px] tabular-nums text-muted-foreground/40">⌘S</span>
+                <span className="text-2xs tabular-nums text-muted-foreground/40">⌘S</span>
               ) : null}
             </div>
           </div>
@@ -182,7 +182,7 @@ export function OpenFileDialog({
           {/* Status bar */}
           {editorNotice && !showDiscardConfirm ? (
             <div className="shrink-0 border-t border-glass-border/50 bg-background/30 px-4 py-2">
-              <span className="text-[11px] text-muted-foreground/60">{editorNotice}</span>
+              <span className="text-2xs text-muted-foreground/60">{editorNotice}</span>
             </div>
           ) : null}
         </DialogContent>

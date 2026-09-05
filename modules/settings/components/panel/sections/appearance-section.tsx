@@ -236,7 +236,7 @@ export function AppearanceSection({
             );
           })}
         </div>
-        <p className="mt-2.5 text-[11px] text-muted-foreground/60">
+        <p className="mt-2.5 text-2xs text-muted-foreground/60">
           {appearance.accentColor === AUTO_ACCENT_VALUE
             ? "Auto — from wallpaper"
             : (accentOptions.find((c) => c.value === appearance.accentColor)?.name ?? "Custom")}
@@ -324,7 +324,7 @@ export function AppearanceSection({
                   className={cn("h-4 w-6 shrink-0 border", active ? "border-primary bg-primary/20" : "border-glass-border bg-background/60")}
                   style={{ borderRadius: preset.value }}
                 />
-                <span className={cn("text-[11px] font-medium", active ? "text-primary" : "text-muted-foreground")}>
+                <span className={cn("text-2xs font-medium", active ? "text-primary" : "text-muted-foreground")}>
                   {preset.name}
                 </span>
               </button>

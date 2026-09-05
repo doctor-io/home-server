@@ -164,7 +164,7 @@ export function CommandPalette({
           value={query}
           onValueChange={onQueryChange}
           placeholder="Search for apps, settings, or actions"
-          className="h-12 text-[15px] text-foreground placeholder:text-muted-foreground/45"
+          className="h-12 text-base text-foreground placeholder:text-muted-foreground/45"
         />
       </div>
 

@@ -80,7 +80,7 @@ function HardwareRow({
         {icon}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground/60">
+        <div className="text-3xs uppercase tracking-[0.14em] text-muted-foreground/60">
           {label}
         </div>
         <div className="truncate text-xs font-medium text-foreground">
@@ -113,7 +113,7 @@ function PreferenceRow({
       <div className="min-w-0">
         <div className="text-sm text-foreground">{label}</div>
         {description && (
-          <div className="mt-0.5 text-[11px] text-muted-foreground/70">
+          <div className="mt-0.5 text-2xs text-muted-foreground/70">
             {description}
           </div>
         )}
@@ -257,7 +257,7 @@ export function GeneralSection({
                 <div className="text-xs font-semibold text-foreground">
                   Homeio Server Manager
                 </div>
-                <p className="mt-0.5 text-[11px] text-muted-foreground/75">
+                <p className="mt-0.5 text-2xs text-muted-foreground/75">
                   Open-source self-hosted server manager released under the MIT
                   License.
                 </p>
@@ -279,7 +279,7 @@ export function GeneralSection({
                 href="https://github.com/doctor-io/homeio"
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+                className="inline-flex items-center gap-1 text-2xs text-muted-foreground transition-colors hover:text-foreground"
               >
                 <Code className="size-3" />
                 <span>GitHub</span>
@@ -289,7 +289,7 @@ export function GeneralSection({
                 href="https://github.com/sponsors/doctor-io"
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+                className="inline-flex items-center gap-1 text-2xs text-muted-foreground transition-colors hover:text-foreground"
               >
                 <Sparkles className="size-3 text-pink-400" />
                 <span>Sponsor</span>
@@ -299,7 +299,7 @@ export function GeneralSection({
                 href="https://homeio.app"
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+                className="inline-flex items-center gap-1 text-2xs text-muted-foreground transition-colors hover:text-foreground"
               >
                 <Globe className="size-3" />
                 <span>Website</span>

@@ -74,7 +74,7 @@ function Crumbs({ segments, onNavigate }: { segments: string[]; onNavigate: (pat
             onClick={() => !isCurrent && onNavigate(target)}
             aria-current={isCurrent ? "page" : undefined}
             className={cn(
-              "shrink-0 rounded-full px-3 py-1.5 text-[12px] whitespace-nowrap transition-colors",
+              "shrink-0 rounded-full px-3 py-1.5 text-xs whitespace-nowrap transition-colors",
               isCurrent
                 ? "bg-primary/15 font-medium text-primary"
                 : "bg-white/5 text-muted-foreground active:bg-white/10",
@@ -113,8 +113,8 @@ function FileSheet({ entry, onClose }: { entry: FileListEntry; onClose: () => vo
             {getLargeFileIcon(ui)}
           </span>
           <div className="min-w-0">
-            <p className="truncate text-[15px] font-medium">{entry.name}</p>
-            <p className="mt-0.5 text-[12px] text-muted-foreground">
+            <p className="truncate text-base font-medium">{entry.name}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
               {[size, formatDate(entry.modifiedAt)].filter(Boolean).join(" · ")}
             </p>
           </div>
@@ -125,14 +125,14 @@ function FileSheet({ entry, onClose }: { entry: FileListEntry; onClose: () => vo
             href={buildDownloadUrl(entry.path)}
             download={entry.name}
             onClick={onClose}
-            className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-primary text-[13px] font-medium text-primary-foreground transition-transform active:scale-[0.98]"
+            className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-primary text-sm font-medium text-primary-foreground transition-transform active:scale-[0.98]"
           >
             <Download className="size-4" /> Download
           </a>
           <button
             type="button"
             onClick={onClose}
-            className="flex min-h-12 items-center justify-center rounded-2xl bg-white/6 px-5 text-[13px] text-muted-foreground active:bg-white/10"
+            className="flex min-h-12 items-center justify-center rounded-2xl bg-white/6 px-5 text-sm text-muted-foreground active:bg-white/10"
           >
             Close
           </button>
@@ -164,7 +164,7 @@ function UploadSheet({
         style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 1.25rem)" }}
       >
         <span aria-hidden="true" className="mx-auto block h-1 w-10 rounded-full bg-white/15" />
-        <p className="mt-4 text-[13px] text-muted-foreground">Upload to this folder</p>
+        <p className="mt-4 text-sm text-muted-foreground">Upload to this folder</p>
 
         <div className="mt-3 flex flex-col gap-2">
           {PICKERS.map((picker) => {
@@ -181,8 +181,8 @@ function UploadSheet({
                   <Icon className="size-5" />
                 </span>
                 <span className="min-w-0">
-                  <span className="block text-[14px]">{picker.label}</span>
-                  <span className="block text-[11px] text-muted-foreground">{picker.hint}</span>
+                  <span className="block text-sm">{picker.label}</span>
+                  <span className="block text-2xs text-muted-foreground">{picker.hint}</span>
                 </span>
               </button>
             );
@@ -260,7 +260,7 @@ export function PhoneFiles() {
     <div className="flex flex-col gap-4">
       <header className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-2xs text-muted-foreground">
             {isLoading
               ? "Loading…"
               : `${folders.length} folder${folders.length === 1 ? "" : "s"} · ${files.length} file${files.length === 1 ? "" : "s"}`}
@@ -286,7 +286,7 @@ export function PhoneFiles() {
 
       {progress !== null && (
         <div className="rounded-2xl bg-white/5 px-3.5 py-3">
-          <p className="text-[12px] text-muted-foreground">Uploading… {Math.round(progress)}%</p>
+          <p className="text-xs text-muted-foreground">Uploading… {Math.round(progress)}%</p>
           <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/8">
             <div
               className="h-full rounded-full bg-primary transition-[width] duration-200"
@@ -297,7 +297,7 @@ export function PhoneFiles() {
       )}
 
       {message && (
-        <p className="rounded-2xl bg-white/4 px-3.5 py-2.5 text-[12px] text-muted-foreground">
+        <p className="rounded-2xl bg-white/4 px-3.5 py-2.5 text-xs text-muted-foreground">
           {message}
         </p>
       )}
@@ -305,7 +305,7 @@ export function PhoneFiles() {
       {error && (
         <p
           role="alert"
-          className="rounded-2xl bg-status-red/10 px-3.5 py-2.5 text-[12px] text-status-red"
+          className="rounded-2xl bg-status-red/10 px-3.5 py-2.5 text-xs text-status-red"
         >
           {error instanceof Error ? error.message : "Could not open that folder."}
         </p>
@@ -331,7 +331,7 @@ export function PhoneFiles() {
             <File className="size-6 opacity-60" />
           </span>
           <p className="mt-3 text-sm text-muted-foreground">This folder is empty</p>
-          <p className="mt-1 text-[12px] text-muted-foreground/70">
+          <p className="mt-1 text-xs text-muted-foreground/70">
             Upload a photo or a file to fill it.
           </p>
         </div>
@@ -339,7 +339,7 @@ export function PhoneFiles() {
 
       {folders.length > 0 && (
         <section className="flex flex-col gap-2">
-          <h2 className="text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Folders</h2>
+          <h2 className="text-3xs tracking-[0.18em] text-muted-foreground uppercase">Folders</h2>
           <div className="grid grid-cols-2 gap-2">
             {folders.map((entry) => (
               <button
@@ -353,7 +353,7 @@ export function PhoneFiles() {
                 </span>
                 <span className="w-full">
                   <span className="block truncate text-[13.5px] font-medium">{entry.name}</span>
-                  <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                  <span className="mt-0.5 block text-2xs text-muted-foreground">
                     {formatDate(entry.modifiedAt)}
                   </span>
                 </span>
@@ -365,7 +365,7 @@ export function PhoneFiles() {
 
       {files.length > 0 && (
         <section className="flex flex-col gap-2">
-          <h2 className="text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Files</h2>
+          <h2 className="text-3xs tracking-[0.18em] text-muted-foreground uppercase">Files</h2>
           <ul className="overflow-hidden rounded-3xl bg-white/4">
             {files.map((entry) => {
               const size = formatSize(entry.sizeBytes);
@@ -382,7 +382,7 @@ export function PhoneFiles() {
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[13.5px]">{entry.name}</span>
-                      <span className="block text-[11px] text-muted-foreground">
+                      <span className="block text-2xs text-muted-foreground">
                         {[size, formatDate(entry.modifiedAt)].filter(Boolean).join(" · ")}
                       </span>
                     </span>

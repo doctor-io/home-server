@@ -720,7 +720,7 @@ function AppStoreDetailPanel({
             {/* Screenshots */}
             {detail.screenshots.length > 0 && (
               <div className="space-y-2">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/50">
+                <p className="text-3xs font-semibold uppercase tracking-[0.16em] text-muted-foreground/50">
                   Screenshots
                 </p>
                 <div className="flex gap-2.5 overflow-x-auto pb-1">
@@ -987,7 +987,7 @@ export function AppStore({
               type="button"
               onClick={() => setFilter(f)}
               className={cn(
-                "rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors",
+                "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
                 filter === f ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-background/50 hover:text-foreground",
               )}
             >

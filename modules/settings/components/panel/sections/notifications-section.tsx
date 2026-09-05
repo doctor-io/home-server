@@ -30,7 +30,7 @@ function ThresholdRow({
       <div className="min-w-0">
         <div className="text-sm text-foreground">{label}</div>
         {description && (
-          <div className="mt-0.5 text-[11px] text-muted-foreground/70">{description}</div>
+          <div className="mt-0.5 text-2xs text-muted-foreground/70">{description}</div>
         )}
       </div>
       <div className="flex shrink-0 items-center gap-1.5">
@@ -41,7 +41,7 @@ function ThresholdRow({
           min={1}
           className="h-8 w-20 rounded-lg border border-glass-border bg-background/55 px-3 text-right text-xs text-foreground focus:border-primary/40 focus:outline-none"
         />
-        <span className="w-6 text-[11px] text-muted-foreground/60">{unit}</span>
+        <span className="w-6 text-2xs text-muted-foreground/60">{unit}</span>
       </div>
     </div>
   );

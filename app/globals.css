@@ -52,11 +52,16 @@
     var(--primary) calc(var(--system-tint-amount) * 0.5),
     oklch(0.94 0.006 250 / 0.8)
   );
-  --system-radius-panel: calc(var(--radius) + 0.9rem);
-  --system-radius-floating: calc(var(--radius) + 0.7rem);
-  --system-radius-control: calc(var(--radius) + 0.125rem);
-  --system-radius-hero: calc(var(--radius) + 0.725rem);
-  --system-radius-icon: calc(var(--radius) - 0.1rem);
+  /* A radius scale, not five offsets from a base. The previous values landed
+     at 28.4 / 25.2 / 25.6 / 16 / 12.4px, so "floating" and "hero" differed by
+     0.4px — two names nobody could tell apart. Steps are now far enough apart
+     to read as deliberate, and panel stays where it was so the surfaces built
+     on it do not move. */
+  --system-radius-icon: 0.75rem; /* 12px — small square things */
+  --system-radius-control: 1rem; /* 16px — buttons, inputs, rows */
+  --system-radius-floating: 1.375rem; /* 22px — cards and docks */
+  --system-radius-panel: 1.75rem; /* 28px — windows and full panels */
+  --system-radius-hero: var(--system-radius-floating);
   --system-shadow-surface: 0 24px 48px rgba(0, 0, 0, 0.35);
   --system-shadow-floating: 0 28px 56px rgba(0, 0, 0, 0.38);
   --system-shadow-dock: 0 30px 64px rgba(0, 0, 0, 0.4);
@@ -120,11 +125,16 @@
     var(--primary) calc(var(--system-tint-amount) * 0.5),
     oklch(0.16 0.015 250 / 0.25)
   );
-  --system-radius-panel: calc(var(--radius) + 0.9rem);
-  --system-radius-floating: calc(var(--radius) + 0.7rem);
-  --system-radius-control: calc(var(--radius) + 0.125rem);
-  --system-radius-hero: calc(var(--radius) + 0.725rem);
-  --system-radius-icon: calc(var(--radius) - 0.1rem);
+  /* A radius scale, not five offsets from a base. The previous values landed
+     at 28.4 / 25.2 / 25.6 / 16 / 12.4px, so "floating" and "hero" differed by
+     0.4px — two names nobody could tell apart. Steps are now far enough apart
+     to read as deliberate, and panel stays where it was so the surfaces built
+     on it do not move. */
+  --system-radius-icon: 0.75rem; /* 12px — small square things */
+  --system-radius-control: 1rem; /* 16px — buttons, inputs, rows */
+  --system-radius-floating: 1.375rem; /* 22px — cards and docks */
+  --system-radius-panel: 1.75rem; /* 28px — windows and full panels */
+  --system-radius-hero: var(--system-radius-floating);
   --system-shadow-surface: 0 24px 48px rgba(0, 0, 0, 0.64);
   --system-shadow-floating: 0 28px 56px rgba(0, 0, 0, 0.66);
   --system-shadow-dock: 0 30px 64px rgba(0, 0, 0, 0.68);
@@ -183,6 +193,11 @@
   --color-status-amber: var(--status-amber);
   --color-status-red: var(--status-red);
   /* Custom type scale — 11px utility for dense labels, badges, and log output */
+  /* One step below 2xs, for the uppercase eyebrow labels. It was written as
+     text-[10px] in seven places and text-[9px] in two more; naming it keeps
+     those on the scale instead of beside it. */
+  --text-3xs: 0.625rem;
+  --text-3xs--line-height: 1.4;
   --text-2xs: 0.6875rem;
   --text-2xs--line-height: 1.4;
 }

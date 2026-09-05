@@ -90,15 +90,15 @@ export function LockScreen({
                   className="relative z-10 size-[3.65rem] blur-[0.15px]"
                 />
               </div>
-              <div className="system-pill-surface mt-2.5 px-3 py-1 text-[10px] tracking-[0.24em] text-foreground/58 uppercase">
+              <div className="system-pill-surface mt-2.5 px-3 py-1 text-3xs tracking-[0.24em] text-foreground/58 uppercase">
                 Home server
               </div>
             </div>
 
-            <p className="text-[1.48rem] font-medium tracking-[-0.03em] text-foreground">
+            <p className="text-2xl font-medium tracking-[-0.03em] text-foreground">
               {displayUsername}
             </p>
-            <p className="mb-5 mt-1 text-[11px] tracking-[0.18em] text-muted-foreground/78 uppercase">
+            <p className="mb-5 mt-1 text-2xs tracking-[0.18em] text-muted-foreground/78 uppercase">
               Locked session
             </p>
 
@@ -114,7 +114,7 @@ export function LockScreen({
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
                     placeholder="Enter your password"
-                    className="h-10 w-full border-0 bg-transparent px-1 text-[15px] text-foreground outline-none placeholder:text-muted-foreground/52"
+                    className="h-10 w-full border-0 bg-transparent px-1 text-base text-foreground outline-none placeholder:text-muted-foreground/52"
                     autoFocus
                   />
 
@@ -160,7 +160,7 @@ export function LockScreen({
 
             <p className="mt-4 text-xs text-muted-foreground">
               Press{" "}
-              <span className="system-keycap-surface px-1.5 py-0.5 text-[11px] text-foreground/90">
+              <span className="system-keycap-surface px-1.5 py-0.5 text-2xs text-foreground/90">
                 Command + L
               </span>{" "}
               anytime to lock

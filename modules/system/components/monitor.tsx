@@ -53,7 +53,7 @@ function MetricCard({
   return (
     <div className={cn(PANEL_INSET, "flex flex-col gap-2 px-4 py-3")}>
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/50">
+        <span className="text-3xs font-semibold uppercase tracking-[0.16em] text-muted-foreground/50">
           {label}
         </span>
         <div className={cn("flex size-6 items-center justify-center rounded-md border border-glass-border/60 bg-background/55", color)}>
@@ -61,7 +61,7 @@ function MetricCard({
         </div>
       </div>
       <div className="font-mono text-2xl font-bold tabular-nums text-foreground">{value}</div>
-      <div className="text-[11px] text-muted-foreground/70">{sub}</div>
+      <div className="text-2xs text-muted-foreground/70">{sub}</div>
     </div>
   );
 }
@@ -199,7 +199,7 @@ export function Monitor() {
               key={t.id}
               onClick={() => setTab(t.id)}
               className={cn(
-                "rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors",
+                "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
                 tab === t.id
                   ? "bg-primary/15 text-primary"
                   : "text-muted-foreground hover:bg-background/50 hover:text-foreground",
@@ -334,7 +334,7 @@ export function Monitor() {
                 ].map(({ label, value }) => (
                   <div key={label} className={cn(PANEL_INSET, "flex flex-col items-center gap-1 py-3")}>
                     <span className="font-mono text-sm font-bold text-foreground">{value ?? "--"}</span>
-                    <span className="text-[11px] text-muted-foreground/60">{label}</span>
+                    <span className="text-2xs text-muted-foreground/60">{label}</span>
                   </div>
                 ))}
               </div>
@@ -348,7 +348,7 @@ export function Monitor() {
                 <Container className="size-3.5 text-primary" />
                 <span className="text-xs font-semibold text-foreground">Docker Containers</span>
                 {dockerConnected && daemonAvailable !== false && (
-                  <span className="flex items-center gap-1 text-[11px] text-status-green">
+                  <span className="flex items-center gap-1 text-2xs text-status-green">
                     <span className="size-1.5 rounded-full bg-status-green" />
                     Live
                   </span>
@@ -365,7 +365,7 @@ export function Monitor() {
               )}
             </div>
 
-            <div className="grid grid-cols-[2.2fr_0.7fr_0.8fr_0.8fr_0.8fr_0.8fr] gap-2 border-b border-glass-border/40 px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/50">
+            <div className="grid grid-cols-[2.2fr_0.7fr_0.8fr_0.8fr_0.8fr_0.8fr] gap-2 border-b border-glass-border/40 px-4 py-2 text-3xs font-semibold uppercase tracking-[0.14em] text-muted-foreground/50">
               <span>Container</span>
               <span>Status</span>
               {(["cpu", "memory", "network", "disk"] as SortKey[]).map((key, i) => (
@@ -403,11 +403,11 @@ export function Monitor() {
                       </div>
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium text-foreground">{p.name}</p>
-                        <p className="font-mono text-[11px] text-muted-foreground/60">{p.pid}</p>
+                        <p className="font-mono text-2xs text-muted-foreground/60">{p.pid}</p>
                       </div>
                     </div>
                     <span className={cn("flex items-center")}>
-                      <span className={cn("rounded-md px-2 py-0.5 text-[11px] font-medium", getStatusBadgeColor(p.status))}>
+                      <span className={cn("rounded-md px-2 py-0.5 text-2xs font-medium", getStatusBadgeColor(p.status))}>
                         {p.status}
                       </span>
                     </span>
@@ -439,7 +439,7 @@ export function Monitor() {
                     </div>
                     <div>
                       <p className="text-sm font-medium text-foreground">{systemMetrics.wifi.iface ?? "Network"}</p>
-                      <p className="text-[11px] text-muted-foreground/70">
+                      <p className="text-2xs text-muted-foreground/70">
                         {systemMetrics.wifi.ssid ?? "Connected"} · {systemMetrics.wifi.ipv4 ?? "No IP"}
                       </p>
                     </div>
@@ -477,7 +477,7 @@ export function Monitor() {
                   ].map(({ label, value }) => (
                     <div key={label} className="flex flex-col items-center gap-1 py-4">
                       <span className="font-mono text-2xl font-bold tabular-nums text-foreground">{value}</span>
-                      <span className="text-[11px] text-muted-foreground/60">{label}</span>
+                      <span className="text-2xs text-muted-foreground/60">{label}</span>
                     </div>
                   ))}
                 </div>

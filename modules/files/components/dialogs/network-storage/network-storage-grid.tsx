@@ -61,7 +61,7 @@ export function NetworkStorageGrid({
     <div className="flex flex-col gap-4">
       {hasDiscovered && (
         <div>
-          <p className="mb-2 text-[10px] uppercase tracking-[0.18em] text-muted-foreground/50">
+          <p className="mb-2 text-3xs uppercase tracking-[0.18em] text-muted-foreground/50">
             Discovered on network
           </p>
           <div className="flex flex-col gap-1.5">
@@ -79,7 +79,7 @@ export function NetworkStorageGrid({
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-medium text-foreground">{server}</div>
-                  <div className="text-[10px] text-muted-foreground/60">SMB server</div>
+                  <div className="text-3xs text-muted-foreground/60">SMB server</div>
                 </div>
                 <button
                   type="button"
@@ -97,7 +97,7 @@ export function NetworkStorageGrid({
 
       {hasConfigured && (
         <div>
-          <p className="mb-2 text-[10px] uppercase tracking-[0.18em] text-muted-foreground/50">
+          <p className="mb-2 text-3xs uppercase tracking-[0.18em] text-muted-foreground/50">
             Configured shares
           </p>
           <div className="flex flex-col gap-1.5">
@@ -117,7 +117,7 @@ export function NetworkStorageGrid({
                   <div className="truncate text-sm font-medium text-foreground">
                     {share.host}/{share.share}
                   </div>
-                  <div className="truncate text-[10px] text-muted-foreground/60">
+                  <div className="truncate text-3xs text-muted-foreground/60">
                     Mounted at /{share.mountPath}
                   </div>
                 </div>

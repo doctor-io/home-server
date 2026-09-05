@@ -94,7 +94,7 @@ export function SettingsPanel({
               <div key={group.id} className="mb-3">
                 <div
                   className={cn(
-                    "mb-1 px-3 text-[10px] font-semibold uppercase tracking-[0.16em]",
+                    "mb-1 px-3 text-3xs font-semibold uppercase tracking-[0.16em]",
                     group.id === "danger"
                       ? "text-status-red/60"
                       : "text-muted-foreground/50",
@@ -124,7 +124,7 @@ export function SettingsPanel({
                               : "text-muted-foreground/60",
                           )}
                         />
-                        <span className="flex-1 truncate text-left text-[13px] font-medium">
+                        <span className="flex-1 truncate text-left text-sm font-medium">
                           {section.label}
                         </span>
                         {section.badge && (
@@ -159,13 +159,13 @@ export function SettingsPanel({
               target="_blank"
               rel="noreferrer"
               title="Star Homeio on GitHub"
-              className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground"
+              className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-2xs font-medium text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground"
             >
               <Star className="size-3 text-amber-400" />
               <span>Star</span>
             </a>
           </div>
-          <span className="mt-0.5 block text-[11px] text-muted-foreground/60">
+          <span className="mt-0.5 block text-2xs text-muted-foreground/60">
             {settingsBackend.general.appVersion} ·{" "}
             {settingsBackend.general.platform}
           </span>

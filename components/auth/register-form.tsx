@@ -129,7 +129,7 @@ export function RegisterForm() {
                 className="relative z-10 size-[3.4rem] blur-[0.12px]"
               />
             </div>
-            <div className="system-pill-surface mt-2 px-3 py-1 text-[10px] tracking-[0.22em] text-foreground/54 uppercase">
+            <div className="system-pill-surface mt-2 px-3 py-1 text-3xs tracking-[0.22em] text-foreground/54 uppercase">
               Home server
             </div>
           </div>
@@ -137,7 +137,7 @@ export function RegisterForm() {
           <p className="text-[1.6rem] font-medium leading-[1.2] tracking-[-0.03em] text-foreground">
             Welcome to your<br />Home Server
           </p>
-          <p className="mx-auto mb-7 mt-2.5 max-w-[22rem] text-[12px] leading-relaxed text-muted-foreground/72">
+          <p className="mx-auto mb-7 mt-2.5 max-w-[22rem] text-xs leading-relaxed text-muted-foreground/72">
             Set up your private home server in minutes. All your files, apps,
             and settings — in one place.
           </p>
@@ -165,15 +165,15 @@ export function RegisterForm() {
                 className="relative z-10 size-[3.2rem] blur-[0.12px]"
               />
             </div>
-            <div className="system-pill-surface mt-2 px-3 py-1 text-[10px] tracking-[0.22em] text-foreground/54 uppercase">
+            <div className="system-pill-surface mt-2 px-3 py-1 text-3xs tracking-[0.22em] text-foreground/54 uppercase">
               Home server
             </div>
           </div>
 
-          <p className="text-[1.48rem] font-medium tracking-[-0.03em] text-foreground">
+          <p className="text-2xl font-medium tracking-[-0.03em] text-foreground">
             Create admin account
           </p>
-          <p className="mb-5 mt-1 text-[11px] tracking-[0.18em] text-muted-foreground/78 uppercase">
+          <p className="mb-5 mt-1 text-2xs tracking-[0.18em] text-muted-foreground/78 uppercase">
             Configure local access
           </p>
 
@@ -193,7 +193,7 @@ export function RegisterForm() {
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     placeholder="Admin username"
-                    className="h-10 w-full border-0 bg-transparent px-1 text-[15px] text-foreground outline-none placeholder:text-muted-foreground/52"
+                    className="h-10 w-full border-0 bg-transparent px-1 text-base text-foreground outline-none placeholder:text-muted-foreground/52"
                     required
                     autoFocus
                   />
@@ -211,7 +211,7 @@ export function RegisterForm() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="New password"
-                    className="h-10 w-full border-0 bg-transparent px-1 text-[15px] text-foreground outline-none placeholder:text-muted-foreground/52"
+                    className="h-10 w-full border-0 bg-transparent px-1 text-base text-foreground outline-none placeholder:text-muted-foreground/52"
                     required
                   />
                   <button
@@ -236,7 +236,7 @@ export function RegisterForm() {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Confirm new password"
-                    className="h-10 w-full border-0 bg-transparent px-1 text-[15px] text-foreground outline-none placeholder:text-muted-foreground/52"
+                    className="h-10 w-full border-0 bg-transparent px-1 text-base text-foreground outline-none placeholder:text-muted-foreground/52"
                     required
                   />
                   <button
@@ -296,7 +296,7 @@ export function RegisterForm() {
                 className="relative z-10 size-[3.2rem] blur-[0.12px]"
               />
             </div>
-            <div className="system-pill-surface mt-2 px-3 py-1 text-[10px] tracking-[0.22em] text-foreground/54 uppercase">
+            <div className="system-pill-surface mt-2 px-3 py-1 text-3xs tracking-[0.22em] text-foreground/54 uppercase">
               Home server
             </div>
           </div>
@@ -304,7 +304,7 @@ export function RegisterForm() {
           <p className="text-[1.4rem] font-medium tracking-[-0.03em] text-foreground">
             {currentSetupStep?.title}
           </p>
-          <p className="mb-4 mt-1 text-[11px] tracking-[0.18em] text-muted-foreground/80 uppercase">
+          <p className="mb-4 mt-1 text-2xs tracking-[0.18em] text-muted-foreground/80 uppercase">
             Setup in progress
           </p>
 
@@ -353,7 +353,7 @@ export function RegisterForm() {
                 className="relative z-10 size-[3.4rem] blur-[0.12px]"
               />
             </div>
-            <div className="system-pill-surface mt-2 px-3 py-1 text-[10px] tracking-[0.22em] text-foreground/54 uppercase">
+            <div className="system-pill-surface mt-2 px-3 py-1 text-3xs tracking-[0.22em] text-foreground/54 uppercase">
               Home server
             </div>
           </div>
@@ -361,7 +361,7 @@ export function RegisterForm() {
           <p className="text-[1.6rem] font-medium leading-[1.2] tracking-[-0.03em] text-foreground">
             You&apos;re all set
           </p>
-          <p className="mx-auto mb-7 mt-2.5 max-w-[22rem] text-[12px] leading-relaxed text-muted-foreground/72">
+          <p className="mx-auto mb-7 mt-2.5 max-w-[22rem] text-xs leading-relaxed text-muted-foreground/72">
             Your home server is ready. Sign in to access your dashboard.
           </p>
 

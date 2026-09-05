@@ -65,7 +65,7 @@ export function UsbStorageDialog({ isOpen, onClose, onNavigateToUsb }: UsbStorag
               type="button"
               onClick={handleRefresh}
               disabled={isBusy}
-              className="inline-flex h-6 items-center gap-1 rounded-md border border-glass-border bg-background/80 px-2 text-[11px] text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-6 items-center gap-1 rounded-md border border-glass-border bg-background/80 px-2 text-2xs text-muted-foreground transition-colors hover:bg-background/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
             >
               <RefreshCw className="size-3" />
               Rescan
@@ -83,7 +83,7 @@ export function UsbStorageDialog({ isOpen, onClose, onNavigateToUsb }: UsbStorag
             </div>
           ) : (
             <div className="flex flex-col gap-1.5">
-              <p className="mb-2 text-[10px] uppercase tracking-[0.18em] text-muted-foreground/50">
+              <p className="mb-2 text-3xs uppercase tracking-[0.18em] text-muted-foreground/50">
                 Detected drives
               </p>
               {drives.map((drive) => (
@@ -107,12 +107,12 @@ export function UsbStorageDialog({ isOpen, onClose, onNavigateToUsb }: UsbStorag
                         {drive.label}
                       </span>
                       {drive.isMounted && (
-                        <span className="shrink-0 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
+                        <span className="shrink-0 rounded-full bg-emerald-500/15 px-2 py-0.5 text-3xs font-medium text-emerald-400">
                           Mounted
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground/60">
+                    <div className="flex items-center gap-2 text-3xs text-muted-foreground/60">
                       <span>{drive.size}</span>
                       {drive.partitions[0]?.fstype && (
                         <>
