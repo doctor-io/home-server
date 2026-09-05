@@ -216,7 +216,7 @@ export function getAppVisualState(app: AppItem) {
       containerClass: "animate-pulse shadow-amber-500/20",
       imageClass: "",
       dotClass: "bg-status-amber",
-      dotInnerClass: "animate-pulse bg-status-amber",
+      dotInnerClass: "animate-pulse",
       ringClass: "border-status-amber/60",
       badgeIcon: RefreshCw,
       badgeClass: "bg-status-amber/20 text-status-amber",
@@ -225,12 +225,14 @@ export function getAppVisualState(app: AppItem) {
     };
   }
 
+  // Degraded is the one state here that genuinely wants attention, so it keeps
+  // amber. It does not need to pulse to say so.
   if (app.status === "partial") {
     return {
-      containerClass: "animate-pulse shadow-amber-500/10",
+      containerClass: "",
       imageClass: "opacity-80 saturate-50",
       dotClass: "bg-status-amber",
-      dotInnerClass: "animate-pulse bg-status-amber",
+      dotInnerClass: "",
       ringClass: "border-status-amber/40",
       badgeIcon: AlertTriangle,
       badgeClass: "bg-status-amber/15 text-status-amber",
@@ -239,15 +241,18 @@ export function getAppVisualState(app: AppItem) {
     };
   }
 
+  // Pausing is a deliberate act, like stopping, so it carries no alert colour.
+  // The pause glyph is what separates it from off — less dimming than stopped,
+  // because a paused app is still loaded.
   if (app.status === "paused") {
     return {
-      containerClass: "animate-pulse shadow-amber-500/10",
+      containerClass: "",
       imageClass: "opacity-80 saturate-50",
-      dotClass: "bg-status-amber",
-      dotInnerClass: "animate-pulse bg-status-amber",
-      ringClass: "border-status-amber/40",
+      dotClass: "bg-muted-foreground/50",
+      dotInnerClass: "",
+      ringClass: "border-transparent",
       badgeIcon: Pause,
-      badgeClass: "bg-status-amber/15 text-status-amber",
+      badgeClass: "bg-muted/80 text-muted-foreground",
       badgeIconClass: "",
       title: "Paused",
     };
@@ -264,7 +269,7 @@ export function getAppVisualState(app: AppItem) {
     return {
       containerClass: "",
       imageClass: "opacity-50 grayscale",
-      dotClass: "bg-muted-foreground/50",
+      dotClass: "",
       dotInnerClass: "",
       ringClass: "border-transparent",
       badgeIcon: null,
@@ -280,7 +285,7 @@ export function getAppVisualState(app: AppItem) {
     return {
       containerClass: "",
       imageClass: "opacity-50 grayscale",
-      dotClass: "bg-muted-foreground/50",
+      dotClass: "",
       dotInnerClass: "",
       ringClass: "border-transparent",
       badgeIcon: AlertTriangle,
@@ -293,7 +298,7 @@ export function getAppVisualState(app: AppItem) {
   return {
     containerClass: "",
     imageClass: "",
-    dotClass: "bg-status-green",
+    dotClass: "",
     dotInnerClass: "",
     ringClass: "border-transparent",
     badgeIcon: null,

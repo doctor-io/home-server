@@ -51,6 +51,43 @@ describe("getAppVisualState", () => {
     ).not.toMatch(/animate-/);
   });
 
+  it("keeps paused calm — deliberate, so no alert colour and no motion", () => {
+    const state = getAppVisualState(appWith("paused"));
+
+    const classes = [
+      state.containerClass,
+      state.ringClass,
+      state.dotClass,
+      state.dotInnerClass,
+      state.badgeClass,
+    ].join(" ");
+
+    expect(classes).not.toMatch(/status-red|status-amber/);
+    expect(classes).not.toMatch(/animate-/);
+    expect(state.badgeIcon).not.toBeNull();
+    expect(state.title).toBe("Paused");
+  });
+
+  it("keeps degraded amber but stops it pulsing", () => {
+    const state = getAppVisualState(appWith("partial"));
+
+    // Degraded is the one state that warrants attention, so the colour stays.
+    expect(`${state.dotClass} ${state.badgeClass}`).toMatch(/status-amber/);
+    expect(
+      [state.containerClass, state.dotInnerClass, state.badgeIconClass].join(" "),
+    ).not.toMatch(/animate-/);
+  });
+
+  it("carries the dot colour separately from its animation", () => {
+    // The colour is the status marker; the animation is decoration. Turning
+    // animations off must not remove the marker.
+    for (const status of ["updating", "partial", "paused"] as const) {
+      const state = getAppVisualState(appWith(status));
+      expect(state.dotClass).not.toBe("");
+      expect(state.dotClass).not.toMatch(/animate-/);
+    }
+  });
+
   it("leaves a running app unmarked", () => {
     const state = getAppVisualState(appWith("running"));
 

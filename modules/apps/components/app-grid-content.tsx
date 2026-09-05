@@ -209,9 +209,12 @@ export function AppGridContent({
                     </span>
                   ) : null}
 
-                  {animatedDotInnerClass ? (
+                  {/* The dot's colour is the status marker and the animation is
+                      decoration, so turning animations off must not take the
+                      marker with it. */}
+                  {visualState.dotClass ? (
                     <span
-                      className={`pointer-events-none absolute -bottom-0.5 -right-0.5 size-3 rounded-[var(--radius)] ${animatedDotInnerClass}`}
+                      className={`pointer-events-none absolute -bottom-0.5 -right-0.5 size-3 rounded-[var(--radius)] ${visualState.dotClass} ${animatedDotInnerClass}`}
                     />
                   ) : null}
                   {app.updateAvailable && app.status === "running" ? (
