@@ -36,17 +36,20 @@ export function AppGridContent({
   primaryOperation,
 }: AppGridContentProps) {
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
+  // Large sits at the widest the 5.5rem grid cell allows once the button's own
+  // padding is counted. It used to be 8px above medium, which made choosing it
+  // feel like nothing happened.
   const iconContainerClass =
     iconSize === "small"
       ? "size-12 rounded-xl"
       : iconSize === "large"
-        ? "size-16 rounded-3xl"
+        ? "size-[4.5rem] rounded-3xl"
         : "size-14 rounded-2xl";
   const iconGlyphClass =
     iconSize === "small"
       ? "size-6"
       : iconSize === "large"
-        ? "size-8"
+        ? "size-10"
         : "size-7";
 
   return (
@@ -115,7 +118,6 @@ export function AppGridContent({
         <div className="mt-24 grid grid-cols-[repeat(4,minmax(0,5.5rem))] justify-center gap-x-1 gap-y-6 sm:grid-cols-[repeat(5,minmax(0,5.5rem))] md:grid-cols-[repeat(6,minmax(0,5.5rem))] lg:grid-cols-[repeat(8,minmax(0,5.5rem))] xl:grid-cols-[repeat(10,minmax(0,5.5rem))]">
           {apps.map((app) => {
             const visualState = getAppVisualState(app);
-            const BadgeIcon = visualState.badgeIcon;
             const animatedContainerClass = animationsEnabled
               ? visualState.containerClass
               : "";
@@ -195,20 +197,6 @@ export function AppGridContent({
                       />
                     )}
                   </div>
-                  {BadgeIcon ? (
-                    <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
-                      <span
-                        className={`flex size-4 items-center justify-center rounded-[var(--radius)] border border-background ${visualState.badgeClass}`}
-                      >
-                        <BadgeIcon
-                          className={`size-2.5 ${
-                            animationsEnabled ? visualState.badgeIconClass : ""
-                          }`}
-                        />
-                      </span>
-                    </span>
-                  ) : null}
-
                   {/* The dot's colour is the status marker and the animation is
                       decoration, so turning animations off must not take the
                       marker with it. */}

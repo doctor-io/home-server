@@ -7,7 +7,6 @@ import type {
   StoreOperationStatus,
 } from "@/lib/shared/contracts/apps";
 import {
-  AlertTriangle,
   BarChart3,
   BookOpen,
   Camera,
@@ -25,8 +24,6 @@ import {
   Mail,
   MessageSquare,
   Music,
-  Pause,
-  RefreshCw,
   Rss,
   Server,
   Shield,
@@ -210,6 +207,13 @@ export function requireAppActionTarget(
   return fallback;
 }
 
+/**
+ * Status is carried by dimming and a small dot, never by a glyph stamped over
+ * the artwork. The icon set renders as coloured <img> SVGs, so a badge could
+ * not be recoloured to match a state, and at the 10px it was drawn at the
+ * detail turned to mush. A dot is CSS: crisp at any size, and its colour is
+ * ours to choose.
+ */
 export function getAppVisualState(app: AppItem) {
   if (app.status === "updating") {
     return {
@@ -218,9 +222,6 @@ export function getAppVisualState(app: AppItem) {
       dotClass: "bg-status-amber",
       dotInnerClass: "animate-pulse",
       ringClass: "border-status-amber/60",
-      badgeIcon: RefreshCw,
-      badgeClass: "bg-status-amber/20 text-status-amber",
-      badgeIconClass: "animate-spin",
       title: "Processing",
     };
   }
@@ -234,9 +235,6 @@ export function getAppVisualState(app: AppItem) {
       dotClass: "bg-status-amber",
       dotInnerClass: "",
       ringClass: "border-status-amber/40",
-      badgeIcon: AlertTriangle,
-      badgeClass: "bg-status-amber/15 text-status-amber",
-      badgeIconClass: "",
       title: "Degraded",
     };
   }
@@ -251,9 +249,6 @@ export function getAppVisualState(app: AppItem) {
       dotClass: "bg-muted-foreground/50",
       dotInnerClass: "",
       ringClass: "border-transparent",
-      badgeIcon: Pause,
-      badgeClass: "bg-muted/80 text-muted-foreground",
-      badgeIconClass: "",
       title: "Paused",
     };
   }
@@ -272,9 +267,6 @@ export function getAppVisualState(app: AppItem) {
       dotClass: "",
       dotInnerClass: "",
       ringClass: "border-transparent",
-      badgeIcon: null,
-      badgeClass: "",
-      badgeIconClass: "",
       title: "Stopped",
     };
   }
@@ -285,12 +277,9 @@ export function getAppVisualState(app: AppItem) {
     return {
       containerClass: "",
       imageClass: "opacity-50 grayscale",
-      dotClass: "",
+      dotClass: "bg-muted-foreground/50",
       dotInnerClass: "",
       ringClass: "border-transparent",
-      badgeIcon: AlertTriangle,
-      badgeClass: "bg-muted/80 text-muted-foreground",
-      badgeIconClass: "",
       title: "Status unknown",
     };
   }
@@ -301,9 +290,6 @@ export function getAppVisualState(app: AppItem) {
     dotClass: "",
     dotInnerClass: "",
     ringClass: "border-transparent",
-    badgeIcon: null,
-    badgeClass: "",
-    badgeIconClass: "",
     title: "Running",
   };
 }

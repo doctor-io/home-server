@@ -21,34 +21,46 @@ function appWith(status: AppItem["status"]): AppItem {
 }
 
 describe("getAppVisualState", () => {
+  // Nothing here may stamp a glyph over the artwork: the icon set renders as
+  // coloured <img> SVGs, so a badge cannot take a state's colour, and at badge
+  // size the detail is unreadable. Status lives in dimming and a CSS dot.
+  it("never returns a badge for any state", () => {
+    for (const status of [
+      "running",
+      "updating",
+      "partial",
+      "paused",
+      "stopped",
+      "unknown",
+    ] as const) {
+      expect(getAppVisualState(appWith(status))).not.toHaveProperty("badgeIcon");
+    }
+  });
+
   it("shows a stopped app as dimmed, with no alarm and no motion", () => {
     const state = getAppVisualState(appWith("stopped"));
 
-    // Stopping an app is usually deliberate, so nothing here may read as an
-    // alert: no red, no pulsing frame, no blinking dot, no warning badge.
     const classes = [
       state.containerClass,
       state.ringClass,
+      state.dotClass,
       state.dotInnerClass,
-      state.badgeClass,
       state.imageClass,
     ].join(" ");
 
     expect(classes).not.toMatch(/status-red/);
     expect(classes).not.toMatch(/animate-/);
-    expect(state.badgeIcon).toBeNull();
     expect(state.imageClass).toMatch(/grayscale/);
     expect(state.title).toBe("Stopped");
   });
 
-  it("marks an unknown status without raising an alarm", () => {
+  it("marks an unknown status with a muted dot rather than an alarm", () => {
     const state = getAppVisualState(appWith("unknown"));
 
-    expect(state.badgeIcon).not.toBeNull();
-    expect(`${state.badgeClass} ${state.ringClass}`).not.toMatch(/status-red/);
+    expect(state.dotClass).toMatch(/muted-foreground/);
     expect(
-      [state.containerClass, state.dotInnerClass, state.badgeIconClass].join(" "),
-    ).not.toMatch(/animate-/);
+      [state.containerClass, state.ringClass, state.dotInnerClass].join(" "),
+    ).not.toMatch(/status-red|status-amber|animate-/);
   });
 
   it("keeps paused calm — deliberate, so no alert colour and no motion", () => {
@@ -59,12 +71,10 @@ describe("getAppVisualState", () => {
       state.ringClass,
       state.dotClass,
       state.dotInnerClass,
-      state.badgeClass,
     ].join(" ");
 
     expect(classes).not.toMatch(/status-red|status-amber/);
     expect(classes).not.toMatch(/animate-/);
-    expect(state.badgeIcon).not.toBeNull();
     expect(state.title).toBe("Paused");
   });
 
@@ -72,16 +82,16 @@ describe("getAppVisualState", () => {
     const state = getAppVisualState(appWith("partial"));
 
     // Degraded is the one state that warrants attention, so the colour stays.
-    expect(`${state.dotClass} ${state.badgeClass}`).toMatch(/status-amber/);
-    expect(
-      [state.containerClass, state.dotInnerClass, state.badgeIconClass].join(" "),
-    ).not.toMatch(/animate-/);
+    expect(state.dotClass).toMatch(/status-amber/);
+    expect([state.containerClass, state.dotInnerClass].join(" ")).not.toMatch(
+      /animate-/,
+    );
   });
 
   it("carries the dot colour separately from its animation", () => {
     // The colour is the status marker; the animation is decoration. Turning
     // animations off must not remove the marker.
-    for (const status of ["updating", "partial", "paused"] as const) {
+    for (const status of ["updating", "partial", "paused", "unknown"] as const) {
       const state = getAppVisualState(appWith(status));
       expect(state.dotClass).not.toBe("");
       expect(state.dotClass).not.toMatch(/animate-/);
@@ -91,8 +101,8 @@ describe("getAppVisualState", () => {
   it("leaves a running app unmarked", () => {
     const state = getAppVisualState(appWith("running"));
 
-    expect(state.badgeIcon).toBeNull();
     expect(state.imageClass).toBe("");
+    expect(state.dotClass).toBe("");
     expect(state.title).toBe("Running");
   });
 });
