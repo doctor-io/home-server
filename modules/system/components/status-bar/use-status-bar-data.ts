@@ -56,10 +56,7 @@ export function useStatusBarData() {
       typeof metrics?.temperature.mainCelsius === "number"
         ? metrics.temperature.mainCelsius
         : null,
-    hostname: metrics?.hostname ?? "ServerLab",
-    uptimeSeconds: metrics?.uptimeSeconds ?? 0,
     stoppedAppsCount,
-    username: currentUser?.username,
     updateAvailable: Boolean(systemUpdates?.updateAvailable),
     latestVersion: systemUpdates?.latestVersion ?? null,
     preferences: notificationPreferences,

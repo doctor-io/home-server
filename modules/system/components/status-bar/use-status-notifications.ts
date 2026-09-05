@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { formatDuration, formatRelativeTime } from "@/modules/system/components/status-bar/utils";
+import { formatRelativeTime } from "@/modules/system/components/status-bar/utils";
 import {
   DESKTOP_NOTIFICATION_EVENT,
   type DesktopNotificationEventDetail,
@@ -22,10 +22,7 @@ type UseStatusNotificationsParams = {
   memoryPercent: number;
   diskPercent: number;
   temperatureCelsius: number | null;
-  hostname: string;
-  uptimeSeconds: number;
   stoppedAppsCount: number;
-  username: string | undefined;
   updateAvailable: boolean;
   latestVersion: string | null;
   preferences: DesktopNotificationPreferences;
@@ -68,16 +65,25 @@ function removeNotification(items: StoredNotification[], id: string) {
   }
 }
 
+/**
+ * Live alerts derived from system metrics.
+ *
+ * Everything here must be an event with a condition that can end: an app is
+ * stopped, a threshold is crossed, an update is waiting. "System Snapshot" and
+ * "Active Session" were neither. They were re-derived on every metrics tick
+ * from conditions that are always true while the desktop runs, so Clear all
+ * appeared broken — both were back a second later — and neither said anything
+ * the desktop was not already showing in the uptime widget, the network widget
+ * and the header greeting. They were also the only two marked read, so they
+ * never reached the badge either.
+ */
 export function useStatusNotifications({
   metricsTimestamp,
   cpuPercent,
   memoryPercent,
   diskPercent,
   temperatureCelsius,
-  hostname,
-  uptimeSeconds,
   stoppedAppsCount,
-  username,
   updateAvailable,
   latestVersion,
   preferences,
@@ -91,22 +97,6 @@ export function useStatusNotifications({
 
     setStoredNotifications((previous) => {
       const next = [...previous];
-
-      if (metricsTimestamp) {
-        upsertNotification(
-          next,
-          {
-            id: "system-snapshot",
-            title: "System Snapshot",
-            message: `${hostname} · uptime ${formatDuration(uptimeSeconds)}`,
-            read: true,
-            createdAt: eventTimestamp,
-          },
-          { preserveCreatedAt: true },
-        );
-      } else {
-        removeNotification(next, "system-snapshot");
-      }
 
       if (preferences.systemAlertsEnabled && stoppedAppsCount > 0) {
         upsertNotification(
@@ -125,22 +115,6 @@ export function useStatusNotifications({
         );
       } else {
         removeNotification(next, "apps-stopped");
-      }
-
-      if (username) {
-        upsertNotification(
-          next,
-          {
-            id: "session",
-            title: "Active Session",
-            message: `Signed in as ${username}`,
-            read: true,
-            createdAt: eventTimestamp,
-          },
-          { preserveCreatedAt: true },
-        );
-      } else {
-        removeNotification(next, "session");
       }
 
       const maybeCreateAlert = (
@@ -221,7 +195,6 @@ export function useStatusNotifications({
     });
   }, [
     cpuPercent,
-    hostname,
     memoryPercent,
     metricsTimestamp,
     stoppedAppsCount,
@@ -229,9 +202,7 @@ export function useStatusNotifications({
     latestVersion,
     preferences,
     temperatureCelsius,
-    uptimeSeconds,
     updateAvailable,
-    username,
   ]);
 
   useEffect(() => {

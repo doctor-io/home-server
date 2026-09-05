@@ -227,7 +227,11 @@ describe("useStatusBarData", () => {
       data: buildMetrics({ timestamp: oldTimestamp, cpuPercent: 20, memoryPercent: 20 }),
       isError: false,
     });
-    mockUseInstalledApps.mockReturnValue({ data: [] });
+    // A live alert, since the list now only holds events with a condition that
+    // can end — the always-on "System Snapshot" this used to watch is gone.
+    mockUseInstalledApps.mockReturnValue({
+      data: [{ id: "1", name: "Immich", status: "stopped", updatedAt: "2026-02-22T23:00:00.000Z" }],
+    });
     mockUseCurrentUser.mockReturnValue({ data: { id: "u1", username: "admin" } });
 
     const client = createTestQueryClient();
@@ -236,10 +240,10 @@ describe("useStatusBarData", () => {
     });
 
     await waitFor(() => {
-      const snapshot = result.current.notifications.find(
-        (notification) => notification.title === "System Snapshot",
+      const alert = result.current.notifications.find(
+        (notification) => notification.title === "Apps Attention",
       );
-      expect(snapshot?.time).toMatch(/min ago/);
+      expect(alert?.time).toMatch(/min ago/);
     });
 
     mockUseSystemMetrics.mockReturnValue({
@@ -248,10 +252,10 @@ describe("useStatusBarData", () => {
     });
     rerender();
 
-    const refreshedSnapshot = result.current.notifications.find(
-      (notification) => notification.title === "System Snapshot",
+    const refreshedAlert = result.current.notifications.find(
+      (notification) => notification.title === "Apps Attention",
     );
-    expect(refreshedSnapshot?.time).not.toBe("0s ago");
+    expect(refreshedAlert?.time).not.toBe("0s ago");
   });
 
   it("marks wifi icon as error style when disconnected", () => {
