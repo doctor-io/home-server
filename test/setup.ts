@@ -21,6 +21,19 @@ vi.mock("@/lib/server/modules/auth/api", async () => {
   };
 });
 
+// Tests must never write to a real database. The app-operation tests walk every
+// success and failure branch, and each branch inserted a notification row for
+// real — around twenty per run, into whatever DATABASE_URL points at, which for
+// a developer is their own dev database. Half the notifications in a working
+// install were coming from the test suite, and the pre-commit hook runs it on
+// every commit.
+vi.mock("@/lib/server/modules/notifications/service", () => ({
+  listNotifications: vi.fn(async () => []),
+  createNotification: vi.fn(async () => undefined),
+  markAllNotificationsRead: vi.fn(async () => undefined),
+  clearAllNotifications: vi.fn(async () => undefined),
+}));
+
 // next-themes calls window.matchMedia on mount; JSDOM doesn't implement it.
 if (typeof window !== "undefined" && !window.matchMedia) {
   Object.defineProperty(window, "matchMedia", {
