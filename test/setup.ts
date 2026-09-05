@@ -71,6 +71,42 @@ if (typeof globalThis !== "undefined" && !globalThis.localStorage) {
   });
 }
 
+// Radix primitives (dropdown menus, selects) rely on pointer capture,
+// ResizeObserver and scrollIntoView — none of which JSDOM implements.
+if (typeof window !== "undefined") {
+  if (!("ResizeObserver" in globalThis)) {
+    class ResizeObserverMock {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+
+    Object.defineProperty(globalThis, "ResizeObserver", {
+      configurable: true,
+      writable: true,
+      value: ResizeObserverMock,
+    });
+  }
+
+  if (!("PointerEvent" in globalThis)) {
+    Object.defineProperty(globalThis, "PointerEvent", {
+      configurable: true,
+      writable: true,
+      value: globalThis.MouseEvent,
+    });
+  }
+
+  if (!Element.prototype.hasPointerCapture) {
+    Element.prototype.hasPointerCapture = () => false;
+    Element.prototype.setPointerCapture = () => {};
+    Element.prototype.releasePointerCapture = () => {};
+  }
+
+  if (!Element.prototype.scrollIntoView) {
+    Element.prototype.scrollIntoView = () => {};
+  }
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
