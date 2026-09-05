@@ -42,11 +42,11 @@ export function FullScreenShell({
     >
       <div className="absolute inset-0">
         <div
-          className="absolute inset-0 scale-110 bg-cover bg-center bg-no-repeat"
+          className="animate-homeio-unblur absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{ backgroundImage: `url('${resolvedWallpaper}')` }}
           data-testid="full-screen-wallpaper"
         />
-        <div className="absolute inset-0 bg-background/62 backdrop-blur-3xl" />
+        <div className="absolute inset-0 bg-background/28 backdrop-blur-[2px]" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_22%,rgba(255,255,255,0.045)_0%,transparent_30%),radial-gradient(circle_at_50%_100%,rgba(255,96,0,0.16)_0%,transparent_42%)]" />
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,10,18,0.26)_0%,rgba(4,10,18,0.14)_38%,rgba(18,12,8,0.3)_100%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.12)_48%,rgba(0,0,0,0.4)_100%)]" />

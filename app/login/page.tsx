@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { LoginForm } from "@/components/auth/login-form";
+import { AuthCard } from "@/modules/shell/components/auth-card";
 import { FullScreenShell } from "@/modules/shell/components/full-screen-shell";
 
 // Read DEMO_MODE at request time, not build time — without this Next.js
@@ -13,11 +14,11 @@ export default function LoginPage() {
   return (
     <FullScreenShell
       center={
-        <div className="w-full max-w-md">
+        <AuthCard>
           <Suspense fallback={null}>
             <LoginForm isDemoMode={isDemoMode} />
           </Suspense>
-        </div>
+        </AuthCard>
       }
     />
   );
