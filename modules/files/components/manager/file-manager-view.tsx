@@ -253,7 +253,7 @@ export function FileManagerView({
           uploadFilesPending={uploadPending}
           uploadInputRef={uploadInputRef}
           viewMode={viewMode}
-          onCycleSortBy={() => dispatch({ type: "SET_SORT_BY", by: sortBy === "name" ? "modified" : sortBy === "modified" ? "size" : "name" })}
+          onSetSortBy={(by) => dispatch({ type: "SET_SORT_BY", by })}
           onEmptyTrash={actions.handleEmptyTrash}
           onNavigateToPath={navigateToPath}
           onNavigateUp={() => dispatch({ type: "NAVIGATE_UP" })}

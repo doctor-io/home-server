@@ -108,7 +108,12 @@ describe("FileManager navigation", () => {
 
     await renderFileManager();
     fireEvent.click(screen.getByRole("button", { name: "Trash" }));
-    fireEvent.click(await screen.findByRole("button", { name: /empty trash/i }));
+    // Radix opens its menu on pointerdown, not click.
+    fireEvent.pointerDown(
+      await screen.findByRole("button", { name: /view options/i }),
+      { button: 0, ctrlKey: false, pointerType: "mouse" },
+    );
+    fireEvent.click(await screen.findByRole("menuitem", { name: /empty trash/i }));
     fireEvent.click(
       await screen.findAllByRole("button", { name: /empty trash/i }).then((buttons) => buttons.at(-1)!),
     );
