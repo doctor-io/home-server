@@ -36,7 +36,21 @@ function EntryActionsButton({
       type="button"
       aria-label={`Actions for ${entry.name}`}
       title="Actions"
-      onClick={(event) => onEntryContextMenu(event, entry)}
+      onClick={(event) => {
+        // Anchor the menu under the handle rather than at the pointer. A
+        // keyboard activation reports clientX/clientY as 0, which the caller
+        // would clamp into the window corner, far from the focused entry.
+        const rect = event.currentTarget.getBoundingClientRect();
+        onEntryContextMenu(
+          {
+            preventDefault: () => event.preventDefault(),
+            stopPropagation: () => event.stopPropagation(),
+            clientX: rect.left,
+            clientY: rect.bottom,
+          } as unknown as MouseEvent,
+          entry,
+        );
+      }}
       className={cn(
         "inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-all",
         "hover:bg-background/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
