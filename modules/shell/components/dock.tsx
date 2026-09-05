@@ -16,7 +16,25 @@ type DockProps = {
   onItemClick?: (id: string) => void;
   position?: "bottom" | "left" | "right";
   animationsEnabled?: boolean;
+  iconSize?: "small" | "medium" | "large";
 };
+
+/**
+ * The dock follows the desktop icon setting.
+ *
+ * It used to be pinned at 44px while the grid moved between 48 and 72, so the
+ * one control named "icon size" resized half the desktop and left the dock
+ * behind — the larger the setting, the more the two disagreed. Medium keeps the
+ * exact size the dock has always had, so the default is unchanged.
+ *
+ * Dock icons stay a little smaller than the grid's, the way a dock usually
+ * reads against the desktop behind it.
+ */
+const DOCK_SIZING = {
+  small: { button: "size-10", radius: "rounded-xl", glyph: "size-4", gap: "gap-2.5" },
+  medium: { button: "size-11", radius: "rounded-2xl", glyph: "size-5", gap: "gap-3" },
+  large: { button: "size-14", radius: "rounded-[1.25rem]", glyph: "size-6", gap: "gap-3.5" },
+} as const;
 
 export function Dock({
   activeWindows = [],
@@ -24,7 +42,9 @@ export function Dock({
   onItemClick,
   position = "bottom",
   animationsEnabled = true,
+  iconSize = "medium",
 }: DockProps) {
+  const sizing = DOCK_SIZING[iconSize];
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const dockRef = useRef<HTMLDivElement>(null);
   const isVertical = position === "left" || position === "right";
@@ -54,7 +74,7 @@ export function Dock({
     <div className={`${dockPositionClass} z-50`} style={dockPositionStyle}>
       <nav
         ref={dockRef}
-        className={`flex gap-3 border border-white/[0.09] rounded-[calc(var(--radius)+0.375rem)] shadow-2xl shadow-black/40 ${
+        className={`flex ${sizing.gap} border border-white/[0.09] rounded-[calc(var(--radius)+0.375rem)] shadow-2xl shadow-black/40 ${
           isVertical
             ? "flex-col items-center px-2.5 py-3"
             : "items-end px-3 py-2.5"
@@ -75,9 +95,9 @@ export function Dock({
 
           const iconFallback = (
             <div
-              className={`size-full rounded-2xl flex items-center justify-center ${item.iconBg}`}
+              className={`size-full ${sizing.radius} flex items-center justify-center ${item.iconBg}`}
             >
-              <item.icon className="size-5 text-white" />
+              <item.icon className={`${sizing.glyph} text-white`} />
             </div>
           );
 
@@ -94,14 +114,14 @@ export function Dock({
                         ? "transform 0.16s ease-out"
                         : "none",
                     }}
-                    className="relative size-11 rounded-2xl overflow-hidden cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                    className={`relative ${sizing.button} ${sizing.radius} overflow-hidden cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary/60`}
                     aria-label={item.name}
                     aria-pressed={isFocused}
                   >
                     <OsIcon
                       src={osSrc}
                       alt={item.name}
-                      className={`size-full rounded-2xl object-contain transition-[box-shadow] duration-150 ${
+                      className={`size-full ${sizing.radius} object-contain transition-[box-shadow] duration-150 ${
                         isFocused
                           ? "shadow-[0_0_0_2px_hsl(var(--primary)/0.5),0_2px_8px_rgba(0,0,0,0.3)]"
                           : isRunning

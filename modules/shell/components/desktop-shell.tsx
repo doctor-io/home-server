@@ -864,6 +864,7 @@ function DesktopShellInner() {
           onItemClick={handleDockClick}
           position={appearance.dockPosition}
           animationsEnabled={appearance.animationsEnabled}
+          iconSize={appIconSize}
         />
 
         {isLocked && (
