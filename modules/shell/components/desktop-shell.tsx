@@ -753,8 +753,13 @@ function DesktopShellInner() {
             onTransitionEnd={finalizeWallpaperFade}
           />
         )}
-        {/* Depth vignette — transparent at center, darker at edges */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_130%_100%_at_50%_0%,transparent_28%,rgba(0,0,0,0.42)_100%)]" />
+        {/* Depth vignette — transparent at center, darker at edges.
+            Three stops rather than two: a single linear ramp reads as a grey
+            wash laid over the wallpaper, and it pooled hardest at the lower
+            right, which is exactly where the widget column sits. Easing the
+            falloff and holding the clear centre wider keeps the depth without
+            the smear behind the cards. */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_130%_100%_at_50%_0%,transparent_45%,rgba(0,0,0,0.10)_72%,rgba(0,0,0,0.26)_100%)]" />
         {/* Bottom ambient shadow (dock area) */}
         <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-black/30 to-transparent" />
       </div>
