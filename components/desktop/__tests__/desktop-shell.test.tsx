@@ -479,7 +479,11 @@ describe("DesktopShell reboot handling", () => {
     fireEvent.click(screen.getByRole("button", { name: "Dock App Store" }));
     fireEvent.keyDown(window, { key: "k", metaKey: true });
 
-    expect(screen.getAllByText("Recent").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Open App Store").length).toBeGreaterThan(1);
+    // The palette is one ranked list now, so a recent entry is recognised by
+    // the context it carries rather than by a "Recent" heading above it — and
+    // being promoted there removes it from the static list, so the destination
+    // is offered exactly once.
+    expect(screen.getByText("Browse and install apps")).toBeTruthy();
+    expect(screen.getAllByText("Open App Store")).toHaveLength(1);
   });
 });

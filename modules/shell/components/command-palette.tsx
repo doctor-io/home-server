@@ -10,13 +10,9 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-  CommandSeparator,
-  CommandShortcut,
 } from "@/components/ui/command";
 import {
-  Clock,
   FolderOpen,
-  Search,
   Settings,
   ShoppingBag,
   Sparkles,
@@ -68,6 +64,29 @@ function StoreSearchIcon({ app }: { app: StoreAppSummary }) {
   );
 }
 
+const ROW = "gap-2.5 rounded-lg px-2.5 py-2.5 text-sm";
+
+/** Where a result lives, said once, inline — not a category chip on every row. */
+function RowContext({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="truncate text-muted-foreground/70 [[data-selected=true]_&]:text-accent-foreground/75">
+      {children}
+    </span>
+  );
+}
+
+/** Only the row you are about to trigger needs to advertise the key for it. */
+function EnterHint() {
+  return (
+    <span
+      aria-hidden="true"
+      className="ml-auto shrink-0 font-mono text-xs opacity-0 [[data-selected=true]_&]:text-accent-foreground/70 [[data-selected=true]_&]:opacity-100"
+    >
+      ↵
+    </span>
+  );
+}
+
 export function CommandPalette({
   open,
   onOpenChange,
@@ -101,6 +120,14 @@ export function CommandPalette({
     return haystack.includes(normalizedQuery.toLowerCase());
   });
 
+  // A window promoted into Recent must not also appear in the static list below:
+  // one ranked list should never offer the same destination twice.
+  const recentWindowIds = new Set(
+    filteredRecentActions
+      .filter((action) => action.kind === "window")
+      .map((action) => action.windowId),
+  );
+
   function renderRecentActionIcon(action: CommandPaletteRecentAction) {
     if (action.kind === "window") {
       if (action.windowId === "files") return <FolderOpen className="size-4 text-primary" />;
@@ -127,33 +154,21 @@ export function CommandPalette({
       className="overflow-hidden border border-white/[0.09] bg-black/60 p-0 shadow-[var(--system-shadow-floating)] [backdrop-filter:blur(40px)_saturate(160%)] [border-radius:var(--system-radius-floating)] max-w-[min(92vw,44rem)]"
       showCloseButton={false}
     >
-      {/* Hero header — matches lock screen / login design language */}
-      <div className="flex flex-col items-center border-b border-white/8 bg-black/22 px-6 py-5">
-        <div className="system-hero-surface flex size-[3.25rem] items-center justify-center bg-black/22 shadow-[var(--system-shadow-dock)]">
-          <Search className="size-6 text-foreground/72" />
-        </div>
-        <div className="system-pill-surface mt-3 px-3 py-1 text-[10px] tracking-[0.22em] text-foreground/55 uppercase">
-          Command Palette
-        </div>
-        <div className="mt-3 w-full [&_[data-slot=command-input-wrapper]]:h-10 [&_[data-slot=command-input-wrapper]]:border-0 [&_[data-slot=command-input-wrapper]]:px-0">
-          <div className="system-soft-surface bg-black/22 px-3 shadow-[var(--system-shadow-dock)]">
-            <CommandInput
-              autoFocus
-              value={query}
-              onValueChange={onQueryChange}
-              placeholder="Search settings, apps, and tools…"
-              className="text-[15px] text-foreground placeholder:text-muted-foreground/50"
-            />
-          </div>
-        </div>
-        <div className="mt-2.5 flex items-center gap-3 text-[10px] text-muted-foreground/40 tracking-widest uppercase">
-          <span className="system-keycap-surface px-1.5 py-0.5 font-mono">⌘K</span>
-          <span className="opacity-50">·</span>
-          <span className="system-keycap-surface px-1.5 py-0.5 font-mono">Esc</span>
-        </div>
+      {/* One input, then results. The palette used to open on a hero icon, a
+          "COMMAND PALETTE" pill and a row of keycaps — three bands of chrome
+          before the first match. You reached this by typing; it does not need
+          to introduce itself. */}
+      <div className="border-b border-white/8 px-2">
+        <CommandInput
+          autoFocus
+          value={query}
+          onValueChange={onQueryChange}
+          placeholder="Search for apps, settings, or actions"
+          className="h-12 text-[15px] text-foreground placeholder:text-muted-foreground/45"
+        />
       </div>
 
-      <CommandList className="max-h-[26rem]">
+      <CommandList className="max-h-[26rem] px-2 pb-2">
         <CommandEmpty>
           <div className="py-8 text-center">
             <p className="text-sm font-medium text-foreground">No matches found</p>
@@ -163,86 +178,70 @@ export function CommandPalette({
           </div>
         </CommandEmpty>
 
-        {filteredRecentActions.length > 0 ? (
-          <>
-            <CommandGroup heading="Recent">
-              {filteredRecentActions.map((action) => (
-                <CommandItem
-                  key={action.key}
-                  value={`${action.title} ${action.subtitle}`}
-                  onSelect={() => onSelectRecentAction(action)}
-                >
-                  {renderRecentActionIcon(action)}
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium text-foreground">
-                      {action.title}
-                    </div>
-                    <div className="truncate text-xs text-muted-foreground">
-                      {action.subtitle}
-                    </div>
-                  </div>
-                  <CommandShortcut className="flex items-center gap-1 tracking-normal">
-                    <Clock className="size-3.5" />
-                    <span>Recent</span>
-                  </CommandShortcut>
-                </CommandItem>
-              ))}
-            </CommandGroup>
+        {/* One ranked list rather than four labelled sections. When you type,
+            the best match should be first, not third inside the right heading —
+            and with each row naming where it lives, the headings only repeated
+            what the rows already say. */}
+        <CommandGroup>
+          {filteredRecentActions.map((action) => (
+            <CommandItem
+              key={action.key}
+              value={`${action.title} ${action.subtitle}`}
+              onSelect={() => onSelectRecentAction(action)}
+              className={ROW}
+            >
+              {renderRecentActionIcon(action)}
+              <span className="truncate text-foreground">{action.title}</span>
+              <RowContext>{action.subtitle}</RowContext>
+              <EnterHint />
+            </CommandItem>
+          ))}
 
-            <CommandSeparator />
-          </>
-        ) : null}
+          {recentWindowIds.has("settings") ? null : (
+            <CommandItem onSelect={() => onOpenWindow("settings")} className={ROW}>
+              <Settings className="size-4 text-primary" />
+              <span className="truncate text-foreground">Open Settings</span>
+              <EnterHint />
+            </CommandItem>
+          )}
+          {recentWindowIds.has("app-store") ? null : (
+            <CommandItem onSelect={() => onOpenWindow("app-store")} className={ROW}>
+              <ShoppingBag className="size-4 text-sky-400" />
+              <span className="truncate text-foreground">Open App Store</span>
+              <EnterHint />
+            </CommandItem>
+          )}
+          {recentWindowIds.has("files") ? null : (
+            <CommandItem onSelect={() => onOpenWindow("files")} className={ROW}>
+              <FolderOpen className="size-4 text-primary" />
+              <span className="truncate text-foreground">Open Files</span>
+              <EnterHint />
+            </CommandItem>
+          )}
+          {recentWindowIds.has("terminal") ? null : (
+            <CommandItem onSelect={() => onOpenWindow("terminal")} className={ROW}>
+              <TerminalSquare className="size-4 text-emerald-400" />
+              <span className="truncate text-foreground">Open Terminal</span>
+              <EnterHint />
+            </CommandItem>
+          )}
 
-        <CommandGroup heading="Quick Actions">
-          <CommandItem onSelect={() => onOpenWindow("settings")}>
-            <Settings className="size-4 text-primary" />
-            <span>Open Settings</span>
-            <CommandShortcut>System</CommandShortcut>
-          </CommandItem>
-          <CommandItem onSelect={() => onOpenWindow("app-store")}>
-            <ShoppingBag className="size-4 text-sky-400" />
-            <span>Open App Store</span>
-            <CommandShortcut>Apps</CommandShortcut>
-          </CommandItem>
-          <CommandItem onSelect={() => onOpenWindow("files")}>
-            <FolderOpen className="size-4 text-primary" />
-            <span>Open Files</span>
-            <CommandShortcut>/DATA</CommandShortcut>
-          </CommandItem>
-          <CommandItem onSelect={() => onOpenWindow("terminal")}>
-            <TerminalSquare className="size-4 text-emerald-400" />
-            <span>Open Terminal</span>
-            <CommandShortcut>Shell</CommandShortcut>
-          </CommandItem>
-        </CommandGroup>
-
-        <CommandSeparator />
-
-        <CommandGroup heading="Settings">
           {matchingSettings.map((section) => (
             <CommandItem
               key={section.id}
               onSelect={() => onOpenSettingsSection(section.id)}
+              className={ROW}
             >
               <Settings className="size-4 text-primary" />
-              <span>{section.label}</span>
-              <CommandShortcut>Settings</CommandShortcut>
+              <span className="truncate text-foreground">{section.label}</span>
+              <RowContext>in Settings</RowContext>
+              <EnterHint />
             </CommandItem>
           ))}
-        </CommandGroup>
 
-        <CommandSeparator />
-
-        <CommandGroup heading="App Store">
           {storeCatalogQuery.isLoading && normalizedQuery ? (
             <div className="px-2 py-3 text-xs text-muted-foreground">
-              Searching apps...
-            </div>
-          ) : null}
-
-          {!storeCatalogQuery.isLoading && appResults.length === 0 && normalizedQuery ? (
-            <div className="px-2 py-3 text-xs text-muted-foreground">
-              No App Store apps match “{normalizedQuery}”.
+              Searching apps…
             </div>
           ) : null}
 
@@ -250,34 +249,18 @@ export function CommandPalette({
             <CommandItem
               key={app.id}
               value={`${app.name} ${app.description} ${app.categories.join(" ")}`}
-              onSelect={() =>
-                onOpenAppStoreSearch({
-                  search: app.name,
-                  appId: app.id,
-                })
-              }
-              className="gap-3 rounded-lg py-2.5"
+              onSelect={() => onOpenAppStoreSearch({ search: app.name, appId: app.id })}
+              className={ROW}
             >
               <StoreSearchIcon app={app} />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="truncate text-sm font-medium text-foreground">
-                    {app.name}
-                  </span>
-                  {app.updateAvailable ? (
-                    <span className="rounded-md bg-primary/12 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-[0.16em] text-primary">
-                      Update
-                    </span>
-                  ) : null}
-                </div>
-                <p className="truncate text-xs text-muted-foreground">
-                  {app.description}
-                </p>
-              </div>
-              <CommandShortcut className="flex items-center gap-1 tracking-normal">
-                <Sparkles className="size-3.5" />
-                <span>App Store</span>
-              </CommandShortcut>
+              <span className="truncate text-foreground">{app.name}</span>
+              {app.updateAvailable ? (
+                <span className="shrink-0 rounded-md bg-primary/12 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-[0.16em] text-primary">
+                  Update
+                </span>
+              ) : null}
+              <RowContext>in App Store</RowContext>
+              <EnterHint />
             </CommandItem>
           ))}
         </CommandGroup>
