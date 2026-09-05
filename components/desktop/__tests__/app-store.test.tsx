@@ -281,15 +281,19 @@ describe("AppStore", () => {
     });
   });
 
-  it("renders CasaOS catalog sections and category sidebar", () => {
+  it("renders CasaOS catalog sections and the category filter", () => {
     setup();
 
     expect(screen.getAllByText("Plex").length).toBeGreaterThan(0);
     expect(screen.getAllByAltText("Plex").length).toBeGreaterThan(0);
-    expect(screen.getByText("Categories")).toBeTruthy();
     expect(screen.getByText("Featured")).toBeTruthy();
     expect(screen.getByText("Recommended")).toBeTruthy();
-    expect(screen.getByTitle("Media apps")).toBeTruthy();
+
+    // Categories are a row of pills, not a column. "All" rather than "All Apps",
+    // which the toolbar already uses for the install-state tab.
+    const filter = screen.getByRole("group", { name: "Filter by category" });
+    expect(within(filter).getByRole("button", { name: "All" })).toBeTruthy();
+    expect(within(filter).getByTitle("Media apps")).toBeTruthy();
   });
 
   it("opens the source management dialog from the install menu", async () => {

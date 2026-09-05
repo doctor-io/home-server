@@ -145,11 +145,23 @@ function SourceBadge({ sourceName, sourceKind }: Pick<StoreAppSummary, "sourceNa
   );
 }
 
-// ── Category sidebar ──────────────────────────────────────────────────────────
+// ── Category filter ───────────────────────────────────────────────────────────
 
 type CatalogCategory = { id: string; name: string; description: string; appCount: number };
 
-function CategorySidebar({
+/**
+ * Categories are a filter, not a place, so they read better as a row of pills
+ * than as a permanent column competing with the catalog for the eye.
+ *
+ * The first pill is "All" rather than "All Apps": the toolbar already has an
+ * "All Apps" tab that filters by install state, and two controls with the same
+ * label meaning different things is worse than a shorter word.
+ *
+ * Per-category counts are dropped here — the catalog header reports the count
+ * for whatever is selected, so the number is one selection away instead of
+ * repeated a dozen times across the row.
+ */
+function CategoryPills({
   categories,
   selectedCategory,
   onSelect,
@@ -158,41 +170,39 @@ function CategorySidebar({
   selectedCategory: string | null;
   onSelect: (category: string | null) => void;
 }) {
+  const pill =
+    "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors";
+  const idle =
+    "border-glass-border bg-background/40 text-muted-foreground hover:text-foreground hover:border-primary/25";
+  const active = "border-primary/30 bg-primary/15 text-primary";
+
   return (
-    <aside className={cn("m-2 flex w-48 shrink-0 flex-col overflow-y-auto px-2 py-3", STORE_PANEL_SHELL)}>
-      <div className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/50">
-        Categories
-      </div>
-      <div className="flex flex-col gap-0.5">
+    <div
+      className="flex shrink-0 items-center gap-1.5 overflow-x-auto px-4 pb-1 pt-3"
+      role="group"
+      aria-label="Filter by category"
+    >
+      <button
+        type="button"
+        onClick={() => onSelect(null)}
+        aria-pressed={selectedCategory === null}
+        className={cn(pill, selectedCategory === null ? active : idle)}
+      >
+        All
+      </button>
+      {categories.map((cat) => (
         <button
+          key={cat.id}
           type="button"
-          onClick={() => onSelect(null)}
-          className={cn(
-            "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-[13px] font-medium transition-colors",
-            selectedCategory === null ? "bg-primary/15 text-foreground" : "text-muted-foreground hover:bg-background/50 hover:text-foreground",
-          )}
+          onClick={() => onSelect(cat.name)}
+          title={cat.description}
+          aria-pressed={selectedCategory === cat.name}
+          className={cn(pill, selectedCategory === cat.name ? active : idle)}
         >
-          <span>All Apps</span>
+          {cat.name}
         </button>
-        {categories.map((cat) => (
-          <button
-            key={cat.id}
-            type="button"
-            onClick={() => onSelect(cat.name)}
-            title={cat.description}
-            className={cn(
-              "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-[13px] font-medium transition-colors",
-              selectedCategory === cat.name ? "bg-primary/15 text-foreground" : "text-muted-foreground hover:bg-background/50 hover:text-foreground",
-            )}
-          >
-            <span className="truncate">{cat.name}</span>
-            <span className={cn(STORE_BADGE_SURFACE, "ml-1.5 shrink-0 px-1.5 py-0.5 text-2xs text-muted-foreground")}>
-              {cat.appCount}
-            </span>
-          </button>
-        ))}
-      </div>
-    </aside>
+      ))}
+    </div>
   );
 }
 
@@ -875,10 +885,10 @@ export function AppStore({
         onRemoveSource={async (sourceId) => { await removeSource.mutateAsync(sourceId); }}
       />
 
-      <div className="flex flex-1 overflow-hidden">
-        <CategorySidebar categories={categories} selectedCategory={selectedCategory} onSelect={setSelectedCategory} />
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <CategoryPills categories={categories} selectedCategory={selectedCategory} onSelect={setSelectedCategory} />
 
-        <div className={cn("m-2 flex-1 overflow-y-auto p-4", STORE_PANEL_SHELL)}>
+        <div className={cn("mx-2 mb-2 mt-1 flex-1 overflow-y-auto p-4", STORE_PANEL_SHELL)}>
           {actionError && (
             <div className="mb-3 rounded-lg border border-status-red/30 bg-status-red/10 px-3 py-2 text-xs text-status-red">
               {actionError}
