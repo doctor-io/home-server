@@ -347,6 +347,26 @@ describe("AppStore", () => {
     expect(installApp).toHaveBeenCalledWith({ appId: "plex" });
   });
 
+  it("installs straight from the catalog row without opening the detail panel", () => {
+    const { installApp } = setup({
+      detail: installableAppDetail,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /^install$/i }));
+
+    expect(installApp).toHaveBeenCalledWith({ appId: "plex" });
+    // The row action must not be a shortcut into the detail view.
+    expect(screen.queryByRole("button", { name: /back to store/i })).toBeNull();
+  });
+
+  it("keeps the row itself a way into the detail panel", () => {
+    setup({ detail: installableAppDetail });
+
+    fireEvent.click(screen.getByRole("button", { name: /view details for plex/i }));
+
+    expect(screen.getByRole("button", { name: /back to store/i })).toBeTruthy();
+  });
+
   it("uses installed apps query for the installed count badge", () => {
     useStoreCatalogMock.mockReturnValue({
       data: {

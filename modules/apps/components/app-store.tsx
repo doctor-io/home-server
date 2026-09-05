@@ -39,6 +39,11 @@ import {
 } from "@/lib/ui/surface-tokens";
 import { cn } from "@/lib/utils";
 
+const STORE_ROW_ACTION =
+  "inline-flex items-center gap-1.5 rounded-lg bg-primary px-2.5 py-1.5 text-2xs font-semibold text-primary-foreground transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60";
+const STORE_ROW_ACTION_SECONDARY =
+  "inline-flex items-center gap-1.5 rounded-lg border border-glass-border bg-background/50 px-2.5 py-1.5 text-2xs font-medium text-foreground transition-colors hover:border-primary/30 hover:text-primary";
+
 const STORE_PAGE_SIZE = 24;
 const STORE_SECTION_LIMIT = 8;
 
@@ -250,90 +255,148 @@ function FeaturedStrip({
 
 // ── Catalog row ───────────────────────────────────────────────────────────────
 
+function CatalogRowAction({
+  app,
+  operation,
+  onInstall,
+  onUpdate,
+}: {
+  app: StoreAppSummary;
+  operation?: AppOperationState;
+  onInstall: () => void;
+  onUpdate: () => void;
+}) {
+  const busy = isOperationBusy(operation);
+
+  if (operation?.status === "error") {
+    return <span className="text-2xs font-medium text-status-red">Failed</span>;
+  }
+  if (operation?.status === "success") {
+    return <span className="text-2xs font-medium text-status-green">Done</span>;
+  }
+  if (operation && busy) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-2xs text-muted-foreground">
+        <Loader2 className="size-3.5 animate-spin text-primary" />
+        {getStoreOperationLabel(operation)}…
+      </span>
+    );
+  }
+
+  if (app.status === "installed") {
+    if (app.updateAvailable) {
+      return (
+        <UpdateInfoTooltip app={app}>
+          <button type="button" onClick={onUpdate} className={STORE_ROW_ACTION}>
+            <ArrowUpCircle className="size-3.5" /> Update
+          </button>
+        </UpdateInfoTooltip>
+      );
+    }
+    if (app.webUiPort) {
+      return (
+        <a
+          href={`http://${typeof window !== "undefined" ? window.location.hostname : "localhost"}:${app.webUiPort}`}
+          target="_blank"
+          rel="noreferrer"
+          className={STORE_ROW_ACTION_SECONDARY}
+        >
+          <ExternalLink className="size-3.5" /> Open
+        </a>
+      );
+    }
+    return <span className="text-2xs font-medium text-status-green">Installed</span>;
+  }
+
+  if (app.status === "error") {
+    return <span className="text-2xs font-medium text-status-red">Error</span>;
+  }
+
+  return (
+    <button type="button" onClick={onInstall} className={STORE_ROW_ACTION}>
+      <Download className="size-3.5" /> Install
+    </button>
+  );
+}
+
 function CatalogRow({
   app,
   operation,
   onClick,
+  onInstall,
+  onUpdate,
 }: {
   app: StoreAppSummary;
   operation?: AppOperationState;
   onClick: () => void;
+  onInstall: () => void;
+  onUpdate: () => void;
 }) {
-  const busy = isOperationBusy(operation);
-
   return (
-    <button
-      type="button"
-      onClick={onClick}
+    <div
       className={cn(
         STORE_PANEL_INSET,
-        "group flex w-full items-center gap-3 p-3 text-left transition-all hover:border-primary/25 hover:bg-background/60",
+        "group flex w-full items-center gap-3 p-3 text-left transition-all hover:border-primary/25 hover:bg-background/60 focus-within:border-primary/25",
       )}
       style={{ contentVisibility: "auto", containIntrinsicSize: "72px" }}
     >
-      {/* Logo */}
-      <div className={cn(STORE_PANEL_INSET, "flex size-11 shrink-0 items-center justify-center overflow-hidden")}>
-        <StoreLogo logoUrl={app.logoUrl} alt={app.name} className="size-6 object-contain" />
-      </div>
+      {/* Everything left of the action opens the detail page. It is a sibling of
+          the action button rather than its parent — nesting them would be
+          invalid markup and would swallow the primary click. */}
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={`View details for ${app.name}`}
+        className="flex min-w-0 flex-1 items-center gap-3 text-left outline-none"
+      >
+        {/* Logo */}
+        <div className={cn(STORE_PANEL_INSET, "flex size-11 shrink-0 items-center justify-center overflow-hidden")}>
+          <StoreLogo logoUrl={app.logoUrl} alt={app.name} className="size-6 object-contain" />
+        </div>
 
-      {/* Info */}
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="truncate text-sm font-medium text-foreground">{app.name}</span>
-          <AppStatusDot app={app} operation={operation} />
-          {operation && !["error", "success"].includes(operation.status) && (
-            <span className="text-2xs text-muted-foreground">
-              {getStoreOperationLabel(operation)}… {operation.progressPercent}%
-            </span>
+        {/* Info */}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="truncate text-sm font-medium text-foreground">{app.name}</span>
+            <AppStatusDot app={app} operation={operation} />
+          </div>
+          <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground/70">{app.description}</p>
+
+          {operation && !["error", "success"].includes(operation.status) ? (
+            <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full bg-primary transition-all"
+                style={{ width: `${Math.max(2, operation.progressPercent)}%` }}
+              />
+            </div>
+          ) : (
+            <div className="mt-1.5 flex flex-wrap items-center gap-1">
+              <SourceBadge sourceName={app.sourceName} sourceKind={app.sourceKind} />
+              {app.categories.slice(0, 2).map((cat) => (
+                <span key={cat} className={cn(STORE_BADGE_SURFACE, "px-1.5 py-0.5 text-2xs text-muted-foreground/70")}>
+                  {cat}
+                </span>
+              ))}
+              {app.webUiPort && (
+                <span className={cn(STORE_BADGE_SURFACE, "px-1.5 py-0.5 font-mono text-2xs text-muted-foreground/70")}>
+                  :{app.webUiPort}
+                </span>
+              )}
+            </div>
           )}
         </div>
-        <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground/70">{app.description}</p>
+      </button>
 
-        {operation && !["error", "success"].includes(operation.status) ? (
-          <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full rounded-full bg-primary transition-all"
-              style={{ width: `${Math.max(2, operation.progressPercent)}%` }}
-            />
-          </div>
-        ) : (
-          <div className="mt-1.5 flex flex-wrap items-center gap-1">
-            <SourceBadge sourceName={app.sourceName} sourceKind={app.sourceKind} />
-            {app.categories.slice(0, 2).map((cat) => (
-              <span key={cat} className={cn(STORE_BADGE_SURFACE, "px-1.5 py-0.5 text-2xs text-muted-foreground/70")}>
-                {cat}
-              </span>
-            ))}
-            {app.webUiPort && (
-              <span className={cn(STORE_BADGE_SURFACE, "px-1.5 py-0.5 font-mono text-2xs text-muted-foreground/70")}>
-                :{app.webUiPort}
-              </span>
-            )}
-          </div>
-        )}
+      {/* Primary action, on the row itself */}
+      <div className="flex shrink-0 items-center justify-end text-right">
+        <CatalogRowAction
+          app={app}
+          operation={operation}
+          onInstall={onInstall}
+          onUpdate={onUpdate}
+        />
       </div>
-
-      {/* Status label */}
-      <div className="shrink-0 text-right">
-        {operation?.status === "error" ? (
-          <span className="text-2xs font-medium text-status-red">Failed</span>
-        ) : operation?.status === "success" ? (
-          <span className="text-2xs font-medium text-status-green">Done</span>
-        ) : busy ? (
-          <Loader2 className="size-3.5 animate-spin text-primary" />
-        ) : app.status === "installed" ? (
-          <span className={cn("text-2xs font-medium", app.updateAvailable ? "text-primary" : "text-status-green")}>
-            {app.updateAvailable ? "Update" : "Installed"}
-          </span>
-        ) : app.status === "error" ? (
-          <span className="text-2xs font-medium text-status-red">Error</span>
-        ) : (
-          <span className="text-2xs text-muted-foreground/40 transition-colors group-hover:text-muted-foreground">
-            Get →
-          </span>
-        )}
-      </div>
-    </button>
+    </div>
   );
 }
 
@@ -880,6 +943,8 @@ export function AppStore({
                       app={app}
                       operation={operationsByApp[app.id]}
                       onClick={() => setSelectedAppId(app.id)}
+                      onInstall={() => void startInstall(app)}
+                      onUpdate={() => void startUpdate(app)}
                     />
                   ))}
                 </div>
