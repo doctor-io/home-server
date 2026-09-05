@@ -362,6 +362,9 @@ function CatalogRow({
           </div>
           <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground/70">{app.description}</p>
 
+          {/* Categories and the web UI port are filter and detail material, not
+              scanning material — the detail panel carries both. The source is
+              worth flagging only when it is not the official catalog. */}
           {operation && !["error", "success"].includes(operation.status) ? (
             <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-muted">
               <div
@@ -369,21 +372,11 @@ function CatalogRow({
                 style={{ width: `${Math.max(2, operation.progressPercent)}%` }}
               />
             </div>
-          ) : (
-            <div className="mt-1.5 flex flex-wrap items-center gap-1">
+          ) : app.sourceKind !== "official" ? (
+            <div className="mt-1.5 flex items-center">
               <SourceBadge sourceName={app.sourceName} sourceKind={app.sourceKind} />
-              {app.categories.slice(0, 2).map((cat) => (
-                <span key={cat} className={cn(STORE_BADGE_SURFACE, "px-1.5 py-0.5 text-2xs text-muted-foreground/70")}>
-                  {cat}
-                </span>
-              ))}
-              {app.webUiPort && (
-                <span className={cn(STORE_BADGE_SURFACE, "px-1.5 py-0.5 font-mono text-2xs text-muted-foreground/70")}>
-                  :{app.webUiPort}
-                </span>
-              )}
             </div>
-          )}
+          ) : null}
         </div>
       </button>
 

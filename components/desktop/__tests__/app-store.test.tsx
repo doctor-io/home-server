@@ -286,7 +286,6 @@ describe("AppStore", () => {
 
     expect(screen.getAllByText("Plex").length).toBeGreaterThan(0);
     expect(screen.getAllByAltText("Plex").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Official CasaOS").length).toBeGreaterThan(0);
     expect(screen.getByText("Categories")).toBeTruthy();
     expect(screen.getByText("Featured")).toBeTruthy();
     expect(screen.getByText("Recommended")).toBeTruthy();
@@ -357,6 +356,36 @@ describe("AppStore", () => {
     expect(installApp).toHaveBeenCalledWith({ appId: "plex" });
     // The row action must not be a shortcut into the detail view.
     expect(screen.queryByRole("button", { name: /back to store/i })).toBeNull();
+  });
+
+  it("keeps the catalog row to name, description and action", () => {
+    setup({ apps: [installedSummaryApp] });
+
+    const row = screen.getByRole("button", { name: /view details for plex/i });
+
+    expect(within(row).getByText("Plex")).toBeTruthy();
+    expect(within(row).getByText("Media server")).toBeTruthy();
+    // Category, port and the official source belong to the detail panel.
+    expect(within(row).queryByText("Media")).toBeNull();
+    expect(within(row).queryByText(/32400/)).toBeNull();
+    expect(within(row).queryByText("Official CasaOS")).toBeNull();
+  });
+
+  it("flags a source on the row only when it is not the official catalog", () => {
+    setup({
+      apps: [
+        {
+          ...installedSummaryApp,
+          sourceId: "my-compose",
+          sourceName: "My Compose",
+          sourceKind: "custom",
+        },
+      ],
+    });
+
+    const row = screen.getByRole("button", { name: /view details for plex/i });
+
+    expect(within(row).getByText("My Compose")).toBeTruthy();
   });
 
   it("keeps the row itself a way into the detail panel", () => {
