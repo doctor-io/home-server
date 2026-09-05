@@ -57,8 +57,15 @@ if [ "${NEW_PASSWORD}" != "${CONFIRM_PASSWORD}" ]; then
 fi
 
 # ── Hash password and update DB using Node.js inline script ───────────────────
+# Runs from the project root so the `pg` dependency resolves, and passes the
+# credentials through the environment rather than interpolating them into the
+# script source — the heredoc is quoted so bash performs no expansion at all.
 # Uses the same scrypt parameters as lib/server/modules/auth/password.ts
-node --input-type=module <<EOF
+cd "${PROJECT_ROOT}"
+
+HOMEIO_RESET_USERNAME="${TARGET_USERNAME}" \
+HOMEIO_RESET_PASSWORD="${NEW_PASSWORD}" \
+node --input-type=module <<'NODE_SCRIPT'
 import { randomBytes, scrypt as scryptCallback } from "node:crypto";
 import { promisify } from "node:util";
 import pg from "pg";
@@ -66,31 +73,31 @@ import pg from "pg";
 const scrypt = promisify(scryptCallback);
 const SCRYPT_KEY_LENGTH = 64;
 
-const username = ${JSON.stringify(TARGET_USERNAME)};
-const plainPassword = ${JSON.stringify(NEW_PASSWORD)};
+const username = process.env.HOMEIO_RESET_USERNAME;
+const plainPassword = process.env.HOMEIO_RESET_PASSWORD;
 const databaseUrl = process.env.DATABASE_URL;
 
 const salt = randomBytes(16).toString("hex");
 const derived = await scrypt(plainPassword, salt, SCRYPT_KEY_LENGTH);
-const hash = \`\${salt}:\${derived.toString("hex")}\`;
+const hash = `${salt}:${derived.toString("hex")}`;
 
 const client = new pg.Client({ connectionString: databaseUrl });
 await client.connect();
 
 try {
   const result = await client.query(
-    "UPDATE users SET password_hash = \$1 WHERE username = \$2 RETURNING id",
-    [hash, username]
+    "UPDATE users SET password_hash = $1 WHERE username = $2 RETURNING id",
+    [hash, username],
   );
 
   if (result.rowCount === 0) {
-    console.error(\`Error: user "\${username}" not found in the database.\`);
+    console.error(`Error: user "${username}" not found in the database.`);
     process.exitCode = 1;
   } else {
-    console.log(\`Password for "\${username}" has been reset successfully.\`);
+    console.log(`Password for "${username}" has been reset successfully.`);
     console.log("You can now log in with the new password.");
   }
 } finally {
   await client.end();
 }
-EOF
+NODE_SCRIPT
