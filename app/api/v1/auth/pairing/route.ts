@@ -8,6 +8,7 @@ import {
 import {
   choosePairingOrigin,
   isPhoneReachable,
+  requestOrigin,
 } from "@/lib/server/modules/auth/pairing-origin";
 import { getLocalTailscaleStatus } from "@/lib/server/modules/integrations/tailscale-status";
 import {
@@ -26,31 +27,6 @@ export const runtime = "nodejs";
  */
 function pairingUrl(origin: string, code: string) {
   return `homeio://pair?server=${encodeURIComponent(origin)}&code=${encodeURIComponent(code)}`;
-}
-
-/**
- * The address the browser actually used, taken from the request headers.
- *
- * `new URL(request.url).origin` cannot be used here: with a custom server, Next
- * builds that from its own bind address, so it answers "http://localhost:3000"
- * whatever Host the client sent. The QR then told the phone to connect to
- * localhost — which, on a phone, is the phone.
- *
- * Host is client-controlled, but the only client here is the authenticated
- * operator asking for their own pairing code, so a forged value can misdirect
- * nobody but themselves.
- */
-function requestOrigin(request: Request) {
-  const first = (value: string | null) => value?.split(",")[0]?.trim() || null;
-
-  const host = first(request.headers.get("x-forwarded-host")) ?? first(request.headers.get("host"));
-  if (!host) return new URL(request.url).origin;
-
-  const proto =
-    first(request.headers.get("x-forwarded-proto")) ??
-    new URL(request.url).protocol.replace(":", "");
-
-  return `${proto}://${host}`;
 }
 
 export async function POST(request: Request) {
@@ -78,7 +54,7 @@ export async function POST(request: Request) {
               .then((status) => status.dnsName)
               .catch(() => null);
 
-        const { origin, reachable } = choosePairingOrigin(browserOrigin, dnsName);
+        const { origin, reachable, reason } = choosePairingOrigin(browserOrigin, dnsName);
         const url = pairingUrl(origin, code);
 
         return NextResponse.json(
@@ -89,6 +65,7 @@ export async function POST(request: Request) {
               // place a wrong address hides until someone scans it.
               origin,
               reachable,
+              reason,
               expiresAt: expiresAt.toISOString(),
               qrSvg: await qrCodeToString(url, {
                 type: "svg",

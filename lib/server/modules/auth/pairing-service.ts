@@ -13,7 +13,17 @@ import { serverEnv } from "@/lib/server/env";
  * hand that is looking at it — anything longer is only more time for the screen
  * to be photographed, shoulder-surfed, or left unattended.
  */
-export const PAIRING_CODE_TTL_MS = 60_000;
+/**
+ * Two minutes, not one.
+ *
+ * The QR is a credential while it is on screen, so this is kept short — but the
+ * real path is: open the app, tap Scan, grant the camera permission the first
+ * time, aim, wait for a reachability probe, then load the claim page. A minute
+ * ran out during the permission prompt, and a first pairing that fails for no
+ * visible reason is the worst possible introduction. Against someone in the room
+ * photographing the screen, sixty more seconds change nothing.
+ */
+export const PAIRING_CODE_TTL_MS = 120_000;
 
 export class PairingError extends Error {
   constructor(

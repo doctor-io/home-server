@@ -14,6 +14,7 @@ type Pairing = {
   origin: string;
   /** False when the server knows that address cannot work from a phone. */
   reachable: boolean;
+  reason?: "loopback" | "mdns";
 };
 
 /**
@@ -125,9 +126,9 @@ export function PairPhoneCard({ isDemoMode }: { isDemoMode?: boolean }) {
               {!pairing.reachable && (
                 <p className="flex items-start gap-1.5 text-2xs text-status-amber" role="alert">
                   <AlertTriangle className="mt-px size-3.5 shrink-0" />
-                  That address only means anything on this machine — a phone scanning it
-                  would look for Homeio on itself. Open Homeio from another device, or
-                  connect this server to Tailscale, then show the QR again.
+                  {pairing.reason === "mdns"
+                    ? "That is an mDNS name. It resolves here and often not on Android, so the phone would find nothing. Open Homeio at its IP or tailnet address, or connect this server to Tailscale, then show the QR again."
+                    : "That address only means anything on this machine — a phone scanning it would look for Homeio on itself. Open Homeio from another device, or connect this server to Tailscale, then show the QR again."}
                 </p>
               )}
 
