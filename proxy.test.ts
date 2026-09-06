@@ -213,3 +213,48 @@ describe("middleware auth guard", () => {
     expect(response.status).toBe(200);
   });
 });
+
+describe("shared caching", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    resetAuthStatusCacheForTests();
+    process.env.AUTH_SESSION_SECRET = "test-session-secret-123456";
+  });
+
+  function answerHasUsers() {
+    vi.spyOn(global, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ data: { hasUsers: true } }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+  }
+
+  it("forbids a proxy from storing a page", async () => {
+    // A CDN told to cache everything served a six-day-old shell to every
+    // visitor, referencing script hashes the next update had replaced. Homeio
+    // ships an updater, so it cannot leave this to a proxy's defaults.
+    answerHasUsers();
+
+    const response = await proxy(new NextRequest("http://localhost/"));
+
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+  });
+
+  it("forbids it on the login page and on the pairing landing too", async () => {
+    answerHasUsers();
+
+    for (const path of ["/login", "/pair?code=abc"]) {
+      const response = await proxy(new NextRequest(`http://localhost${path}`));
+      expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+    }
+  });
+
+  it("leaves static files cacheable, which is what a CDN is for", async () => {
+    // They carry no session and change name when they change content.
+    for (const path of ["/images/wallpaper.jpg", "/icon.svg", "/_next/chunk.js"]) {
+      const response = await proxy(new NextRequest(`http://localhost${path}`));
+      expect(response.headers.get("Cache-Control")).not.toBe("private, no-store");
+    }
+  });
+});

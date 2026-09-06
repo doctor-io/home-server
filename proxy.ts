@@ -156,7 +156,36 @@ function clearSessionCookie(response: NextResponse) {
   return response;
 }
 
+/**
+ * Nothing this middleware touches may sit in a shared cache.
+ *
+ * Homeio is commonly published through a tunnel or a CDN — the docs recommend
+ * exactly that — and one of those, configured to "cache everything", served a
+ * six-day-old copy of the desktop shell to every visitor: the origin answered
+ * `307 -> /login`, the edge answered a stale 200 whose script and stylesheet
+ * hashes had been replaced by the next update, so eleven of its fourteen assets
+ * 404'd and the page sat unstyled on "Loading session…" forever.
+ *
+ * An app that ships an updater cannot leave that to a proxy's defaults: every
+ * release changes those hashes. Immutable assets are not affected — `_next/
+ * static` never reaches this middleware, by the matcher below — so they keep
+ * the long-lived caching that makes them worth caching.
+ */
+function withoutSharedCaching(response: NextResponse) {
+  response.headers.set("Cache-Control", "private, no-store");
+  return response;
+}
+
 export async function proxy(request: NextRequest) {
+  const response = await route(request);
+
+  // Static files are the exception, and the only one: they carry no session,
+  // they change name when they change content, and caching them is the whole
+  // point of putting a CDN in front of anything.
+  return isStaticRoute(request.nextUrl.pathname) ? response : withoutSharedCaching(response);
+}
+
+async function route(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
   if (isStaticRoute(pathname)) {
