@@ -6,6 +6,11 @@ import {
   purgeStalePairingCodes,
 } from "@/lib/server/modules/auth/pairing-service";
 import {
+  choosePairingOrigin,
+  isPhoneReachable,
+} from "@/lib/server/modules/auth/pairing-origin";
+import { getLocalTailscaleStatus } from "@/lib/server/modules/integrations/tailscale-status";
+import {
   createRequestId,
   logServerAction,
   withServerTiming,
@@ -63,14 +68,27 @@ export async function POST(request: Request) {
 
         // Whatever reaches this browser reaches the phone on the same network,
         // and guessing a public hostname from the server side gets it wrong
-        // behind a tunnel.
-        const origin = requestOrigin(request);
+        // behind a tunnel — with one exception: a browser on the machine itself
+        // reports localhost, which on a phone is the phone. Only then is the
+        // tailnet name worth the cost of asking for it.
+        const browserOrigin = requestOrigin(request);
+        const dnsName = isPhoneReachable(browserOrigin)
+          ? null
+          : await getLocalTailscaleStatus()
+              .then((status) => status.dnsName)
+              .catch(() => null);
+
+        const { origin, reachable } = choosePairingOrigin(browserOrigin, dnsName);
         const url = pairingUrl(origin, code);
 
         return NextResponse.json(
           {
             data: {
               url,
+              // The card shows this, because a QR nobody can read is the one
+              // place a wrong address hides until someone scans it.
+              origin,
+              reachable,
               expiresAt: expiresAt.toISOString(),
               qrSvg: await qrCodeToString(url, {
                 type: "svg",

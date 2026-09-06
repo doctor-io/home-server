@@ -2,11 +2,18 @@ import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as PairingServiceModule from "@/lib/server/modules/auth/pairing-service";
 
-const { mockRequireApiSession, mockCreate, mockClaim, mockPurge } = vi.hoisted(() => ({
-  mockRequireApiSession: vi.fn(),
-  mockCreate: vi.fn(),
-  mockClaim: vi.fn(),
-  mockPurge: vi.fn(),
+const { mockRequireApiSession, mockCreate, mockClaim, mockPurge, mockTailscale } = vi.hoisted(
+  () => ({
+    mockRequireApiSession: vi.fn(),
+    mockCreate: vi.fn(),
+    mockClaim: vi.fn(),
+    mockPurge: vi.fn(),
+    mockTailscale: vi.fn(),
+  }),
+);
+
+vi.mock("@/lib/server/modules/integrations/tailscale-status", () => ({
+  getLocalTailscaleStatus: mockTailscale,
 }));
 
 vi.mock("@/lib/server/modules/auth/api", async () => {
@@ -68,6 +75,7 @@ beforeEach(() => {
     expiresAt: new Date(Date.now() + 60_000),
   });
   mockPurge.mockResolvedValue(undefined);
+  mockTailscale.mockResolvedValue({ dnsName: "homeio.tail1234.ts.net." });
 });
 
 describe("POST /api/v1/auth/pairing", () => {
@@ -194,5 +202,51 @@ describe("POST /api/v1/auth/pairing/claim", () => {
     // Six attempts reached the service, the seventh did not: a rate limit that
     // still runs the work it is limiting protects nothing.
     expect(mockClaim).toHaveBeenCalledTimes(5);
+  });
+});
+
+describe("the address the QR carries", () => {
+  function mintFrom(host: string) {
+    return mint(
+      new NextRequest("http://localhost:3000/api/v1/auth/pairing", {
+        method: "POST",
+        headers: { cookie: "homeio_session=t", host },
+      }),
+    );
+  }
+
+  it("uses the address the browser used", async () => {
+    const body = await (await mintFrom("homeio.example.com")).json();
+
+    expect(body.data.origin).toBe("http://homeio.example.com");
+    expect(body.data.reachable).toBe(true);
+    expect(body.data.url).toContain(encodeURIComponent("http://homeio.example.com"));
+    // No reason to shell out to tailscale for an address that already works.
+    expect(mockTailscale).not.toHaveBeenCalled();
+  });
+
+  it("swaps localhost for the tailnet name, because a phone's localhost is the phone", async () => {
+    const body = await (await mintFrom("localhost:3000")).json();
+
+    expect(body.data.origin).toBe("http://homeio.tail1234.ts.net");
+    expect(body.data.reachable).toBe(true);
+  });
+
+  it("issues the code anyway when there is no better address, and says it will not work", async () => {
+    mockTailscale.mockResolvedValue({ dnsName: null });
+
+    const body = await (await mintFrom("localhost:3000")).json();
+
+    expect(body.data.reachable).toBe(false);
+    expect(body.data.qrSvg).toContain("<svg");
+  });
+
+  it("survives a tailscale binary that is not there", async () => {
+    mockTailscale.mockRejectedValue(new Error("tailscale: command not found"));
+
+    const response = await mintFrom("localhost:3000");
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).data.reachable).toBe(false);
   });
 });

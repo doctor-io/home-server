@@ -10,6 +10,10 @@ type Pairing = {
   url: string;
   qrSvg: string;
   expiresAt: string;
+  /** The address encoded in the QR, which is not always the one in the URL bar. */
+  origin: string;
+  /** False when the server knows that address cannot work from a phone. */
+  reachable: boolean;
 };
 
 /**
@@ -110,6 +114,22 @@ export function PairPhoneCard({ isDemoMode }: { isDemoMode?: boolean }) {
                 It carries this server&apos;s address and a one-time code. The phone is
                 signed in as you — treat the screen like a password while it is up.
               </p>
+
+              {/* Shown always, not only when it is wrong: the address is the one
+                  thing in this card that can be silently useless, and it costs a
+                  line to make it checkable before anyone points a camera at it. */}
+              <p className="break-all text-2xs text-muted-foreground/70">
+                Points at <span className="text-foreground">{pairing.origin}</span>
+              </p>
+
+              {!pairing.reachable && (
+                <p className="flex items-start gap-1.5 text-2xs text-status-amber" role="alert">
+                  <AlertTriangle className="mt-px size-3.5 shrink-0" />
+                  That address only means anything on this machine — a phone scanning it
+                  would look for Homeio on itself. Open Homeio from another device, or
+                  connect this server to Tailscale, then show the QR again.
+                </p>
+              )}
 
               <p
                 className={cn(
