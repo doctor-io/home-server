@@ -83,6 +83,14 @@ launcher's listeners die the moment the WebView navigates onto a server.
 - **Phone-UI fallback** — see contract point 4. The launcher cannot detect a
   missing `/m` itself, because its probe is cross-origin and a `no-cors`
   response is opaque.
+- **In-app navigation** — `allowNavigation` is baked in at build time, so a
+  server on an mDNS name, a LAN address or the owner's own domain was handed to
+  the external browser. `MainActivity` overrides `shouldOverrideUrlLoading` and
+  keeps navigation in-app for any origin in the **saved server list**, which is
+  the allowlist this document always described. It matters most on a pairing
+  scan: the code is single use, so leaving for Chrome spent it there and put the
+  session in the wrong browser. Anything that is not a saved server still opens
+  externally.
 - **Settings bridge** — see contract point 2.
 - **Push, ping mode** — by default the push carries no alert text at all: the
   relay is told that something happened, at what severity, and nothing else.
